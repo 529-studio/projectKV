@@ -13,7 +13,7 @@
 
 # 🇻🇳 Tiếng Việt
 
-> **Ứng dụng tra cứu và theo dõi camera giao thông Thành phố Hồ Chí Minh theo thời gian thực với độ trễ thấp, giao diện tối giản trực quan, hỗ trợ bộ lọc phân cấp liên hoàn, dock ghim theo dõi nhiều camera đồng thời cùng các tính năng phân tích tích hợp thêm.**
+> **Ứng dụng tra cứu và theo dõi camera giao thông Thành phố Hồ Chí Minh với độ trễ thấp tối ưu, giao diện tối giản trực quan, hỗ trợ bộ lọc phân cấp liên hoàn, dock ghim theo dõi nhiều camera đồng thời cùng các tính năng phân tích tích hợp thêm.**
 
 Hệ thống được tổ chức theo cấu trúc **Monorepo tinh gọn**, phân tách độc lập giữa ứng dụng Web Client (`apps/web`) và dịch vụ Backend Node.js (`services/node-server`), sẵn sàng mở rộng các dịch vụ phân tích hình ảnh (Computer Vision) trong tương lai.
 
@@ -97,7 +97,7 @@ Chi tiết thiết kế kiến trúc và giải pháp kỹ thuật đã được
 
 # 🇬🇧 English
 
-> **Real-time Ho Chi Minh City traffic camera viewer and explorer with ultra-low latency, clean monochromatic high-contrast UI, chained hierarchical filtering, multi-camera pin dock, and extensible modular architecture.**
+> **Ho Chi Minh City traffic camera viewer and explorer optimized for low latency, clean monochromatic high-contrast UI, chained hierarchical filtering, multi-camera pin dock, and extensible modular architecture.**
 
 The system is organized as a **clean monorepo**, strictly decoupling the Web Client (`apps/web`) from the Node.js Backend service (`services/node-server`), ready for future computer vision and analytics extensions.
 

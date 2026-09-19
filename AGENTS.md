@@ -37,7 +37,7 @@ Tài liệu này định nghĩa các nguyên tắc cốt lõi, tiêu chuẩn thi
     *   Camera đang được chọn/theo dõi: Hiển thị dạng Dot to hơn (đường kính 20px, viền đậm, bring to front trên các layer khác, số thứ tự `#1`, `#2` nằm gọn trong hình tròn), tuyệt đối không dùng hộp text dài che lấp bản đồ.
 *   **Không Vẽ Tuyến Cố Định / Tuyến Mặc Định (No Default Routes)**:
     *   Không ép buộc vẽ bất kỳ tuyến đường mặc định nào khi mở app.
-    *   Ứng dụng tập trung 100% vào việc tra cứu và kiểm tra camera tự do theo thời gian thực (Free Camera Explorer) tại các nút thắt then chốt để nắm thực tế hiện trường đường sá trước khi di chuyển.
+    *   Ứng dụng tập trung 100% vào việc tra cứu và kiểm tra camera tự do với độ trễ tối ưu (Free Camera Explorer) tại các nút thắt then chốt để nắm thực tế hiện trường đường sá trước khi di chuyển.
 
 ---
 
