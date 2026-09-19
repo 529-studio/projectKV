@@ -1,0 +1,34 @@
+name: CI - Code Verification
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify JavaScript Syntax
+        run: |
+          node --check services/node-server/server.js
+          node --check apps/web/app.js
+          node --check tools/crawler/get_all_cameras.js
+
+      - name: Verify Camera Dataset Integrity
+        run: |
+          node -e "
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('cameras_all.json', 'utf8'));
+            console.log('Tổng số camera hợp lệ:', data.length);
+            if (!Array.isArray(data) || data.length === 0) process.exit(1);
+          "

@@ -1,0 +1,27 @@
+#!/bin/sh
+# ==============================================================================
+# Git Pre-Push Hook: Chặn tuyệt đối hành vi push trực tiếp lên main và dev
+# ==============================================================================
+
+protected_branches="main dev"
+
+while read local_ref local_sha remote_ref remote_sha
+do
+  for branch in $protected_branches; do
+    if [ "$remote_ref" = "refs/heads/$branch" ]; then
+      echo ""
+      echo "=================================================================="
+      echo " 🛑 [CHẶN PUSH TRỰC TIẾP] Không được phép push trực tiếp lên '$branch'!"
+      echo "=================================================================="
+      echo " 👉 Quy trình phát triển an toàn:"
+      echo "    1. Tạo nhánh tính năng mới: git checkout -b feat/<ten-tinh-nang>"
+      echo "    2. Push nhánh tính năng:   git push origin feat/<ten-tinh-nang>"
+      echo "    3. Mở Pull Request (PR) trên GitHub để review và gộp vào '$branch'."
+      echo "=================================================================="
+      echo ""
+      exit 1
+    fi
+  done
+done
+
+exit 0
