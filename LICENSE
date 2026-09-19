@@ -1,21 +1,21 @@
 PROPRIETARY AND SOURCE-AVAILABLE (FOR REFERENCE ONLY) LICENSE
 
-BẢN QUYỀN THUỘC VỀ DỰ ÁN CAMERA VIEW
-Copyright (c) 2026 Camera View. Tất cả các quyền được bảo lưu (All Rights Reserved).
+CAMERA VIEW PROJECT
+Copyright (c) 2026 Camera View. All Rights Reserved.
 
-QUY ĐỊNH VÀ ĐIỀU KHOẢN SỬ DỤNG:
+TERMS AND CONDITIONS OF USE:
 
-1. PHẠM VI ÁP DỤNG & TÍNH CHẤT:
-   Phần mềm và toàn bộ mã nguồn này KHÔNG PHẢI LÀ MÃ NGUỒN MỞ (NOT AN OPEN-SOURCE SOFTWARE).
-   Mã nguồn được cung cấp chỉ dành riêng cho mục đích THAM KHẢO, NGHIÊN CỨU NỘI BỘ VÀ ĐÁNH GIÁ KỸ THUẬT (REFERENCE & EVALUATION ONLY).
+1. SCOPE AND NATURE:
+   This software and its entire source code is NOT OPEN-SOURCE SOFTWARE.
+   The source code is made available strictly for INTERNAL REFERENCE, EDUCATIONAL PURPOSES, AND TECHNICAL EVALUATION ONLY.
 
-2. CÁC HÀNH VI BỊ NGHIÊM CẤM (STRICT PROHIBITIONS):
-   Nghiêm cấm tuyệt đối bất kỳ cá nhân, tổ chức nào thực hiện các hành vi sau khi chưa có sự đồng ý bằng văn bản của tác giả:
-   - Sử dụng phần mềm hoặc bất kỳ phần nào của mã nguồn cho mục đích thương mại, kinh doanh hoặc dịch vụ thu phí.
-   - Tái phân phối (redistribution), sao chép (copying), cấp phép lại (sublicensing), bán lại (reselling) dưới mọi hình thức.
-   - Đóng gói, sửa đổi và phát hành lại dưới dạng sản phẩm phái sinh (derivative works) công khai hoặc nội bộ nhằm mục đích cạnh tranh.
-   - Thu thập, cào dữ liệu (scraping), trích xuất trái phép tài nguyên hệ thống hoặc lưu trữ sao chép dữ liệu camera cho các dịch vụ bên thứ ba.
+2. STRICT PROHIBITIONS:
+   No individual or entity may perform any of the following actions without prior express written consent from the copyright owner:
+   - Use the software or any portion of the source code for commercial, business, or fee-charging services.
+   - Redistribute, copy, sublicense, lease, or resell the software or source code in any form.
+   - Package, modify, or publish derivative works publicly or privately for competitive or commercial purposes.
+   - Scrape, harvest, or extract system resources or mirror camera feeds for third-party platforms or services.
 
-3. TỪ CHỐI BẢO ĐẢM (NO WARRANTY):
-   PHẦN MỀM ĐƯỢC CUNG CẤP NGUYÊN TRẠNG "AS IS", KHÔNG KÈM THEO BẤT KỲ BẢO ĐẢM NÀO DÙ RÕ RÀNG HAY NGỤ Ý, BAO GỒM NHƯNG KHÔNG GIỚI HẠN Ở CÁC BẢO ĐẢM VỀ KHẢ NĂNG THƯƠNG MẠI, TÍNH PHÙ HỢP CHO MỘT MỤC ĐÍCH CỤ THỂ HOẶC TÍNH KHÔNG XÂM PHẠM QUYỀN SỞ HỮU TRÍ TUỆ.
-   TÁC GIẢ HOẶC CHỦ SỞ HỮU BẢN QUYỀN TRONG MỌI TRƯỜNG HỢP SẼ KHÔNG CHỊU TRÁCH NHIỆM CHO BẤT KỲ KHIẾU NẠI, THIỆT HẠI HOẶC TRÁCH NHIỆM PHÁP LÝ NÀO PHÁT SINH TỪ VIỆC SỬ DỤNG PHẦN MỀM NÀY.
+3. DISCLAIMER OF WARRANTY:
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

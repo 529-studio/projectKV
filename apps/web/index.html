@@ -49,13 +49,21 @@
           <h1 class="text-xs sm:text-sm font-bold font-mono tracking-wider text-white whitespace-nowrap">
             CAMERA VIEW
           </h1>
-          <span class="text-[9px] font-mono text-zinc-400 hidden md:inline">CAMERA GIAO THÔNG TP. HỒ CHÍ MINH</span>
+          <span id="brand-subtitle" class="text-[9px] font-mono text-zinc-400 hidden md:inline">CAMERA GIAO THÔNG TP. HỒ CHÍ MINH</span>
         </div>
 
         <!-- TOGGLE SIDEBAR BUTTON -->
         <button id="btn-toggle-sidebar" class="action-btn text-[10px] sm:text-[10.5px] font-mono px-2 sm:px-2.5 py-1 bg-zinc-900 border border-zinc-700 hover:border-white text-zinc-200 hover:text-white rounded-sm transition cursor-pointer shrink-0" title="Bật/Tắt danh mục và bộ lọc camera">
-          <span class="sm:hidden">[DANH MỤC]</span>
-          <span class="hidden sm:inline">[DANH MỤC & BỘ LỌC]</span>
+          <span id="btn-toggle-sidebar-mobile" class="sm:hidden">[DANH MỤC]</span>
+          <span id="btn-toggle-sidebar-desktop" class="hidden sm:inline">[DANH MỤC & BỘ LỌC]</span>
+        </button>
+      </div>
+
+      <!-- LANGUAGE TOGGLE & ACTION CONTROLS -->
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="btn-toggle-lang" class="action-btn text-[10.5px] font-mono px-2 sm:px-2.5 py-1 bg-zinc-900 border border-zinc-700 hover:border-white text-zinc-200 hover:text-white rounded-sm transition cursor-pointer shrink-0 flex items-center gap-1.5" title="Chuyển đổi ngôn ngữ / Switch language">
+          <span class="text-[10px] text-zinc-400">🌐</span>
+          <span id="lang-indicator" class="font-bold text-white tracking-wider">[VI]</span>
         </button>
       </div>
     </header>
@@ -73,7 +81,7 @@
         <div class="sidebar-panel-header border-b border-zinc-800 bg-zinc-950 p-3 shrink-0">
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
-              <span class="text-xs font-bold font-mono tracking-wide text-white">DANH MỤC CAMERA</span>
+              <span id="sidebar-title" class="text-xs font-bold font-mono tracking-wide text-white">DANH MỤC CAMERA</span>
               <span class="cam-total-badge text-[10px] px-1.5 py-0.5 font-mono bg-zinc-900 border border-zinc-700 text-zinc-300 rounded" id="sidebar-total-cams">[837]</span>
             </div>
             <button id="btn-close-sidebar" class="close-sidebar-btn text-zinc-400 hover:text-white font-mono text-xs px-2 py-0.5 border border-zinc-800 hover:border-zinc-600 rounded cursor-pointer" title="Đóng danh mục">[ĐÓNG X]</button>
@@ -93,7 +101,7 @@
         <div class="sidebar-panel-filter border-b border-zinc-800 bg-zinc-950/60 p-3 shrink-0">
           <div class="filter-card bg-zinc-900 border border-zinc-700/80 rounded-md p-3 shadow-sm">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-[10px] font-bold font-mono text-zinc-300 uppercase tracking-wider">BỘ LỌC ĐIỀU KIỆN (DEEP FILTER)</span>
+              <span id="filter-title" class="text-[10px] font-bold font-mono text-zinc-300 uppercase tracking-wider">BỘ LỌC ĐIỀU KIỆN (DEEP FILTER)</span>
               <button id="btn-clear-all-filters" class="clear-filters-btn hidden text-[10px] font-mono text-red-400 hover:text-red-300 font-bold cursor-pointer" title="Xóa toàn bộ điều kiện lọc">[XÓA HẾT LỌC]</button>
             </div>
             <div id="filter-rows-container" class="filter-rows-container flex flex-col gap-2">
@@ -109,8 +117,8 @@
         <!-- PANEL 3: FILTERED RESULTS & CAMERA LIST -->
         <div class="sidebar-panel-list flex-1 flex flex-col min-h-0 bg-zinc-950">
           <div class="results-header px-3 py-2 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between shrink-0">
-            <span class="text-[10px] font-mono font-bold text-zinc-300 tracking-wide">DANH SÁCH CAMERA PHÙ HỢP</span>
-            <span class="text-[9px] font-mono text-zinc-500">[Cuộn xem chi tiết]</span>
+            <span id="results-title" class="text-[10px] font-mono font-bold text-zinc-300 tracking-wide">DANH SÁCH CAMERA PHÙ HỢP</span>
+            <span id="results-scroll-hint" class="text-[9px] font-mono text-zinc-500">[Cuộn xem chi tiết]</span>
           </div>
           <div class="sidebar-cam-list flex-1 overflow-y-auto p-2 space-y-2" id="sidebar-cam-list">
             <!-- Camera list items container -->
@@ -126,24 +134,24 @@
         <!-- MAP LEGEND -->
         <div id="map-legend" class="map-legend absolute top-3 right-3 z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md p-3 font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[210px]">
           <div class="flex items-center justify-between border-b border-zinc-800 pb-1.5 mb-2">
-            <span class="font-bold text-white tracking-wider text-xs uppercase">CHÚ GIẢI BẢN ĐỒ</span>
+            <span id="legend-title" class="font-bold text-white tracking-wider text-xs uppercase">CHÚ GIẢI BẢN ĐỒ</span>
             <button id="btn-toggle-legend" class="text-[10px] text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-600 px-1.5 py-0.5 rounded cursor-pointer" title="Thu gọn / Mở rộng chú giải">[−]</button>
           </div>
           <div id="legend-body" class="legend-content flex flex-col gap-2.5 text-zinc-200 text-xs">
             <div class="legend-row flex items-center gap-2.5">
               <span class="legend-symbol symbol-selected-dot shrink-0">#1</span>
-              <span class="font-semibold text-white">Camera chọn (Đưa lên trên)</span>
+              <span id="legend-label-selected" class="font-semibold text-white">Camera chọn (Đưa lên trên)</span>
             </div>
             <div class="legend-row flex items-center gap-2.5">
               <span class="legend-symbol symbol-dot shrink-0"></span>
-              <span class="text-zinc-200">Camera hoạt động bình thường</span>
+              <span id="legend-label-online" class="text-zinc-200">Camera hoạt động bình thường</span>
             </div>
             <div class="legend-row flex items-center gap-2.5">
               <span class="legend-symbol symbol-dot-offline shrink-0"></span>
-              <span class="text-zinc-400">Camera mất tín hiệu / bảo trì</span>
+              <span id="legend-label-offline" class="text-zinc-400">Camera mất tín hiệu / bảo trì</span>
             </div>
             <div class="pt-1.5 border-t border-zinc-800/80 flex items-center justify-between text-[10.5px] text-zinc-400">
-              <span>Độ phóng to (Zoom):</span>
+              <span id="legend-label-zoom">Độ phóng to (Zoom):</span>
               <span id="legend-zoom-indicator" class="font-bold text-white bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 rounded">11x (3px)</span>
             </div>
           </div>
@@ -153,12 +161,12 @@
         <div id="route-cameras-drawer" class="route-drawer collapsed">
           <div class="drawer-header flex items-center justify-between px-2 sm:px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 font-mono text-xs select-none h-[38px]">
             <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              <span class="font-bold text-white text-[10px] sm:text-[11px] tracking-wide">DOCK THEO DÕI</span>
+              <span id="dock-title" class="font-bold text-white text-[10px] sm:text-[11px] tracking-wide">DOCK THEO DÕI</span>
               <span class="badge bg-zinc-950 border border-zinc-700 text-zinc-200 text-[9px] sm:text-[9.5px] px-1.5 py-0.5 rounded" id="pinned-camera-count">[0 CAM]</span>
             </div>
             <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <button id="btn-clear-pinned" class="toggle-drawer-btn text-[9px] sm:text-[10px] font-mono px-1.5 sm:px-2 py-0.5 bg-zinc-950 border border-zinc-700 hover:border-zinc-400 text-zinc-300 hover:text-white rounded cursor-pointer shrink-0" title="Xóa toàn bộ danh sách theo dõi">[XÓA HẾT]</button>
-              <span class="refresh-indicator text-[9.5px] sm:text-[10px] text-zinc-400 hidden sm:inline shrink-0" id="refresh-indicator">LÀM MỚI: <b id="countdown-timer" class="text-white">10s</b></span>
+              <span class="refresh-indicator text-[9.5px] sm:text-[10px] text-zinc-400 hidden sm:inline shrink-0" id="refresh-indicator"><span id="refresh-indicator-label">LÀM MỚI: </span><b id="countdown-timer" class="text-white">10s</b></span>
               <button id="btn-toggle-drawer" class="toggle-drawer-btn text-[9px] sm:text-[10px] font-mono font-bold px-2 sm:px-2.5 py-0.5 bg-zinc-950 border border-zinc-700 hover:border-white text-white rounded cursor-pointer transition shrink-0" title="Thu gọn / Mở rộng Dock">[▲ MỞ DOCK]</button>
             </div>
           </div>

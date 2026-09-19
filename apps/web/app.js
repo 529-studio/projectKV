@@ -14,6 +14,258 @@ let autoRefreshInterval = null;
 let refreshCountdown = 10;
 let currentModalCamera = null;
 
+// =======================================================
+// INTERNATIONALIZATION (i18n) DICTIONARY & HELPERS
+// =======================================================
+let currentLang = localStorage.getItem('camera_view_lang') || 'vi';
+
+const TRANSLATIONS = {
+  vi: {
+    page_title: 'Camera View - Xem Camera Giao Thông TP. Hồ Chí Minh',
+    brand_subtitle: 'CAMERA GIAO THÔNG TP. HỒ CHÍ MINH',
+    btn_toggle_sidebar_mobile: '[DANH MỤC]',
+    btn_toggle_sidebar_desktop: '[DANH MỤC & BỘ LỌC]',
+    btn_toggle_sidebar_title: 'Bật/Tắt danh mục và bộ lọc camera',
+    btn_toggle_lang_title: 'Chuyển đổi ngôn ngữ / Switch language',
+    sidebar_title: 'DANH MỤC CAMERA',
+    btn_close_sidebar: '[ĐÓNG X]',
+    btn_close_sidebar_title: 'Đóng danh mục',
+    search_placeholder: '[Tìm nhanh tên đường, ngã tư, mã camera...]',
+    filter_title: 'BỘ LỌC ĐIỀU KIỆN (DEEP FILTER)',
+    btn_clear_all_filters: '[XÓA HẾT LỌC]',
+    btn_clear_all_filters_title: 'Xóa toàn bộ điều kiện lọc',
+    btn_add_filter: '[+ THÊM ĐIỀU KIỆN LỌC]',
+    btn_add_filter_title: 'Thêm một tầng điều kiện lọc mới',
+    filter_match_badge: '[{count} CAMERA]',
+    results_title: 'DANH SÁCH CAMERA PHÙ HỢP',
+    results_scroll_hint: '[Cuộn xem chi tiết]',
+    results_empty: '[Không tìm thấy camera phù hợp điều kiện lọc]',
+    prop_zone: 'Khu vực',
+    prop_road: 'Tuyến đường',
+    prop_node: 'Giao lộ cắt',
+    prop_status: 'Trạng thái',
+    no_items_available: '[Không có mục khả dụng]',
+    filter_remove_title: 'Xóa điều kiện này',
+    status_online: '[HOẠT ĐỘNG]',
+    status_offline: '[MẤT TÍN HIỆU]',
+    coords_label: 'Tọa độ: {coords}',
+    no_coords: 'Chưa có GPS',
+    legend_title: 'CHÚ GIẢI BẢN ĐỒ',
+    btn_toggle_legend_title: 'Thu gọn / Mở rộng chú giải',
+    legend_selected: 'Camera chọn (Đưa lên trên)',
+    legend_online: 'Camera hoạt động bình thường',
+    legend_offline: 'Camera mất tín hiệu / bảo trì',
+    legend_zoom: 'Độ phóng to (Zoom):',
+    dock_title: 'DOCK THEO DÕI',
+    pinned_count_badge: '[{count} CAM]',
+    btn_clear_pinned: '[XÓA HẾT]',
+    btn_clear_pinned_title: 'Xóa toàn bộ danh sách theo dõi',
+    refresh_label: 'LÀM MỚI: ',
+    btn_toggle_drawer_open: '[▲ MỞ DOCK]',
+    btn_toggle_drawer_close: '[▼ THU GỌN]',
+    btn_toggle_drawer_title: 'Thu gọn / Mở rộng Dock',
+    dock_empty_message: '[Chưa có camera nào trong danh sách theo dõi. Bấm vào camera bất kỳ trên bản đồ hoặc danh sách để theo dõi hình ảnh trực tiếp liên tục tại đây]',
+    card_unpin_title: 'Bỏ theo dõi camera này',
+    modal_default_title: 'TÊN NÚT GIAO',
+    modal_coords: 'TỌA ĐỘ: {coords} | ID: {id}',
+    modal_alt_img: 'Ảnh trực tiếp từ camera',
+    btn_pin_add: '[+ GHIM THEO DÕI]',
+    btn_pin_add_title: 'Thêm camera này vào Dock theo dõi dưới đáy bản đồ',
+    btn_pin_active: '[✓ ĐÃ GHIM THEO DÕI]',
+    btn_pin_active_title: 'Camera này đang được theo dõi trong Dock. Bấm để bỏ ghim.',
+    toast_cleared_all: '[OK] Đã xóa toàn bộ danh sách theo dõi.',
+    toast_unpinned: '[OK] Đã bỏ ghim "{name}".',
+    toast_pinned: '[OK] Đã ghim "{name}" vào danh sách theo dõi.',
+    tooltip_click_view: '[Bấm xem ảnh & theo dõi]',
+    tooltip_live_view: '[Bấm xem ảnh trực tiếp]'
+  },
+  en: {
+    page_title: 'Camera View - HCMC Traffic Cameras Explorer',
+    brand_subtitle: 'HCMC TRAFFIC CAMERAS',
+    btn_toggle_sidebar_mobile: '[DIRECTORY]',
+    btn_toggle_sidebar_desktop: '[CATALOG & FILTERS]',
+    btn_toggle_sidebar_title: 'Toggle camera catalog and filters',
+    btn_toggle_lang_title: 'Switch language / Chuyển đổi ngôn ngữ',
+    sidebar_title: 'CAMERA DIRECTORY',
+    btn_close_sidebar: '[CLOSE X]',
+    btn_close_sidebar_title: 'Close directory',
+    search_placeholder: '[Search street name, intersection, camera ID...]',
+    filter_title: 'CHAINED DEEP FILTER',
+    btn_clear_all_filters: '[CLEAR ALL FILTERS]',
+    btn_clear_all_filters_title: 'Clear all filter conditions',
+    btn_add_filter: '[+ ADD FILTER CONDITION]',
+    btn_add_filter_title: 'Add a new filter condition tier',
+    filter_match_badge: '[{count} CAMERAS]',
+    results_title: 'MATCHED CAMERAS',
+    results_scroll_hint: '[Scroll to view]',
+    results_empty: '[No cameras match the filter conditions]',
+    prop_zone: 'Zone',
+    prop_road: 'Corridor',
+    prop_node: 'Intersection',
+    prop_status: 'Status',
+    no_items_available: '[No items available]',
+    filter_remove_title: 'Remove this condition',
+    status_online: '[ONLINE]',
+    status_offline: '[OFFLINE]',
+    coords_label: 'Coords: {coords}',
+    no_coords: 'No GPS data',
+    legend_title: 'MAP LEGEND',
+    btn_toggle_legend_title: 'Collapse / Expand legend',
+    legend_selected: 'Selected Camera (Top layer)',
+    legend_online: 'Active Online Camera',
+    legend_offline: 'Offline / Maintenance Camera',
+    legend_zoom: 'Zoom Level:',
+    dock_title: 'PINNED DOCK',
+    pinned_count_badge: '[{count} CAMS]',
+    btn_clear_pinned: '[CLEAR ALL]',
+    btn_clear_pinned_title: 'Clear all pinned cameras',
+    refresh_label: 'REFRESH: ',
+    btn_toggle_drawer_open: '[▲ OPEN DOCK]',
+    btn_toggle_drawer_close: '[▼ COLLAPSE]',
+    btn_toggle_drawer_title: 'Collapse / Expand Dock',
+    dock_empty_message: '[No cameras in monitoring dock. Click any camera on the map or catalog to monitor live snapshots continuously here]',
+    card_unpin_title: 'Unpin this camera',
+    modal_default_title: 'JUNCTION NAME',
+    modal_coords: 'COORDINATES: {coords} | ID: {id}',
+    modal_alt_img: 'Live camera snapshot',
+    btn_pin_add: '[+ PIN TO DOCK]',
+    btn_pin_add_title: 'Pin this camera to bottom monitoring dock',
+    btn_pin_active: '[✓ PINNED TO DOCK]',
+    btn_pin_active_title: 'Currently pinned in dock. Click to unpin.',
+    toast_cleared_all: '[OK] Cleared all pinned cameras.',
+    toast_unpinned: '[OK] Unpinned "{name}".',
+    toast_pinned: '[OK] Pinned "{name}" to monitoring dock.',
+    tooltip_click_view: '[Click to view snapshot & monitor]',
+    tooltip_live_view: '[Click to view live snapshot]'
+  }
+};
+
+function t(key, params = {}) {
+  let str = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key]) || (TRANSLATIONS.vi[key] || key);
+  Object.keys(params).forEach(k => {
+    str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), params[k]);
+  });
+  return str;
+}
+
+function setLanguage(lang) {
+  if (lang !== 'vi' && lang !== 'en') return;
+  currentLang = lang;
+  localStorage.setItem('camera_view_lang', lang);
+  applyLanguage(lang);
+}
+
+function applyLanguage(lang) {
+  document.documentElement.lang = lang;
+  document.title = t('page_title');
+
+  // Top header elements
+  const brandSubtitle = document.getElementById('brand-subtitle');
+  if (brandSubtitle) brandSubtitle.textContent = t('brand_subtitle');
+
+  const sidebarBtnMobile = document.getElementById('btn-toggle-sidebar-mobile');
+  if (sidebarBtnMobile) sidebarBtnMobile.textContent = t('btn_toggle_sidebar_mobile');
+
+  const sidebarBtnDesktop = document.getElementById('btn-toggle-sidebar-desktop');
+  if (sidebarBtnDesktop) sidebarBtnDesktop.textContent = t('btn_toggle_sidebar_desktop');
+
+  const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+  if (btnToggleSidebar) btnToggleSidebar.title = t('btn_toggle_sidebar_title');
+
+  const langIndicator = document.getElementById('lang-indicator');
+  if (langIndicator) langIndicator.textContent = lang === 'vi' ? '[VI]' : '[EN]';
+
+  const btnToggleLang = document.getElementById('btn-toggle-lang');
+  if (btnToggleLang) btnToggleLang.title = t('btn_toggle_lang_title');
+
+  // Sidebar elements
+  const sidebarTitle = document.getElementById('sidebar-title');
+  if (sidebarTitle) sidebarTitle.textContent = t('sidebar_title');
+
+  const btnCloseSidebar = document.getElementById('btn-close-sidebar');
+  if (btnCloseSidebar) {
+    btnCloseSidebar.textContent = t('btn_close_sidebar');
+    btnCloseSidebar.title = t('btn_close_sidebar_title');
+  }
+
+  const searchInput = document.getElementById('camera-search-input');
+  if (searchInput) searchInput.placeholder = t('search_placeholder');
+
+  const filterTitle = document.getElementById('filter-title');
+  if (filterTitle) filterTitle.textContent = t('filter_title');
+
+  const btnClearFilters = document.getElementById('btn-clear-all-filters');
+  if (btnClearFilters) {
+    btnClearFilters.textContent = t('btn_clear_all_filters');
+    btnClearFilters.title = t('btn_clear_all_filters_title');
+  }
+
+  const btnAddFilter = document.getElementById('btn-add-filter');
+  if (btnAddFilter) {
+    btnAddFilter.textContent = t('btn_add_filter');
+    btnAddFilter.title = t('btn_add_filter_title');
+  }
+
+  const resultsTitle = document.getElementById('results-title');
+  if (resultsTitle) resultsTitle.textContent = t('results_title');
+
+  const resultsScrollHint = document.getElementById('results-scroll-hint');
+  if (resultsScrollHint) resultsScrollHint.textContent = t('results_scroll_hint');
+
+  // Legend elements
+  const legendTitle = document.getElementById('legend-title');
+  if (legendTitle) legendTitle.textContent = t('legend_title');
+
+  const btnToggleLegend = document.getElementById('btn-toggle-legend');
+  if (btnToggleLegend) btnToggleLegend.title = t('btn_toggle_legend_title');
+
+  const legendSelected = document.getElementById('legend-label-selected');
+  if (legendSelected) legendSelected.textContent = t('legend_selected');
+
+  const legendOnline = document.getElementById('legend-label-online');
+  if (legendOnline) legendOnline.textContent = t('legend_online');
+
+  const legendOffline = document.getElementById('legend-label-offline');
+  if (legendOffline) legendOffline.textContent = t('legend_offline');
+
+  const legendZoom = document.getElementById('legend-label-zoom');
+  if (legendZoom) legendZoom.textContent = t('legend_zoom');
+
+  // Bottom dock elements
+  const dockTitle = document.getElementById('dock-title');
+  if (dockTitle) dockTitle.textContent = t('dock_title');
+
+  const btnClearPinned = document.getElementById('btn-clear-pinned');
+  if (btnClearPinned) {
+    btnClearPinned.textContent = t('btn_clear_pinned');
+    btnClearPinned.title = t('btn_clear_pinned_title');
+  }
+
+  const refreshLabel = document.getElementById('refresh-indicator-label');
+  if (refreshLabel) refreshLabel.textContent = t('refresh_label');
+
+  const drawer = document.getElementById('route-cameras-drawer');
+  const btnToggleDrawer = document.getElementById('btn-toggle-drawer');
+  if (drawer && btnToggleDrawer) {
+    btnToggleDrawer.textContent = drawer.classList.contains('collapsed')
+      ? t('btn_toggle_drawer_open')
+      : t('btn_toggle_drawer_close');
+    btnToggleDrawer.title = t('btn_toggle_drawer_title');
+  }
+
+  // Active camera modal re-translation
+  if (currentModalCamera) {
+    openCameraModal(currentModalCamera);
+  }
+
+  // If cameras dataset is loaded, refresh dynamic components
+  if (allCameras && allCameras.length > 0) {
+    renderFilterBuilderRows();
+    applyChainedFilterEngine();
+    renderPinnedCameraTrack();
+  }
+}
+
 // Lock map view strictly within Southeast mainland Vietnam (territorial safety)
 const CAMERA_VIEW_MAP_BOUNDS = [
   [10.15, 106.35],
@@ -235,6 +487,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sidebar = document.getElementById('camera-sidebar');
     if (sidebar) sidebar.classList.add('collapsed');
   }
+  applyLanguage(currentLang);
   initMap();
   setupEventListeners();
   await loadCameras();
@@ -308,6 +561,15 @@ function setupEventListeners() {
   // Clear pinned cameras button
   document.getElementById('btn-clear-pinned').addEventListener('click', clearAllPinned);
 
+  // Toggle language (VI <=> EN)
+  const btnToggleLang = document.getElementById('btn-toggle-lang');
+  if (btnToggleLang) {
+    btnToggleLang.addEventListener('click', () => {
+      const newLang = currentLang === 'vi' ? 'en' : 'vi';
+      setLanguage(newLang);
+    });
+  }
+
   // Toggle bottom dock
   const btnToggleDrawer = document.getElementById('btn-toggle-drawer');
   if (btnToggleDrawer) {
@@ -315,7 +577,7 @@ function setupEventListeners() {
       const drawer = document.getElementById('route-cameras-drawer');
       if (drawer) {
         drawer.classList.toggle('collapsed');
-        btnToggleDrawer.textContent = drawer.classList.contains('collapsed') ? '[▲ MỞ DOCK]' : '[▼ THU GỌN]';
+        btnToggleDrawer.textContent = drawer.classList.contains('collapsed') ? t('btn_toggle_drawer_open') : t('btn_toggle_drawer_close');
       }
     });
   }
@@ -330,12 +592,13 @@ function setupEventListeners() {
   document.getElementById('btn-pin-modal-cam').addEventListener('click', () => {
     if (currentModalCamera) {
       const isPinned = pinnedCameras.some(c => c.id === currentModalCamera.id);
+      const camName = currentModalCamera.displayName || currentModalCamera.title;
       if (isPinned) {
         unpinCamera(currentModalCamera.id);
-        showToast(`[OK] Đã bỏ ghim "${currentModalCamera.displayName || currentModalCamera.title}".`);
+        showToast(t('toast_unpinned', { name: camName }));
       } else {
         pinCamera(currentModalCamera);
-        showToast(`[OK] Đã ghim "${currentModalCamera.displayName || currentModalCamera.title}" vào danh sách theo dõi.`);
+        showToast(t('toast_pinned', { name: camName }));
       }
       openCameraModal(currentModalCamera);
     }
@@ -468,8 +731,8 @@ function getAvailableFacetsForFilter(filterIndex) {
   let offlineCount = 0;
   prevSubset.forEach(c => { if (c.isOnline) onlineCount++; else offlineCount++; });
   const statuses = [
-    { val: 'ONLINE', label: `[HOẠT ĐỘNG] (${onlineCount})` },
-    { val: 'OFFLINE', label: `[MẤT TÍN HIỆU] (${offlineCount})` }
+    { val: 'ONLINE', label: `${t('status_online')} (${onlineCount})` },
+    { val: 'OFFLINE', label: `${t('status_offline')} (${offlineCount})` }
   ];
 
   return { zones, roads, nodes, statuses, totalAvailable: prevSubset.length };
@@ -551,10 +814,10 @@ function renderFilterBuilderRows() {
     const propSelect = document.createElement('select');
     propSelect.className = 'filter-prop-select';
     propSelect.innerHTML = `
-      <option value="zone" ${filter.prop === 'zone' ? 'selected' : ''}>Khu vực</option>
-      <option value="road" ${filter.prop === 'road' ? 'selected' : ''}>Tuyến đường</option>
-      <option value="node" ${filter.prop === 'node' ? 'selected' : ''}>Giao lộ cắt</option>
-      <option value="status" ${filter.prop === 'status' ? 'selected' : ''}>Trạng thái</option>
+      <option value="zone" ${filter.prop === 'zone' ? 'selected' : ''}>${t('prop_zone')}</option>
+      <option value="road" ${filter.prop === 'road' ? 'selected' : ''}>${t('prop_road')}</option>
+      <option value="node" ${filter.prop === 'node' ? 'selected' : ''}>${t('prop_node')}</option>
+      <option value="status" ${filter.prop === 'status' ? 'selected' : ''}>${t('prop_status')}</option>
     `;
     row.appendChild(propSelect);
 
@@ -577,7 +840,7 @@ function renderFilterBuilderRows() {
       else if (prop === 'status') items = facets.statuses;
 
       if (items.length === 0) {
-        valSelect.innerHTML = '<option value="">[Không có mục khả dụng]</option>';
+        valSelect.innerHTML = `<option value="">${t('no_items_available')}</option>`;
         filter.val = '';
         return;
       }
@@ -605,7 +868,7 @@ function renderFilterBuilderRows() {
     const removeBtn = document.createElement('button');
     removeBtn.className = 'filter-remove-btn';
     removeBtn.textContent = 'x';
-    removeBtn.title = 'Xóa điều kiện này';
+    removeBtn.title = t('filter_remove_title');
     removeBtn.addEventListener('click', () => {
       removeFilterCondition(filter.id);
     });
@@ -641,7 +904,7 @@ function applyChainedFilterEngine(shouldFitMap = false) {
   // Update matched camera count badge
   const countBadge = document.getElementById('filter-match-count');
   if (countBadge) {
-    countBadge.textContent = `[${filteredCameras.length} CAMERA]`;
+    countBadge.textContent = t('filter_match_badge', { count: filteredCameras.length });
     if (filteredCameras.length === 0) {
       countBadge.style.color = 'var(--status-danger)';
       countBadge.style.background = 'rgba(239, 68, 68, 0.1)';
@@ -696,7 +959,7 @@ function renderMapMarkers(cameras) {
       fillOpacity: 0.95
     });
 
-    marker.bindTooltip(`<b>${cam.displayName || cam.title}</b><br><span style="color:#a1a1aa;">${cam.zone} | [Bấm xem ảnh & theo dõi]</span>`, {
+    marker.bindTooltip(`<b>${cam.displayName || cam.title}</b><br><span style="color:#a1a1aa;">${cam.zone} | ${t('tooltip_click_view')}</span>`, {
       direction: 'top',
       offset: [0, -4]
     });
@@ -732,7 +995,7 @@ function renderCameraListItems(cameras) {
   container.innerHTML = '';
 
   if (cameras.length === 0) {
-    container.innerHTML = '<div style="padding:16px; font-size:11px; color:#71717a; text-align:center;">[Không tìm thấy camera phù hợp điều kiện lọc]</div>';
+    container.innerHTML = `<div style="padding:16px; font-size:11px; color:#71717a; text-align:center;">${t('results_empty')}</div>`;
     return;
   }
 
@@ -743,14 +1006,19 @@ function renderCameraListItems(cameras) {
     const isPinned = pinnedCameras.some(c => c.id === cam.id);
     item.className = `cam-list-item ${selectedCameraId === cam.id ? 'selected' : ''}`;
 
+    const statusTagText = cam.isOnline ? t('status_online') : t('status_offline');
+    const coordsText = cam.latitude
+      ? t('coords_label', { coords: `${cam.latitude.toFixed(4)}, ${cam.longitude.toFixed(4)}` })
+      : t('no_coords');
+
     item.innerHTML = `
       <div class="cam-item-header">
         <div class="cam-item-name" title="${cam.displayName || cam.title}">${isPinned ? '[•] ' : ''}${cam.displayName || cam.title}</div>
-        <span class="cam-item-tag ${cam.isOnline ? 'on' : 'off'}">${cam.isOnline ? '[HOẠT ĐỘNG]' : '[MẤT TÍN HIỆU]'}</span>
+        <span class="cam-item-tag ${cam.isOnline ? 'on' : 'off'}">${statusTagText}</span>
       </div>
       <div class="cam-item-meta">
         <span class="cam-zone-badge">[${cam.zone}]</span>
-        <span class="cam-coords">Tọa độ: ${cam.latitude ? `${cam.latitude.toFixed(4)}, ${cam.longitude.toFixed(4)}` : 'Chưa có GPS'}</span>
+        <span class="cam-coords">${coordsText}</span>
       </div>
     `;
 
@@ -843,7 +1111,7 @@ function pinCamera(cam) {
     const btn = document.getElementById('btn-toggle-drawer');
     if (drawer && drawer.classList.contains('collapsed')) {
       drawer.classList.remove('collapsed');
-      if (btn) btn.textContent = '[▼ THU GỌN]';
+      if (btn) btn.textContent = t('btn_toggle_drawer_close');
     }
   }
 }
@@ -863,7 +1131,7 @@ function unpinCamera(camId, e) {
     const btn = document.getElementById('btn-toggle-drawer');
     if (drawer && !drawer.classList.contains('collapsed')) {
       drawer.classList.add('collapsed');
-      if (btn) btn.textContent = '[▲ MỞ DOCK]';
+      if (btn) btn.textContent = t('btn_toggle_drawer_open');
     }
   }
 }
@@ -873,14 +1141,14 @@ function clearAllPinned() {
   selectedCameraId = null;
   renderPinnedCameraTrack();
   renderActiveMarkers();
-  showToast('[OK] Đã xóa toàn bộ danh sách theo dõi.');
+  showToast(t('toast_cleared_all'));
 
   // Auto-collapse dock when empty
   const drawer = document.getElementById('route-cameras-drawer');
   const btn = document.getElementById('btn-toggle-drawer');
   if (drawer && !drawer.classList.contains('collapsed')) {
     drawer.classList.add('collapsed');
-    if (btn) btn.textContent = '[▲ MỞ DOCK]';
+    if (btn) btn.textContent = t('btn_toggle_drawer_open');
   }
 }
 
@@ -912,7 +1180,7 @@ function renderActiveMarkers() {
         selectCamera(cam);
       });
 
-      marker.bindTooltip(`<b>#${idx + 1}: ${cam.displayName || cam.title}</b><br>[Bấm xem ảnh trực tiếp]`, {
+      marker.bindTooltip(`<b>#${idx + 1}: ${cam.displayName || cam.title}</b><br>${t('tooltip_live_view')}`, {
         direction: 'top',
         offset: [0, -10]
       });
@@ -929,7 +1197,7 @@ function renderPinnedCameraTrack() {
   const track = document.getElementById('route-camera-track');
   track.innerHTML = '';
 
-  document.getElementById('pinned-camera-count').textContent = `[${pinnedCameras.length} CAM]`;
+  document.getElementById('pinned-camera-count').textContent = t('pinned_count_badge', { count: pinnedCameras.length });
 
   const clearBtn = document.getElementById('btn-clear-pinned');
   if (clearBtn) {
@@ -941,7 +1209,7 @@ function renderPinnedCameraTrack() {
   }
 
   if (pinnedCameras.length === 0) {
-    track.innerHTML = '<div class="flex items-center justify-center w-full h-full py-4 px-2 text-center"><div class="text-[11px] font-mono text-zinc-500 border border-dashed border-zinc-800 rounded-sm p-3 w-full max-w-lg">[Chưa có camera nào trong danh sách theo dõi. Bấm vào camera bất kỳ trên bản đồ hoặc danh sách để theo dõi hình ảnh trực tiếp liên tục tại đây]</div></div>';
+    track.innerHTML = `<div class="flex items-center justify-center w-full h-full py-4 px-2 text-center"><div class="text-[11px] font-mono text-zinc-500 border border-dashed border-zinc-800 rounded-sm p-3 w-full max-w-lg">${t('dock_empty_message')}</div></div>`;
     return;
   }
 
@@ -955,7 +1223,7 @@ function renderPinnedCameraTrack() {
     card.innerHTML = `
       <div class="card-img-wrap">
         <span class="card-order-tag" style="background:#fff; color:#000; border:1px solid #000;">#${index + 1}</span>
-        <button class="card-unpin-btn" title="Bỏ theo dõi camera này" id="unpin-${cam.id}">x</button>
+        <button class="card-unpin-btn" title="${t('card_unpin_title')}" id="unpin-${cam.id}">x</button>
         <img src="${imgUrl}" alt="${cam.displayName}" loading="lazy" id="thumb-${cam.id}" />
       </div>
       <div class="card-name">${cam.displayName || cam.title}</div>
@@ -1007,7 +1275,7 @@ function refreshVisibleSnapshots() {
     const modalImg = document.getElementById('modal-camera-img');
     if (modalImg) {
       modalImg.src = `${API_BASE}/api/cameras/snapshot/${currentModalCamera.id}?t=${now}`;
-      document.getElementById('modal-img-timestamp').textContent = new Date().toLocaleTimeString('vi-VN');
+      document.getElementById('modal-img-timestamp').textContent = new Date().toLocaleTimeString(currentLang === 'vi' ? 'vi-VN' : 'en-US');
     }
   }
 }
@@ -1025,26 +1293,31 @@ function openCameraModal(cam) {
   document.getElementById('modal-camera-name').textContent = cam.displayName || cam.title;
   
   const statusTag = document.getElementById('modal-camera-status');
-  statusTag.textContent = cam.isOnline ? '[HOẠT ĐỘNG]' : '[MẤT TÍN HIỆU]';
+  statusTag.textContent = cam.isOnline ? t('status_online') : t('status_offline');
   statusTag.className = cam.isOnline ? 'online-tag' : 'online-tag offline';
 
   const img = document.getElementById('modal-camera-img');
   img.src = `${API_BASE}/api/cameras/snapshot/${cam.id}?t=${Date.now()}`;
-  document.getElementById('modal-img-timestamp').textContent = new Date().toLocaleTimeString('vi-VN');
+  img.alt = t('modal_alt_img');
+  document.getElementById('modal-img-timestamp').textContent = new Date().toLocaleTimeString(currentLang === 'vi' ? 'vi-VN' : 'en-US');
 
-  document.getElementById('modal-camera-coords').textContent = `TỌA ĐỘ: ${cam.latitude?.toFixed(5)}, ${cam.longitude?.toFixed(5)} | ID: ${cam.id}`;
+  const coordsFormatted = cam.latitude ? `${cam.latitude.toFixed(5)}, ${cam.longitude.toFixed(5)}` : '0, 0';
+  document.getElementById('modal-camera-coords').textContent = t('modal_coords', {
+    coords: coordsFormatted,
+    id: cam.id
+  });
 
   // Update modal pin button state
   const pinBtn = document.getElementById('btn-pin-modal-cam');
   if (pinBtn) {
     const isPinned = pinnedCameras.some(c => c.id === cam.id);
     if (isPinned) {
-      pinBtn.textContent = '[✓ ĐÃ GHIM THEO DÕI]';
-      pinBtn.title = 'Camera này đang được theo dõi trong Dock. Bấm để bỏ ghim.';
+      pinBtn.textContent = t('btn_pin_active');
+      pinBtn.title = t('btn_pin_active_title');
       pinBtn.classList.add('pinned-active');
     } else {
-      pinBtn.textContent = '[+ GHIM THEO DÕI]';
-      pinBtn.title = 'Thêm camera này vào Dock theo dõi dưới đáy bản đồ';
+      pinBtn.textContent = t('btn_pin_add');
+      pinBtn.title = t('btn_pin_add_title');
       pinBtn.classList.remove('pinned-active');
     }
   }
