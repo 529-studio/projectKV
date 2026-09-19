@@ -42,7 +42,7 @@
 </head>
 <body class="h-full overflow-hidden bg-black font-sans text-zinc-100 antialiased select-none">
   <div id="app-container" class="flex flex-col h-full w-full">
-    <!-- THANH TIÊU ĐỀ TRÊN CÙNG -->
+    <!-- TOP HEADER BAR -->
     <header id="top-bar" class="h-12 bg-black border-b border-[#27272a] px-2.5 sm:px-4 flex items-center justify-between shrink-0 select-none z-[1000] w-full max-w-full overflow-hidden">
       <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
         <div class="brand-text flex flex-col">
@@ -52,7 +52,7 @@
           <span class="text-[9px] font-mono text-zinc-400 hidden md:inline">CAMERA GIAO THÔNG TP. HỒ CHÍ MINH</span>
         </div>
 
-        <!-- NÚT BẬT TẮT DANH MỤC CAMERA -->
+        <!-- TOGGLE SIDEBAR BUTTON -->
         <button id="btn-toggle-sidebar" class="action-btn text-[10px] sm:text-[10.5px] font-mono px-2 sm:px-2.5 py-1 bg-zinc-900 border border-zinc-700 hover:border-white text-zinc-200 hover:text-white rounded-sm transition cursor-pointer shrink-0" title="Bật/Tắt danh mục và bộ lọc camera">
           <span class="sm:hidden">[DANH MỤC]</span>
           <span class="hidden sm:inline">[DANH MỤC & BỘ LỌC]</span>
@@ -60,16 +60,16 @@
       </div>
     </header>
 
-    <!-- KHÔNG GIAN LÀM VIỆC CHÍNH: SIDEBAR + BẢN ĐỒ -->
+    <!-- MAIN WORKSPACE: SIDEBAR + MAP -->
     <div id="main-workspace" class="flex-1 w-full relative flex overflow-hidden">
       
-      <!-- LỚP PHỦ MỜ KHI MỞ SIDEBAR TRÊN MOBILE -->
+      <!-- MOBILE BACKDROP OVERLAY -->
       <div id="sidebar-backdrop" class="fixed inset-0 bg-black/70 z-[940] hidden md:hidden transition-opacity"></div>
 
-      <!-- SIDEBAR DANH MỤC CAMERA (3 PHÂN KHU RÀNH MẠCH, 100% CHIỀU CAO) -->
+      <!-- CAMERA SIDEBAR: 3 PANELS, 100% HEIGHT -->
       <aside id="camera-sidebar" class="sidebar flex flex-col h-full bg-zinc-950 border-r border-zinc-800 z-[950] transition-all duration-200">
         
-        <!-- PHÂN KHU 1: TIÊU ĐỀ & TÌM KIẾM NHANH -->
+        <!-- PANEL 1: TITLE & QUICK SEARCH -->
         <div class="sidebar-panel-header border-b border-zinc-800 bg-zinc-950 p-3 shrink-0">
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
@@ -89,7 +89,7 @@
           </div>
         </div>
 
-        <!-- PHÂN KHU 2: CARD BỘ LỌC PHÂN CẤP LIÊN HOÀN (DEEP FILTER) -->
+        <!-- PANEL 2: DYNAMIC CHAINED DEEP FILTER -->
         <div class="sidebar-panel-filter border-b border-zinc-800 bg-zinc-950/60 p-3 shrink-0">
           <div class="filter-card bg-zinc-900 border border-zinc-700/80 rounded-md p-3 shadow-sm">
             <div class="flex items-center justify-between mb-2">
@@ -97,7 +97,7 @@
               <button id="btn-clear-all-filters" class="clear-filters-btn hidden text-[10px] font-mono text-red-400 hover:text-red-300 font-bold cursor-pointer" title="Xóa toàn bộ điều kiện lọc">[XÓA HẾT LỌC]</button>
             </div>
             <div id="filter-rows-container" class="filter-rows-container flex flex-col gap-2">
-              <!-- Render các dòng điều kiện lọc liên hoàn -->
+              <!-- Dynamic filter rows container -->
             </div>
             <div class="flex items-center justify-between mt-3 pt-2.5 border-t border-zinc-800">
               <button id="btn-add-filter" class="add-filter-btn text-[10.5px] font-mono font-bold px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-white rounded transition cursor-pointer" title="Thêm một tầng điều kiện lọc mới">[+ THÊM ĐIỀU KIỆN LỌC]</button>
@@ -106,24 +106,24 @@
           </div>
         </div>
 
-        <!-- PHÂN KHU 3: KẾT QUẢ & DANH SÁCH CAMERA (TỪNG CARD RIÊNG BIỆT) -->
+        <!-- PANEL 3: FILTERED RESULTS & CAMERA LIST -->
         <div class="sidebar-panel-list flex-1 flex flex-col min-h-0 bg-zinc-950">
           <div class="results-header px-3 py-2 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between shrink-0">
             <span class="text-[10px] font-mono font-bold text-zinc-300 tracking-wide">DANH SÁCH CAMERA PHÙ HỢP</span>
             <span class="text-[9px] font-mono text-zinc-500">[Cuộn xem chi tiết]</span>
           </div>
           <div class="sidebar-cam-list flex-1 overflow-y-auto p-2 space-y-2" id="sidebar-cam-list">
-            <!-- Render danh sách thẻ camera -->
+            <!-- Camera list items container -->
           </div>
         </div>
       </aside>
 
-      <!-- KHÔNG GIAN BẢN ĐỒ VÀ DOCK (MAP WORKSPACE) -->
+      <!-- MAP WORKSPACE & BOTTOM DOCK -->
       <main id="map-workspace" class="flex-1 flex flex-col h-full relative overflow-hidden bg-zinc-950">
-        <!-- BẢN ĐỒ LEAFLET -->
+        <!-- LEAFLET MAP CONTAINER -->
         <div id="map" class="flex-1 w-full h-full relative z-0"></div>
 
-        <!-- CHÚ GIẢI BẢN ĐỒ (TO RÕ RÀNG, CO GIÃN THEO ZOOM CÓ GIỚI HẠN) -->
+        <!-- MAP LEGEND -->
         <div id="map-legend" class="map-legend absolute top-3 right-3 z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md p-3 font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[210px]">
           <div class="flex items-center justify-between border-b border-zinc-800 pb-1.5 mb-2">
             <span class="font-bold text-white tracking-wider text-xs uppercase">CHÚ GIẢI BẢN ĐỒ</span>
@@ -149,7 +149,7 @@
           </div>
         </div>
 
-        <!-- DOCK DƯỚI ĐÁY: CAMERA ĐANG THEO DÕI (NẰM TRỌN TRONG MAP WORKSPACE, KHÔNG BAO GIỜ CHE SIDEBAR) -->
+        <!-- BOTTOM DOCK: PINNED MONITORING CAMERAS -->
         <div id="route-cameras-drawer" class="route-drawer collapsed">
           <div class="drawer-header flex items-center justify-between px-2 sm:px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 font-mono text-xs select-none h-[38px]">
             <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -163,13 +163,13 @@
             </div>
           </div>
           <div class="drawer-scroll flex items-center gap-2.5 p-2 overflow-x-auto overflow-y-hidden" id="route-camera-track">
-            <!-- Render các thẻ camera đang theo dõi -->
+            <!-- Pinned camera cards track -->
           </div>
         </div>
       </main>
     </div>
 
-    <!-- MODAL XEM CHI TIẾT ẢNH CAMERA -->
+    <!-- CAMERA DETAIL SNAPSHOT MODAL -->
     <div id="camera-modal" class="modal-overlay hidden">
       <div class="modal-card">
         <div class="modal-header">
@@ -196,7 +196,7 @@
       </div>
     </div>
 
-    <!-- THÔNG BÁO TOAST NHANH -->
+    <!-- TOAST NOTIFICATION -->
     <div id="toast" class="toast hidden"></div>
   </div>
 

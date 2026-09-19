@@ -235,7 +235,7 @@ body, html {
 }
 
 /* =======================================================
-   BỘ LỌC ĐIỀU KIỆN LIÊN HOÀN (DYNAMIC CHAINED DEEP FILTER)
+   DYNAMIC CHAINED DEEP FILTER
 ======================================================= */
 .dynamic-filter-builder {
   padding: 8px 10px;
@@ -541,12 +541,12 @@ body, html {
   background: #09090b;
 }
 
-/* GỠ BỎ BỘ LỌC XÁM XỊT ĐỂ BẢN ĐỒ RÕ NÉT VÀ DỄ NHÌN */
+/* Clear grayscale/filter for natural and crisp map rendering */
 .leaflet-tile {
   filter: none;
 }
 
-/* MARKER CHO CAMERA ĐANG ĐƯỢC CHỌN (DOT TO, BRING TO FRONT, CO GIÃN THEO ZOOM) */
+/* Selected camera marker dot (prominent dot, brought to front, scalable) */
 .custom-pin-wrap {
   background: transparent;
 }
@@ -576,7 +576,7 @@ body, html {
   border-color: #ffffff;
 }
 
-/* CHÚ GIẢI BẢN ĐỒ (TO RÕ, DỄ QUAN SÁT) */
+/* Map legend container */
 .map-legend {
   position: absolute;
   top: 12px;
@@ -629,7 +629,7 @@ body, html {
 }
 
 /* =======================================================
-   BOTTOM DRAWER: DOCK CAMERA THEO DÕI
+   BOTTOM DRAWER: PINNED CAMERAS DOCK
 ======================================================= */
 #route-cameras-drawer {
   position: absolute;
