@@ -7,7 +7,7 @@ Tài liệu này tổng hợp toàn bộ ý tưởng kiến trúc, lộ trình p
 ## 1. Tầm Nhìn Dự Án (Project Vision)
 
 *   **Tên Ứng Dụng**: **CAMERA VIEW**
-*   **Sứ Mệnh**: Hệ thống giám sát, tra cứu và theo dõi hiện trường giao thông thời gian thực với độ trễ thấp, giao diện đơn sắc tối ưu chuẩn phòng điều độ (Control Room UX), hỗ trợ lọc phân cấp thông minh và ghim theo dõi đa camera đồng thời.
+*   **Sứ Mệnh**: Ứng dụng tra cứu và theo dõi camera giao thông TP. Hồ Chí Minh thời gian thực với độ trễ thấp, giao diện tối giản trực quan, hỗ trợ lọc phân cấp thông minh, ghim theo dõi đa camera đồng thời cùng các tính năng phân tích tích hợp thêm.
 *   **Mục Tiêu Mở Rộng**: 
     1. Xây dựng tầng Backend chịu tải cao, proxy & cache thông minh hàng ngàn luồng camera.
     2. Tích hợp thị giác máy tính (Computer Vision) để tự động hóa hoàn toàn việc phát hiện ùn tắc, đếm xe, đo chiều dài hàng xe nối đuôi và cảnh báo sự cố.
@@ -23,7 +23,7 @@ hcm-traffic-cameras/
 │
 ├── apps/                                  # TẦNG ỨNG DỤNG (CLIENTS)
 │   └── web/                               # Web App thuần (HTML/CSS/JS + Leaflet + TailwindCDN)
-│       ├── index.html                     # Giao diện điều độ đơn sắc
+│       ├── index.html                     # Giao diện web trực quan, tối giản
 │       ├── styles.css                     # CSS responsive desktop/tablet/mobile
 │       ├── app.js                         # Leaflet map, Chained Deep Filter, Docking logic
 │       └── package.json                   # Package @camera-view/web

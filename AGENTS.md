@@ -28,7 +28,7 @@ Tài liệu này định nghĩa các nguyên tắc cốt lõi, tiêu chuẩn thi
 
 *   **Tile Layer sạch, không dính Watermark**:
     *   Không sử dụng các tile server thương mại chưa kích hoạt bản quyền (tránh lỗi watermark *"API KEY REQUIRED"*).
-    *   Sử dụng OpenStreetMap chuẩn (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`) kết hợp bộ lọc đơn sắc (Grayscale/Neutral) trong CSS để không làm rối mắt người điều độ.
+    *   Sử dụng OpenStreetMap chuẩn (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`) kết hợp bộ lọc đơn sắc (Grayscale/Neutral) trong CSS để không làm rối mắt người dùng.
 *   **Chủ quyền Lãnh thổ Việt Nam**:
     *   Bắt buộc duy trì cấu hình `maxBounds` khóa chặt khung nhìn trong đất liền Đông Nam Bộ (`[10.15, 106.35]` đến `[11.35, 107.45]`), triệt tiêu rủi ro tranh chấp biển đảo.
 *   **Chống quá tải hiển thị Marker (Clutter Prevention)**:
@@ -37,7 +37,7 @@ Tài liệu này định nghĩa các nguyên tắc cốt lõi, tiêu chuẩn thi
     *   Camera đang được chọn/theo dõi: Hiển thị dạng Dot to hơn (đường kính 20px, viền đậm, bring to front trên các layer khác, số thứ tự `#1`, `#2` nằm gọn trong hình tròn), tuyệt đối không dùng hộp text dài che lấp bản đồ.
 *   **Không Vẽ Tuyến Cố Định / Tuyến Mặc Định (No Default Routes)**:
     *   Không ép buộc vẽ bất kỳ tuyến đường mặc định nào khi mở app.
-    *   Ứng dụng tập trung 100% vào việc kiểm tra camera tự do theo thời gian thực (Free Camera Explorer) tại các nút thắt then chốt để điều độ nắm thực tế hiện trường trước khi ra quyết định điều xe.
+    *   Ứng dụng tập trung 100% vào việc tra cứu và kiểm tra camera tự do theo thời gian thực (Free Camera Explorer) tại các nút thắt then chốt để nắm thực tế hiện trường đường sá trước khi di chuyển.
 
 ---
 
@@ -47,11 +47,10 @@ Tài liệu này định nghĩa các nguyên tắc cốt lõi, tiêu chuẩn thi
     *   Không cài thêm các UI framework nặng nề (Bootstrap, Tailwind build tool cồng kềnh, jQuery).
     *   Giữ HTML/CSS/JS thuần, tải trang tức thì.
 *   **Bảo vệ API & Chống chặn IP**:
-    *   Mọi ảnh snapshot từ cổng giao thông phải đi qua proxy của backend (`server.js` hoặc `worker.js`) kèm cache tối thiểu 10–15 giây.
+    *   Mọi ảnh snapshot từ cổng giao thông phải đi qua proxy của backend (`server.js`) kèm cache tối thiểu 10–15 giây.
     *   Không bao giờ để client fetch trực tiếp hàng loạt ảnh từ `giaothong.hochiminhcity.gov.vn`.
-*   **Quy định Giờ Cấm Tải xe đầu kéo**:
-    *   Luôn kiểm tra và cảnh báo 2 khung giờ cấm xe đầu kéo tại Bình Dương: **06:00 - 08:00** và **16:30 - 18:30**.
-    *   AI Vision (Gemini 3.8 Flash) phải trả về văn bản ngắn gọn, tập trung vào 3 yếu tố:
-        1. Mật độ xe container và chiều dài hàng xe nối đuôi.
-        2. Nguy cơ ngập nước / sự cố cản đường.
-        3. Khuyến nghị hành động (Xuất bến / Chờ / Đổi tuyến).
+*   **Tích hợp Tính Năng Phân Tích Thông Minh**:
+    *   Các module phân tích hình ảnh (Computer Vision / AI) trong tương lai cần trả về kết quả súc tích, trực quan về:
+        1. Mật độ phương tiện trên tuyến đường.
+        2. Tình trạng ùn tắc / sự cố cản đường.
+        3. Khuyến nghị lưu thông thực tế.

@@ -1,6 +1,6 @@
-# CAMERA VIEW — Bản Đồ Giám Sát Camera Hiện Trường
+# CAMERA VIEW — Xem Camera Giao Thông TP. Hồ Chí Minh & Tính Năng Mở Rộng
 
-> **Hệ thống theo dõi & tra cứu camera giao thông thời gian thực với độ trễ thấp, giao diện đơn sắc chuẩn phòng điều độ (Control Room UX), hỗ trợ lọc phân cấp liên hoàn và dock ghim theo dõi đa camera đồng thời.**
+> **Ứng dụng tra cứu và theo dõi camera giao thông Thành phố Hồ Chí Minh theo thời gian thực với độ trễ thấp, giao diện tối giản trực quan, hỗ trợ bộ lọc phân cấp liên hoàn, dock ghim theo dõi nhiều camera đồng thời cùng các tính năng phân tích tích hợp thêm.**
 
 Hệ thống được tổ chức theo cấu trúc **Monorepo tinh gọn**, phân tách độc lập giữa ứng dụng Web Client (`apps/web`) và dịch vụ Backend Node.js (`services/node-server`), sẵn sàng mở rộng các dịch vụ phân tích hình ảnh (Computer Vision) trong tương lai.
 
@@ -13,7 +13,7 @@ hcm-traffic-cameras/
 │
 ├── apps/
 │   └── web/                           # [FRONTEND] Web App độc lập (@camera-view/web)
-│       ├── index.html                 # Giao diện điều độ đơn sắc, tải trang tức thì
+│       ├── index.html                 # Giao diện web trực quan, tải trang tức thì
 │       ├── styles.css                 # CSS tối ưu, tương thích Desktop, Tablet & Mobile
 │       ├── app.js                     # Leaflet map, Chained Deep Filter, Marker scaling, Dock
 │       └── package.json
@@ -67,7 +67,7 @@ make crawl
 
 ## 3. Tính Năng Nổi Bật
 
-*   **Đơn Sắc & Trực Quan (Control Room UX)**: Thiết kế tối giản với độ tương phản cao, tông màu đen / xám đậm / trắng, không gây mỏi mắt khi theo dõi liên tục 24/7 trên màn hình điều hành.
+*   **Giao Diện Đơn Sắc & Trực Quan**: Thiết kế tối giản với độ tương phản cao, tông màu đen / xám đậm / trắng, giúp tập trung theo dõi hình ảnh hiện trường một cách rõ ràng, không gây mỏi mắt.
 *   **Bản Đồ Mặc Định OSM Chuẩn**: Sử dụng OpenStreetMap tự nhiên, đường sá sắc nét, tuyệt đối không dính watermark và khóa chặt phạm vi lãnh thổ Đông Nam Bộ (`maxBounds`).
 *   **Chained Deep Filter (Bộ Lọc Phân Cấp Liên Hoàn)**:
     *   Lọc đa tầng: *Khu vực* ➔ *Tuyến đường* ➔ *Giao lộ / Điểm cắt*.

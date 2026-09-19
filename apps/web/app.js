@@ -838,7 +838,7 @@ function pinCamera(cam) {
     renderPinnedCameraTrack();
     renderActiveMarkers();
 
-    // Tự động mở Dock nếu đang thu gọn để người điều độ nhìn thấy camera mới được thêm
+    // Tự động mở Dock nếu đang thu gọn để người dùng nhìn thấy camera mới được thêm
     const drawer = document.getElementById('route-cameras-drawer');
     const btn = document.getElementById('btn-toggle-drawer');
     if (drawer && drawer.classList.contains('collapsed')) {
