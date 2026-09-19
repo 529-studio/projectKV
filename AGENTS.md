@@ -54,3 +54,24 @@ Tài liệu này định nghĩa các nguyên tắc cốt lõi, tiêu chuẩn thi
         1. Mật độ phương tiện trên tuyến đường.
         2. Tình trạng ùn tắc / sự cố cản đường.
         3. Khuyến nghị lưu thông thực tế.
+
+---
+
+## 4. Quy Tắc Git, Nhánh & CI/CD (Git, Branching & CI/CD Rules)
+
+*   **100% Tiếng Anh Cho GitHub Actions & CI/CD**:
+    *   Toàn bộ cấu hình trong `.github/workflows/` (tên workflow, job name, step name, script, log output, commit message sinh tự động, issue title/body) **BẮT BUỘC SỬ DỤNG 100% TIẾNG ANH (ENGLISH ONLY)**.
+    *   Tuyệt đối không dùng tiếng Việt trong bất kỳ phần nào của GitHub Actions.
+*   **Chiến Lược Phân Nhánh (Branching Model)**:
+    *   `dev`: Nhánh mặc định (Default Branch) cho tích hợp và phát triển hàng ngày.
+    *   `main`: Nhánh sản phẩm (Production Branch) cho các bản phát hành ổn định.
+*   **Nghiêm Cấm Push Trực Tiếp Lên `main` & `dev` (Zero Direct Push Policy)**:
+    *   Tuyệt đối **KHÔNG** push code trực tiếp lên `main` hoặc `dev` (áp dụng cho cả lập trình viên và AI Agent).
+    *   Mọi tính năng hoặc sửa lỗi bắt buộc phải tuân theo quy trình Pull Request:
+        1. Tạo nhánh tính năng: `git checkout -b feat/<ten-tinh-nang>` hoặc `fix/<ten-loi>`.
+        2. Đẩy nhánh lên GitHub: `git push origin feat/<ten-tinh-nang>`.
+        3. Mở Pull Request vào nhánh `dev` để review và chạy CI verification.
+    *   Trường hợp bảo trì khẩn cấp cấp độ Admin, commit message phải chứa cờ `[skip-pr-check]`.
+*   **Hệ Thống Bảo Vệ 2 Tầng (Two-Tier Protection Guard)**:
+    *   *Tầng 1 (Client-Side Guard)*: File hook `.githooks/pre-push` chặn ngay lập tức tại máy khi phát hiện lệnh push vào `main` hoặc `dev`. Kích hoạt tự động qua `make install` hoặc `make setup-hooks`.
+    *   *Tầng 2 (Server-Side Guard)*: GitHub Action `branch-guard.yml` tự động kiểm tra nguồn gốc commit trên máy chủ GitHub. Nếu phát hiện commit không đến từ Pull Request hợp lệ, pipeline sẽ lập tức **FAIL ❌** và tự động tạo Issue cảnh báo vi phạm.

@@ -1,0 +1,100 @@
+name: Branch Protection - Enforce Pull Requests
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  enforce-pr:
+    name: Enforce Pull Request Policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Verify Pull Request Origin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          echo "=================================================================="
+          echo "Verifying branch push policy for: $BRANCH_NAME"
+          echo "Commit SHA: $COMMIT_SHA"
+          echo "Committed by actor: @$ACTOR"
+          echo "=================================================================="
+
+          COMMIT_MSG=$(git log -1 --pretty=%B "$COMMIT_SHA")
+          echo "Commit message: $COMMIT_MSG"
+
+          # 1. Allow bypass if [skip-pr-check] flag is present in the commit message
+          if echo "$COMMIT_MSG" | grep -qi "\[skip-pr-check\]"; then
+            echo "✓ Bypass flag [skip-pr-check] detected. Skipping PR enforcement check."
+            exit 0
+          fi
+
+          # 2. Check if commit is a merge commit (has 2 or more parents)
+          PARENT_COUNT=$(git rev-parse "${COMMIT_SHA}^@" | wc -w | tr -d ' ')
+          echo "Parent commits count: $PARENT_COUNT"
+          if [ "$PARENT_COUNT" -gt 1 ]; then
+            echo "✓ Verified: Commit is a merge commit (parent count: $PARENT_COUNT)."
+            exit 0
+          fi
+
+          # 3. Check if commit message follows standard PR merge patterns (e.g. Squash merge)
+          if echo "$COMMIT_MSG" | grep -qE "Merge pull request #[0-9]+|Merge branch|\(#[0-9]+\)"; then
+            echo "✓ Verified: Commit message contains Pull Request reference."
+            exit 0
+          fi
+
+          # 4. Query GitHub API to check if commit is associated with a merged PR
+          echo "Querying GitHub API for associated merged pull requests..."
+          PR_COUNT=$(gh api "repos/${{ github.repository }}/commits/${COMMIT_SHA}/pulls" --jq '[.[] | select(.state == "closed" and .merged_at != null)] | length' 2>/dev/null || echo "0")
+          echo "Associated merged PR count: $PR_COUNT"
+          if [ "$PR_COUNT" -gt 0 ]; then
+            echo "✓ Verified: Commit is associated with a merged Pull Request."
+            exit 0
+          fi
+
+          # 5. Direct push violation detected!
+          echo ""
+          echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+          echo "🛑 DIRECT PUSH DETECTED: Direct push to '$BRANCH_NAME' is forbidden!"
+          echo "Policy: All changes to '$BRANCH_NAME' must be merged via Pull Requests."
+          echo "Actor: @$ACTOR"
+          echo "Commit: $COMMIT_SHA"
+          echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+          echo ""
+
+          # Create an issue to document the policy violation
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "⚠️ Direct Push Policy Violation on $BRANCH_NAME by @$ACTOR" \
+            --body "### Direct Push Policy Violation Detected
+
+A direct push was detected on branch **$BRANCH_NAME** without an associated Pull Request.
+
+- **Branch**: \`$BRANCH_NAME\`
+- **Actor**: @$ACTOR
+- **Commit**: \`$COMMIT_SHA\`
+- **Message**:
+> $COMMIT_MSG
+
+---
+### Required Development Workflow
+1. Create a feature branch: \`git checkout -b feat/<feature-name>\`
+2. Push to the feature branch: \`git push origin feat/<feature-name>\`
+3. Open a Pull Request (PR) into \`dev\` for review and CI verification.
+" || true
+
+          exit 1

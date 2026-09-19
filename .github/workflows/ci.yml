@@ -29,6 +29,6 @@ jobs:
           node -e "
             const fs = require('fs');
             const data = JSON.parse(fs.readFileSync('cameras_all.json', 'utf8'));
-            console.log('Tổng số camera hợp lệ:', data.length);
+            console.log('Total valid cameras count:', data.length);
             if (!Array.isArray(data) || data.length === 0) process.exit(1);
           "

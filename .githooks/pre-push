@@ -9,6 +9,15 @@ while read local_ref local_sha remote_ref remote_sha
 do
   for branch in $protected_branches; do
     if [ "$remote_ref" = "refs/heads/$branch" ]; then
+      # Cho phép vượt qua nếu commit có cờ [skip-pr-check]
+      if [ -n "$local_sha" ] && [ "$local_sha" != "0000000000000000000000000000000000000000" ]; then
+        commit_msg=$(git log -1 --pretty=%B "$local_sha" 2>/dev/null)
+        if echo "$commit_msg" | grep -qi "\[skip-pr-check\]"; then
+          echo "⚠️ [BYPASS] Cờ [skip-pr-check] được kích hoạt. Bỏ qua kiểm tra cho '$branch'."
+          continue
+        fi
+      fi
+
       echo ""
       echo "=================================================================="
       echo " 🛑 [CHẶN PUSH TRỰC TIẾP] Không được phép push trực tiếp lên '$branch'!"
