@@ -5,10 +5,10 @@ const BASE_URL = 'https://giaothong.hochiminhcity.gov.vn';
 
 async function getAllCameras() {
   console.log('========================================================');
-  console.log(' [1/3] Đang kết nối tới Cổng thông tin giao thông TP.HCM...');
+  console.log(' [1/3] Connecting to HCMC Traffic Portal...');
   console.log('========================================================');
 
-  // 1. Lấy session cookies từ Map.aspx
+  // 1. Retrieve session cookies from Map.aspx
   const mapRes = await fetch(`${BASE_URL}/Map.aspx`, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -18,10 +18,10 @@ async function getAllCameras() {
 
   const rawCookies = mapRes.headers.getSetCookie ? mapRes.headers.getSetCookie() : [];
   const cookieStr = rawCookies.map(c => c.split(';')[0]).join('; ');
-  console.log(' -> Đã nhận session cookie thành công.');
+  console.log(' -> Successfully received session cookie.');
 
-  // 2. Gọi AjaxPro RPC để lấy toàn bộ danh sách camera
-  console.log('\n [2/3] Đang truy vấn danh sách toàn bộ camera thành phố...');
+  // 2. Invoke AjaxPro RPC to fetch full camera list
+  console.log('\n [2/3] Querying full city camera list...');
   const rpcRes = await fetch(
     `${BASE_URL}/ajaxpro/VDMS.Web.Library.AJAX.FolderAjax,VDMS.Web.Library.ashx`,
     {
@@ -35,7 +35,7 @@ async function getAllCameras() {
       body: JSON.stringify({
         path: '/root/vdms/tangthu/data/layerdata/camera',
         isInTree: false,
-        searchKey: '', // Rỗng để lấy tất cả
+        searchKey: '', // Empty to fetch all
         layer: ['CAMERA'],
         detail: true,
         page: 1,
@@ -49,7 +49,7 @@ async function getAllCameras() {
 
   const text = await rpcRes.text();
 
-  // Khởi tạo đối tượng giả lập DataTable của AjaxPro
+  // Mock AjaxPro DataTable structure
   global.Ajax = {
     Web: {
       DataTable: function (cols, rows) {
@@ -63,14 +63,14 @@ async function getAllCameras() {
   const dataTable = evalResult.value[1][1];
   const rows = dataTable.rows;
 
-  console.log(` -> Tổng số camera tìm thấy trong hệ thống: ${rows.length}`);
+  console.log(` -> Total cameras found in system: ${rows.length}`);
 
-  // 3. Chuẩn hóa dữ liệu camera
+  // 3. Normalize camera data
   const cameras = rows.map(r => {
     const id = r[2];
     const title = r[0];
     const displayName = r[13] || title;
-    const status = r[10]; // 'UP' hoặc 'NOT_IMAGE'
+    const status = r[10]; // 'UP' or 'NOT_IMAGE'
     const rawLoc = r[4]?.rows?.[0]?.[1] || null;
 
     let latitude = null;
@@ -96,25 +96,25 @@ async function getAllCameras() {
     };
   });
 
-  // 4. Lưu ra file JSON
+  // 4. Save to JSON file
   const projectRoot = path.join(__dirname, '../../');
   const outputPath = path.join(projectRoot, 'cameras_all.json');
   fs.writeFileSync(outputPath, JSON.stringify(cameras, null, 2), 'utf8');
-  console.log(` -> Đã lưu toàn bộ danh sách vào: ${outputPath}`);
+  console.log(` -> Saved full list to: ${outputPath}`);
 
-  // Thống kê nhanh
+  // Quick statistics
   const onlineCams = cameras.filter(c => c.isOnline);
   const offlineCams = cameras.filter(c => !c.isOnline);
 
   console.log('\n========================================================');
-  console.log(' THỐNG KÊ TỔNG QUAN:');
-  console.log(` - Tổng số camera: ${cameras.length}`);
-  console.log(` - Đang hoạt động (UP): ${onlineCams.length} camera`);
-  console.log(` - Mất tín hiệu/Bảo trì: ${offlineCams.length} camera`);
+  console.log(' OVERALL STATISTICS:');
+  console.log(` - Total cameras: ${cameras.length}`);
+  console.log(` - Active (UP): ${onlineCams.length} cameras`);
+  console.log(` - Offline/Maintenance: ${offlineCams.length} cameras`);
   console.log('========================================================');
 
-  // 5. Thử nghiệm tải 3 camera ngẫu nhiên đang hoạt động để kiểm tra chất lượng ảnh
-  console.log('\n [3/3] Tải thử nghiệm 3 ảnh snapshot mới nhất từ camera đang online...');
+  // 5. Test downloading 3 sample snapshots from online cameras to verify image quality
+  console.log('\n [3/3] Downloading 3 test snapshot images from online cameras...');
   const snapshotDir = path.join(projectRoot, 'snapshots');
   if (!fs.existsSync(snapshotDir)) {
     fs.mkdirSync(snapshotDir, { recursive: true });
@@ -135,21 +135,21 @@ async function getAllCameras() {
       fs.writeFileSync(saveFile, Buffer.from(buffer));
       console.log(` [✓] Camera ${i + 1}: "${cam.displayName}"`);
       console.log(`     - ID: ${cam.id}`);
-      console.log(`     - Tọa độ: ${cam.latitude}, ${cam.longitude}`);
-      console.log(`     - Dung lượng ảnh: ${(buffer.byteLength / 1024).toFixed(1)} KB`);
-      console.log(`     - Đã lưu tại: snapshots/${filename}\n`);
+      console.log(`     - Coordinates: ${cam.latitude}, ${cam.longitude}`);
+      console.log(`     - Image Size: ${(buffer.byteLength / 1024).toFixed(1)} KB`);
+      console.log(`     - Saved to: snapshots/${filename}\n`);
     } catch (err) {
-      console.error(` [✗] Lỗi tải ảnh camera ${cam.id}:`, err.message);
+      console.error(` [✗] Failed to load snapshot for camera ${cam.id}:`, err.message);
     }
   }
 
   console.log('========================================================');
-  console.log(' HOÀN TẤT THỬ NGHIỆM!');
-  console.log(` - File dữ liệu: ${outputPath}`);
-  console.log(` - Thư mục ảnh mẫu: ${snapshotDir}`);
+  console.log(' CRAWL & VERIFICATION COMPLETED!');
+  console.log(` - Data file: ${outputPath}`);
+  console.log(` - Sample images dir: ${snapshotDir}`);
   console.log('========================================================');
 }
 
 getAllCameras().catch(err => {
-  console.error('Lỗi khi thực thi:', err);
+  console.error('Execution error:', err);
 });

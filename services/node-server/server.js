@@ -16,7 +16,7 @@ function resolvePath(rel) {
 
 app.use(express.json());
 
-// Cho phép CORS để Frontend dev server (port 3001) gọi API port 3000 mượt mà
+// Enable CORS so Frontend dev server (port 3001) can smoothly call port 3000 API
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -27,19 +27,19 @@ app.use((req, res, next) => {
 
 app.use(express.static(resolvePath('apps/web')));
 
-// 1. Tải danh mục camera vào bộ nhớ
+// 1. Load camera catalog into memory
 const camerasData = JSON.parse(fs.readFileSync(resolvePath('cameras_all.json'), 'utf8'));
 
-// Map tra cứu nhanh camera theo ID
+// Fast lookup map for cameras by ID
 const camerasMap = {};
 camerasData.forEach(c => {
   camerasMap[c.id] = c;
 });
 
-// Cache trong bộ nhớ RAM cho ảnh Snapshot (10 giây)
+// In-memory RAM cache for snapshot images (10 seconds)
 const snapshotCache = new Map(); // id -> { buffer, contentType, timestamp }
 
-// Tự động dọn dẹp cache quá hạn mỗi phút
+// Automatically clean up expired cache entries every minute
 setInterval(() => {
   const now = Date.now();
   for (const [id, item] of snapshotCache.entries()) {
@@ -51,7 +51,7 @@ setInterval(() => {
 // API ENDPOINTS
 // ==========================================
 
-// 1. Danh sách toàn bộ 837 camera
+// 1. List all cameras
 app.get('/api/cameras', (req, res) => {
   res.json({
     total: camerasData.length,
@@ -60,12 +60,12 @@ app.get('/api/cameras', (req, res) => {
   });
 });
 
-// 2. Proxy ảnh snapshot camera (kèm Cache 10s chống nghẽn server cổng GT)
+// 2. Proxy camera snapshot image (with 10s cache to avoid overloading upstream server)
 app.get('/api/cameras/snapshot/:id', async (req, res) => {
   const cameraId = req.params.id;
   const now = Date.now();
 
-  // Kiểm tra cache trước
+  // Check cache first
   if (snapshotCache.has(cameraId)) {
     const cached = snapshotCache.get(cameraId);
     if (now - cached.timestamp < 10000) {
@@ -91,7 +91,7 @@ app.get('/api/cameras/snapshot/:id', async (req, res) => {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Lưu cache 10 giây
+    // Cache for 10 seconds
     snapshotCache.set(cameraId, {
       buffer,
       contentType,
@@ -103,15 +103,15 @@ app.get('/api/cameras/snapshot/:id', async (req, res) => {
     res.setHeader('X-Cache-Status', 'MISS');
     res.send(buffer);
   } catch (err) {
-    console.error(`Lỗi tải snapshot camera ${cameraId}:`, err.message);
+    console.error(`Error loading snapshot for camera ${cameraId}:`, err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 app.listen(PORT, () => {
   console.log('================================================================');
-  console.log(` [OK] CAMERA VIEW SERVER ĐANG CHẠY`);
-  console.log(` [URL] Truy cập: http://localhost:${PORT}`);
-  console.log(` [CAM] Đã nạp ${camerasData.length} camera vào bộ nhớ`);
+  console.log(` [OK] CAMERA VIEW SERVER RUNNING`);
+  console.log(` [URL] Available at: http://localhost:${PORT}`);
+  console.log(` [CAM] Loaded ${camerasData.length} cameras into memory`);
   console.log('================================================================');
 });

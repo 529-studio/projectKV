@@ -1,6 +1,6 @@
 #!/bin/sh
 # ==============================================================================
-# Git Pre-Push Hook: Chặn tuyệt đối hành vi push trực tiếp lên main và dev
+# Git Pre-Push Hook: Block direct push to main and dev branches
 # ==============================================================================
 
 protected_branches="main dev"
@@ -9,23 +9,23 @@ while read local_ref local_sha remote_ref remote_sha
 do
   for branch in $protected_branches; do
     if [ "$remote_ref" = "refs/heads/$branch" ]; then
-      # Cho phép vượt qua nếu commit có cờ [skip-pr-check]
+      # Allow bypass if commit message contains [skip-pr-check]
       if [ -n "$local_sha" ] && [ "$local_sha" != "0000000000000000000000000000000000000000" ]; then
         commit_msg=$(git log -1 --pretty=%B "$local_sha" 2>/dev/null)
         if echo "$commit_msg" | grep -qi "\[skip-pr-check\]"; then
-          echo "⚠️ [BYPASS] Cờ [skip-pr-check] được kích hoạt. Bỏ qua kiểm tra cho '$branch'."
+          echo "⚠️ [BYPASS] Flag [skip-pr-check] detected. Skipping check for '$branch'."
           continue
         fi
       fi
 
       echo ""
       echo "=================================================================="
-      echo " 🛑 [CHẶN PUSH TRỰC TIẾP] Không được phép push trực tiếp lên '$branch'!"
+      echo " 🛑 [DIRECT PUSH BLOCKED] Direct push to '$branch' is not allowed!"
       echo "=================================================================="
-      echo " 👉 Quy trình phát triển an toàn:"
-      echo "    1. Tạo nhánh tính năng mới: git checkout -b feat/<ten-tinh-nang>"
-      echo "    2. Push nhánh tính năng:   git push origin feat/<ten-tinh-nang>"
-      echo "    3. Mở Pull Request (PR) trên GitHub để review và gộp vào '$branch'."
+      echo " 👉 Safe development workflow:"
+      echo "    1. Create a feature branch: git checkout -b feat/<feature-name>"
+      echo "    2. Push feature branch:     git push origin feat/<feature-name>"
+      echo "    3. Open a Pull Request (PR) on GitHub to review and merge into '$branch'."
       echo "=================================================================="
       echo ""
       exit 1

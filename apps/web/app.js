@@ -5,27 +5,27 @@ let map = null;
 let currentTileLayer = null;
 let allCameras = [];
 let dotMarkersLayer = null;
-let activeMarkerLayer = null; // Layer chứa các camera đang theo dõi (Dot to, bring to front)
-let mapMarkerRefs = new Map(); // Lưu tham chiếu marker trên bản đồ để tương tác đồng bộ
-let pinnedCameras = []; // Danh sách các camera đang được ghim theo dõi trong bottom dock
+let activeMarkerLayer = null; // Layer containing pinned/monitored cameras (larger dot, brought to front)
+let mapMarkerRefs = new Map(); // Map marker references for synchronized interaction
+let pinnedCameras = []; // List of cameras pinned for monitoring in the bottom dock
 let selectedCameraId = null;
 
 let autoRefreshInterval = null;
 let refreshCountdown = 10;
 let currentModalCamera = null;
 
-// Khóa chặt khung nhìn trong đất liền Đông Nam Bộ (An toàn lãnh thổ, không tranh chấp biển đảo)
+// Lock map view strictly within Southeast mainland Vietnam (territorial safety)
 const CAMERA_VIEW_MAP_BOUNDS = [
   [10.15, 106.35],
   [11.35, 107.45]
 ];
 
-// Tự động định tuyến API: nếu chạy frontend độc lập trên port 3001 thì gọi về backend port 3000
+// Automatic API routing: route requests to backend port 3000 when frontend runs on port 3001
 const API_BASE = window.location.port === '3001' ? 'http://localhost:3000' : '';
 
 
 
-// Tính toán bán kính chấm marker theo độ zoom bản đồ có giới hạn (Min 3.5px - Max 12px)
+// Calculate marker radius based on map zoom level (Min 3.5px - Max 12px)
 function getMarkerRadiusForZoom(zoom, isFew = false) {
   let r = 3.5;
   if (zoom <= 10) r = 3.5;
@@ -40,7 +40,7 @@ function getMarkerRadiusForZoom(zoom, isFew = false) {
   return Math.min(Math.max(r, 3.5), 12);
 }
 
-// Cập nhật kích thước toàn bộ marker khi zoom thay đổi
+// Update marker scales across all markers on zoom change
 function updateMarkerScales() {
   if (!map) return;
   const zoom = map.getZoom();
@@ -66,7 +66,7 @@ function updateMarkerScales() {
     el.style.fontSize = `${Math.round(pinSize * 0.45)}px`;
   });
 
-  // Đồng bộ kích thước hình học mẫu trong bảng Chú giải (Legend)
+  // Synchronize sample legend dot sizes with current zoom scale
   const sampleDot = document.querySelector('.symbol-dot');
   if (sampleDot) {
     const dotD = Math.min(Math.max(Math.round(radius * 2), 8), 18);
@@ -89,15 +89,15 @@ function updateMarkerScales() {
 }
 
 // =======================================================
-// TRẠNG THÁI BỘ LỌC LIÊN HOÀN (DYNAMIC CHAINED DEEP FILTER)
+// DYNAMIC CHAINED DEEP FILTER STATE
 // =======================================================
-// Mỗi phần tử: { id: number, prop: 'zone' | 'road' | 'node' | 'status', val: string }
+// Each item: { id: number, prop: 'zone' | 'road' | 'node' | 'status', val: string }
 let activeFilters = [];
 let currentSearchQuery = '';
 let filterIdCounter = 1;
 
 // =======================================================
-// TIỆN ÍCH BỎ DẤU TIẾNG VIỆT (TÌM KIẾM KHÔNG PHÂN BIỆT DẤU)
+// VIETNAMESE DIACRITICS STRIPPER (ACCENT-INSENSITIVE SEARCH)
 // =======================================================
 function removeVietnameseTones(str) {
   if (!str) return '';
@@ -110,16 +110,16 @@ function removeVietnameseTones(str) {
 function cleanStreet(str) {
   if (!str) return '';
   let s = str.trim();
-  // Loại bỏ số thứ tự camera trong ngoặc như (20-1), (1), (2), (phía cảng)...
+  // Remove camera index suffix in parentheses e.g. (20-1), (1), (2)...
   s = s.replace(/\s*\([\d\-A-Za-z\s]+\)\s*$/, '').trim();
-  // Chỉ gỡ các tiền tố chung chỉ hình thái nút giao (giữ nguyên Cầu, Cổng Cảng, Hầm...)
+  // Strip generic intersection prefixes (keep bridge, tunnel, port intact)
   s = s.replace(/^(giao lộ|nút giao|ngã tư|ngã ba|ngã 4)\s+/i, '').trim();
   s = s.replace(/[\(\)]+/g, '').trim();
   return s;
 }
 
 // =======================================================
-// PHÂN LOẠI METADATA CHO CAMERA (KHU VỰC, TRỤC ĐƯỜNG, NÚT GIAO)
+// CAMERA METADATA CLASSIFIER (ZONE, CORRIDOR, INTERSECTION NODE)
 // =======================================================
 function getCameraZone(cam) {
   const lat = cam.latitude;
@@ -127,15 +127,15 @@ function getCameraZone(cam) {
   const name = (cam.displayName || cam.title || '').trim();
   const lower = name.toLowerCase();
 
-  // 1. Ngoại tỉnh: Bà Rịa - Vũng Tàu (dọc QL51)
+  // 1. Neighboring province: Ba Ria - Vung Tau (along National Highway 51)
   if (lon && lon > 107.0) return 'Bà Rịa - Vũng Tàu';
 
-  // 2. Bình Dương (Dĩ An, Thuận An, Thủ Dầu Một, Mỹ Phước - Tân Vạn, ĐT743...)
+  // 2. Binh Duong province
   if (lower.includes('mỹ phước') || lower.includes('tân vạn') || lower.includes('dĩ an') || lower.includes('thuận an') || lower.includes('dt743') || lower.includes('đại lộ bình dương') || (lat && lat > 10.92 && lon && lon > 106.65)) {
     return 'Bình Dương';
   }
 
-  // 3. Cụm Cảng Cát Lái - Mỹ Thủy (Khóa chặt bằng tọa độ chuẩn, loại bỏ hoàn toàn string collision)
+  // 3. Cat Lai - My Thuy Port Cluster (strict bounding box to prevent string collision)
   const inCatLaiBox = (lat && lon) ? (lat >= 10.748 && lat <= 10.785 && lon >= 106.745 && lon <= 106.815) : false;
   const isCatLaiName = lower.includes('cát lái') || lower.includes('mỹ thủy') || lower.includes('lê phụng hiểu') ||
     (lower.includes('nguyễn thị định') && !lower.includes('thân văn nhiếp')) ||
@@ -146,27 +146,27 @@ function getCameraZone(cam) {
     return 'Cụm Cảng Cát Lái';
   }
 
-  // 4. Khu vực Nam Sài Gòn - Quận 7 - Nhà Bè (Nguyễn Văn Linh, Huỳnh Tấn Phát, Cầu Phú Mỹ bờ Q7, Nguyễn Hữu Thọ)
+  // 4. South Saigon - District 7 - Nha Be
   if ((lat && lat < 10.755 && lon && lon >= 106.68 && lon < 106.75) || lower.includes('huỳnh tấn phát') || lower.includes('nguyễn văn linh') || lower.includes('nhà bè') || lower.includes('nguyễn hữu thọ')) {
     return 'Quận 7 - Nhà Bè';
   }
 
-  // 5. TP. Thủ Đức (Toàn bộ phía Đông sông Sài Gòn: Khu CNC, Xa Lộ Hà Nội, Mai Chí Thọ, Võ Nguyên Giáp, Đỗ Xuân Hợp...)
+  // 5. Thu Duc City (East of Saigon River)
   if (lon && lon >= 106.725 && lat >= 10.74) {
     return 'TP. Thủ Đức';
   }
 
-  // 6. Khu vực Tây Nam - Bình Tân - Bình Chánh (Cửa ngõ miền Tây: QL1, Võ Trần Chí, Kinh Dương Vương, An Lạc)
+  // 6. Southwest - Binh Tan - Binh Chanh (Western gateway)
   if ((lon && lon < 106.62) || lower.includes('bình chánh') || lower.includes('bình tân') || lower.includes('tân kiên') || lower.includes('an lạc') || lower.includes('võ trần chí') || lower.includes('kinh dương vương')) {
     return 'Bình Tân - Bình Chánh';
   }
 
-  // 7. Khu vực Tây Bắc - Quận 12 - Hóc Môn - Củ Chi (Cửa ngõ Tây Ninh / QL22 / QL1 đoạn An Sương, Ngã Tư Ga)
+  // 7. Northwest - District 12 - Hoc Mon - Cu Chi (Northwestern gateway)
   if ((lat && lat >= 10.835 && lon && lon < 106.72) || lower.includes('hóc môn') || lower.includes('củ chi') || lower.includes('quốc lộ 22') || lower.includes('ngã 4 ga') || lower.includes('an sương')) {
     return 'Q.12 - Hóc Môn - Củ Chi';
   }
 
-  // 8. Khu vực Nội thành TP.HCM (Quận 1, 3, 5, 10, Bình Thạnh, Tân Bình, Phú Nhuận...)
+  // 8. HCMC Urban Core (District 1, 3, 5, 10, Binh Thanh, Tan Binh, Phu Nhuan...)
   return 'Khu vực Nội thành TP.HCM';
 }
 
@@ -191,7 +191,7 @@ function getCameraRoads(cam) {
   }
 
   const lower = raw.toLowerCase();
-  // Sử dụng word boundary và lookahead để không nhầm QL1 với QL13, QL14
+  // Use word boundary & lookahead to avoid false positives (e.g. QL1 vs QL13/14)
   if (/(quốc lộ 1\b|ql\s*1\b)(?!\d)/i.test(lower)) roads.add('Quốc Lộ 1');
   if (/(quốc lộ 13\b|ql\s*13\b)/i.test(lower)) roads.add('Quốc Lộ 13');
   if (/(quốc lộ 22\b|ql\s*22\b)/i.test(lower)) roads.add('Quốc Lộ 22');
@@ -227,10 +227,10 @@ function getCameraNodes(cam) {
 }
 
 // =======================================================
-// KHỞI TẠO ỨNG DỤNG
+// APPLICATION INITIALIZATION
 // =======================================================
 document.addEventListener('DOMContentLoaded', async () => {
-  // Mặc định thu gọn sidebar trên màn hình hẹp (< 768px) để ưu tiên bản đồ
+  // Collapse sidebar on small screens (< 768px) by default to prioritize map view
   if (window.innerWidth <= 768) {
     const sidebar = document.getElementById('camera-sidebar');
     if (sidebar) sidebar.classList.add('collapsed');
@@ -251,7 +251,7 @@ function initMap() {
     maxBoundsViscosity: 1.0
   });
 
-  // Khởi tạo lớp bản đồ chuẩn OpenStreetMap (Màu sắc tự nhiên, rõ ràng, không watermark)
+  // Initialize standard OpenStreetMap tile layer (clean, natural colors, no watermark)
   currentTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
     maxZoom: 19
@@ -260,24 +260,24 @@ function initMap() {
   dotMarkersLayer = L.layerGroup().addTo(map);
   activeMarkerLayer = L.layerGroup().addTo(map);
 
-  // Tự động co giãn kích thước chấm marker và dot to theo độ phóng to (zoom) của bản đồ
+  // Automatically scale marker dots based on map zoom level
   map.on('zoomend', () => {
     updateMarkerScales();
   });
 }
 
 function setupEventListeners() {
-  // Bật / tắt Sidebar
+  // Toggle sidebar
   document.getElementById('btn-toggle-sidebar').addEventListener('click', toggleSidebar);
   document.getElementById('btn-close-sidebar').addEventListener('click', toggleSidebar);
 
-  // Đóng Sidebar khi nhấp vào lớp phủ mờ trên mobile
+  // Close sidebar when clicking mobile backdrop
   const backdrop = document.getElementById('sidebar-backdrop');
   if (backdrop) {
     backdrop.addEventListener('click', toggleSidebar);
   }
 
-  // Thu gọn / Mở rộng Chú giải bản đồ
+  // Toggle map legend
   const btnToggleLegend = document.getElementById('btn-toggle-legend');
   if (btnToggleLegend) {
     btnToggleLegend.addEventListener('click', () => {
@@ -289,26 +289,26 @@ function setupEventListeners() {
     });
   }
 
-  // Tìm kiếm nhanh trong Sidebar
+  // Quick search input
   document.getElementById('camera-search-input').addEventListener('input', (e) => {
     currentSearchQuery = e.target.value.trim();
     applyChainedFilterEngine();
   });
 
-  // Nút Thêm Điều Kiện Lọc
+  // Add filter condition button
   document.getElementById('btn-add-filter').addEventListener('click', () => {
     addNewFilterCondition();
   });
 
-  // Nút Xóa Toàn Bộ Điều Kiện Lọc
+  // Clear all filter conditions button
   document.getElementById('btn-clear-all-filters').addEventListener('click', () => {
     clearAllFilterConditions();
   });
 
-  // Nút xóa toàn bộ danh sách theo dõi
+  // Clear pinned cameras button
   document.getElementById('btn-clear-pinned').addEventListener('click', clearAllPinned);
 
-  // Nút thu gọn / mở rộng Dock dưới đáy
+  // Toggle bottom dock
   const btnToggleDrawer = document.getElementById('btn-toggle-drawer');
   if (btnToggleDrawer) {
     btnToggleDrawer.addEventListener('click', () => {
@@ -320,13 +320,13 @@ function setupEventListeners() {
     });
   }
 
-  // Đóng Modal chi tiết camera
+  // Close camera modal
   document.getElementById('btn-close-modal').addEventListener('click', closeModal);
   document.getElementById('camera-modal').addEventListener('click', (e) => {
     if (e.target.id === 'camera-modal') closeModal();
   });
 
-  // Ghim / Bỏ ghim camera từ trong modal
+  // Pin / unpin camera from modal
   document.getElementById('btn-pin-modal-cam').addEventListener('click', () => {
     if (currentModalCamera) {
       const isPinned = pinnedCameras.some(c => c.id === currentModalCamera.id);
@@ -360,7 +360,7 @@ function toggleSidebar() {
 }
 
 // =======================================================
-// 1. TẢI DỮ LIỆU CAMERA & BỔ SUNG METADATA
+// 1. LOAD CAMERA DATA & ENRICH METADATA
 // =======================================================
 async function loadCameras() {
   try {
@@ -368,7 +368,7 @@ async function loadCameras() {
     const data = await res.json();
     const rawCams = data.cameras || [];
 
-    // Bổ sung metadata phân loại cho 837 camera
+    // Enrich metadata classifications for camera catalog
     allCameras = rawCams.map(c => ({
       ...c,
       zone: getCameraZone(c),
@@ -378,20 +378,20 @@ async function loadCameras() {
 
     document.getElementById('sidebar-total-cams').textContent = `[${allCameras.length}]`;
 
-    // Khởi chạy Bộ Lọc Phân Cấp Động và vẽ marker camera theo display list
+    // Initialize dynamic filter engine and render markers
     renderFilterBuilderRows();
     applyChainedFilterEngine();
     renderPinnedCameraTrack();
   } catch (err) {
-    console.error('Lỗi nạp dữ liệu camera:', err);
+    console.error('Failed to load camera data:', err);
   }
 }
 
 // =======================================================
-// 2. THUẬT TOÁN BỘ LỌC ĐIỀU KIỆN LIÊN HOÀN (CHAINED FILTER ENGINE)
+// 2. CHAINED FILTER ENGINE
 // =======================================================
 
-// Lấy tập camera vượt qua các filter từ 0 đến index (nếu index không truyền thì tất cả)
+// Get camera subset matching filters up to specified index (or all filters if omitted)
 function getFilteredSubset(upToIndex = activeFilters.length - 1) {
   let subset = allCameras;
 
@@ -416,7 +416,7 @@ function getFilteredSubset(upToIndex = activeFilters.length - 1) {
     });
   }
 
-  // Kết hợp cùng ô tìm kiếm nếu có
+  // Combine with text search query if present
   if (currentSearchQuery) {
     const cleanQ = removeVietnameseTones(currentSearchQuery);
     subset = subset.filter(cam => {
@@ -429,12 +429,12 @@ function getFilteredSubset(upToIndex = activeFilters.length - 1) {
   return subset;
 }
 
-// Tính toán các giá trị liên kết khả dụng dựa trên tập camera của các tầng trước
+// Compute available facets based on camera subset from previous filter tiers
 function getAvailableFacetsForFilter(filterIndex) {
-  // Tập camera đã lọc từ các tầng 0 đến (filterIndex - 1)
+  // Filtered camera subset from tier 0 to (filterIndex - 1)
   const prevSubset = filterIndex > 0 ? getFilteredSubset(filterIndex - 1) : allCameras;
 
-  // 1. Danh sách Khu vực khả dụng (Sắp xếp theo số lượng camera giảm dần)
+  // 1. Available Zones (sorted by count descending)
   const zoneCounts = new Map();
   prevSubset.forEach(c => {
     zoneCounts.set(c.zone, (zoneCounts.get(c.zone) || 0) + 1);
@@ -443,7 +443,7 @@ function getAvailableFacetsForFilter(filterIndex) {
     .map(([val, count]) => ({ val, count, label: `${val} (${count})` }))
     .sort((a, b) => b.count - a.count);
 
-  // 2. Danh sách Tuyến đường khả dụng (Sắp xếp theo số lượng camera giảm dần)
+  // 2. Available Corridors/Roads (sorted by count descending)
   const roadCounts = new Map();
   prevSubset.forEach(c => {
     c.roads.forEach(r => roadCounts.set(r, (roadCounts.get(r) || 0) + 1));
@@ -452,7 +452,7 @@ function getAvailableFacetsForFilter(filterIndex) {
     .map(([val, count]) => ({ val, count, label: `${val} (${count})` }))
     .sort((a, b) => b.count - a.count);
 
-  // 3. Danh sách Giao lộ / Điểm cắt ngang khả dụng (Sắp xếp theo số lượng camera giảm dần)
+  // 3. Available Intersection Nodes (sorted by count descending)
   const nodeCounts = new Map();
   prevSubset.forEach(c => {
     c.nodes.forEach(n => {
@@ -463,7 +463,7 @@ function getAvailableFacetsForFilter(filterIndex) {
     .map(([val, count]) => ({ val, count, label: `${val} (${count})` }))
     .sort((a, b) => b.count - a.count);
 
-  // 4. Trạng thái kết nối
+  // 4. Connection status
   let onlineCount = 0;
   let offlineCount = 0;
   prevSubset.forEach(c => { if (c.isOnline) onlineCount++; else offlineCount++; });
@@ -475,12 +475,12 @@ function getAvailableFacetsForFilter(filterIndex) {
   return { zones, roads, nodes, statuses, totalAvailable: prevSubset.length };
 }
 
-// Thêm một dòng điều kiện lọc mới
+// Add a new filter condition row
 function addNewFilterCondition() {
   const newIndex = activeFilters.length;
   const facets = getAvailableFacetsForFilter(newIndex);
 
-  // Thuật toán chọn thuộc tính thông minh dựa trên tầng trước
+  // Smart property heuristic based on previous filter tier
   let smartProp = 'zone';
   if (newIndex > 0) {
     const prevProp = activeFilters[newIndex - 1].prop;
@@ -490,7 +490,7 @@ function addNewFilterCondition() {
     else smartProp = 'road';
   }
 
-  // Chọn giá trị mặc định đầu tiên của thuộc tính đó
+  // Select first default value for chosen property
   let initialVal = '';
   if (smartProp === 'zone' && facets.zones.length > 0) initialVal = facets.zones[0].val;
   else if (smartProp === 'road' && facets.roads.length > 0) initialVal = facets.roads[0].val;
@@ -507,21 +507,21 @@ function addNewFilterCondition() {
   applyChainedFilterEngine(true);
 }
 
-// Xóa một dòng điều kiện lọc
+// Remove a filter condition row
 function removeFilterCondition(filterId) {
   activeFilters = activeFilters.filter(f => f.id !== filterId);
   renderFilterBuilderRows();
   applyChainedFilterEngine(true);
 }
 
-// Xóa tất cả các điều kiện lọc
+// Clear all filter conditions
 function clearAllFilterConditions() {
   activeFilters = [];
   renderFilterBuilderRows();
   applyChainedFilterEngine(true);
 }
 
-// Render các dòng điều kiện lọc liên hoàn trong Sidebar
+// Render chained filter builder rows in sidebar
 function renderFilterBuilderRows() {
   const container = document.getElementById('filter-rows-container');
   const clearBtn = document.getElementById('btn-clear-all-filters');
@@ -541,13 +541,13 @@ function renderFilterBuilderRows() {
     const row = document.createElement('div');
     row.className = 'filter-row';
 
-    // Số thứ tự tầng
+    // Filter tier index
     const idxEl = document.createElement('span');
     idxEl.className = 'filter-row-index';
     idxEl.textContent = `${index + 1}.`;
     row.appendChild(idxEl);
 
-    // Dropdown chọn Thuộc tính (Mục lọc)
+    // Property selector dropdown
     const propSelect = document.createElement('select');
     propSelect.className = 'filter-prop-select';
     propSelect.innerHTML = `
@@ -558,13 +558,13 @@ function renderFilterBuilderRows() {
     `;
     row.appendChild(propSelect);
 
-    // Dấu bằng
+    // Equal sign
     const eq = document.createElement('span');
     eq.className = 'filter-eq-sign';
     eq.textContent = '=';
     row.appendChild(eq);
 
-    // Dropdown chọn Giá trị (Chỉ chứa giá trị có thật trong tập camera hiện tại)
+    // Value selector dropdown (populated with valid facets for current subset)
     const valSelect = document.createElement('select');
     valSelect.className = 'filter-val-select';
 
@@ -590,7 +590,7 @@ function renderFilterBuilderRows() {
         valSelect.appendChild(opt);
       });
 
-      // Nếu giá trị hiện tại không khớp mục nào, chọn mục đầu tiên
+      // If current value is invalid in new facet list, fall back to first item
       if (!items.some(it => it.val === filter.val)) {
         filter.val = items[0].val;
         valSelect.value = items[0].val;
@@ -601,7 +601,7 @@ function renderFilterBuilderRows() {
     valSelect.title = filter.val;
     row.appendChild(valSelect);
 
-    // Nút Xóa điều kiện này
+    // Remove condition button
     const removeBtn = document.createElement('button');
     removeBtn.className = 'filter-remove-btn';
     removeBtn.textContent = 'x';
@@ -611,21 +611,21 @@ function renderFilterBuilderRows() {
     });
     row.appendChild(removeBtn);
 
-    // Sự kiện khi thay đổi Mục lọc
+    // On filter property change
     propSelect.addEventListener('change', (e) => {
       filter.prop = e.target.value;
       fillValuesForProp(filter.prop);
       valSelect.title = filter.val;
-      // Cập nhật lại các tầng lọc kế tiếp vì tập dữ liệu đã đổi
+      // Re-render subsequent filter rows as facets have changed
       renderFilterBuilderRows();
       applyChainedFilterEngine(true);
     });
 
-    // Sự kiện khi thay đổi Giá trị lọc
+    // On filter value change
     valSelect.addEventListener('change', (e) => {
       filter.val = e.target.value;
       valSelect.title = filter.val;
-      // Cập nhật lại các tầng lọc kế tiếp
+      // Update subsequent filter rows
       renderFilterBuilderRows();
       applyChainedFilterEngine(true);
     });
@@ -634,11 +634,11 @@ function renderFilterBuilderRows() {
   });
 }
 
-// Áp dụng bộ lọc và cập nhật danh sách camera + bản đồ
+// Apply chained filters and update camera list & map
 function applyChainedFilterEngine(shouldFitMap = false) {
   const filteredCameras = getFilteredSubset();
 
-  // Cập nhật badge hiển thị số lượng camera khớp
+  // Update matched camera count badge
   const countBadge = document.getElementById('filter-match-count');
   if (countBadge) {
     countBadge.textContent = `[${filteredCameras.length} CAMERA]`;
@@ -653,13 +653,13 @@ function applyChainedFilterEngine(shouldFitMap = false) {
     }
   }
 
-  // Vẽ marker trên bản đồ CHỈ cho các camera nằm trong danh sách hiển thị
+  // Render map markers ONLY for cameras in the filtered subset
   renderMapMarkers(filteredCameras);
 
-  // Render danh sách camera Cấp 2 trong sidebar
+  // Render camera items list in sidebar
   renderCameraListItems(filteredCameras);
 
-  // Căn chỉnh góc nhìn bản đồ theo tập camera kết quả
+  // Fit map viewport to matched camera coordinates
   if (shouldFitMap && filteredCameras.length > 0 && (activeFilters.length > 0 || currentSearchQuery)) {
     const validCoords = filteredCameras
       .map(c => [c.latitude, c.longitude])
@@ -672,7 +672,7 @@ function applyChainedFilterEngine(shouldFitMap = false) {
   }
 }
 
-// Vẽ các chấm camera (circleMarker) chỉ cho các camera trong danh sách đang hiển thị
+// Render circle markers for visible cameras
 function renderMapMarkers(cameras) {
   if (!dotMarkersLayer) return;
   dotMarkersLayer.clearLayers();
@@ -725,7 +725,7 @@ function renderMapMarkers(cameras) {
   updateMarkerScales();
 }
 
-// Render danh sách camera trong Sidebar
+// Render camera list items in sidebar
 function renderCameraListItems(cameras) {
   const container = document.getElementById('sidebar-cam-list');
   if (!container) return;
@@ -754,7 +754,7 @@ function renderCameraListItems(cameras) {
       </div>
     `;
 
-    // Hiệu ứng hover đồng bộ với marker trên bản đồ
+    // Synchronize hover state with map marker
     item.addEventListener('mouseenter', () => {
       const marker = mapMarkerRefs.get(cam.id);
       if (marker) {
@@ -790,15 +790,15 @@ function renderCameraListItems(cameras) {
 }
 
 // =======================================================
-// 3. CHỌN CAMERA: XEM ẢNH TRỰC TIẾP (KHÔNG TỰ ĐỘNG GHIM VÀO DOCK)
+// 3. SELECT CAMERA: DIRECT SNAPSHOT PREVIEW (NO AUTO-PIN)
 // =======================================================
 function selectCamera(cam) {
   selectedCameraId = cam.id;
 
-  // Cập nhật marker đã ghim
+  // Update active markers
   renderActiveMarkers();
 
-  // Highlight dòng được chọn trong sidebar
+  // Highlight selected item in sidebar
   document.querySelectorAll('.cam-list-item').forEach(el => el.classList.remove('selected'));
   const currentCard = Array.from(document.querySelectorAll('.cam-list-item')).find(el => {
     return el.querySelector('.cam-item-name')?.getAttribute('title') === (cam.displayName || cam.title);
@@ -807,12 +807,12 @@ function selectCamera(cam) {
     currentCard.classList.add('selected');
   }
 
-  // Di chuyển mượt mà khung nhìn đến camera
+  // Smoothly pan map viewport to selected camera
   if (cam.latitude && cam.longitude) {
     map.flyTo([cam.latitude, cam.longitude], 16, { duration: 0.8 });
   }
 
-  // Tự động đóng sidebar trên mobile khi người dùng bấm chọn camera
+  // Auto-collapse sidebar on mobile when a camera is selected
   if (window.innerWidth < 768) {
     const sidebar = document.getElementById('camera-sidebar');
     const backdrop = document.getElementById('sidebar-backdrop');
@@ -822,7 +822,7 @@ function selectCamera(cam) {
     }
   }
 
-  // Mở modal ảnh snapshot trực tiếp
+  // Open direct snapshot modal
   openCameraModal(cam);
 }
 
@@ -833,12 +833,12 @@ function selectAndPinCamera(cam) {
 function pinCamera(cam) {
   if (!pinnedCameras.some(c => c.id === cam.id)) {
     pinnedCameras.unshift(cam);
-    // Giữ tối đa 10 camera trong dock theo dõi
+    // Maintain max 10 pinned cameras in dock
     if (pinnedCameras.length > 10) pinnedCameras.pop();
     renderPinnedCameraTrack();
     renderActiveMarkers();
 
-    // Tự động mở Dock nếu đang thu gọn để người dùng nhìn thấy camera mới được thêm
+    // Auto-expand dock if collapsed so user sees newly pinned camera
     const drawer = document.getElementById('route-cameras-drawer');
     const btn = document.getElementById('btn-toggle-drawer');
     if (drawer && drawer.classList.contains('collapsed')) {
@@ -857,7 +857,7 @@ function unpinCamera(camId, e) {
   renderPinnedCameraTrack();
   renderActiveMarkers();
 
-  // Nếu không còn camera nào, tự động thu gọn dock
+  // Auto-collapse dock when empty
   if (pinnedCameras.length === 0) {
     const drawer = document.getElementById('route-cameras-drawer');
     const btn = document.getElementById('btn-toggle-drawer');
@@ -875,7 +875,7 @@ function clearAllPinned() {
   renderActiveMarkers();
   showToast('[OK] Đã xóa toàn bộ danh sách theo dõi.');
 
-  // Tự động thu gọn dock khi danh sách trống
+  // Auto-collapse dock when empty
   const drawer = document.getElementById('route-cameras-drawer');
   const btn = document.getElementById('btn-toggle-drawer');
   if (drawer && !drawer.classList.contains('collapsed')) {
@@ -884,7 +884,7 @@ function clearAllPinned() {
   }
 }
 
-// Vẽ các Dot to hơn cho các camera đang theo dõi (Bring to Front)
+// Render prominent numbered dots for pinned cameras (Bring to Front)
 function renderActiveMarkers() {
   activeMarkerLayer.clearLayers();
 
@@ -905,7 +905,7 @@ function renderActiveMarkers() {
 
       const marker = L.marker([cam.latitude, cam.longitude], {
         icon: pinIcon,
-        zIndexOffset: 3000 // Đưa lên trên tất cả các layer khác
+        zIndexOffset: 3000 // Elevate above all other map layers
       });
 
       marker.on('click', () => {
@@ -923,7 +923,7 @@ function renderActiveMarkers() {
 }
 
 // =======================================================
-// 4. BOTTOM DOCK: CAMERA ĐANG THEO DÕI
+// 4. BOTTOM DOCK: PINNED CAMERAS TRACK
 // =======================================================
 function renderPinnedCameraTrack() {
   const track = document.getElementById('route-camera-track');
@@ -979,7 +979,7 @@ function renderPinnedCameraTrack() {
   });
 }
 
-// Chu kỳ tự động làm mới ảnh mỗi 10 giây
+// Auto-refresh snapshot cycle (every 10 seconds)
 function startRefreshCycle() {
   refreshCountdown = 10;
   clearInterval(autoRefreshInterval);
@@ -1015,7 +1015,7 @@ function refreshVisibleSnapshots() {
 
 
 // =======================================================
-// 6. MODAL XEM ẢNH CAMERA TRỰC TIẾP (THUẦN TÚY, KHÔNG AI)
+// 5. DIRECT CAMERA SNAPSHOT MODAL
 // =======================================================
 function openCameraModal(cam) {
   currentModalCamera = cam;
@@ -1034,7 +1034,7 @@ function openCameraModal(cam) {
 
   document.getElementById('modal-camera-coords').textContent = `TỌA ĐỘ: ${cam.latitude?.toFixed(5)}, ${cam.longitude?.toFixed(5)} | ID: ${cam.id}`;
 
-  // Cập nhật trạng thái nút ghim trong modal
+  // Update modal pin button state
   const pinBtn = document.getElementById('btn-pin-modal-cam');
   if (pinBtn) {
     const isPinned = pinnedCameras.some(c => c.id === cam.id);
@@ -1056,7 +1056,7 @@ function closeModal() {
 }
 
 // =======================================================
-// TOAST THÔNG BÁO NHANH
+// TOAST NOTIFICATIONS
 // =======================================================
 function showToast(msg) {
   const toast = document.getElementById('toast');
