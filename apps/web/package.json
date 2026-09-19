@@ -1,0 +1,9 @@
+{
+  "name": "@camera-view/web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Camera View - Ứng Dụng Giám Sát Camera Giao Thông (Web Client)",
+  "scripts": {
+    "dev": "npx serve -l 3001 ."
+  }
+}
