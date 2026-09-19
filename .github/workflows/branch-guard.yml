@@ -76,25 +76,11 @@ jobs:
           echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
           echo ""
 
-          # Create an issue to document the policy violation
+          ISSUE_BODY="### Direct Push Policy Violation Detected\n\nA direct push was detected on branch **${BRANCH_NAME}** without an associated Pull Request.\n\n- **Branch**: \`${BRANCH_NAME}\`\n- **Actor**: @${ACTOR}\n- **Commit**: \`${COMMIT_SHA}\`\n\n### Required Development Workflow\n1. Create a feature branch: \`git checkout -b feat/<feature-name>\`\n2. Push to the feature branch: \`git push origin feat/<feature-name>\`\n3. Open a Pull Request (PR) into \`dev\` for review and CI verification."
+
           gh issue create \
             --repo "${{ github.repository }}" \
-            --title "⚠️ Direct Push Policy Violation on $BRANCH_NAME by @$ACTOR" \
-            --body "### Direct Push Policy Violation Detected
-
-A direct push was detected on branch **$BRANCH_NAME** without an associated Pull Request.
-
-- **Branch**: \`$BRANCH_NAME\`
-- **Actor**: @$ACTOR
-- **Commit**: \`$COMMIT_SHA\`
-- **Message**:
-> $COMMIT_MSG
-
----
-### Required Development Workflow
-1. Create a feature branch: \`git checkout -b feat/<feature-name>\`
-2. Push to the feature branch: \`git push origin feat/<feature-name>\`
-3. Open a Pull Request (PR) into \`dev\` for review and CI verification.
-" || true
+            --title "⚠️ Direct Push Policy Violation on ${BRANCH_NAME} by @${ACTOR}" \
+            --body "$ISSUE_BODY" || true
 
           exit 1
