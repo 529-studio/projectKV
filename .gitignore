@@ -40,3 +40,4 @@ build/
 snapshots/
 .tempmediaStorage/
 *.tmp
+bin/
