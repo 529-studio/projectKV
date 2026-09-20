@@ -9,6 +9,7 @@ let activeMarkerLayer = null; // Layer containing pinned/monitored cameras (larg
 let mapMarkerRefs = new Map(); // Map marker references for synchronized interaction
 let pinnedCameras = []; // List of cameras pinned for monitoring in the bottom dock
 let selectedCameraId = null;
+let selectedMarkerRef = null;
 
 let autoRefreshInterval = null;
 let refreshCountdown = 10;
@@ -1061,27 +1062,25 @@ function renderCameraListItems(cameras) {
 // 3. SELECT CAMERA: DIRECT SNAPSHOT PREVIEW (NO AUTO-PIN)
 // =======================================================
 function selectCamera(cam) {
+  if (!cam) return;
   selectedCameraId = cam.id;
 
   // Update active markers
   renderActiveMarkers();
 
-  // Highlight selected item in sidebar
+  // Highlight selected item in sidebar & scroll into view
   document.querySelectorAll('.cam-list-item').forEach(el => el.classList.remove('selected'));
   const currentCard = Array.from(document.querySelectorAll('.cam-list-item')).find(el => {
     return el.querySelector('.cam-item-name')?.getAttribute('title') === (cam.displayName || cam.title);
   });
   if (currentCard) {
     currentCard.classList.add('selected');
-  }
-
-  // Smoothly pan map viewport to selected camera
-  if (cam.latitude && cam.longitude) {
-    map.flyTo([cam.latitude, cam.longitude], 16, { duration: 0.8 });
+    currentCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   // Auto-collapse sidebar on mobile when a camera is selected
-  if (window.innerWidth < 768) {
+  const isMobile = window.innerWidth < 768;
+  if (isMobile) {
     const sidebar = document.getElementById('camera-sidebar');
     const backdrop = document.getElementById('sidebar-backdrop');
     if (sidebar && !sidebar.classList.contains('collapsed')) {
@@ -1089,6 +1088,64 @@ function selectCamera(cam) {
       if (backdrop) backdrop.classList.add('hidden');
     }
   }
+
+  // Reliably center map viewport to selected camera
+  if (cam.latitude && cam.longitude && map) {
+    if (isMobile) {
+      map.invalidateSize();
+    }
+
+    const currentZoom = map.getZoom();
+    // At low zoom (< 13.5), the map viewport is physically wider than the distance to the Southeast Vietnam maxBounds,
+    // causing Leaflet's _limitCenter to clamp against the boundary and prevent the camera from reaching the center.
+    // Flying into a comfortable corridor zoom (13.5) guarantees 100% dead-center focus without the claustrophobic zoom-16.
+    const targetZoom = Math.max(currentZoom, 13.5);
+
+    if (currentZoom < 13.5) {
+      map.flyTo([cam.latitude, cam.longitude], targetZoom, {
+        duration: 0.6
+      });
+    } else {
+      map.setView([cam.latitude, cam.longitude], currentZoom, {
+        animate: true,
+        duration: 0.4
+      });
+    }
+
+    // Reset previous selected marker highlight
+    if (selectedMarkerRef) {
+      const isFew = allCameras.length <= 40;
+      const curRadius = getMarkerRadiusForZoom(currentZoom, isFew);
+      const curWeight = currentZoom >= 14 ? 2 : 1.5;
+      selectedMarkerRef.setStyle({
+        radius: curRadius,
+        fillColor: selectedMarkerRef._isOnline ? '#ffffff' : '#52525b',
+        color: '#000000',
+        weight: curWeight
+      });
+      selectedMarkerRef.closeTooltip();
+      selectedMarkerRef = null;
+    }
+
+    // Highlight selected marker on map and open its tooltip
+    const marker = mapMarkerRefs.get(cam.id);
+    if (marker) {
+      marker._isOnline = cam.isOnline;
+      const isFew = allCameras.length <= 40;
+      const curRadius = getMarkerRadiusForZoom(targetZoom, isFew);
+      marker.setStyle({
+        radius: curRadius + 4,
+        fillColor: '#ffffff',
+        color: '#ffffff',
+        weight: 3.5
+      });
+      marker.openTooltip();
+      selectedMarkerRef = marker;
+    }
+  }
+
+  // Synchronize bottom pinned dock card selection state
+  renderPinnedCameraTrack();
 
   // Open direct snapshot modal
   openCameraModal(cam);
@@ -1234,13 +1291,7 @@ function renderPinnedCameraTrack() {
     });
 
     card.addEventListener('click', () => {
-      selectedCameraId = cam.id;
-      renderActiveMarkers();
-      renderPinnedCameraTrack();
-      if (cam.latitude && cam.longitude) {
-        map.flyTo([cam.latitude, cam.longitude], 16, { duration: 0.8 });
-      }
-      openCameraModal(cam);
+      selectCamera(cam);
     });
 
     track.appendChild(card);
