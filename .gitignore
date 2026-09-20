@@ -40,3 +40,12 @@ build/
 snapshots/
 .tempmediaStorage/
 *.tmp
+
+# Go build & SQLite
+bin/
+services/go-server/bin/
+services/go-server/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

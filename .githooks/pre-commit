@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd services/go-server
+UNFORMATTED=$(gofmt -l .)
+if [ -n "$UNFORMATTED" ]; then
+  echo "Go files not formatted (run gofmt -w):"
+  echo "$UNFORMATTED"
+  exit 1
+fi
+go vet ./...
