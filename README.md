@@ -65,7 +65,7 @@ hcm-traffic-cameras/
 # Install dependencies (Go modules + frontend, first time only)
 make install
 
-# [RECOMMENDED] Launch entire system concurrently (Backend :3000 & Frontend Dev :3001)
+# [RECOMMENDED] Launch entire system concurrently (Go Backend :3000 & Frontend Dev :3001)
 make dev-all
 
 # Or run the Go backend only (Port 3000) - Serves both API and Web Frontend

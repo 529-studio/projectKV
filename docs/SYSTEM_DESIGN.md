@@ -29,8 +29,9 @@ hcm-traffic-cameras/
 │       └── package.json                   # Package configuration
 │
 ├── services/                              # BACKEND SERVICES LAYER
-│   ├── node-server/                       # [CURRENT] Lightweight Express.js server (Port 3000)
-│   │   └── server.js                      # API /api/cameras & Snapshot Proxy Cache (10s TTL)
+│   ├── go-server/                         # [PRIMARY PRODUCTION] High-throughput Go Gin server (Port 3000)
+│   │   ├── cmd/server/main.go             # Entrypoint, route setup & graceful shutdown
+│   │   └── internal/                      # Config, cache with singleflight dedup, handlers, models
 │   │
 │   └── cv-engine/                         # [FUTURE ROADMAP] Computer Vision Service
 │       ├── models/                        # YOLO / Detection model weights
@@ -45,7 +46,6 @@ hcm-traffic-cameras/
 │   └── SYSTEM_DESIGN.md                   # This document
 │
 ├── cameras_all.json                       # 837 Traffic camera catalog dataset
-├── LICENSE                                # Proprietary & Source-Available license
 ├── Makefile                               # Centralized task orchestrator
 └── README.md                              # Project documentation
 ```
@@ -54,14 +54,12 @@ hcm-traffic-cameras/
 
 ## 3. Backend Evaluation & Caching Strategy
 
-### 3.1. Architectural Assessment: Node.js (Current) vs. Golang (At Scale)
-*   **Node.js Express (`services/node-server`) - Current (Recommended for Phase 1)**:
-    *   *Strengths*: Zero compilation dependencies, unified JavaScript syntax shared with frontend, immediate developer onboarding.
-    *   *Current Performance*: Easily handles hundreds of concurrent users thanks to in-memory Buffer caching (capped at 1 upstream fetch per 10s per camera).
-    *   *Verdict*: Optimal for initial deployment, operational simplicity, and testing.
-*   **Golang - Upgrade Choice for Massive Scale (High Traffic)**:
-    *   *When to switch*: When scaling to thousands of cameras nationwide or tens of thousands of concurrent client connections. Goroutines and minimal memory footprint (< 30MB RAM) drastically outperform V8 under heavy parallel I/O.
-    *   *Current Status*: Cleaned up unused prototype code to maintain a single source of truth in Node.js, ready to spin up a dedicated Go service when traffic justifies it.
+### 3.1. Architectural Status: Production Go Gin Backend (`services/go-server`)
+*   **Golang Gin (`services/go-server`) - Active Primary Backend**:
+    *   *High Throughput*: Goroutines and minimal memory footprint (< 15MB RAM idle) handle thousands of concurrent client connections with near-zero overhead.
+    *   *Singleflight Deduplication*: Employs `golang.org/x/sync/singleflight` so that even if 100 concurrent requests arrive for an uncached camera, exactly **one** upstream fetch is triggered.
+    *   *Thread-Safe In-Memory Cache*: Protected by `sync.RWMutex` with a 10s TTL and a periodic background cleaner goroutine.
+    *   *Static Web Serving*: Delivers the frontend SPA (`apps/web`) directly at port 3000 with CORS support for development.
 
 ### 3.2. Multi-Tier Caching Architecture
 1. **Tier 1 - Browser Client**: 10-second client-side cache enforced via `Cache-Control: public, max-age=10`.
@@ -121,7 +119,7 @@ To prevent system crashes when user traffic spikes, computation is completely de
 
 ## 5. Current Implementation Status
 
-1. [x] Monorepo restructuring (`apps/web`, `services/node-server`, `tools/crawler`).
+1. [x] Monorepo restructuring (`apps/web`, `services/go-server`, `tools/crawler`).
 2. [x] Monochromatic UI & OpenStreetMap integration without watermarks.
 3. [x] In-memory proxy snapshot cache (10s TTL).
 4. [x] Dynamic Chained Deep Filter (Zone, Corridor, Intersection, Status).
