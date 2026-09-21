@@ -1,0 +1,173 @@
+basePath: /
+definitions:
+  camera.Camera:
+    properties:
+      displayName:
+        type: string
+      id:
+        type: string
+      isOnline:
+        type: boolean
+      latitude:
+        type: number
+      longitude:
+        type: number
+      snapshotUrl:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      zone:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Ho Chi Minh City Traffic Camera & Flood Alert API
+  title: Camera View API
+  version: "1.0"
+paths:
+  /api/cameras:
+    get:
+      description: Retrieve full camera catalog with optional zone and corridor filters
+      parameters:
+      - description: Filter by administrative or geographic zone
+        in: query
+        name: zone
+        type: string
+      - description: Filter by corridor keyword
+        in: query
+        name: corridor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/camera.Camera'
+            type: array
+      summary: List cameras
+      tags:
+      - Camera
+  /api/cameras/{id}:
+    get:
+      description: Retrieve single camera metadata by its unique identifier
+      parameters:
+      - description: Camera ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/camera.Camera'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get camera by ID
+      tags:
+      - Camera
+  /api/cameras/snapshot/{id}:
+    get:
+      description: Proxy and cache real-time traffic camera snapshot image from upstream
+        portal
+      parameters:
+      - description: Camera ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - image/jpeg
+      responses:
+        "200":
+          description: JPEG image data
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "502":
+          description: Bad Gateway
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get camera snapshot image
+      tags:
+      - Camera
+  /api/snapshot/{id}:
+    get:
+      description: Proxy and cache real-time traffic camera snapshot image from upstream
+        portal
+      parameters:
+      - description: Camera ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - image/jpeg
+      responses:
+        "200":
+          description: JPEG image data
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "502":
+          description: Bad Gateway
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get camera snapshot image
+      tags:
+      - Camera
+  /api/zones:
+    get:
+      description: Retrieve sorted list of valid camera zone identifiers
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+      summary: List camera zones
+      tags:
+      - Camera
+  /healthz:
+    get:
+      description: Liveness and readiness probe
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - System
+swagger: "2.0"

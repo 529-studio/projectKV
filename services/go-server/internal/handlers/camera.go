@@ -39,7 +39,17 @@ func (h *CameraHandler) GetCameras(c *gin.Context) {
 	})
 }
 
-// GetSnapshot handles GET /api/cameras/snapshot/:id.
+// GetSnapshot godoc
+// @Summary Get camera snapshot image
+// @Description Proxy and cache real-time traffic camera snapshot image from upstream portal
+// @Tags Camera
+// @Produce image/jpeg
+// @Param id path string true "Camera ID"
+// @Success 200 {string} binary "JPEG image data"
+// @Failure 400 {object} map[string]string
+// @Failure 502 {object} map[string]string
+// @Router /api/snapshot/{id} [get]
+// @Router /api/cameras/snapshot/{id} [get]
 func (h *CameraHandler) GetSnapshot(c *gin.Context) {
 	cameraID := c.Param("id")
 	if cameraID == "" {

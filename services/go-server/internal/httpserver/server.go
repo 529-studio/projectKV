@@ -14,13 +14,22 @@ import (
 // @description Ho Chi Minh City Traffic Camera & Flood Alert API
 // @BasePath /
 
+// Healthz godoc
+// @Summary Health check
+// @Description Liveness and readiness probe
+// @Tags System
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /healthz [get]
+func Healthz(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
 func NewServer() *gin.Engine {
 	r := gin.Default()
 
 	// Health check endpoint
-	r.GET("/healthz", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
+	r.GET("/healthz", Healthz)
 
 	// Swagger documentation UI
 	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
