@@ -1,0 +1,261 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Ho Chi Minh City Traffic Camera \u0026 Flood Alert API",
+        "title": "Camera View API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/api/cameras": {
+            "get": {
+                "description": "Retrieve full camera catalog with optional zone and corridor filters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Camera"
+                ],
+                "summary": "List cameras",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by administrative or geographic zone",
+                        "name": "zone",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by corridor keyword",
+                        "name": "corridor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/camera.Camera"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/cameras/snapshot/{id}": {
+            "get": {
+                "description": "Proxy and cache real-time traffic camera snapshot image from upstream portal",
+                "produces": [
+                    "image/jpeg"
+                ],
+                "tags": [
+                    "Camera"
+                ],
+                "summary": "Get camera snapshot image",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Camera ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "JPEG image data",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/cameras/{id}": {
+            "get": {
+                "description": "Retrieve single camera metadata by its unique identifier",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Camera"
+                ],
+                "summary": "Get camera by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Camera ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/camera.Camera"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/snapshot/{id}": {
+            "get": {
+                "description": "Proxy and cache real-time traffic camera snapshot image from upstream portal",
+                "produces": [
+                    "image/jpeg"
+                ],
+                "tags": [
+                    "Camera"
+                ],
+                "summary": "Get camera snapshot image",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Camera ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "JPEG image data",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/zones": {
+            "get": {
+                "description": "Retrieve sorted list of valid camera zone identifiers",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Camera"
+                ],
+                "summary": "List camera zones",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/healthz": {
+            "get": {
+                "description": "Liveness and readiness probe",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "camera.Camera": {
+            "type": "object",
+            "properties": {
+                "displayName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isOnline": {
+                    "type": "boolean"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "snapshotUrl": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "zone": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}
