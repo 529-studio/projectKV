@@ -130,6 +130,29 @@
                 }
             }
         },
+        "/api/flood-status": {
+            "get": {
+                "description": "Placeholder — flood detection shares the same verdict store; this endpoint is out of scope for issue #8 and returns an empty list.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Traffic"
+                ],
+                "summary": "Get latest flood-detection verdicts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/hotset.Verdict"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/snapshot/{id}": {
             "get": {
                 "description": "Proxy and cache a real-time traffic camera snapshot from the upstream DOT portal (TTL ≥ 10 s). Also triggers HotSet Touch for automatic AI analysis.",
@@ -167,6 +190,38 @@
                     },
                     "502": {
                         "description": "Bad Gateway",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/traffic-status": {
+            "get": {
+                "description": "Returns the most recent AI-analyzed congestion verdict for every camera in the Hot Set (all cameras with a stored verdict).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Traffic"
+                ],
+                "summary": "Get latest traffic congestion verdicts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/hotset.Verdict"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -253,6 +308,24 @@
                     "type": "string"
                 },
                 "zone": {
+                    "type": "string"
+                }
+            }
+        },
+        "hotset.Verdict": {
+            "type": "object",
+            "properties": {
+                "camera_id": {
+                    "type": "string"
+                },
+                "confidence": {
+                    "type": "number"
+                },
+                "severity": {
+                    "description": "e.g. \"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\", or \"DRY\" | \"WET\" | \"FLOODED_SHALLOW\" | \"FLOODED_DEEP\"",
+                    "type": "string"
+                },
+                "timestamp": {
                     "type": "string"
                 }
             }

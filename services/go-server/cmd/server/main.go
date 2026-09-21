@@ -23,11 +23,40 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/models"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
+	"github.com/529-studio/projectKV/services/go-server/internal/store"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
+
+// verdictStoreAdapter adapts *store.VerdictRepo to hotset.VerdictStorer
+// (Dependency Inversion Principle: consumer package hotset defines the interface,
+// composition root adapts the persistent store).
+type verdictStoreAdapter struct {
+	repo *store.VerdictRepo
+}
+
+func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
+	if a.repo == nil {
+		return []hotset.Verdict{}
+	}
+	verdicts, err := a.repo.GetLatest()
+	if err != nil {
+		log.Printf("[WARN] Failed to query latest verdicts: %v", err)
+		return []hotset.Verdict{}
+	}
+	out := make([]hotset.Verdict, len(verdicts))
+	for i, v := range verdicts {
+		out[i] = hotset.Verdict{
+			CameraID:   v.CameraID,
+			Severity:   v.Severity,
+			Confidence: v.Confidence,
+			Timestamp:  v.Timestamp,
+		}
+	}
+	return out
+}
 
 func main() {
 	cfg := config.LoadConfig()
@@ -39,7 +68,7 @@ func main() {
 
 	// 1. Load camera catalog into memory
 	log.Printf("[INIT] Loading cameras from: %s", cfg.CamerasFilePath)
-	store, err := models.LoadCameraStore(cfg.CamerasFilePath)
+	camStore, err := models.LoadCameraStore(cfg.CamerasFilePath)
 	if err != nil {
 		log.Fatalf("[FATAL] Failed to load camera store: %v", err)
 	}
@@ -74,10 +103,21 @@ func main() {
 		hotsetRegistry.Touch(hotset.Camera{ID: id, Name: name, Zone: zone, SnapshotURL: snapshotURL})
 	})
 
-	// 5. Legacy HTTP Handlers (camera list + old snapshot path).
-	cameraHandler := handlers.NewCameraHandler(store, snapCache)
+	// 5. Initialize SQLite DB and Verdict Repository
+	db, err := store.NewDB(cfg.SQLitePath)
+	var verdictRepo *store.VerdictRepo
+	if err != nil {
+		log.Printf("[WARN] Failed to initialize SQLite database (%s): %v", cfg.SQLitePath, err)
+	} else {
+		verdictRepo = store.NewVerdictRepo(db)
+		defer db.Close()
+	}
+	hotsetHandler := hotset.NewHandler(&verdictStoreAdapter{repo: verdictRepo})
 
-	// 6. Setup Gin Engine
+	// 6. Legacy HTTP Handlers (camera list + old snapshot path).
+	cameraHandler := handlers.NewCameraHandler(camStore, snapCache)
+
+	// 7. Setup Gin Engine
 	router := gin.Default()
 	router.Use(middleware.CORSMiddleware())
 
@@ -117,8 +157,10 @@ func main() {
 			api.GET("/cameras/:id", camCatalogHandler.GetCameraByID)
 			api.GET("/zones", camCatalogHandler.GetZones)
 		}
-		// Proxy cache snapshot routes (new — wraps proxycache.Handler)
+		// Proxy cache snapshot routes (wraps proxycache.Handler)
 		proxyHandler.RegisterRoutes(api)
+		// Traffic and flood congestion status endpoints (Issue #8)
+		hotsetHandler.RegisterRoutes(api)
 		// Legacy alias kept for backward compat with existing FE constants.js
 		api.GET("/cameras/snapshot/:id", proxyHandler.GetSnapshot)
 		api.HEAD("/cameras/snapshot/:id", proxyHandler.GetSnapshot)
@@ -162,7 +204,7 @@ func main() {
 		log.Printf(" [OK] CAMERA VIEW GO-GIN SERVER RUNNING")
 		log.Printf(" [URL] Available at: http://localhost:%s", cfg.Port)
 		log.Printf(" [DOC] Swagger UI:   http://localhost:%s/swagger/index.html", cfg.Port)
-		log.Printf(" [CAM] Loaded %d cameras into memory (%d online)", store.Total, store.OnlineCount)
+		log.Printf(" [CAM] Loaded %d cameras into memory (%d online)", camStore.Total, camStore.OnlineCount)
 		log.Println("================================================================")
 
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

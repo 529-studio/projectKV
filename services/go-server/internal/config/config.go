@@ -137,6 +137,7 @@ type ServerConfig struct {
 	Port               string
 	CamerasFilePath    string
 	StaticWebDir       string
+	SQLitePath         string
 	CacheTTL           time.Duration
 	CacheEvictInterval time.Duration
 	CacheMaxAge        time.Duration
@@ -181,10 +182,16 @@ func LoadConfig() *ServerConfig {
 		staticDir = resolvePath("apps/web")
 	}
 
+	sqlitePath := os.Getenv("SQLITE_PATH")
+	if sqlitePath == "" {
+		sqlitePath = resolvePath("data/camera-view.db")
+	}
+
 	return &ServerConfig{
 		Port:               port,
 		CamerasFilePath:    camerasPath,
 		StaticWebDir:       staticDir,
+		SQLitePath:         sqlitePath,
 		CacheTTL:           10 * time.Second,
 		CacheEvictInterval: 60 * time.Second,
 		CacheMaxAge:        15 * time.Second,

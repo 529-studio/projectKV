@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -15,6 +17,15 @@ import (
 var migrationFiles embed.FS
 
 func NewDB(dbPath string) (*sql.DB, error) {
+	if dbPath != ":memory:" && !strings.HasPrefix(dbPath, "file:") {
+		dir := filepath.Dir(dbPath)
+		if dir != "" && dir != "." {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return nil, fmt.Errorf("create sqlite dir %s: %w", dir, err)
+			}
+		}
+	}
+
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite %s: %w", dbPath, err)
