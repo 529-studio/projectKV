@@ -381,11 +381,11 @@ function getCameraZone(cam) {
   const lower = name.toLowerCase();
 
   // 1. Neighboring province: Ba Ria - Vung Tau (along National Highway 51)
-  if (lon && lon > 107.0) return 'Bà Rịa - Vũng Tàu';
+  if (lon && lon > 107.0) return (window.CAMERA_ZONES && window.CAMERA_ZONES.BA_RIA_VUNG_TAU) || 'Bà Rịa - Vũng Tàu';
 
   // 2. Binh Duong province
   if (lower.includes('mỹ phước') || lower.includes('tân vạn') || lower.includes('dĩ an') || lower.includes('thuận an') || lower.includes('dt743') || lower.includes('đại lộ bình dương') || (lat && lat > 10.92 && lon && lon > 106.65)) {
-    return 'Bình Dương';
+    return (window.CAMERA_ZONES && window.CAMERA_ZONES.BINH_DUONG) || 'Bình Dương';
   }
 
   // 3. Cat Lai - My Thuy Port Cluster (strict bounding box to prevent string collision)
@@ -396,31 +396,31 @@ function getCameraZone(cam) {
     /\bđường [abcdgk]\b/i.test(lower);
 
   if (inCatLaiBox && isCatLaiName) {
-    return 'Cụm Cảng Cát Lái';
+    return (window.CAMERA_ZONES && window.CAMERA_ZONES.CAT_LAI) || 'Cụm Cảng Cát Lái';
   }
 
   // 4. South Saigon - District 7 - Nha Be
   if ((lat && lat < 10.755 && lon && lon >= 106.68 && lon < 106.75) || lower.includes('huỳnh tấn phát') || lower.includes('nguyễn văn linh') || lower.includes('nhà bè') || lower.includes('nguyễn hữu thọ')) {
-    return 'Quận 7 - Nhà Bè';
+    return (window.CAMERA_ZONES && window.CAMERA_ZONES.QUAN_7_NHA_BE) || 'Quận 7 - Nhà Bè';
   }
 
   // 5. Thu Duc City (East of Saigon River)
   if (lon && lon >= 106.725 && lat >= 10.74) {
-    return 'TP. Thủ Đức';
+    return (window.CAMERA_ZONES && window.CAMERA_ZONES.THU_DUC) || 'TP. Thủ Đức';
   }
 
   // 6. Southwest - Binh Tan - Binh Chanh (Western gateway)
   if ((lon && lon < 106.62) || lower.includes('bình chánh') || lower.includes('bình tân') || lower.includes('tân kiên') || lower.includes('an lạc') || lower.includes('võ trần chí') || lower.includes('kinh dương vương')) {
-    return 'Bình Tân - Bình Chánh';
+    return (window.CAMERA_ZONES && window.CAMERA_ZONES.BINH_TAN_BINH_CHANH) || 'Bình Tân - Bình Chánh';
   }
 
   // 7. Northwest - District 12 - Hoc Mon - Cu Chi (Northwestern gateway)
   if ((lat && lat >= 10.835 && lon && lon < 106.72) || lower.includes('hóc môn') || lower.includes('củ chi') || lower.includes('quốc lộ 22') || lower.includes('ngã 4 ga') || lower.includes('an sương')) {
-    return 'Q.12 - Hóc Môn - Củ Chi';
+    return (window.CAMERA_ZONES && window.CAMERA_ZONES.Q12_HOC_MON_CU_CHI) || 'Q.12 - Hóc Môn - Củ Chi';
   }
 
   // 8. HCMC Urban Core (District 1, 3, 5, 10, Binh Thanh, Tan Binh, Phu Nhuan...)
-  return 'Khu vực Nội thành TP.HCM';
+  return (window.CAMERA_ZONES && window.CAMERA_ZONES.NOI_THANH) || 'Khu vực Nội thành TP.HCM';
 }
 
 function getCameraRoads(cam) {
