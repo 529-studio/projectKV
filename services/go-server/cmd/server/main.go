@@ -13,13 +13,18 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/529-studio/projectKV/services/go-server/docs"
 	"github.com/529-studio/projectKV/services/go-server/internal/cache"
+	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
 	"github.com/529-studio/projectKV/services/go-server/internal/handlers"
+	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/models"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func main() {
@@ -37,6 +42,15 @@ func main() {
 		log.Fatalf("[FATAL] Failed to load camera store: %v", err)
 	}
 
+	camCatalog, err := camera.LoadCatalog(cfg.CamerasFilePath)
+	if err != nil {
+		log.Printf("[WARN] Failed to load structured camera catalog: %v", err)
+	}
+	var camCatalogHandler *camera.Handler
+	if camCatalog != nil {
+		camCatalogHandler = camera.NewHandler(camCatalog)
+	}
+
 	// 2. Initialize in-memory cache with singleflight dedup
 	snapCache := cache.NewSnapshotCache(cfg.CacheTTL)
 	stopEvictCh := make(chan struct{})
@@ -52,12 +66,41 @@ func main() {
 	// Health check
 	router.GET("/health", cameraHandler.HealthCheck)
 	router.HEAD("/health", cameraHandler.HealthCheck)
+	router.GET("/healthz", httpserver.Healthz)
+
+	// Swagger documentation UI
+	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
+	router.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+	})
+	router.GET("/swagger/*any", func(c *gin.Context) {
+		p := c.Param("any")
+		if p == "" || p == "/" {
+			c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+			return
+		}
+		swaggerHandler(c)
+	})
 
 	// API Group
 	api := router.Group("/api")
 	{
-		api.GET("/cameras", cameraHandler.GetCameras)
+		api.GET("/cameras", func(c *gin.Context) {
+			zone := c.Query("zone")
+			corridor := c.Query("corridor")
+			if (zone != "" || corridor != "") && camCatalogHandler != nil {
+				camCatalogHandler.GetCameras(c)
+				return
+			}
+			cameraHandler.GetCameras(c)
+		})
 		api.HEAD("/cameras", cameraHandler.GetCameras)
+		if camCatalogHandler != nil {
+			api.GET("/cameras/:id", camCatalogHandler.GetCameraByID)
+			api.GET("/zones", camCatalogHandler.GetZones)
+		}
+		api.GET("/snapshot/:id", cameraHandler.GetSnapshot)
+		api.HEAD("/snapshot/:id", cameraHandler.GetSnapshot)
 		api.GET("/cameras/snapshot/:id", cameraHandler.GetSnapshot)
 		api.HEAD("/cameras/snapshot/:id", cameraHandler.GetSnapshot)
 	}
@@ -73,8 +116,8 @@ func main() {
 		// Handle any additional assets or SPA fallback
 		router.NoRoute(func(c *gin.Context) {
 			reqPath := c.Request.URL.Path
-			if strings.HasPrefix(reqPath, "/api/") {
-				c.JSON(http.StatusNotFound, gin.H{"error": "api endpoint not found"})
+			if strings.HasPrefix(reqPath, "/api/") || strings.HasPrefix(reqPath, "/swagger") {
+				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 				return
 			}
 			filePath := filepath.Join(cfg.StaticWebDir, filepath.Clean(reqPath))
@@ -99,6 +142,7 @@ func main() {
 		log.Println("================================================================")
 		log.Printf(" [OK] CAMERA VIEW GO-GIN SERVER RUNNING")
 		log.Printf(" [URL] Available at: http://localhost:%s", cfg.Port)
+		log.Printf(" [DOC] Swagger UI:   http://localhost:%s/swagger/index.html", cfg.Port)
 		log.Printf(" [CAM] Loaded %d cameras into memory (%d online)", store.Total, store.OnlineCount)
 		log.Println("================================================================")
 
