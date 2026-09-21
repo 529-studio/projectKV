@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"camera-view-server/internal/cache"
-	"camera-view-server/internal/models"
+	"github.com/529-studio/projectKV/services/go-server/internal/cache"
+	"github.com/529-studio/projectKV/services/go-server/internal/models"
 
 	"github.com/gin-gonic/gin"
 )

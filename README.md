@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**Ho Chi Minh City Traffic Camera Monitor & Extensible Analytics**  
+**Ho Chi Minh City Traffic Camera Monitor & Extensible Analytics**
 *Ứng Dụng Xem Camera Giao Thông TP. Hồ Chí Minh & Tính Năng Mở Rộng*
 
 [🇬🇧 English](#-english) &nbsp;•&nbsp; [🇻🇳 Tiếng Việt](#-tiếng-việt)
@@ -13,9 +13,9 @@
 
 # 🇬🇧 English
 
-> **Ho Chi Minh City traffic camera viewer and explorer optimized for low latency, clean monochromatic high-contrast UI, chained hierarchical filtering, multi-camera pin dock, and extensible modular architecture.**
+> **Ho Chi Minh City traffic camera viewer and explorer optimized for low latency, clean monochromatic high-contrast UI, chained hierarchical filtering, multi-camera pin dock, and extensible modular architecture — extending toward real-time computer vision and flood alerting.**
 
-The system is organized as a **clean monorepo**, strictly decoupling the Web Client (`apps/web`) from the high-throughput Go Backend service (`services/go-server`), ready for future computer vision and analytics extensions.
+The system is organized as a **clean monorepo**, decoupling the Web Client (`apps/web`) from a Go backend (`services/go-server`), with a separate Python service (`services/cv-engine`) for model inference. See [`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md) for the full architectural rationale.
 
 ## 1. Project Directory Structure (Monorepo)
 
@@ -25,53 +25,51 @@ hcm-traffic-cameras/
 ├── apps/
 │   └── web/                           # [FRONTEND] Standalone Web Client (@camera-view/web)
 │       ├── index.html                 # Clean, fast-loading web interface with i18n
-│       ├── styles.css                 # Optimized responsive CSS (Desktop, Tablet & Mobile)
+│       ├── styles.css                 # Responsive CSS (Desktop, Tablet & Mobile)
 │       ├── app.js                     # Leaflet map, Chained Deep Filter, Marker scaling, Dock
 │       └── package.json
 │
 ├── services/
-│   └── go-server/                     # [BACKEND] High-throughput Go Gin Server & Proxy Cache
-│       ├── cmd/server/main.go         # Entry point, router, graceful shutdown
-│       ├── internal/
-│       │   ├── cache/                 # RWMutex snapshot cache with singleflight dedup
-│       │   ├── config/                # Environment configuration & path resolvers
-│       │   ├── handlers/              # /api/cameras & /api/cameras/snapshot/:id
-│       │   ├── middleware/            # CORS middleware for dev client
-│       │   └── models/                # Camera data models & catalog loader
-│       └── go.mod
+│   ├── go-server/                     # [BACKEND — Go] Single static binary
+│   │   ├── cmd/api/main.go            # Entry point, wiring
+│   │   └── internal/
+│   │       ├── proxycache/            # Snapshot reverse-proxy + in-memory TTL cache
+│   │       ├── hotset/                # Hot Set Pool scheduler (see ADR-001 §2)
+│   │       ├── notify/                # Notification Adapter: Telegram / Zalo / WebPush / SMS
+│   │       └── store/                 # SQLite (pure Go, no cgo) — subscriptions, dedupe state
+│   │
+│   └── cv-engine/                     # [ML PLANE — Python] Model inference only
+│       ├── models/                    # YOLO / ONNX weights (Phase 2, self-hosted)
+│       └── api.py                     # Analysis endpoint called by the Go scheduler
 │
 ├── tools/
 │   └── crawler/                       # [DATA CRAWLER]
-│       └── get_all_cameras.js         # Fetch 837 cameras dataset from official DOT portal
+│       └── get_all_cameras.js         # Fetch camera dataset from official DOT portal
 │
-├── docs/                              # [DOCUMENTATION]
-│   └── SYSTEM_DESIGN.md               # System architecture, Hot Set caching & CV roadmap
+├── docs/
+│   ├── SYSTEM_DESIGN.md               # Original caching & CV roadmap design
+│   ├── ADR-001-flood-alert-architecture.md   # Flood-alert feasibility & architecture
+│   └── (ADR-002 is appended to ADR-001, backend language decision)
 │
-├── cameras_all.json                   # 837 traffic cameras dataset
-├── Makefile                           # Unified orchestration commands (make dev-all, dev-go...)
+├── cameras_all.json                   # Traffic camera catalog dataset
+├── Makefile                           # Unified orchestration commands
 ├── LICENSE                            # Strict proprietary, reference-only license
 └── README.md                          # Project documentation
 ```
 
+> **Migration note**: `services/node-server` (the original Express.js proxy) is being retired in favor of `services/go-server`. The migration is incremental — new components (Hot Set Scheduler, Notification Adapter, SQLite state store) are Go-native from the start; the existing snapshot proxy/cache is ported once the new components are verified stable. See ADR-002 for the full rationale.
+
 ## 2. Quick Start
 
-The project is optimized for fast launch via **Makefile**:
-
 ```bash
-# Install dependencies & activate git hooks (first time only)
+# Install dependencies (Go modules + frontend, first time only)
 make install
 
 # [RECOMMENDED] Launch entire system concurrently (Go Backend :3000 & Frontend Dev :3001)
 make dev-all
 
-# Or run Go Gin backend server only (Port 3000) - Serves both API and Web Frontend
+# Or run the Go backend only (Port 3000) - Serves both API and Web Frontend
 make dev-go
-
-# Run Go test suite
-make test-go
-
-# Compile standalone Go production binary
-make build-go
 
 # (Optional) Run standalone static server for Frontend (Port 3001)
 make dev-web
@@ -86,36 +84,38 @@ make crawl
 
 ## 3. Key Highlights
 
-*   **Monochromatic & Intuitive Interface**: Minimalist high-contrast design using black, dark gray, and white tones to focus on real-world camera imagery without eye strain.
-*   **Bilingual i18n Support**: Seamless instant switching between Vietnamese (`vi`, default) and English (`en`) via a one-click header toggle, persisted across sessions.
-*   **Clean Standard OSM Basemap**: Uses clean OpenStreetMap tiles with no third-party watermark, geographically constrained within Southeastern Vietnam coordinates (`maxBounds`).
-*   **Chained Deep Filter**:
-    *   Multi-tier faceted filtering: *Zone* ➔ *Road / Corridor* ➔ *Intersection / Node*.
-    *   Dynamic facet count computation, showing only available options sorted by camera count.
-*   **Multi-Camera Corridor Tracking Dock**:
-    *   Click any camera to instantly preview live snapshots.
-    *   Click `[+ PIN FOR MONITORING]` to pin cameras into the bottom tracking dock.
-    *   Automatic synchronized snapshot refresh every 10 seconds via in-memory backend cache.
-*   **Responsive Layout (100dvh)**: Seamless experience across wide desktop displays, tablets, and smartphones (sidebar auto-collapses on mobile when selecting a camera).
+*   **Monochromatic & Intuitive Interface**: Minimalist high-contrast design using black, dark gray, and white tones.
+*   **Bilingual i18n Support**: Instant switching between Vietnamese (`vi`, default) and English (`en`), persisted across sessions.
+*   **Clean Standard OSM Basemap**: OpenStreetMap tiles, no watermark, geographically constrained to Southeastern Vietnam (`maxBounds`).
+*   **Chained Deep Filter**: Multi-tier faceted filtering — *Zone* ➔ *Road / Corridor* ➔ *Intersection / Node*.
+*   **Multi-Camera Corridor Tracking Dock**: Pin cameras into the bottom tracking dock with synchronized snapshot refresh.
+*   **Responsive Layout (100dvh)**: Desktop, tablet, and smartphone friendly.
+*   **Go Backend**: Single static binary, no runtime dependency install, in-memory + SQLite state, goroutine-based Hot Set scheduler.
 
 ## 4. Next Evolution Steps
 
-Detailed architectural decisions and technical specifications are documented in:
-📄 **[`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md)**
+Detailed architectural decisions are documented in:
+📄 **[`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md)** — original caching & CV roadmap
+📄 **[`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md)** — flood-alert feasibility, notification channels, and the Go backend migration decision (ADR-002)
 
-*   **Multi-User Scalability**: **Hot Set Pool** architecture — whether 10 or 10,000 concurrent users view the same camera, only 1 request is sent to the traffic portal every 10 seconds.
-*   **Computer Vision Integration (CV Engine)**: Traffic congestion detection, container truck counting, and queue length measurement via a **Pluggable Adapter** pattern (Mock ➔ Cloud Vision ➔ Self-hosted YOLOv8/v11 ONNX).
+*   **Computer Vision Integration**: Traffic congestion + flood detection via a **Pluggable Adapter** pattern (Mock ➔ Cloud Vision API ➔ Self-hosted YOLO/ONNX), orchestrated from Go, model inference in Python.
+*   **Real-Time Flood Alerting**: Zone-based subscriptions with a pluggable **Notification Adapter** — Telegram (Phase 1), Zalo OA (Phase 2), Web Push, SMS — because a rider on a motorbike cannot open a browser tab to check a map.
 
 ---
 
 # 🇻🇳 Tiếng Việt
 
-> **Ứng dụng tra cứu và theo dõi camera giao thông Thành phố Hồ Chí Minh với độ trễ thấp tối ưu, giao diện tối giản trực quan, hỗ trợ bộ lọc phân cấp liên hoàn, dock ghim theo dõi nhiều camera đồng thời, tích hợp đa ngôn ngữ i18n cùng các tính năng phân tích mở rộng.**
+> **Ứng dụng tra cứu và theo dõi camera giao thông Thành phố Hồ Chí Minh với độ trễ thấp tối ưu, giao diện tối giản trực quan, hỗ trợ bộ lọc phân cấp liên hoàn, dock ghim theo dõi nhiều camera đồng thời, tích hợp đa ngôn ngữ i18n cùng các tính năng phân tích mở rộng — hướng tới xử lý thị giác máy tính thời gian thực và cảnh báo ngập lụt.**
 
-Vui lòng tham khảo các lệnh khởi chạy nhanh:
-- Khởi chạy toàn bộ (Go Backend + Web Dev): `make dev-all`
-- Khởi chạy riêng Go Gin Backend: `make dev-go`
-- Chạy kiểm thử Go: `make test-go`
-- Biên dịch Go binary: `make build-go`
-- Truy cập trình duyệt: `http://localhost:3000` (Go Backend + Web) hoặc `http://localhost:3001` (Frontend Dev).
-- Tài liệu kiến trúc chuyên sâu: [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md).
+Hệ thống được tổ chức theo mô hình monorepo, tách biệt Web Client (`apps/web`) khỏi backend Go (`services/go-server`), với một service Python riêng (`services/cv-engine`) chuyên trách suy luận mô hình (model inference).
+
+## Khởi chạy nhanh
+- Khởi chạy toàn bộ: `make dev-all`
+- Truy cập trình duyệt: `http://localhost:3000` (Backend + Web) hoặc `http://localhost:3001` (Frontend Dev).
+
+## Tài liệu kiến trúc chuyên sâu
+- [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md) — thiết kế caching & roadmap CV gốc.
+- [`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md) — đánh giá khả thi cảnh báo ngập lụt, lựa chọn kênh thông báo (Telegram/Zalo/Web Push/SMS), và quyết định chuyển backend sang Go (ADR-002).
+
+## Vì sao chuyển sang Go?
+Không phải vì lưu lượng hiện tại đã vượt ngưỡng (chưa vượt), mà vì các thành phần mới cần xây (Hot Set Scheduler, Notification Adapter, state store) hợp với goroutine/channel hơn, và rủi ro viết mới bằng Go thấp hơn nhiều so với việc viết lại `server.js` đang chạy ổn. Phần suy luận mô hình CV (YOLO/ONNX, xử lý ảnh nặng) vẫn giữ ở Python vì hệ sinh thái thư viện tốt hơn hẳn.

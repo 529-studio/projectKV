@@ -1,4 +1,7 @@
-.PHONY: all dev-all dev-go dev-web build-go test-go crawl help install setup-hooks
+-include .env
+export
+
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-api build-go test-go lint-go
 
 help:
 	@echo "========================================================"
@@ -25,11 +28,17 @@ setup-hooks:
 dev-go:
 	cd services/go-server && go run ./cmd/server
 
+dev-api:
+	cd services/go-server && go run ./cmd/api
+
 build-go:
-	cd services/go-server && go build -o bin/server ./cmd/server
+	cd services/go-server && go build -o bin/server ./cmd/server && go build ./...
 
 test-go:
-	cd services/go-server && go test -v ./...
+	cd services/go-server && go test ./... -race
+
+lint-go:
+	cd services/go-server && golangci-lint run
 
 dev-web:
 	npx -y serve -l 3001 apps/web
