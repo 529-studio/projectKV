@@ -31,7 +31,15 @@ func RegisterRoutes(rg *gin.RouterGroup, reader Reader) {
 	h.RegisterRoutes(rg)
 }
 
-// GetCameras handles GET /cameras with optional zone and corridor filter query parameters.
+// GetCameras godoc
+// @Summary List cameras
+// @Description Retrieve full camera catalog with optional zone and corridor filters
+// @Tags Camera
+// @Produce json
+// @Param zone query string false "Filter by administrative or geographic zone"
+// @Param corridor query string false "Filter by corridor keyword"
+// @Success 200 {array} Camera
+// @Router /api/cameras [get]
 func (h *Handler) GetCameras(c *gin.Context) {
 	zone := c.Query(ParamZone)
 	corridor := c.Query(ParamCorridor)
@@ -40,7 +48,15 @@ func (h *Handler) GetCameras(c *gin.Context) {
 	c.JSON(http.StatusOK, cameras)
 }
 
-// GetCameraByID handles GET /cameras/:id returning camera metadata or 404.
+// GetCameraByID godoc
+// @Summary Get camera by ID
+// @Description Retrieve single camera metadata by its unique identifier
+// @Tags Camera
+// @Produce json
+// @Param id path string true "Camera ID"
+// @Success 200 {object} Camera
+// @Failure 404 {object} map[string]string
+// @Router /api/cameras/{id} [get]
 func (h *Handler) GetCameraByID(c *gin.Context) {
 	id := c.Param(ParamID)
 	if cam, ok := h.reader.ByID(id); ok {
@@ -50,7 +66,13 @@ func (h *Handler) GetCameraByID(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{"error": ErrCameraNotFound})
 }
 
-// GetZones handles GET /zones returning the sorted list of valid zones.
+// GetZones godoc
+// @Summary List camera zones
+// @Description Retrieve sorted list of valid camera zone identifiers
+// @Tags Camera
+// @Produce json
+// @Success 200 {array} string
+// @Router /api/zones [get]
 func (h *Handler) GetZones(c *gin.Context) {
 	c.JSON(http.StatusOK, h.reader.Zones())
 }

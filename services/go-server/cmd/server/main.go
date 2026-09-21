@@ -15,8 +15,10 @@ import (
 
 	_ "github.com/529-studio/projectKV/services/go-server/docs"
 	"github.com/529-studio/projectKV/services/go-server/internal/cache"
+	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
 	"github.com/529-studio/projectKV/services/go-server/internal/handlers"
+	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/models"
 
@@ -40,6 +42,15 @@ func main() {
 		log.Fatalf("[FATAL] Failed to load camera store: %v", err)
 	}
 
+	camCatalog, err := camera.LoadCatalog(cfg.CamerasFilePath)
+	if err != nil {
+		log.Printf("[WARN] Failed to load structured camera catalog: %v", err)
+	}
+	var camCatalogHandler *camera.Handler
+	if camCatalog != nil {
+		camCatalogHandler = camera.NewHandler(camCatalog)
+	}
+
 	// 2. Initialize in-memory cache with singleflight dedup
 	snapCache := cache.NewSnapshotCache(cfg.CacheTTL)
 	stopEvictCh := make(chan struct{})
@@ -55,6 +66,7 @@ func main() {
 	// Health check
 	router.GET("/health", cameraHandler.HealthCheck)
 	router.HEAD("/health", cameraHandler.HealthCheck)
+	router.GET("/healthz", httpserver.Healthz)
 
 	// Swagger documentation UI
 	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
@@ -73,8 +85,22 @@ func main() {
 	// API Group
 	api := router.Group("/api")
 	{
-		api.GET("/cameras", cameraHandler.GetCameras)
+		api.GET("/cameras", func(c *gin.Context) {
+			zone := c.Query("zone")
+			corridor := c.Query("corridor")
+			if (zone != "" || corridor != "") && camCatalogHandler != nil {
+				camCatalogHandler.GetCameras(c)
+				return
+			}
+			cameraHandler.GetCameras(c)
+		})
 		api.HEAD("/cameras", cameraHandler.GetCameras)
+		if camCatalogHandler != nil {
+			api.GET("/cameras/:id", camCatalogHandler.GetCameraByID)
+			api.GET("/zones", camCatalogHandler.GetZones)
+		}
+		api.GET("/snapshot/:id", cameraHandler.GetSnapshot)
+		api.HEAD("/snapshot/:id", cameraHandler.GetSnapshot)
 		api.GET("/cameras/snapshot/:id", cameraHandler.GetSnapshot)
 		api.HEAD("/cameras/snapshot/:id", cameraHandler.GetSnapshot)
 	}
