@@ -54,3 +54,10 @@ dev-all:
 
 crawl:
 	node tools/crawler/get_all_cameras.js
+
+docker-build:
+	docker build -t warded-stg:latest .
+
+docker-run:
+	docker run --rm -p 3000:3000 -v $(shell pwd)/data:/app/data warded-stg:latest
+

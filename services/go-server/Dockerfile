@@ -1,10 +1,16 @@
-FROM golang:1.23-alpine AS builder
+# Standalone Go server Dockerfile (use root Dockerfile for full monorepo image with static assets)
+FROM golang:alpine AS builder
 WORKDIR /app
+RUN apk add --no-cache ca-certificates tzdata
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /server ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /server ./cmd/server
 
-FROM scratch
-COPY --from=builder /server /server
-ENTRYPOINT ["/server"]
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /app
+COPY --from=builder /server /app/server
+EXPOSE 3000
+ENTRYPOINT ["/app/server"]
+
