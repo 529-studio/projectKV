@@ -1,6 +1,8 @@
 package httpserver
 
 import (
+	"net/http"
+
 	_ "github.com/529-studio/projectKV/services/go-server/docs"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -21,7 +23,18 @@ func NewServer() *gin.Engine {
 	})
 
 	// Swagger documentation UI
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
+	r.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+	})
+	r.GET("/swagger/*any", func(c *gin.Context) {
+		p := c.Param("any")
+		if p == "" || p == "/" {
+			c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+			return
+		}
+		swaggerHandler(c)
+	})
 
 	return r
 }

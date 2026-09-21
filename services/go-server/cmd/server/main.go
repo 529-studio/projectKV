@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/529-studio/projectKV/services/go-server/docs"
 	"github.com/529-studio/projectKV/services/go-server/internal/cache"
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
 	"github.com/529-studio/projectKV/services/go-server/internal/handlers"
@@ -20,6 +21,8 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/models"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func main() {
@@ -53,6 +56,20 @@ func main() {
 	router.GET("/health", cameraHandler.HealthCheck)
 	router.HEAD("/health", cameraHandler.HealthCheck)
 
+	// Swagger documentation UI
+	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
+	router.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+	})
+	router.GET("/swagger/*any", func(c *gin.Context) {
+		p := c.Param("any")
+		if p == "" || p == "/" {
+			c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+			return
+		}
+		swaggerHandler(c)
+	})
+
 	// API Group
 	api := router.Group("/api")
 	{
@@ -73,8 +90,8 @@ func main() {
 		// Handle any additional assets or SPA fallback
 		router.NoRoute(func(c *gin.Context) {
 			reqPath := c.Request.URL.Path
-			if strings.HasPrefix(reqPath, "/api/") {
-				c.JSON(http.StatusNotFound, gin.H{"error": "api endpoint not found"})
+			if strings.HasPrefix(reqPath, "/api/") || strings.HasPrefix(reqPath, "/swagger") {
+				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 				return
 			}
 			filePath := filepath.Join(cfg.StaticWebDir, filepath.Clean(reqPath))
@@ -99,6 +116,7 @@ func main() {
 		log.Println("================================================================")
 		log.Printf(" [OK] CAMERA VIEW GO-GIN SERVER RUNNING")
 		log.Printf(" [URL] Available at: http://localhost:%s", cfg.Port)
+		log.Printf(" [DOC] Swagger UI:   http://localhost:%s/swagger/index.html", cfg.Port)
 		log.Printf(" [CAM] Loaded %d cameras into memory (%d online)", store.Total, store.OnlineCount)
 		log.Println("================================================================")
 
