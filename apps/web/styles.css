@@ -628,6 +628,67 @@ body, html {
   display: inline-block;
 }
 
+.symbol-dot-clear {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid #000000;
+  display: inline-block;
+}
+
+.symbol-dot-moderate {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #eab308;
+  border: 2px solid #000000;
+  display: inline-block;
+}
+
+.symbol-dot-congested {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid #000000;
+  display: inline-block;
+}
+
+.traffic-tag {
+  font-size: 9.5px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 2px;
+  display: inline-block;
+  line-height: 1.2;
+}
+
+.traffic-tag.clear {
+  color: var(--status-clear);
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.traffic-tag.moderate {
+  color: var(--status-moderate);
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+
+.traffic-tag.congested {
+  color: var(--status-danger);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.traffic-tag.unknown {
+  color: var(--text-muted);
+  background: rgba(113, 113, 122, 0.12);
+  border: 1px solid rgba(113, 113, 122, 0.3);
+}
+
 /* =======================================================
    BOTTOM DRAWER: PINNED CAMERAS DOCK
 ======================================================= */

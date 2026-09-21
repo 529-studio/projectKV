@@ -42,6 +42,7 @@ const TRAFFIC_SEVERITY = Object.freeze({
 const FUNCTIONAL_COLORS = Object.freeze({
   CLEAR: '#22c55e',      // Green: Clear / Active
   MODERATE: '#eab308',   // Yellow: Slow / Moderate
+  HEAVY: '#ef4444',      // Red: Heavy congestion
   CONGESTED: '#ef4444',  // Red: Congested / Bottleneck
   ONLINE_DEFAULT: '#ffffff',
   OFFLINE_DEFAULT: '#52525b',
