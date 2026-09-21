@@ -18,5 +18,5 @@ jobs:
       - uses: golangci/golangci-lint-action@v6
         with:
           working-directory: services/go-server
-          version: latest
+          install-mode: "goinstall"
       - run: go test ./... -race -cover
