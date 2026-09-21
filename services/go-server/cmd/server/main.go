@@ -18,9 +18,11 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
 	"github.com/529-studio/projectKV/services/go-server/internal/handlers"
+	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/models"
+	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -51,15 +53,31 @@ func main() {
 		camCatalogHandler = camera.NewHandler(camCatalog)
 	}
 
-	// 2. Initialize in-memory cache with singleflight dedup
+	// 2. Initialize HotSet registry for active camera tracking.
+	// activeTTL = 120 s; no fixed cameras at startup for this server.
+	hotsetRegistry := hotset.NewRegistry(nil, 120*time.Second)
+
+	// 3. Initialize in-memory cache with singleflight dedup (legacy handler).
 	snapCache := cache.NewSnapshotCache(cfg.CacheTTL)
 	stopEvictCh := make(chan struct{})
 	snapCache.StartEvictionRoutine(cfg.CacheEvictInterval, cfg.CacheMaxAge, stopEvictCh)
 
-	// 3. Initialize HTTP Handlers
+	// 4. proxycache handler — wraps the DOT portal proxy with TTL cache and
+	// HotSet Touch (Dependency Inversion: Touch is injected as a callback so
+	// proxycache does not import hotset directly).
+	upstreamBase := os.Getenv("SNAPSHOT_UPSTREAM_BASE_URL")
+	if upstreamBase == "" {
+		upstreamBase = "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx"
+	}
+	proxyCache := proxycache.NewCache(cfg.CacheTTL)
+	proxyHandler := proxycache.NewHandler(proxyCache, upstreamBase, func(id, name, zone, snapshotURL string) {
+		hotsetRegistry.Touch(hotset.Camera{ID: id, Name: name, Zone: zone, SnapshotURL: snapshotURL})
+	})
+
+	// 5. Legacy HTTP Handlers (camera list + old snapshot path).
 	cameraHandler := handlers.NewCameraHandler(store, snapCache)
 
-	// 4. Setup Gin Engine
+	// 6. Setup Gin Engine
 	router := gin.Default()
 	router.Use(middleware.CORSMiddleware())
 
@@ -99,10 +117,11 @@ func main() {
 			api.GET("/cameras/:id", camCatalogHandler.GetCameraByID)
 			api.GET("/zones", camCatalogHandler.GetZones)
 		}
-		api.GET("/snapshot/:id", cameraHandler.GetSnapshot)
-		api.HEAD("/snapshot/:id", cameraHandler.GetSnapshot)
-		api.GET("/cameras/snapshot/:id", cameraHandler.GetSnapshot)
-		api.HEAD("/cameras/snapshot/:id", cameraHandler.GetSnapshot)
+		// Proxy cache snapshot routes (new — wraps proxycache.Handler)
+		proxyHandler.RegisterRoutes(api)
+		// Legacy alias kept for backward compat with existing FE constants.js
+		api.GET("/cameras/snapshot/:id", proxyHandler.GetSnapshot)
+		api.HEAD("/cameras/snapshot/:id", proxyHandler.GetSnapshot)
 	}
 
 	// 5. Static Web Serving
