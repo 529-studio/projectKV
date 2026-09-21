@@ -6,3 +6,16 @@ linters:
     - gofmt
 run:
   timeout: 3m
+issues:
+  exclude-rules:
+    # nhooyr.io/websocket was transferred to coder/websocket; suppress deprecation warning SA1019
+    - text: "coder now maintains this library"
+      linters:
+        - staticcheck
+    - text: "nhooyr.io/websocket"
+      linters:
+        - staticcheck
+    - path: internal/ws/
+      text: "SA1019"
+      linters:
+        - staticcheck
