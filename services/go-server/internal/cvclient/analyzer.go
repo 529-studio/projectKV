@@ -4,4 +4,4 @@ package cvclient
 import "net/http"
 import "time"
 
-var sharedClient = &http.Client{Timeout: 10 * time.Second}
+var SharedClient = &http.Client{Timeout: 10 * time.Second}

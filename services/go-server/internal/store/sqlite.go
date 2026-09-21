@@ -64,7 +64,9 @@ func applyMigration(db *sql.DB, query string) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	if _, err := tx.Exec(query); err != nil {
 		return err
