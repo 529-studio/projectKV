@@ -110,8 +110,8 @@ paths:
       - Camera
   /api/snapshot/{id}:
     get:
-      description: Proxy and cache real-time traffic camera snapshot image from upstream
-        portal
+      description: Proxy and cache a real-time traffic camera snapshot from the upstream
+        DOT portal (TTL ≥ 10 s). Also triggers HotSet Touch for automatic AI analysis.
       parameters:
       - description: Camera ID
         in: path
@@ -137,7 +137,7 @@ paths:
             additionalProperties:
               type: string
             type: object
-      summary: Get camera snapshot image
+      summary: Get camera snapshot (proxy cache)
       tags:
       - Camera
   /api/zones:

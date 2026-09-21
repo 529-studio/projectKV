@@ -139,14 +139,14 @@ const docTemplate = `{
         },
         "/api/snapshot/{id}": {
             "get": {
-                "description": "Proxy and cache real-time traffic camera snapshot image from upstream portal",
+                "description": "Proxy and cache a real-time traffic camera snapshot from the upstream DOT portal (TTL ≥ 10 s). Also triggers HotSet Touch for automatic AI analysis.",
                 "produces": [
                     "image/jpeg"
                 ],
                 "tags": [
                     "Camera"
                 ],
-                "summary": "Get camera snapshot image",
+                "summary": "Get camera snapshot (proxy cache)",
                 "parameters": [
                     {
                         "type": "string",
