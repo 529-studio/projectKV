@@ -1,0 +1,40 @@
+services:
+  warded-stg:
+    image: ghcr.io/529-studio/projectkv:stg-latest
+    container_name: warded-stg
+    restart: unless-stopped
+    pull_policy: always
+    networks:
+      - core-network
+    environment:
+      - PORT=3000
+      - GIN_MODE=release
+      - CAMERAS_FILE_PATH=/app/cameras_all.json
+      - STATIC_WEB_DIR=/app/web
+      - SQLITE_PATH=/app/data/camera-view.db
+      - SNAPSHOT_UPSTREAM_BASE_URL=https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx
+      - SNAPSHOT_CACHE_TTL_SECONDS=10
+      - HOTSET_INTERVAL_SECONDS=30
+      - HOTSET_ACTIVE_TTL_SECONDS=120
+      - TZ=Asia/Ho_Chi_Minh
+    volumes:
+      - warded-stg-data:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=core-network"
+      - "traefik.http.routers.warded-stg.rule=Host(`warded-stg.529studio.site`)"
+      - "traefik.http.routers.warded-stg.entrypoints=websecure"
+      - "traefik.http.routers.warded-stg.tls.certresolver=cloudflare"
+      - "traefik.http.services.warded-stg.loadbalancer.server.port=3000"
+
+volumes:
+  warded-stg-data: {}
+
+networks:
+  core-network:
+    external: true
