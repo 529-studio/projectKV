@@ -21,6 +21,19 @@ definitions:
       zone:
         type: string
     type: object
+  hotset.Verdict:
+    properties:
+      camera_id:
+        type: string
+      confidence:
+        type: number
+      severity:
+        description: e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED", or "DRY" |
+          "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP"
+        type: string
+      timestamp:
+        type: string
+    type: object
 info:
   contact: {}
   description: Ho Chi Minh City Traffic Camera & Flood Alert API
@@ -108,6 +121,22 @@ paths:
       summary: Get camera snapshot image
       tags:
       - Camera
+  /api/flood-status:
+    get:
+      description: 'Placeholder — flood detection shares the same verdict store; this
+        endpoint is out of scope for issue #8 and returns an empty list.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/hotset.Verdict'
+            type: array
+      summary: Get latest flood-detection verdicts
+      tags:
+      - Traffic
   /api/snapshot/{id}:
     get:
       description: Proxy and cache a real-time traffic camera snapshot from the upstream
@@ -140,6 +169,28 @@ paths:
       summary: Get camera snapshot (proxy cache)
       tags:
       - Camera
+  /api/traffic-status:
+    get:
+      description: Returns the most recent AI-analyzed congestion verdict for every
+        camera in the Hot Set (all cameras with a stored verdict).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/hotset.Verdict'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get latest traffic congestion verdicts
+      tags:
+      - Traffic
   /api/zones:
     get:
       description: Retrieve sorted list of valid camera zone identifiers
