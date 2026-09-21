@@ -1,15 +1,139 @@
 package config
 
 import (
+	"bufio"
+	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
-
-	"github.com/joho/godotenv"
 )
 
-// Config represents runtime configuration for the Go backend server.
 type Config struct {
+	Port                    int
+	SnapshotUpstreamBaseURL string
+	SnapshotCacheTTLSeconds int
+	HotsetIntervalSeconds   int
+	HotsetMaxParallel       int
+	HotsetActiveTTLSeconds  int
+	TelegramBotToken        string
+	CloudVisionAPIKey       string
+	CVEngineURL             string
+	SQLitePath              string
+	DedupeCooldownMinutes   int
+	LogLevel                string
+}
+
+func loadDotEnv() {
+	paths := []string{".env", "../../.env", "../.env"}
+	for _, p := range paths {
+		f, err := os.Open(p)
+		if err != nil {
+			continue
+		}
+		defer f.Close()
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				val := strings.TrimSpace(parts[1])
+				val = strings.Trim(val, `"'`)
+				if _, exists := os.LookupEnv(key); !exists {
+					_ = os.Setenv(key, val)
+				}
+			}
+		}
+		break
+	}
+}
+
+func LoadFromEnv() (*Config, error) {
+	loadDotEnv()
+
+	var errs []error
+	cfg := &Config{
+		Port:                    3000,
+		SnapshotCacheTTLSeconds: 10,
+		HotsetIntervalSeconds:   30,
+		HotsetMaxParallel:       10,
+		HotsetActiveTTLSeconds:  120,
+		CVEngineURL:             "http://localhost:8001",
+		SQLitePath:              "./data/camera-view.db",
+		DedupeCooldownMinutes:   15,
+		LogLevel:                "info",
+	}
+
+	if portStr := os.Getenv("PORT"); portStr != "" {
+		if p, err := strconv.Atoi(portStr); err == nil {
+			cfg.Port = p
+		}
+	}
+
+	cfg.SnapshotUpstreamBaseURL = os.Getenv("SNAPSHOT_UPSTREAM_BASE_URL")
+	if cfg.SnapshotUpstreamBaseURL == "" {
+		errs = append(errs, errors.New("SNAPSHOT_UPSTREAM_BASE_URL is required"))
+	}
+
+	if ttlStr := os.Getenv("SNAPSHOT_CACHE_TTL_SECONDS"); ttlStr != "" {
+		if t, err := strconv.Atoi(ttlStr); err == nil {
+			cfg.SnapshotCacheTTLSeconds = t
+		}
+	}
+
+	if val := os.Getenv("HOTSET_INTERVAL_SECONDS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			cfg.HotsetIntervalSeconds = v
+		}
+	}
+
+	if val := os.Getenv("HOTSET_MAX_PARALLEL"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			cfg.HotsetMaxParallel = v
+		}
+	}
+
+	if val := os.Getenv("HOTSET_ACTIVE_TTL_SECONDS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			cfg.HotsetActiveTTLSeconds = v
+		}
+	}
+
+	cfg.TelegramBotToken = os.Getenv("TELEGRAM_BOT_TOKEN")
+	cfg.CloudVisionAPIKey = os.Getenv("CLOUD_VISION_API_KEY")
+
+	if val := os.Getenv("CV_ENGINE_URL"); val != "" {
+		cfg.CVEngineURL = val
+	}
+
+	if val := os.Getenv("SQLITE_PATH"); val != "" {
+		cfg.SQLitePath = val
+	}
+
+	if val := os.Getenv("DEDUPE_COOLDOWN_MINUTES"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			cfg.DedupeCooldownMinutes = v
+		}
+	}
+
+	if val := os.Getenv("LOG_LEVEL"); val != "" {
+		cfg.LogLevel = val
+	}
+
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
+	return cfg, nil
+}
+
+// ServerConfig represents runtime configuration for the snapshot/web server.
+type ServerConfig struct {
 	Port               string
 	CamerasFilePath    string
 	StaticWebDir       string
@@ -20,19 +144,16 @@ type Config struct {
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
 func resolvePath(rel string) string {
-	// 1. Try relative to current working directory
 	p1 := filepath.Clean(rel)
 	if _, err := os.Stat(p1); err == nil {
 		return p1
 	}
 
-	// 2. Try relative to parent directory (if run from services/go-server)
 	p2 := filepath.Join("../..", rel)
 	if _, err := os.Stat(p2); err == nil {
 		return p2
 	}
 
-	// 3. Try one level up
 	p3 := filepath.Join("..", rel)
 	if _, err := os.Stat(p3); err == nil {
 		return p3
@@ -41,16 +162,9 @@ func resolvePath(rel string) string {
 	return rel
 }
 
-// LoadConfig reads configuration from environment variables with sensible defaults.
-func LoadConfig() *Config {
-	// Attempt to load .env from repository root or current directory
-	envPaths := []string{".env", "../../.env", "../.env"}
-	for _, envPath := range envPaths {
-		if _, err := os.Stat(envPath); err == nil {
-			_ = godotenv.Load(envPath)
-			break
-		}
-	}
+// LoadConfig reads configuration for the snapshot server from environment variables with sensible defaults.
+func LoadConfig() *ServerConfig {
+	loadDotEnv()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -67,7 +181,7 @@ func LoadConfig() *Config {
 		staticDir = resolvePath("apps/web")
 	}
 
-	return &Config{
+	return &ServerConfig{
 		Port:               port,
 		CamerasFilePath:    camerasPath,
 		StaticWebDir:       staticDir,

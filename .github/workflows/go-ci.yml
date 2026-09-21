@@ -1,0 +1,22 @@
+name: go-ci
+on:
+  pull_request:
+    branches: [dev, main]
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/go-server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'services/go-server/go.mod'
+      - run: go build ./...
+      - run: go vet ./...
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: services/go-server
+          install-mode: "goinstall"
+      - run: go test ./... -race -cover
