@@ -24,6 +24,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/models"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
+	"github.com/529-studio/projectKV/services/go-server/internal/ws"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -114,10 +115,14 @@ func main() {
 	}
 	hotsetHandler := hotset.NewHandler(&verdictStoreAdapter{repo: verdictRepo})
 
-	// 6. Legacy HTTP Handlers (camera list + old snapshot path).
+	// 6. Initialize WebSocket Hub for real-time verdict streaming (Issue #9)
+	wsHub := ws.NewHub()
+	defer wsHub.Close()
+
+	// 7. Legacy HTTP Handlers (camera list + old snapshot path).
 	cameraHandler := handlers.NewCameraHandler(camStore, snapCache)
 
-	// 7. Setup Gin Engine
+	// 8. Setup Gin Engine
 	router := gin.Default()
 	router.Use(middleware.CORSMiddleware())
 
@@ -125,6 +130,9 @@ func main() {
 	router.GET("/health", cameraHandler.HealthCheck)
 	router.HEAD("/health", cameraHandler.HealthCheck)
 	router.GET("/healthz", httpserver.Healthz)
+
+	// WebSocket Live Broadcast (Issue #9: GET /ws/live)
+	wsHub.RegisterRoutes(router)
 
 	// Swagger documentation UI
 	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
@@ -177,7 +185,7 @@ func main() {
 		// Handle any additional assets or SPA fallback
 		router.NoRoute(func(c *gin.Context) {
 			reqPath := c.Request.URL.Path
-			if strings.HasPrefix(reqPath, "/api/") || strings.HasPrefix(reqPath, "/swagger") {
+			if strings.HasPrefix(reqPath, "/api/") || strings.HasPrefix(reqPath, "/swagger") || strings.HasPrefix(reqPath, "/ws") {
 				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 				return
 			}
@@ -204,6 +212,7 @@ func main() {
 		log.Printf(" [OK] CAMERA VIEW GO-GIN SERVER RUNNING")
 		log.Printf(" [URL] Available at: http://localhost:%s", cfg.Port)
 		log.Printf(" [DOC] Swagger UI:   http://localhost:%s/swagger/index.html", cfg.Port)
+		log.Printf(" [WS]  WebSocket:    ws://localhost:%s%s", cfg.Port, ws.RouteLive)
 		log.Printf(" [CAM] Loaded %d cameras into memory (%d online)", camStore.Total, camStore.OnlineCount)
 		log.Println("================================================================")
 
