@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"camera-view-server/internal/cache"
+	"github.com/529-studio/projectKV/services/go-server/internal/cache"
 )
 
 func TestSnapshotCache_TTLAndHit(t *testing.T) {
