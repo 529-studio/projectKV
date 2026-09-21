@@ -1,0 +1,11 @@
+.git
+.github
+.githooks
+.agents
+.claude
+data/
+*.db
+*.db-journal
+bin/
+services/go-server/bin/
+node_modules/
