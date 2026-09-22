@@ -46,7 +46,7 @@ jobs:
           TAGS="${IMAGE_LOWER}:${{ github.sha }}"
 
           if [ "${{ github.ref_name }}" = "dev" ]; then
-            TAGS="${TAGS},${IMAGE_LOWER}:dev,${IMAGE_LOWER}:stg-latest"
+            TAGS="${TAGS},${IMAGE_LOWER}:dev,${IMAGE_LOWER}:stg-latest,${IMAGE_LOWER}:latest"
           elif [ "${{ github.ref_name }}" = "main" ]; then
             TAGS="${TAGS},${IMAGE_LOWER}:latest"
           fi

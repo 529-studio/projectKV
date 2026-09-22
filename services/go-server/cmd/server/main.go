@@ -182,6 +182,11 @@ func main() {
 		router.StaticFile("/styles.css", filepath.Join(cfg.StaticWebDir, "styles.css"))
 		router.StaticFile("/app.js", filepath.Join(cfg.StaticWebDir, "app.js"))
 
+		nextDir := filepath.Join(cfg.StaticWebDir, "_next")
+		if info, err := os.Stat(nextDir); err == nil && info.IsDir() {
+			router.Static("/_next", nextDir)
+		}
+
 		// Handle any additional assets or SPA fallback
 		router.NoRoute(func(c *gin.Context) {
 			reqPath := c.Request.URL.Path
