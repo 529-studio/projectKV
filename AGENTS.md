@@ -44,9 +44,10 @@ This document defines the core principles, design standards, and mandatory techn
 
 ## 3. Engineering & Performance Rules
 
-*   **Zero-Bloat Frontend**:
-    *   Do not install heavy UI frameworks (Bootstrap, bulky Tailwind build pipelines, jQuery).
-    *   Keep HTML, CSS, and JS lightweight, dependency-free, and instantly responsive.
+*   **Modern Frontend Stack**:
+    *   Use **Next.js (App Router)**, **Tailwind CSS**, and **TypeScript** for all web frontend development.
+    *   Animations must be sleek, minimalist, and implemented via **Framer Motion** or Tailwind utilities.
+    *   Ensure components are properly split (e.g., Client Components for Leaflet/interactive hooks, Server Components for static shells).
 *   **API Protection & Rate Limiting Prevention**:
     *   All snapshot images from upstream traffic portals must pass through the backend proxy (`server.js`) with an in-memory cache of at least 10–15 seconds.
     *   Never allow the frontend client to fetch bulk snapshot images directly from `giaothong.hochiminhcity.gov.vn`.
@@ -71,6 +72,7 @@ This document defines the core principles, design standards, and mandatory techn
         1. Create feature branch: `git checkout -b feat/<feature-name>` or `fix/<fix-name>`.
         2. Push feature branch: `git push origin feat/<feature-name>`.
         3. Open a Pull Request targeting `dev` for review and automated CI verification.
+    *   **No Auto-Merge by AI Agents**: AI agents must NEVER merge or squash Pull Requests. All PRs must remain open in "In review" state for direct human review and approval.
     *   For emergency administrative maintenance, the commit message must include the flag `[skip-pr-check]`.
 *   **Two-Tier Protection Guard**:
     *   *Tier 1 (Client-Side Guard)*: `.githooks/pre-push` rejects direct push attempts to `main` or `dev` locally. Activated automatically via `make install` or `make setup-hooks`.
