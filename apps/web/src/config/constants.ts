@@ -27,6 +27,44 @@ export const API_ENDPOINTS = Object.freeze({
   WS_LIVE: '/ws/live',
 });
 
+/**
+ * Resolves the full URL for an API endpoint.
+ * - If NEXT_PUBLIC_API_BASE_URL is set, prefixes with it.
+ * - If running in local development on port 3001, defaults to http://localhost:3000.
+ * - Otherwise (production/staging sharing origin with Go server), uses relative path.
+ */
+export const getApiUrl = (endpoint: string): string => {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL !== undefined && process.env.NEXT_PUBLIC_API_BASE_URL !== '') {
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, '');
+    return `${base}${endpoint}`;
+  }
+  if (typeof window !== 'undefined' && window.location.port === '3001') {
+    return `http://localhost:3000${endpoint}`;
+  }
+  return endpoint;
+};
+
+/**
+ * Resolves the full WebSocket URL.
+ * - If NEXT_PUBLIC_WS_URL is set, uses it.
+ * - If running in local development on port 3001, defaults to ws://localhost:3000/ws/live.
+ * - Otherwise, dynamically derives wss:// (or ws://) from current window.location.
+ */
+export const getWebSocketUrl = (endpoint: string = API_ENDPOINTS.WS_LIVE): string => {
+  if (process.env.NEXT_PUBLIC_WS_URL !== undefined && process.env.NEXT_PUBLIC_WS_URL !== '') {
+    const base = process.env.NEXT_PUBLIC_WS_URL.replace(/\/$/, '');
+    return `${base}${endpoint}`;
+  }
+  if (typeof window !== 'undefined') {
+    if (window.location.port === '3001') {
+      return `ws://localhost:3000${endpoint}`;
+    }
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}${endpoint}`;
+  }
+  return `ws://localhost:3000${endpoint}`;
+};
+
 export const TRAFFIC_SEVERITY = Object.freeze({
   CLEAR: 'CLEAR',
   MODERATE: 'MODERATE',
