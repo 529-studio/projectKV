@@ -35,7 +35,10 @@ export const API_ENDPOINTS = Object.freeze({
  */
 export const getApiUrl = (endpoint: string): string => {
   if (process.env.NEXT_PUBLIC_API_BASE_URL !== undefined && process.env.NEXT_PUBLIC_API_BASE_URL !== '') {
-    const base = process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, '');
+    let base = process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, '');
+    if (base.endsWith('/api') && endpoint.startsWith('/api')) {
+      base = base.slice(0, -4);
+    }
     return `${base}${endpoint}`;
   }
   if (typeof window !== 'undefined' && window.location.port === '3001') {
