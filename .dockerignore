@@ -9,3 +9,6 @@ data/
 bin/
 services/go-server/bin/
 node_modules/
+apps/web/node_modules/
+apps/web/.next/
+apps/web/out/
