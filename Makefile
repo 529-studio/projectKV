@@ -41,16 +41,16 @@ lint-go:
 	cd services/go-server && golangci-lint run
 
 dev-web:
-	npx -y serve -l 3001 apps/web
+	cd apps/web && npm run dev -- -p 3001
 
 dev-all:
 	@echo "========================================================"
 	@echo " Starting all Camera View services..."
-	@echo " - Go Backend API & Web: http://localhost:3000"
-	@echo " - Frontend Dev:         http://localhost:3001"
+	@echo " - Go Backend API:       http://localhost:3000"
+	@echo " - Next.js Frontend Dev: http://localhost:3001"
 	@echo " (Press Ctrl+C to stop all services)"
 	@echo "========================================================"
-	@trap 'kill 0' SIGINT SIGTERM EXIT; (cd services/go-server && go run ./cmd/server) & npx -y serve -l 3001 apps/web & wait
+	@trap 'kill 0' SIGINT SIGTERM EXIT; (cd services/go-server && go run ./cmd/server) & (cd apps/web && npm run dev -- -p 3001) & wait
 
 crawl:
 	node tools/crawler/get_all_cameras.js
