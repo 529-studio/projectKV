@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_ENDPOINTS } from '../config/constants';
+import { API_ENDPOINTS, getApiUrl, getWebSocketUrl } from '../config/constants';
 
 export interface TrafficVerdict {
   camera_id: string;
@@ -29,7 +29,7 @@ export function useTraffic() {
 
     async function fetchInitial() {
       try {
-        const res = await fetch(`http://localhost:3000${API_ENDPOINTS.TRAFFIC_STATUS}`);
+        const res = await fetch(getApiUrl(API_ENDPOINTS.TRAFFIC_STATUS));
         if (!res.ok) return;
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.verdicts || []);
@@ -46,7 +46,7 @@ export function useTraffic() {
     }
 
     function initWs() {
-      ws = new WebSocket(`ws://localhost:3000${API_ENDPOINTS.WS_LIVE}`);
+      ws = new WebSocket(getWebSocketUrl(API_ENDPOINTS.WS_LIVE));
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);

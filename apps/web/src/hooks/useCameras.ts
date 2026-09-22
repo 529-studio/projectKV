@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API_ENDPOINTS } from '../config/constants';
+import { API_ENDPOINTS, getApiUrl } from '../config/constants';
 
 export interface Camera {
   id: string;
@@ -19,7 +19,7 @@ export function useCameras() {
   useEffect(() => {
     async function fetchCameras() {
       try {
-        const res = await fetch(`http://localhost:3000${API_ENDPOINTS.CAMERAS}`);
+        const res = await fetch(getApiUrl(API_ENDPOINTS.CAMERAS));
         if (!res.ok) throw new Error('Failed to fetch cameras');
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.cameras || []);
