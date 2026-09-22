@@ -7,11 +7,12 @@ import { TrafficVerdict } from '../hooks/useTraffic';
 import { MAP_CONFIG, FUNCTIONAL_COLORS } from '../config/constants';
 
 interface MapComponentProps {
+  onCameraClick?: (cam: Camera) => void;
   cameras: Camera[];
   verdicts: Map<string, TrafficVerdict>;
 }
 
-export default function MapComponent({ cameras, verdicts }: MapComponentProps) {
+export default function MapComponent({ cameras, verdicts, onCameraClick }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
@@ -107,6 +108,12 @@ export default function MapComponent({ cameras, verdicts }: MapComponentProps) {
           color: FUNCTIONAL_COLORS.MAP_STROKE, 
           weight: curZ >= 14 ? 2 : 1.5 
         });
+      });
+
+      marker.on('click', () => {
+        if (onCameraClick) {
+          onCameraClick(cam);
+        }
       });
 
       markersLayerRef.current?.addLayer(marker);
