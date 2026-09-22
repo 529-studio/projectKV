@@ -20,9 +20,12 @@ export default function LandingOverlay() {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="text-center font-mono text-white p-6 max-w-2xl mx-auto"
           >
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">GIAO THÔNG TP.HCM</h1>
+            <div className="flex items-center justify-center gap-4 mb-4">
+              <img src="/wared-icon.png" alt="Warded Logo" className="w-12 h-12 md:w-16 md:h-16 object-contain" />
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Warded</h1>
+            </div>
             <p className="text-zinc-400 text-lg mb-8">
-              Giám sát camera thời gian thực. Phân tích ùn tắc bằng AI với độ trễ 0s.
+              Giúp đoạn đường của bạn đỡ chông gai hơn mỗi ngày.
             </p>
             <button 
               onClick={() => setIsVisible(false)}
