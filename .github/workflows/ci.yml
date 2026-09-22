@@ -30,9 +30,14 @@ jobs:
           go test -v ./...
           go build -v -o bin/server ./cmd/server
 
-      - name: Verify JavaScript Syntax
+      - name: Verify Web Frontend (Next.js)
         run: |
-          node --check apps/web/app.js
+          cd apps/web
+          npm install
+          npm run build
+      
+      - name: Verify Tools Syntax
+        run: |
           node --check tools/crawler/get_all_cameras.js
 
       - name: Verify Camera Dataset Integrity
