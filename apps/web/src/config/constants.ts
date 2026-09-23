@@ -63,11 +63,16 @@ export const FUNCTIONAL_COLORS = Object.freeze({
 export const MAP_CONFIG = Object.freeze({
   DEFAULT_CENTER: [10.7769, 106.7009],
   DEFAULT_ZOOM: 11,
-  MIN_ZOOM: 9,
+  MIN_ZOOM: 10,
   MAX_ZOOM: 18,
   MAX_BOUNDS: [
     [10.15, 106.35],
     [11.35, 107.45],
   ],
+  MAX_BOUNDS_VISCOSITY: 0.75,
+  TILE_URL: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  TILE_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  TILE_SUBDOMAINS: 'abcd',
   REFRESH_INTERVAL_SECONDS: 10,
 });
+
