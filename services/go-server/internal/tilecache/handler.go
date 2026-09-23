@@ -2,6 +2,7 @@ package tilecache
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -55,6 +56,7 @@ func (h *Handler) GetTile(c *gin.Context) {
 
 	data, isHit, err := h.manager.GetTile(c.Request.Context(), z, x, y)
 	if err != nil {
+		log.Printf("[WARN] Failed to get map tile (%d/%d/%d): %v", z, x, y, err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to get tile: %v", err)})
 		return
 	}
