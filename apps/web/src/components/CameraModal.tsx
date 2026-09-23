@@ -1,6 +1,6 @@
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
-import { API_ENDPOINTS, FUNCTIONAL_COLORS } from '../config/constants';
+import { API_ENDPOINTS, FUNCTIONAL_COLORS, getApiUrl } from '../config/constants';
 
 interface CameraModalProps {
   camera: Camera | null;
@@ -51,7 +51,7 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
         <div className="relative w-full aspect-video bg-black flex items-center justify-center">
           {camera.isOnline ? (
             <img 
-              src={`http://localhost:3000${API_ENDPOINTS.SNAPSHOT(camera.id)}?t=${Date.now()}`}
+              src={`${getApiUrl(API_ENDPOINTS.SNAPSHOT(camera.id))}?t=${Date.now()}`}
               className="w-full h-full object-contain"
               alt="Live Snapshot"
               onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="none"><rect width="100%" height="100%" fill="%23111"/><text x="50%" y="50%" fill="%23666" font-family="monospace" font-size="14" text-anchor="middle">Lỗi tải ảnh</text></svg>' }}
