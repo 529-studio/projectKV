@@ -27,6 +27,22 @@ export const API_ENDPOINTS = Object.freeze({
   WS_LIVE: '/ws/live',
 });
 
+export const getApiUrl = (endpoint: string): string => {
+  const base = process.env.NEXT_PUBLIC_API_URL || '';
+  return `${base}${endpoint}`;
+};
+
+export const getWsUrl = (endpoint: string): string => {
+  if (process.env.NEXT_PUBLIC_WS_URL) {
+    return `${process.env.NEXT_PUBLIC_WS_URL}${endpoint}`;
+  }
+  if (typeof window !== 'undefined') {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}${endpoint}`;
+  }
+  return `ws://localhost:3000${endpoint}`;
+};
+
 export const TRAFFIC_SEVERITY = Object.freeze({
   CLEAR: 'CLEAR',
   MODERATE: 'MODERATE',
