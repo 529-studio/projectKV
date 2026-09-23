@@ -24,6 +24,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/models"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
+	"github.com/529-studio/projectKV/services/go-server/internal/tilecache"
 	"github.com/529-studio/projectKV/services/go-server/internal/ws"
 
 	"github.com/gin-gonic/gin"
@@ -104,6 +105,10 @@ func main() {
 		hotsetRegistry.Touch(hotset.Camera{ID: id, Name: name, Zone: zone, SnapshotURL: snapshotURL})
 	})
 
+	// Initialize tilecache Manager and Handler for self-hosted map tiles
+	tileManager := tilecache.NewManager(cfg.TileCacheDir)
+	tileHandler := tilecache.NewHandler(tileManager)
+
 	// 5. Initialize SQLite DB and Verdict Repository
 	db, err := store.NewDB(cfg.SQLitePath)
 	var verdictRepo *store.VerdictRepo
@@ -169,6 +174,8 @@ func main() {
 		proxyHandler.RegisterRoutes(api)
 		// Traffic and flood congestion status endpoints (Issue #8)
 		hotsetHandler.RegisterRoutes(api)
+		// Map tile proxy and local disk cache
+		tileHandler.RegisterRoutes(api)
 		// Legacy alias kept for backward compat with existing FE constants.js
 		api.GET("/cameras/snapshot/:id", proxyHandler.GetSnapshot)
 		api.HEAD("/cameras/snapshot/:id", proxyHandler.GetSnapshot)
