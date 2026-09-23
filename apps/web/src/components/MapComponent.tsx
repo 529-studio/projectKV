@@ -16,7 +16,6 @@ export default function MapComponent({ cameras, verdicts, onCameraClick }: MapCo
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
-  const canvasRendererRef = useRef<L.Canvas | null>(null);
 
   const getTrafficColor = useCallback((camId: string, isOnline: boolean) => {
     const verdict = verdicts.get(camId);
@@ -54,14 +53,12 @@ export default function MapComponent({ cameras, verdicts, onCameraClick }: MapCo
 
       L.tileLayer(MAP_CONFIG.TILE_URL, {
         attribution: MAP_CONFIG.TILE_ATTRIBUTION,
-        subdomains: MAP_CONFIG.TILE_SUBDOMAINS,
         maxZoom: MAP_CONFIG.MAX_ZOOM,
         keepBuffer: 6,
         updateWhenIdle: true,
         updateWhenZooming: false,
       }).addTo(map);
 
-      canvasRendererRef.current = L.canvas({ padding: 0.5 });
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
 
@@ -110,7 +107,6 @@ export default function MapComponent({ cameras, verdicts, onCameraClick }: MapCo
       
       const fillColor = getTrafficColor(cam.id, cam.isOnline);
       const marker = L.circleMarker([cam.latitude, cam.longitude], {
-        renderer: canvasRendererRef.current || undefined,
         radius: getRadius(zoom, isFew),
         fillColor,
         color: FUNCTIONAL_COLORS.MAP_STROKE,
