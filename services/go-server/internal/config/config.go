@@ -138,6 +138,7 @@ type ServerConfig struct {
 	CamerasFilePath    string
 	StaticWebDir       string
 	SQLitePath         string
+	TileCacheDir       string
 	CacheTTL           time.Duration
 	CacheEvictInterval time.Duration
 	CacheMaxAge        time.Duration
@@ -187,11 +188,17 @@ func LoadConfig() *ServerConfig {
 		sqlitePath = resolvePath("data/camera-view.db")
 	}
 
+	tileCacheDir := os.Getenv("TILE_CACHE_DIR")
+	if tileCacheDir == "" {
+		tileCacheDir = resolvePath("data/tiles")
+	}
+
 	return &ServerConfig{
 		Port:               port,
 		CamerasFilePath:    camerasPath,
 		StaticWebDir:       staticDir,
 		SQLitePath:         sqlitePath,
+		TileCacheDir:       tileCacheDir,
 		CacheTTL:           10 * time.Second,
 		CacheEvictInterval: 60 * time.Second,
 		CacheMaxAge:        15 * time.Second,

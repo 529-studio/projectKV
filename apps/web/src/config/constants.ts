@@ -70,7 +70,7 @@ export const MAP_CONFIG = Object.freeze({
     [11.35, 107.45],
   ],
   MAX_BOUNDS_VISCOSITY: 0.75,
-  TILE_URL: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  TILE_URL: getApiUrl('/api/tiles/{z}/{x}/{y}.png'),
   TILE_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   REFRESH_INTERVAL_SECONDS: 10,
 });
