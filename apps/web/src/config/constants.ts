@@ -63,11 +63,16 @@ export const FUNCTIONAL_COLORS = Object.freeze({
 export const MAP_CONFIG = Object.freeze({
   DEFAULT_CENTER: [10.7769, 106.7009],
   DEFAULT_ZOOM: 11,
-  MIN_ZOOM: 9,
+  MIN_ZOOM: 10,
   MAX_ZOOM: 18,
   MAX_BOUNDS: [
     [10.15, 106.35],
     [11.35, 107.45],
   ],
+  MAX_BOUNDS_VISCOSITY: 0.75,
+  TILE_URL: getApiUrl('/api/tiles/{z}/{x}/{y}.png'),
+  TILE_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   REFRESH_INTERVAL_SECONDS: 10,
 });
+
+
