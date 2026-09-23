@@ -106,6 +106,7 @@ func (m *Manager) fetchUpstream(ctx context.Context, z, x, y int) ([]byte, error
 		return nil, fmt.Errorf("build upstream request: %w", err)
 	}
 	req.Header.Set("User-Agent", defaultUserAgent)
+	req.Header.Set("Referer", "https://warded-stg.529studio.site/")
 	req.Header.Set("Accept", "image/png,image/*;q=0.8")
 
 	resp, err := m.httpClient.Do(req)
