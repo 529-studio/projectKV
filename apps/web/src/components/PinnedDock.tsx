@@ -1,5 +1,5 @@
 import { Camera } from '../hooks/useCameras';
-import { API_ENDPOINTS } from '../config/constants';
+import { API_ENDPOINTS, getApiUrl } from '../config/constants';
 
 interface PinnedDockProps {
   pinnedCameras: Camera[];
@@ -33,7 +33,7 @@ export default function PinnedDock({ pinnedCameras, onUnpin, onClear }: PinnedDo
           return (
             <div key={cam.id} className="relative min-w-[160px] h-full bg-black border border-zinc-800 rounded group flex-shrink-0">
               <img 
-                src={`http://localhost:3000${API_ENDPOINTS.SNAPSHOT(cam.id)}?t=${Date.now()}`}
+                src={`${getApiUrl(API_ENDPOINTS.SNAPSHOT(cam.id))}?t=${Date.now()}`}
                 className="w-full h-full object-cover rounded opacity-80 group-hover:opacity-100 transition-opacity"
                 alt={cam.title}
               />
