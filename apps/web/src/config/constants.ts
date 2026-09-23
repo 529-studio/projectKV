@@ -70,9 +70,9 @@ export const MAP_CONFIG = Object.freeze({
     [11.35, 107.45],
   ],
   MAX_BOUNDS_VISCOSITY: 0.75,
-  TILE_URL: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  TILE_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  TILE_SUBDOMAINS: 'abcd',
+  TILE_URL: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  TILE_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   REFRESH_INTERVAL_SECONDS: 10,
 });
+
 
