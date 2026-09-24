@@ -45,7 +45,7 @@ export default function Home() {
       <LandingOverlay />
       
       {/* SIDEBAR */}
-      <aside className="w-80 border-r border-zinc-800 bg-zinc-900/50 flex flex-col z-10 shrink-0 hidden md:flex">
+      <aside className="w-72 lg:w-80 border-r border-zinc-800 bg-zinc-900/50 flex flex-col z-10 shrink-0 hidden md:flex">
         <div className="p-4 border-b border-zinc-800 bg-zinc-950">
           <div className="flex items-center gap-2">
             <img src="/wared-icon.png" alt="Warded Logo" className="w-6 h-6 object-contain" />
@@ -82,19 +82,10 @@ export default function Home() {
       </aside>
 
       {/* MAP WORKSPACE */}
-      <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-zinc-950 z-0">
+      <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-zinc-950">
         <div className="flex-1 w-full h-full relative z-0">
           <MapComponent cameras={cameras} verdicts={verdicts} onCameraClick={setSelectedCamera} />
         </div>
-        
-        {/* MODAL */}
-        <CameraModal 
-          camera={selectedCamera} 
-          verdict={selectedCamera ? verdicts.get(selectedCamera.id) : undefined} 
-          onClose={() => setSelectedCamera(null)} 
-          isPinned={selectedCamera ? pinnedCameraIds.includes(selectedCamera.id) : false}
-          onTogglePin={() => selectedCamera && togglePin(selectedCamera.id)}
-        />
         
         {/* BOTTOM DOCK */}
         <PinnedDock 
@@ -130,6 +121,15 @@ export default function Home() {
           onSearchChange={setSearchTerm}
         />
       </main>
+
+      {/* MODAL — global viewport overlay */}
+      <CameraModal 
+        camera={selectedCamera} 
+        verdict={selectedCamera ? verdicts.get(selectedCamera.id) : undefined} 
+        onClose={() => setSelectedCamera(null)} 
+        isPinned={selectedCamera ? pinnedCameraIds.includes(selectedCamera.id) : false}
+        onTogglePin={() => selectedCamera && togglePin(selectedCamera.id)}
+      />
     </div>
   );
 }
