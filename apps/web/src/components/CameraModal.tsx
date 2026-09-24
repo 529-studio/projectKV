@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
 import { API_ENDPOINTS, FUNCTIONAL_COLORS, getApiUrl } from '../config/constants';
@@ -11,6 +12,12 @@ interface CameraModalProps {
 }
 
 export default function CameraModal({ camera, verdict, onClose, isPinned, onTogglePin }: CameraModalProps) {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [camera?.id]);
+
   if (!camera) return null;
 
   const severity = verdict?.severity || 'UNKNOWN';
@@ -25,6 +32,8 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
     severityColor = FUNCTIONAL_COLORS.CONGESTED;
   }
 
+  const isActuallyAvailable = camera.isOnline && !camera.isGhost && !imgError;
+
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="bg-zinc-950 border border-zinc-700 shadow-2xl rounded-lg w-full max-w-2xl overflow-hidden flex flex-col font-mono text-zinc-300">
@@ -33,11 +42,28 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
         <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 flex justify-between items-start">
           <div>
             <h2 className="text-white font-bold text-lg">{camera.displayName || camera.title}</h2>
-            <div className="flex gap-2 mt-2 text-xs font-bold">
-              <span className={`px-2 py-0.5 rounded border ${camera.isOnline ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-red-950 border-red-800 text-red-500'}`}>
-                [{camera.isOnline ? 'HOẠT ĐỘNG' : 'MẤT TÍN HIỆU'}]
-              </span>
-              {camera.isOnline && verdict && (
+            <div className="flex flex-wrap gap-2 mt-2 text-xs font-bold items-center">
+              {camera.isGhost ? (
+                <span className="px-2 py-0.5 rounded border bg-amber-950/70 border-amber-800 text-amber-400">
+                  [MẤT TÍN HIỆU THỰC ĐỊA]
+                </span>
+              ) : isActuallyAvailable ? (
+                <span className="px-2 py-0.5 rounded border bg-zinc-800 border-zinc-600 text-white">
+                  [HOẠT ĐỘNG]
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded border bg-red-950/70 border-red-800 text-red-400">
+                  [MẤT KẾT NỐI]
+                </span>
+              )}
+
+              {camera.duplicateOf && (
+                <span className="px-2 py-0.5 rounded border bg-zinc-900 border-zinc-700 text-zinc-400 text-[11px]" title={`Trùng nguồn video với camera ID: ${camera.duplicateOf}`}>
+                  [TRÙNG NGUỒN VỚI: {camera.duplicateOf.slice(0, 8)}...]
+                </span>
+              )}
+
+              {isActuallyAvailable && verdict && (
                 <span className="px-2 py-0.5 rounded border" style={{ borderColor: severityColor, color: severityColor, backgroundColor: `${severityColor}20` }}>
                   {severityLabel}
                 </span>
@@ -49,15 +75,40 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
 
         {/* IMAGE WRAPPER */}
         <div className="relative w-full aspect-video bg-black flex items-center justify-center">
-          {camera.isOnline ? (
+          {camera.isGhost ? (
+            <div className="text-center p-6 space-y-2">
+              <div className="text-amber-400 font-bold text-sm">
+                MẤT TÍN HIỆU CAMERA THỰC ĐỊA
+              </div>
+              <div className="text-zinc-500 text-xs max-w-md">
+                Cổng thông tin trả về ảnh giữ chỗ (Image Not Available). Máy chủ đã tự động đánh dấu để tránh tải dữ liệu vô ích.
+              </div>
+            </div>
+          ) : !camera.isOnline ? (
+            <div className="text-center p-6 space-y-2">
+              <div className="text-zinc-400 font-bold text-sm">
+                CAMERA ĐANG BẢO TRÌ HOẶC MẤT KẾT NỐI
+              </div>
+              <div className="text-zinc-600 text-xs">
+                Không thể kết nối đến camera tại vị trí này.
+              </div>
+            </div>
+          ) : imgError ? (
+            <div className="text-center p-6 space-y-2">
+              <div className="text-red-400 font-bold text-sm">
+                KHÔNG THỂ TẢI HÌNH ẢNH SNAPSHOT
+              </div>
+              <div className="text-zinc-500 text-xs">
+                Máy chủ proxy báo lỗi 503 hoặc mất kết nối tới camera.
+              </div>
+            </div>
+          ) : (
             <img 
               src={`${getApiUrl(API_ENDPOINTS.SNAPSHOT(camera.id))}?t=${Date.now()}`}
               className="w-full h-full object-contain"
               alt="Live Snapshot"
-              onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="none"><rect width="100%" height="100%" fill="%23111"/><text x="50%" y="50%" fill="%23666" font-family="monospace" font-size="14" text-anchor="middle">Lỗi tải ảnh</text></svg>' }}
+              onError={() => setImgError(true)}
             />
-          ) : (
-            <div className="text-zinc-600 font-mono">Camera đang bảo trì hoặc mất kết nối</div>
           )}
         </div>
 
