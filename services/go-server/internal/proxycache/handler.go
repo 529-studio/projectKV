@@ -2,6 +2,7 @@ package proxycache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,27 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// GhostPlaceholderSize is the byte size of the upstream "IMAGE NOT AVAILABLE" placeholder PNG.
+const GhostPlaceholderSize = 2638
+
+// ErrGhostCamera indicates that the upstream portal returned a placeholder error image.
+var ErrGhostCamera = errors.New("upstream returned placeholder image: camera stream offline")
+
+// IsGhostImage checks if the byte slice represents an upstream error placeholder.
+func IsGhostImage(data []byte) bool {
+	if len(data) == 0 {
+		return true
+	}
+	if len(data) == GhostPlaceholderSize {
+		return true
+	}
+	// The upstream DOT portal returns an "IMAGE NOT AVAILABLE" PNG file when offline
+	if len(data) >= 8 && string(data[:8]) == "\x89PNG\r\n\x1a\n" {
+		return true
+	}
+	return false
+}
 
 // TouchFunc is a callback invoked after a successful snapshot fetch so the
 // caller can register the camera with hotset.Registry.Touch without creating
@@ -56,6 +78,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 // @Success 200 {string} binary "JPEG image data"
 // @Failure 400 {object} map[string]string
 // @Failure 502 {object} map[string]string
+// @Failure 503 {object} map[string]string
 // @Router /api/snapshot/{id} [get]
 func (h *Handler) GetSnapshot(c *gin.Context) {
 	id := c.Param("id")
@@ -68,6 +91,15 @@ func (h *Handler) GetSnapshot(c *gin.Context) {
 		return h.fetchUpstream(c.Request.Context(), id)
 	})
 	if err != nil {
+		if errors.Is(err, ErrGhostCamera) {
+			c.Header("X-Camera-Status", "GHOST_OFFLINE")
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error":    "camera stream offline (signal lost)",
+				"code":     "GHOST_CAMERA",
+				"is_ghost": true,
+			})
+			return
+		}
 		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("upstream fetch failed: %v", err)})
 		return
 	}
@@ -114,6 +146,10 @@ func (h *Handler) fetchUpstream(ctx context.Context, id string) ([]byte, string,
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, "", fmt.Errorf("read body: %w", err)
+	}
+
+	if IsGhostImage(body) {
+		return nil, "", ErrGhostCamera
 	}
 
 	ct := resp.Header.Get("Content-Type")
