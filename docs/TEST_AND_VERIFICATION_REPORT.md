@@ -31,7 +31,7 @@ Traffic cameras deployed across Ho Chi Minh City have an OSD timestamp hard-code
 - The web modal displays both the extracted real-world roadside time (**THỰC ĐỊA**) in high-contrast emerald green alongside the client download time (**TẢI VỀ**).
 
 #### Visual Proof: Real-Time OSD Extraction in Web UI
-![Real-Time OSD Extraction and Duplicate Stream Badge](https://raw.githubusercontent.com/529-studio/projectKV/feat/ghost-camera-detection-and-osd-extractor/docs/proofs/proof_ui_duplicate_and_osd.png)
+![Real-Time OSD Extraction and Duplicate Stream Badge](./docs/proofs/proof_ui_duplicate_and_osd.png)
 
 *Observation*: Note the exact match between the header label **`THỰC ĐỊA: 21:44:42`** and the burned-in video feed OSD **`24.Sep 2026 21:44:42`** on the top right.
 
@@ -56,18 +56,15 @@ In the screenshot above, camera `595dd9ac3dcfc400106f28b4` (`Quốc lộ 1 - BQB
 $$\boxed{\text{[HOẠT ĐỘNG]} \quad \text{[TRÙNG NGUỒN VỚI: 595ddc12...]}}$$
 
 #### Physical Feed Comparison (Side-by-Side Verification)
-<p align="center">
-  <img src="https://raw.githubusercontent.com/529-studio/projectKV/feat/ghost-camera-detection-and-osd-extractor/docs/proofs/proof_pair1_tan_thoi_hiep.jpg" width="80%" alt="Duplicate Pair 1: Tan Thoi Hiep Flyover" /><br/>
-  <b>Pair 1: Tan Thoi Hiep Flyover</b>
-</p>
-<p align="center">
-  <img src="https://raw.githubusercontent.com/529-studio/projectKV/feat/ghost-camera-detection-and-osd-extractor/docs/proofs/proof_pair2_tan_thuan.jpg" width="80%" alt="Duplicate Pair 2: Tan Thuan Bridge" /><br/>
-  <b>Pair 2: Tan Thuan Bridge</b>
-</p>
-<p align="center">
-  <img src="https://raw.githubusercontent.com/529-studio/projectKV/feat/ghost-camera-detection-and-osd-extractor/docs/proofs/proof_pair3_thanh_nien.jpg" width="80%" alt="Duplicate Pair 3: Thanh Nien - Chua Lien Hoa" /><br/>
-  <b>Pair 3: Thanh Nien - Chua Lien Hoa</b>
-</p>
+
+![Duplicate Pair 1: Tan Thoi Hiep Flyover](./docs/proofs/proof_pair1_tan_thoi_hiep.jpg)
+*Pair 1: Tan Thoi Hiep Flyover*
+
+![Duplicate Pair 2: Tan Thuan Bridge](./docs/proofs/proof_pair2_tan_thuan.jpg)
+*Pair 2: Tan Thuan Bridge*
+
+![Duplicate Pair 3: Thanh Nien - Chua Lien Hoa](./docs/proofs/proof_pair3_thanh_nien.jpg)
+*Pair 3: Thanh Nien - Chua Lien Hoa*
 
 ---
 
@@ -83,7 +80,7 @@ Certain cameras in the DOT catalog are marked `UP` / `isOnline: true` but actual
 - The frontend renders an amber alert badge and helpful diagnostic notice instead of an empty box.
 
 #### Visual Proof: Ghost Camera Fallback in Web UI
-![Ghost Camera Graceful Fallback](https://raw.githubusercontent.com/529-studio/projectKV/feat/ghost-camera-detection-and-osd-extractor/docs/proofs/proof_ui_ghost_camera.png)
+![Ghost Camera Graceful Fallback](./docs/proofs/proof_ui_ghost_camera.png)
 
 #### Live Proxy Interception Verification
 ```bash

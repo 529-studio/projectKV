@@ -280,7 +280,7 @@ func TestHandler_GhostCamera_Returns503(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		// Exactly 2638 bytes of dummy placeholder data
-		w.Write(make([]byte, proxycache.GhostPlaceholderSize))
+		_, _ = w.Write(make([]byte, proxycache.GhostPlaceholderSize))
 	}))
 	defer upstream.Close()
 
@@ -321,7 +321,7 @@ func TestHandler_GetSnapshotOSD(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("fake-jpeg-image-bytes"))
+		_, _ = w.Write([]byte("fake-jpeg-image-bytes"))
 	}))
 	defer upstream.Close()
 
