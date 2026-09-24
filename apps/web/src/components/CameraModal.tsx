@@ -26,8 +26,14 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-zinc-950 border border-zinc-700 shadow-2xl rounded-lg w-full max-w-2xl overflow-hidden flex flex-col font-mono text-zinc-300">
+    <div 
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-zinc-950 border border-zinc-700 shadow-2xl rounded-lg w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col font-mono text-zinc-300"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* HEADER */}
         <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 flex justify-between items-start">
