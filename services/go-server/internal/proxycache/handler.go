@@ -67,6 +67,8 @@ func NewHandler(cache *Cache, upstreamURL string, onTouch TouchFunc) *Handler {
 // group.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/snapshot/:id", h.GetSnapshot)
+	rg.HEAD("/snapshot/:id", h.GetSnapshot)
+	rg.GET("/snapshot/:id/osd", h.GetSnapshotOSD)
 }
 
 // GetSnapshot godoc
@@ -116,10 +118,43 @@ func (h *Handler) GetSnapshot(c *gin.Context) {
 	c.Header("X-Cache-Status", cacheStatus)
 	c.Header("Cache-Control", "public, max-age=10")
 
+	if osdTime, rawOSD, ok := h.cache.GetOSD(id); ok && osdTime != "" {
+		c.Header("X-OSD-Timestamp", osdTime)
+		c.Header("X-OSD-Raw", rawOSD)
+	}
+
 	if contentType == "" {
 		contentType = "image/jpeg"
 	}
 	c.Data(http.StatusOK, contentType, data)
+}
+
+// GetSnapshotOSD returns the extracted OSD timestamp and camera information.
+func (h *Handler) GetSnapshotOSD(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "camera id is required"})
+		return
+	}
+
+	_, _, _, err := h.cache.GetOrFetch(id, func() ([]byte, string, error) {
+		return h.fetchUpstream(c.Request.Context(), id)
+	})
+	if err != nil {
+		if errors.Is(err, ErrGhostCamera) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ghost camera offline", "is_ghost": true})
+			return
+		}
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("upstream fetch failed: %v", err)})
+		return
+	}
+
+	osdTime, rawOSD, _ := h.cache.GetOSD(id)
+	c.JSON(http.StatusOK, gin.H{
+		"camera_id": id,
+		"timestamp": osdTime,
+		"raw_osd":   rawOSD,
+	})
 }
 
 // fetchUpstream fetches the raw snapshot bytes from the upstream DOT portal.
