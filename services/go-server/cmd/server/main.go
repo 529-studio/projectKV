@@ -157,9 +157,7 @@ func main() {
 	api := router.Group("/api")
 	{
 		api.GET("/cameras", func(c *gin.Context) {
-			zone := c.Query("zone")
-			corridor := c.Query("corridor")
-			if (zone != "" || corridor != "") && camCatalogHandler != nil {
+			if camCatalogHandler != nil {
 				camCatalogHandler.GetCameras(c)
 				return
 			}
