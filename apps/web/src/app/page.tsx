@@ -6,6 +6,8 @@ import { useTraffic } from '../hooks/useTraffic';
 import LandingOverlay from '../components/LandingOverlay';
 import CameraModal from '../components/CameraModal';
 import PinnedDock from '../components/PinnedDock';
+import MapLegend from '../components/MapLegend';
+import MobileCameraDrawer from '../components/MobileCameraDrawer';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 
@@ -16,6 +18,8 @@ export default function Home() {
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pinnedCameraIds, setPinnedCameraIds] = useState<string[]>([]);
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   const filteredCameras = useMemo(() => {
     if (!searchTerm) return cameras;
@@ -98,35 +102,33 @@ export default function Home() {
           onUnpin={togglePin} 
           onClear={() => setPinnedCameraIds([])} 
         />
-        
-        {/* MAP LEGEND */}
-        <div className="absolute top-3 right-3 z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md p-3 font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[210px]">
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5 mb-2">
-            <span className="font-bold text-white tracking-wider text-xs uppercase">CHÚ GIẢI BẢN ĐỒ</span>
-          </div>
-          <div className="flex flex-col gap-2.5 text-zinc-200 text-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="w-3 h-3 rounded-full bg-white shrink-0"></span>
-              <span>Camera hoạt động</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="w-3 h-3 rounded-full bg-zinc-600 shrink-0"></span>
-              <span className="text-zinc-400">Camera mất tín hiệu</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="w-3 h-3 rounded-full bg-green-500 shrink-0"></span>
-              <span>Giao thông thông thoáng</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="w-3 h-3 rounded-full bg-yellow-500 shrink-0"></span>
-              <span>Đông xe / Chậm</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>
-              <span>Ùn tắc / Kẹt xe</span>
-            </div>
-          </div>
-        </div>
+
+        {/* MAP LEGEND — collapsible */}
+        <MapLegend
+          isOpen={legendOpen}
+          onToggle={() => setLegendOpen(prev => !prev)}
+        />
+
+        {/* MOBILE CAMERA LIST — trigger button (hidden on md+) */}
+        <button
+          onClick={() => setMobileDrawerOpen(true)}
+          className="md:hidden absolute bottom-20 right-3 z-[800] w-11 h-11 bg-zinc-950 border border-zinc-700 hover:border-zinc-400 text-white rounded flex items-center justify-center shadow-2xl transition-colors"
+          aria-label="Danh sách camera"
+        >
+          <span className="text-base leading-none">☰</span>
+        </button>
+
+        {/* MOBILE CAMERA DRAWER */}
+        <MobileCameraDrawer
+          cameras={cameras}
+          loading={loading}
+          error={error}
+          isOpen={mobileDrawerOpen}
+          onClose={() => setMobileDrawerOpen(false)}
+          onCameraClick={setSelectedCamera}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+        />
       </main>
     </div>
   );
