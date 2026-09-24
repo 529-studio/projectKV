@@ -13,10 +13,33 @@ interface CameraModalProps {
 
 export default function CameraModal({ camera, verdict, onClose, isPinned, onTogglePin }: CameraModalProps) {
   const [imgError, setImgError] = useState(false);
+  const [fetchTimestamp, setFetchTimestamp] = useState<number>(Date.now());
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
     setImgError(false);
+    setFetchTimestamp(Date.now());
+    setElapsedSeconds(0);
   }, [camera?.id]);
+
+  useEffect(() => {
+    if (!camera?.isOnline || camera?.isGhost) return;
+    const interval = setInterval(() => {
+      setElapsedSeconds(prev => {
+        if (prev >= 15) {
+          setFetchTimestamp(Date.now());
+          return 0;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [camera?.id, camera?.isOnline, camera?.isGhost]);
+
+  const handleRefresh = () => {
+    setFetchTimestamp(Date.now());
+    setElapsedSeconds(0);
+  };
 
   if (!camera) return null;
 
@@ -42,6 +65,20 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
         <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 flex justify-between items-start">
           <div>
             <h2 className="text-white font-bold text-lg">{camera.displayName || camera.title}</h2>
+            <div className="flex items-center gap-2 mt-1 text-xs text-zinc-400">
+              <span>CẬP NHẬT: {new Date(fetchTimestamp).toLocaleTimeString('vi-VN')}</span>
+              <span className="text-zinc-600">•</span>
+              <span>{elapsedSeconds === 0 ? 'vừa xong' : `${elapsedSeconds}s trước`}</span>
+              {isActuallyAvailable && (
+                <button
+                  onClick={handleRefresh}
+                  className="text-zinc-400 hover:text-white underline text-[11px] ml-1"
+                  title="Tải lại khung hình mới nhất"
+                >
+                  [↻ LÀM MỚI]
+                </button>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2 mt-2 text-xs font-bold items-center">
               {camera.isGhost ? (
                 <span className="px-2 py-0.5 rounded border bg-amber-950/70 border-amber-800 text-amber-400">
@@ -104,7 +141,8 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
             </div>
           ) : (
             <img 
-              src={`${getApiUrl(API_ENDPOINTS.SNAPSHOT(camera.id))}?t=${Date.now()}`}
+              key={fetchTimestamp}
+              src={`${getApiUrl(API_ENDPOINTS.SNAPSHOT(camera.id))}?t=${fetchTimestamp}`}
               className="w-full h-full object-contain"
               alt="Live Snapshot"
               onError={() => setImgError(true)}
@@ -114,9 +152,16 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
 
         {/* FOOTER */}
         <div className="px-4 py-3 bg-zinc-900 border-t border-zinc-800 flex justify-between items-center text-xs">
-          <span className="text-zinc-500">
-            TỌA ĐỘ: {camera.latitude?.toFixed(5)}, {camera.longitude?.toFixed(5)}
-          </span>
+          <div className="flex items-center gap-3 text-zinc-500">
+            <span>
+              TỌA ĐỘ: {camera.latitude?.toFixed(5)}, {camera.longitude?.toFixed(5)}
+            </span>
+            {isActuallyAvailable && (
+              <span className="hidden sm:inline text-zinc-500">
+                • TỰ ĐỘNG LÀM MỚI: {15 - elapsedSeconds}s
+              </span>
+            )}
+          </div>
           <button 
             onClick={onTogglePin}
             className={`px-3 py-1.5 border rounded transition ${isPinned ? 'bg-zinc-200 text-black border-white hover:bg-white' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-600 text-white'}`}
