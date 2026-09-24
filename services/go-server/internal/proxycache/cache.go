@@ -14,6 +14,8 @@ import (
 type cacheEntry struct {
 	data        []byte
 	contentType string
+	osdTime     string
+	rawOSD      string
 	expiresAt   time.Time
 }
 
@@ -71,15 +73,30 @@ func (c *Cache) GetOrFetch(id string, fetch func() (data []byte, contentType str
 	}
 
 	res := v.(fetchResult)
+	osdTime, rawOSD := ExtractOSD(res.data)
+
 	c.mu.Lock()
 	c.items[id] = cacheEntry{
 		data:        res.data,
 		contentType: res.contentType,
+		osdTime:     osdTime,
+		rawOSD:      rawOSD,
 		expiresAt:   time.Now().Add(c.ttl),
 	}
 	c.mu.Unlock()
 
 	return res.data, res.contentType, false, nil
+}
+
+// GetOSD returns the cached OSD timestamp and raw text for the given camera ID.
+func (c *Cache) GetOSD(id string) (osdTime string, rawOSD string, ok bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	entry, found := c.items[id]
+	if found && time.Now().Before(entry.expiresAt) {
+		return entry.osdTime, entry.rawOSD, true
+	}
+	return "", "", false
 }
 
 // Purge removes all expired entries from the cache.  Call periodically to

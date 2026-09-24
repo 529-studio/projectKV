@@ -15,11 +15,13 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
   const [imgError, setImgError] = useState(false);
   const [fetchTimestamp, setFetchTimestamp] = useState<number>(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [osdTime, setOsdTime] = useState<string | null>(null);
 
   useEffect(() => {
     setImgError(false);
     setFetchTimestamp(Date.now());
     setElapsedSeconds(0);
+    setOsdTime(null);
   }, [camera?.id]);
 
   useEffect(() => {
@@ -35,6 +37,21 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
     }, 1000);
     return () => clearInterval(interval);
   }, [camera?.id, camera?.isOnline, camera?.isGhost]);
+
+  useEffect(() => {
+    if (!camera?.id || !camera.isOnline || camera.isGhost) {
+      setOsdTime(null);
+      return;
+    }
+    fetch(getApiUrl(`/api/snapshot/${encodeURIComponent(camera.id)}/osd`))
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.timestamp) {
+          setOsdTime(data.timestamp);
+        }
+      })
+      .catch(() => {});
+  }, [camera?.id, fetchTimestamp, camera?.isOnline, camera?.isGhost]);
 
   const handleRefresh = () => {
     setFetchTimestamp(Date.now());
@@ -65,8 +82,14 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
         <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 flex justify-between items-start">
           <div>
             <h2 className="text-white font-bold text-lg">{camera.displayName || camera.title}</h2>
-            <div className="flex items-center gap-2 mt-1 text-xs text-zinc-400">
-              <span>CẬP NHẬT: {new Date(fetchTimestamp).toLocaleTimeString('vi-VN')}</span>
+            <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-zinc-400">
+              {osdTime ? (
+                <>
+                  <span className="text-emerald-400 font-bold tracking-wide">THỰC ĐỊA: {osdTime}</span>
+                  <span className="text-zinc-600">•</span>
+                </>
+              ) : null}
+              <span>TẢI VỀ: {new Date(fetchTimestamp).toLocaleTimeString('vi-VN')}</span>
               <span className="text-zinc-600">•</span>
               <span>{elapsedSeconds === 0 ? 'vừa xong' : `${elapsedSeconds}s trước`}</span>
               {isActuallyAvailable && (

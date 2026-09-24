@@ -316,3 +316,24 @@ func TestIsGhostImage(t *testing.T) {
 		t.Error("valid >1000 bytes JPEG must not be recognized as ghost image")
 	}
 }
+
+func TestHandler_GetSnapshotOSD(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("fake-jpeg-image-bytes"))
+	}))
+	defer upstream.Close()
+
+	cache := proxycache.NewCache(30 * time.Second)
+	h := proxycache.NewHandler(cache, upstream.URL, nil)
+	router := newTestRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/snapshot/cam-osd-1/osd", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for OSD endpoint, got %d", w.Code)
+	}
+}

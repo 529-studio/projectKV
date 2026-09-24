@@ -6,17 +6,20 @@ import AppKit
 // Usage: swift extract_osd_timestamp.swift <image_path>
 // Outputs JSON: {"status": "OK", "osd_text": "...", "timestamp": "...", "confidence": 1.0}
 
-guard CommandLine.arguments.count > 1 else {
-    print("{\"error\": \"Usage: extract_osd_timestamp.swift <image_path>\"}")
-    exit(1)
+var rawData: Data? = nil
+var sourcePath: String = "stdin"
+
+if CommandLine.arguments.count > 1 && CommandLine.arguments[1] != "-" {
+    sourcePath = CommandLine.arguments[1]
+    rawData = try? Data(contentsOf: URL(fileURLWithPath: sourcePath))
+} else {
+    rawData = FileHandle.standardInput.readDataToEndOfFile()
 }
 
-let imagePath = CommandLine.arguments[1]
-let url = URL(fileURLWithPath: imagePath)
-
-guard let image = NSImage(contentsOf: url),
+guard let data = rawData, !data.isEmpty,
+      let image = NSImage(data: data),
       let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-    print("{\"error\": \"Failed to load image: \(imagePath)\"}")
+    print("{\"error\": \"Failed to load image from \(sourcePath)\"}")
     exit(1)
 }
 
@@ -86,7 +89,7 @@ for obs in observations {
 let fullText = lines.joined(separator: " | ")
 let result: [String: Any] = [
     "status": "OK",
-    "imagePath": imagePath,
+    "imagePath": sourcePath,
     "timestamp": detectedTime as Any,
     "raw_osd": fullText
 ]
