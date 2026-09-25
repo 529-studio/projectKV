@@ -9,6 +9,8 @@ export interface Camera {
   latitude?: number;
   longitude?: number;
   isOnline: boolean;
+  duplicateOf?: string;
+  isGhost?: boolean;
 }
 
 export function useCameras() {
@@ -28,7 +30,9 @@ export function useCameras() {
         const parsed = list.map((c: any) => ({
           ...c,
           id: c.id || c._id,
-          isOnline: c.status === 'UP' || c.isOnline === true,
+          duplicateOf: c.duplicateOf,
+          isGhost: Boolean(c.isGhost),
+          isOnline: (c.status === 'UP' || c.isOnline === true) && !c.isGhost,
         }));
         setCameras(parsed);
       } catch (err) {

@@ -120,6 +120,11 @@ export default function MapComponent({ cameras, verdicts, onCameraClick }: MapCo
       if (verdict?.severity) {
         trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">Traffic: ${verdict.severity}</span>`;
       }
+      if (cam.isGhost) {
+        trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">[MẤT TÍN HIỆU THỰC ĐỊA]</span>`;
+      } else if (cam.duplicateOf) {
+        trafficInfo += `<br><span style="color:#a1a1aa;">[TRÙNG NGUỒN]</span>`;
+      }
 
       marker.bindTooltip(`<b>${cam.displayName || cam.title}</b><br><span style="color:#a1a1aa;">${cam.zone}</span>${trafficInfo}`, {
         direction: 'top',

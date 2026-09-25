@@ -305,3 +305,61 @@ func TestLoadCatalog(t *testing.T) {
 		t.Errorf("expected error for invalid JSON, got nil")
 	}
 }
+
+func TestCatalog_DeduplicationAndGhost(t *testing.T) {
+	cams := []Camera{
+		{
+			ID:          "595dd9ac3dcfc400106f28b4",
+			DisplayName: "Quốc lộ 1 - BQB Trước UBND Q12",
+			IsOnline:    true,
+			Status:      "UP",
+		},
+		{
+			ID:          "595ddbbf3dcfc400106f28b8",
+			DisplayName: "Quốc lộ 1 - Cầu vượt Tân Thới Hiệp 3",
+			IsOnline:    true,
+			Status:      "UP",
+		},
+		{
+			ID:          "regular-cam-1",
+			DisplayName: "Bình thường",
+			IsOnline:    true,
+			Status:      "UP",
+		},
+	}
+
+	cat := NewCatalog(cams)
+
+	// Verify duplicate camera mapping
+	dupCam, ok := cat.ByID("595dd9ac3dcfc400106f28b4")
+	if !ok {
+		t.Fatal("expected duplicate camera to exist")
+	}
+	if dupCam.DuplicateOf != "595ddc123dcfc400106f28ba" {
+		t.Errorf("expected DuplicateOf to be 595ddc123dcfc400106f28ba, got %s", dupCam.DuplicateOf)
+	}
+
+	// Verify ghost camera conversion to offline
+	ghostCam, ok := cat.ByID("595ddbbf3dcfc400106f28b8")
+	if !ok {
+		t.Fatal("expected ghost camera to exist")
+	}
+	if !ghostCam.IsGhost {
+		t.Error("expected IsGhost to be true")
+	}
+	if ghostCam.IsOnline {
+		t.Error("expected IsOnline to be false for ghost camera")
+	}
+	if ghostCam.Status != "DOWN" {
+		t.Errorf("expected Status to be DOWN, got %s", ghostCam.Status)
+	}
+
+	// Verify regular camera untouched
+	regCam, ok := cat.ByID("regular-cam-1")
+	if !ok {
+		t.Fatal("expected regular camera to exist")
+	}
+	if regCam.IsGhost || regCam.DuplicateOf != "" {
+		t.Errorf("expected regular camera not to be ghost or duplicate, got ghost=%v, dup=%s", regCam.IsGhost, regCam.DuplicateOf)
+	}
+}
