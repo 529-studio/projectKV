@@ -274,3 +274,66 @@ func TestHandler_MissingID_Returns400(t *testing.T) {
 		t.Errorf("expected 400 for missing id, got %d", w.Code)
 	}
 }
+
+func TestHandler_GhostCamera_Returns503(t *testing.T) {
+	// Upstream returns 2638 bytes placeholder image
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Exactly 2638 bytes of dummy placeholder data
+		_, _ = w.Write(make([]byte, proxycache.GhostPlaceholderSize))
+	}))
+	defer upstream.Close()
+
+	cache := proxycache.NewCache(30 * time.Second)
+	h := proxycache.NewHandler(cache, upstream.URL, nil)
+	router := newTestRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/snapshot/ghost1", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503 for ghost camera, got %d", w.Code)
+	}
+	if w.Header().Get("X-Camera-Status") != "GHOST_OFFLINE" {
+		t.Errorf("expected X-Camera-Status: GHOST_OFFLINE, got %s", w.Header().Get("X-Camera-Status"))
+	}
+}
+
+func TestIsGhostImage(t *testing.T) {
+	if !proxycache.IsGhostImage(make([]byte, 2638)) {
+		t.Error("2638-byte payload must be recognized as ghost image")
+	}
+	pngHeader := []byte("\x89PNG\r\n\x1a\nplaceholder")
+	if !proxycache.IsGhostImage(pngHeader) {
+		t.Error("PNG header payload must be recognized as ghost image")
+	}
+	if !proxycache.IsGhostImage([]byte{}) {
+		t.Error("empty payload must be recognized as ghost image")
+	}
+	validJpeg := append([]byte("\xFF\xD8\xFF\xE0"), make([]byte, 2000)...)
+	if proxycache.IsGhostImage(validJpeg) {
+		t.Error("valid >1000 bytes JPEG must not be recognized as ghost image")
+	}
+}
+
+func TestHandler_GetSnapshotOSD(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("fake-jpeg-image-bytes"))
+	}))
+	defer upstream.Close()
+
+	cache := proxycache.NewCache(30 * time.Second)
+	h := proxycache.NewHandler(cache, upstream.URL, nil)
+	router := newTestRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/snapshot/cam-osd-1/osd", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for OSD endpoint, got %d", w.Code)
+	}
+}

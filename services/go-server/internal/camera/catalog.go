@@ -28,6 +28,38 @@ type Camera struct {
 	Longitude   float64 `json:"longitude"`
 	SnapshotURL string  `json:"snapshotUrl"`
 	Zone        string  `json:"zone,omitempty"`
+	DuplicateOf string  `json:"duplicateOf,omitempty"`
+	IsGhost     bool    `json:"isGhost,omitempty"`
+}
+
+// KnownDuplicateStreams maps secondary camera IDs to their primary canonical camera ID.
+var KnownDuplicateStreams = map[string]string{
+	// QL1 - BQB Trước UBND Q12 (hướng đi An Sương) -> QL1 - Cầu vượt Tân Thới Hiệp 1
+	"595dd9ac3dcfc400106f28b4": "595ddc123dcfc400106f28ba",
+	// Huỳnh Tấn Phát - Cầu Tân Thuận 1 (TTH 309) -> Huỳnh Tấn Phát - cầu Tân Thuận 1 (TTH 323.2)
+	"665861d864f11e00173c73a9": "662a8e121afb9c00172d2a3f",
+	// Thanh Niên - gần chùa Liên Hoa (TTH 454) -> Thanh Niên - Phạm Văn Hai (TTH 453)
+	"68188e466dfb4b0018f902f2": "68188d586dfb4b0018f9018d",
+}
+
+// KnownGhostCameras is a set of camera IDs confirmed to return "IMAGE NOT AVAILABLE" placeholders.
+var KnownGhostCameras = map[string]struct{}{
+	"595ddbbf3dcfc400106f28b8": {}, // QL1 - Cầu vượt Tân Thới Hiệp 3
+	"5deb576d1dc17d7c5515ad02": {}, // Điện Biên Phủ - Pasteur
+	"595f86c43dcfc400106f28ea": {}, // QL1 - Nguyễn Văn Quá 1
+	"595f874d3dcfc400106f28ec": {}, // QL1 - Nguyễn Văn Quá 2
+	"585b2b1ec3f96200127dc505": {}, // Nguyễn Văn Linh - Huỳnh Tấn Phát 1
+	"585b2baec3f96200127dc508": {}, // Nguyễn Văn Linh - Huỳnh Tấn Phát 2
+	"585b2980c3f96200127dc502": {}, // Huỳnh Tấn Phát - Lưu Trọng Lư 2
+	"583f969161cfea0012cf68f7": {}, // Nguyễn Thị Định - Đường D
+	"67e217c43215f90017863bc8": {}, // Nguyễn Thị Định - Đường C (20-1)
+	"67e217ea3215f90017863bf1": {}, // Nguyễn Thị Định - Đường C (20-2)
+	"58b571c817139d0010f35d5d": {}, // Nguyễn Văn Trỗi - Trần Huy Liệu
+	"5a605f828576340017d06608": {}, // Nguyễn Thái Sơn - Nguyễn Văn Nghi 1
+	"5a607e298576340017d0666b": {}, // IDICO-QL1 04
+	"595dc70d3dcfc400106f289a": {}, // QL1 - Ngã 4 Ga
+	"595dd6093dcfc400106f28ad": {}, // QL1 - Cầu Bến Cát 2
+	"68188fe36dfb4b0018f90520": {}, // Trần Văn Giàu - đường Kênh 1
 }
 
 // Catalog holds an in-memory repository of traffic cameras with fast index lookups.
@@ -61,12 +93,21 @@ func NewCatalogWithClassifier(cameras []Camera, classifier ZoneClassifier) *Cata
 
 	zoneSet := make(map[string]struct{})
 	for i := range c.list {
-		if c.list[i].Zone == "" {
-			c.list[i].Zone = classifier.Classify(c.list[i])
+		cam := &c.list[i]
+		if cam.Zone == "" {
+			cam.Zone = classifier.Classify(*cam)
 		}
-		c.dict[c.list[i].ID] = &c.list[i]
-		if c.list[i].Zone != "" {
-			zoneSet[c.list[i].Zone] = struct{}{}
+		if primaryID, isDup := KnownDuplicateStreams[cam.ID]; isDup {
+			cam.DuplicateOf = primaryID
+		}
+		if _, isGhost := KnownGhostCameras[cam.ID]; isGhost {
+			cam.IsGhost = true
+			cam.IsOnline = false
+			cam.Status = "DOWN"
+		}
+		c.dict[cam.ID] = cam
+		if cam.Zone != "" {
+			zoneSet[cam.Zone] = struct{}{}
 		}
 	}
 
