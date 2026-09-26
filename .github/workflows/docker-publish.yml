@@ -114,3 +114,51 @@ jobs:
             -d "$PAYLOAD"
 
           echo "Portainer deploy completed successfully."
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 3: Notify Alert Gateway (Failure & Deploy Success)
+  # ────────────────────────────────────────────────────────────────────────────
+  notify-status:
+    name: Notify Alert Gateway
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy]
+    if: always()
+
+    steps:
+      - name: Send Alert to Gateway
+        env:
+          ALERT_URL: ${{ secrets.ALERT_GATEWAY_URL || 'https://n8n.529studio.site/webhook/alert-gateway' }}
+          ALERT_KEY: ${{ secrets.ALERT_GATEWAY_KEY || 'ak_live_529s_9a8f27e1c4b603d8' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_MSG: ${{ github.event.head_commit.message || github.sha }}
+          BP_RES: ${{ needs.build-and-push.result }}
+          DP_RES: ${{ needs.deploy.result }}
+        run: |
+          if [ "$BP_RES" = "failure" ] || [ "$DP_RES" = "failure" ]; then
+            SEVERITY="CRITICAL"
+            TITLE="CI/CD Failed: ${{ github.repository }}"
+            MESSAGE="Pipeline thất bại tại commit: $COMMIT_MSG (Branch: ${{ github.ref_name }} by @${{ github.actor }})"
+          elif [ "$DP_RES" = "success" ]; then
+            SEVERITY="SUCCESS"
+            TITLE="Deploy Success: ${{ github.repository }}"
+            MESSAGE="Đã build và triển khai thành công Camera View lên Warded STG (Portainer Stack 14) - Commit: $COMMIT_MSG"
+          else
+            exit 0
+          fi
+
+          PAYLOAD=$(cat <<JSON
+          {
+            "target": "devteam",
+            "source": "camera-view-ci-cd",
+            "severity": "$SEVERITY",
+            "title": "$TITLE",
+            "message": "$MESSAGE",
+            "url": "$RUN_URL"
+          }
+          JSON
+          )
+
+          curl -s -m 10 -o /dev/null -X POST "$ALERT_URL" \
+            -H "X-Alert-Key: $ALERT_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
