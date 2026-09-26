@@ -200,9 +200,7 @@ func (h *Hub) register(cl *client) bool {
 func (h *Hub) unregister(cl *client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if _, ok := h.clients[cl]; ok {
-		delete(h.clients, cl)
-		// Do not close cl.send here — it may still be drained in HandleSSE.
-		// Closing is only done by hub.Close() for a hard shutdown.
-	}
+	delete(h.clients, cl)
+	// Do not close cl.send here — it may still be drained in HandleSSE.
+	// Closing is only done by hub.Close() for a hard shutdown.
 }
