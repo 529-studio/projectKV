@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-api build-go test-go lint-go
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-api build-go test-go lint-go geo-enrich test-enrich
 
 help:
 	@echo "========================================================"
@@ -15,6 +15,8 @@ help:
 	@echo "  make install     - Install dependencies & activate git hooks"
 	@echo "  make setup-hooks - Activate git pre-push hook (blocks direct push to main/dev)"
 	@echo "  make crawl       - Update camera dataset from traffic portal"
+	@echo "  make geo-enrich  - Run batch Phường point-in-polygon enrichment"
+	@echo "  make test-enrich - Run unit tests for geo-enrich tool"
 
 install:
 	cd services/go-server && go mod download
@@ -54,6 +56,12 @@ dev-all:
 
 crawl:
 	node tools/crawler/get_all_cameras.js
+
+geo-enrich:
+	python3 tools/geo-enrich/enrich.py --cameras cameras_all.json --boundaries tools/geo-enrich/data/phuong_boundaries.geojson --output cameras_enriched.json
+
+test-enrich:
+	python3 -m unittest discover -s tools/geo-enrich -p "test_*.py"
 
 docker-build:
 	docker build -t warded-stg:latest .

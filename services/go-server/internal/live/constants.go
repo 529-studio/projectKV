@@ -1,0 +1,15 @@
+package live
+
+import "time"
+
+// RouteStream is the SSE endpoint path.
+// Supersedes ws.RouteLive ("/ws/live") per ADR-003 Decision 1.
+const RouteStream = "/api/live/stream"
+
+// HeartbeatInterval is how often a keep-alive comment is sent to each client
+// so proxies and load-balancers do not close idle SSE connections.
+const HeartbeatInterval = 15 * time.Second
+
+// DefaultClientBuffer is the number of serialized events buffered per client
+// before a slow client is considered dropped (non-blocking broadcast).
+const DefaultClientBuffer = 32
