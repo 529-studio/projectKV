@@ -17,9 +17,11 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/cache"
 	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
+	"github.com/529-studio/projectKV/services/go-server/internal/cvclient"
 	"github.com/529-studio/projectKV/services/go-server/internal/handlers"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
+	"github.com/529-studio/projectKV/services/go-server/internal/live"
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/models"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
@@ -120,11 +122,47 @@ func main() {
 	}
 	hotsetHandler := hotset.NewHandler(&verdictStoreAdapter{repo: verdictRepo})
 
-	// 6. Initialize WebSocket Hub for real-time verdict streaming (Issue #9)
+	// 6. Initialize WebSocket Hub for real-time verdict streaming (Issue #9).
+	// Kept in place — will be retired after D1 (EventSource migration) is verified.
 	wsHub := ws.NewHub()
 	defer wsHub.Close()
 
-	// 7. Legacy HTTP Handlers (camera list + old snapshot path).
+	// 6b. Initialize SSE Hub (ADR-003 Decision 1 — replaces WebSocket for new clients).
+	// internal/live broadcasts camera_update events to all EventSource subscribers.
+	liveHub := live.NewHub()
+	defer liveHub.Close()
+
+	// 6c. Wire the Hot Set scheduler with OnVerdict.
+	// OnVerdict fans out to: (1) SSE live broadcast, (2) SQLite verdict store.
+	// The ws hub broadcast is intentionally NOT wired here — it will be cleaned up
+	// once D1 (EventSource frontend migration) is merged and verified.
+	mockAnalyzer := cvclient.NewMockAnalyzer()
+	onVerdict := func(v hotset.Verdict) {
+		// Fan-out 1: push to all SSE clients immediately.
+		liveHub.Broadcast(v)
+
+		// Fan-out 2: persist to SQLite for GET /api/traffic-status hydration.
+		if verdictRepo != nil {
+			sv := store.Verdict{
+				CameraID:   v.CameraID,
+				Severity:   v.Severity,
+				Confidence: v.Confidence,
+				Timestamp:  v.Timestamp,
+			}
+			if err := verdictRepo.Save(context.Background(), sv); err != nil {
+				log.Printf("[WARN] Failed to persist verdict for %s: %v", v.CameraID, err)
+			}
+		}
+	}
+	hotsetScheduler := hotset.NewScheduler(
+		hotsetRegistry,
+		mockAnalyzer,
+		30*time.Second,
+		10,
+		onVerdict,
+		nil, // uses slog.Default()
+	)
+
 	cameraHandler := handlers.NewCameraHandler(camStore, snapCache)
 
 	// 8. Setup Gin Engine
@@ -136,8 +174,16 @@ func main() {
 	router.HEAD("/health", cameraHandler.HealthCheck)
 	router.GET("/healthz", httpserver.Healthz)
 
-	// WebSocket Live Broadcast (Issue #9: GET /ws/live)
+	// WebSocket Live Broadcast (Issue #9: GET /ws/live) — kept until D1 FE migration verified.
 	wsHub.RegisterRoutes(router)
+
+	// SSE Live Stream (ADR-003 Decision 1: GET /api/live/stream).
+	liveHub.RegisterRoutes(router)
+
+	// Start the Hot Set scheduler in background; cancelled on graceful shutdown.
+	schedulerCtx, cancelScheduler := context.WithCancel(context.Background())
+	defer cancelScheduler()
+	go hotsetScheduler.Run(schedulerCtx)
 
 	// Swagger documentation UI
 	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
@@ -223,6 +269,7 @@ func main() {
 		log.Printf(" [URL] Available at: http://localhost:%s", cfg.Port)
 		log.Printf(" [DOC] Swagger UI:   http://localhost:%s/swagger/index.html", cfg.Port)
 		log.Printf(" [WS]  WebSocket:    ws://localhost:%s%s", cfg.Port, ws.RouteLive)
+		log.Printf(" [SSE] Live stream:  http://localhost:%s%s", cfg.Port, live.RouteStream)
 		log.Printf(" [CAM] Loaded %d cameras into memory (%d online)", camStore.Total, camStore.OnlineCount)
 		log.Println("================================================================")
 
