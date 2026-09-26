@@ -1,0 +1,44 @@
+{
+  "type": "FeatureCollection",
+  "name": "sample_phuong_boundaries",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "phuong_id": "P_BEN_NGHE",
+        "phuong_name": "Phường Bến Nghé"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [106.696, 10.770],
+            [106.708, 10.770],
+            [106.708, 10.785],
+            [106.696, 10.785],
+            [106.696, 10.770]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "phuong_id": "P_TAN_DINH",
+        "phuong_name": "Phường Tân Định"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [106.685, 10.788],
+            [106.695, 10.788],
+            [106.695, 10.796],
+            [106.685, 10.796],
+            [106.685, 10.788]
+          ]
+        ]
+      }
+    }
+  ]
+}
