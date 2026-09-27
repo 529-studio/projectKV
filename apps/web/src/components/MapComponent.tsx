@@ -10,12 +10,21 @@ interface MapComponentProps {
   onCameraClick?: (cam: Camera) => void;
   cameras: Camera[];
   verdicts: Map<string, TrafficVerdict>;
+  selectedCamera?: Camera | null;
+  isFiltered?: boolean;
 }
 
-export default function MapComponent({ cameras, verdicts, onCameraClick }: MapComponentProps) {
+export default function MapComponent({
+  cameras,
+  verdicts,
+  onCameraClick,
+  selectedCamera,
+  isFiltered = false,
+}: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const prevFilteredRef = useRef(false);
 
   const getTrafficColor = useCallback((camId: string, isOnline: boolean) => {
     const verdict = verdicts.get(camId);
@@ -94,6 +103,40 @@ export default function MapComponent({ cameras, verdicts, onCameraClick }: MapCo
       }
     };
   }, []);
+
+  // Smoothly fly to selected camera
+  useEffect(() => {
+    if (!mapRef.current || !selectedCamera?.latitude || !selectedCamera?.longitude) return;
+    mapRef.current.flyTo(
+      [selectedCamera.latitude, selectedCamera.longitude],
+      Math.max(mapRef.current.getZoom(), 15),
+      { duration: 1 }
+    );
+  }, [selectedCamera]);
+
+  // Fit bounds when a filtered subset of cameras (Phường or Corridor) is selected
+  useEffect(() => {
+    if (!mapRef.current || !isFiltered || cameras.length === 0) return;
+    const validPoints = cameras
+      .filter(c => c.latitude && c.longitude)
+      .map(c => [c.latitude!, c.longitude!] as L.LatLngTuple);
+    if (validPoints.length > 0) {
+      const bounds = L.latLngBounds(validPoints);
+      mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    }
+  }, [cameras, isFiltered]);
+
+  // When filter is cleared, smoothly return to default network view
+  useEffect(() => {
+    if (prevFilteredRef.current && !isFiltered && mapRef.current) {
+      mapRef.current.flyTo(
+        MAP_CONFIG.DEFAULT_CENTER as L.LatLngTuple,
+        MAP_CONFIG.DEFAULT_ZOOM,
+        { duration: 0.8 }
+      );
+    }
+    prevFilteredRef.current = isFiltered;
+  }, [isFiltered]);
 
   useEffect(() => {
     if (!mapRef.current || !markersLayerRef.current) return;
