@@ -24,6 +24,8 @@ export const API_ENDPOINTS = Object.freeze({
   SNAPSHOT: (id: string) => `/api/snapshot/${encodeURIComponent(id)}`,
   TRAFFIC_STATUS: '/api/traffic-status',
   ZONES: '/api/zones',
+  PHUONG: '/api/phuong',
+  SSE_LIVE: '/api/live/stream',
   WS_LIVE: '/ws/live',
 });
 
