@@ -73,9 +73,13 @@ func (h *Hub) RegisterRoutes(r gin.IRouter) {
 	r.GET(RouteStream, h.HandleSSE)
 }
 
-// HandleSSE is the Gin handler for GET /api/live/stream.
-// It upgrades the HTTP connection to an SSE stream and blocks until the client
-// disconnects (r.Context().Done()) or the hub is closed.
+// HandleSSE godoc
+// @Summary Real-time camera verdict SSE stream
+// @Description Server-Sent Events (SSE) stream delivering real-time Hot Set verdict updates. Emits 'camera_update' events with verdict JSON payload and periodic heartbeat comments (: heartbeat).
+// @Tags Live
+// @Produce text/event-stream
+// @Success 200 {string} string "text/event-stream stream"
+// @Router /api/live/stream [get]
 func (h *Hub) HandleSSE(c *gin.Context) {
 	// SSE requires these three headers.
 	c.Header("Content-Type", "text/event-stream")

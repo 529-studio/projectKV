@@ -56,6 +56,10 @@ This document defines the core principles, design standards, and mandatory techn
         1. Vehicle density on the corridor.
         2. Congestion status and roadway bottlenecks.
         3. Actionable travel recommendations.
+*   **Mandatory Swagger Synchronization for Backend APIs**:
+    *   Whenever a backend API endpoint is added, modified, or removed in `services/go-server`, developers and AI agents **MUST** update the Swagger annotations (godoc comments: `@Summary`, `@Description`, `@Tags`, `@Produce`, `@Success`, `@Router`, etc.) on the corresponding HTTP handler.
+    *   Regenerate the Swagger documentation artifacts (`services/go-server/docs/docs.go`, `swagger.json`, and `swagger.yaml`) via `make swagger`.
+    *   Pull Requests that introduce, alter, or remove API routes without corresponding Swagger documentation updates are strictly prohibited.
 
 ---
 
