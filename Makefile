@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-api build-go test-go lint-go geo-enrich test-enrich
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-api build-go test-go lint-go swagger geo-enrich test-enrich
 
 help:
 	@echo "========================================================"
@@ -12,6 +12,8 @@ help:
 	@echo "  make dev-web     - Run static server for Frontend (apps/web - port 3001)"
 	@echo "  make build-go    - Compile standalone Go backend binary"
 	@echo "  make test-go     - Run Go test suite"
+	@echo "  make lint-go     - Run Go linter"
+	@echo "  make swagger     - Regenerate Swagger API documentation"
 	@echo "  make install     - Install dependencies & activate git hooks"
 	@echo "  make setup-hooks - Activate git pre-push hook (blocks direct push to main/dev)"
 	@echo "  make crawl       - Update camera dataset from traffic portal"
@@ -41,6 +43,9 @@ test-go:
 
 lint-go:
 	cd services/go-server && golangci-lint run
+
+swagger:
+	cd services/go-server && (which swag > /dev/null 2>&1 && swag init -g internal/httpserver/server.go -o docs || $$(go env GOPATH)/bin/swag init -g internal/httpserver/server.go -o docs || $(HOME)/go/bin/swag init -g internal/httpserver/server.go -o docs)
 
 dev-web:
 	cd apps/web && npm run dev -- -p 3001
