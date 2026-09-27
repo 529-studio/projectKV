@@ -213,6 +213,7 @@ func main() {
 		if camCatalogHandler != nil {
 			api.GET("/cameras/:id", camCatalogHandler.GetCameraByID)
 			api.GET("/zones", camCatalogHandler.GetZones)
+			api.GET("/phuong", camCatalogHandler.GetPhuongs)
 		}
 		// Proxy cache snapshot routes (wraps proxycache.Handler)
 		proxyHandler.RegisterRoutes(api)

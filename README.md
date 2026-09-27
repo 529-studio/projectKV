@@ -14,6 +14,7 @@
   <a href="https://leafletjs.com/"><img src="https://img.shields.io/badge/Leaflet-1.9+-199900?logo=leaflet&logoColor=white" alt="Leaflet"></a>
   <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white" alt="Go"></a>
   <a href="https://sqlite.org/"><img src="https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white" alt="SQLite"></a>
+  <a href="docs/ADR-001-flood-alert-architecture.md#adr-003-sprint-1-scope--live-updates-sse-hot-set-scoped-congestion-colors-phường-based-filter"><img src="https://img.shields.io/badge/SSE-Live_Stream-FFA500?logo=html5&logoColor=white" alt="SSE"></a>
   <a href="https://python.org/"><img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Proprietary-yellow" alt="License"></a>
 </p>
@@ -55,35 +56,45 @@ The system is organized as a **clean monorepo**, decoupling the Web Client (`app
 hcm-traffic-cameras/
 │
 ├── apps/
-│   └── web/                           # [FRONTEND] Standalone Web Client (@camera-view/web)
-│       ├── index.html                 # Clean, fast-loading web interface with i18n
-│       ├── styles.css                 # Responsive CSS (Desktop, Tablet & Mobile)
-│       ├── app.js                     # Leaflet map, Chained Deep Filter, Marker scaling, Dock
+│   └── web/                           # [FRONTEND] Next.js App Router Client (@camera-view/web)
+│       ├── src/
+│       │   ├── app/                   # App Router pages & layout
+│       │   ├── components/            # Leaflet map, docked tracking UI, modals, legends
+│       │   ├── hooks/                 # useCameras, useTraffic (SSE EventSource)
+│       │   └── config/                # API endpoints, map constants
+│       ├── tailwind.config.ts         # Tailwind CSS styling
 │       └── package.json
 │
 ├── services/
-│   ├── go-server/                     # [BACKEND — Go] Single static binary
-│   │   ├── cmd/api/main.go            # Entry point, wiring
+│   ├── go-server/                     # [BACKEND — Go] Single static binary (Gin + SQLite)
+│   │   ├── cmd/server/main.go         # Composition root, routing, graceful shutdown
 │   │   └── internal/
+│   │       ├── live/                  # Server-Sent Events (SSE) hub & live stream endpoint
+│   │       ├── camera/                # Camera catalog, Phường indexing, query endpoints
 │   │       ├── proxycache/            # Snapshot reverse-proxy + in-memory TTL cache
 │   │       ├── hotset/                # Hot Set Pool scheduler (see ADR-001 §2)
 │   │       ├── notify/                # Notification Adapter: Telegram / Zalo / WebPush / SMS
-│   │       └── store/                 # SQLite (pure Go, no cgo) — subscriptions, dedupe state
+│   │       ├── store/                 # SQLite (pure Go, no cgo) — subscriptions, dedupe, verdicts
+│   │       └── tilecache/             # Offline/local map tile proxy and caching
 │   │
 │   └── cv-engine/                     # [ML PLANE — Python] Model inference only
 │       ├── models/                    # YOLO / ONNX weights (Phase 2, self-hosted)
 │       └── api.py                     # Analysis endpoint called by the Go scheduler
 │
 ├── tools/
+│   ├── geo-enrich/                    # [GEO ENRICHMENT] Batch Phường point-in-polygon tool
+│   │   ├── enrich.py                  # CLI enrichment script (Ray casting / Shapely)
+│   │   └── data/                      # GeoJSON boundary polygons
 │   └── crawler/                       # [DATA CRAWLER]
 │       └── get_all_cameras.js         # Fetch camera dataset from official DOT portal
 │
 ├── docs/
 │   ├── SYSTEM_DESIGN.md               # Original caching & CV roadmap design
-│   ├── ADR-001-flood-alert-architecture.md   # Flood-alert feasibility & architecture
-│   └── (ADR-002 is appended to ADR-001, backend language decision)
+│   ├── ADR-001-flood-alert-architecture.md   # Flood-alert feasibility, Go migration & Sprint 1 scope
+│   └── sprint1_execution_guide.md     # Sprint 1 task sequencing and agy CLI commands
 │
-├── cameras_all.json                   # Traffic camera catalog dataset
+├── cameras_all.json                   # Base traffic camera catalog dataset
+├── cameras_enriched.json              # Enriched camera catalog with phuong_id / phuong_name
 ├── Makefile                           # Unified orchestration commands
 ├── LICENSE                            # Strict proprietary, reference-only license
 └── README.md                          # Project documentation
@@ -129,9 +140,9 @@ make crawl
 | Layer | Technologies & Badges | Purpose |
 |---|---|---|
 | **Frontend** | [![Next.js](https://img.shields.io/badge/Next.js-14.2+-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/) [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4+-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/) [![Framer Motion](https://img.shields.io/badge/Framer_Motion-11+-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion/) [![Leaflet](https://img.shields.io/badge/Leaflet-1.9+-199900?logo=leaflet&logoColor=white)](https://leafletjs.com/) | Next.js App Router, TypeScript, Tailwind CSS, Framer Motion animations, Leaflet interactive mapping |
-| **Backend** | [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![Gin](https://img.shields.io/badge/Gin-1.10+-008ECF?logo=go&logoColor=white)](https://gin-gonic.com/) [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/) | Single static binary, Gin HTTP router, SQLite state persistence, in-memory TTL proxy caching, WebSockets |
+| **Backend** | [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![Gin](https://img.shields.io/badge/Gin-1.10+-008ECF?logo=go&logoColor=white)](https://gin-gonic.com/) [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/) [![SSE](https://img.shields.io/badge/SSE-Live_Stream-FFA500?logo=html5&logoColor=white)](docs/ADR-001-flood-alert-architecture.md#adr-003-sprint-1-scope--live-updates-sse-hot-set-scoped-congestion-colors-phường-based-filter) | Single static binary, Gin HTTP router, SQLite state persistence, in-memory TTL proxy caching, Server-Sent Events (SSE) live streaming |
 | **Computer Vision** | [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/) [![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/) | Python 3.11+, YOLO / ONNX model inference, pluggable traffic congestion and flood alert analyzers |
-| **DevOps & Tooling** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-Proprietary-yellow)](LICENSE) | GitHub Actions CI/CD workflows, golangci-lint, ESLint, unified Makefile |
+| **DevOps & Tooling** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-Proprietary-yellow)](LICENSE) [![Geo-Enrich](https://img.shields.io/badge/Geo--Enrich-Point--in--Polygon-708090?logo=python&logoColor=white)](tools/geo-enrich) | GitHub Actions CI/CD workflows, golangci-lint, ESLint, unified Makefile, batch Phường point-in-polygon enrichment |
 
 ## 4. Next Evolution Steps
 
@@ -159,9 +170,9 @@ Hệ thống được tổ chức theo mô hình monorepo, tách biệt Web Clie
 | Phân tầng | Công nghệ & Huy hiệu | Vai trò |
 |---|---|---|
 | **Frontend** | [![Next.js](https://img.shields.io/badge/Next.js-14.2+-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/) [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4+-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/) [![Framer Motion](https://img.shields.io/badge/Framer_Motion-11+-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion/) [![Leaflet](https://img.shields.io/badge/Leaflet-1.9+-199900?logo=leaflet&logoColor=white)](https://leafletjs.com/) | Next.js App Router, TypeScript, Tailwind CSS, animation Framer Motion, bản đồ tương tác Leaflet |
-| **Backend** | [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![Gin](https://img.shields.io/badge/Gin-1.10+-008ECF?logo=go&logoColor=white)](https://gin-gonic.com/) [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/) | Single static binary (Go), Gin router, lưu trữ SQLite, in-memory TTL cache, WebSocket thời gian thực |
+| **Backend** | [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![Gin](https://img.shields.io/badge/Gin-1.10+-008ECF?logo=go&logoColor=white)](https://gin-gonic.com/) [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/) [![SSE](https://img.shields.io/badge/SSE-Live_Stream-FFA500?logo=html5&logoColor=white)](docs/ADR-001-flood-alert-architecture.md#adr-003-sprint-1-scope--live-updates-sse-hot-set-scoped-congestion-colors-phường-based-filter) | Single static binary (Go), Gin router, lưu trữ SQLite, in-memory TTL cache, phát luồng Server-Sent Events (SSE) trực tiếp |
 | **Thị giác máy tính** | [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/) [![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/) | Python 3.11+, suy luận mô hình YOLO / ONNX, phân tích kẹt xe và ngập úng |
-| **DevOps & Công cụ** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-Proprietary-yellow)](LICENSE) | CI/CD GitHub Actions, golangci-lint, ESLint, Makefile điều phối tập trung |
+| **DevOps & Công cụ** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-Proprietary-yellow)](LICENSE) [![Geo-Enrich](https://img.shields.io/badge/Geo--Enrich-Point--in--Polygon-708090?logo=python&logoColor=white)](tools/geo-enrich) | CI/CD GitHub Actions, golangci-lint, ESLint, Makefile điều phối tập trung, công cụ gán Phường point-in-polygon |
 
 ## Tài liệu kiến trúc chuyên sâu
 - [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md) — thiết kế caching & roadmap CV gốc.

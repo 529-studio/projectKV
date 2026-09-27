@@ -34,6 +34,7 @@ const (
 const (
 	ParamZone     = "zone"
 	ParamCorridor = "corridor"
+	ParamPhuong   = "phuong"
 	ParamID       = "id"
 )
 
@@ -42,6 +43,7 @@ const (
 	RouteCameras      = "/cameras"
 	RouteCameraDetail = "/cameras/:id"
 	RouteZones        = "/zones"
+	RoutePhuong       = "/phuong"
 )
 
 // Error message constants.
