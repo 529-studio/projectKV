@@ -1,6 +1,8 @@
 'use client';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { FUNCTIONAL_COLORS } from '../config/constants';
+
 interface MapLegendProps {
   isOpen: boolean;
   onToggle: () => void;
@@ -8,7 +10,7 @@ interface MapLegendProps {
 
 export default function MapLegend({ isOpen, onToggle }: MapLegendProps) {
   return (
-    <div className="absolute top-3 right-3 z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[210px]">
+    <div className="absolute top-3 right-3 z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[230px]">
       {/* Header row — always visible */}
       <button
         onClick={onToggle}
@@ -35,25 +37,49 @@ export default function MapLegend({ isOpen, onToggle }: MapLegendProps) {
             transition={{ duration: 0.22, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className="flex flex-col gap-2.5 text-zinc-200 text-xs px-3 pb-3 pt-1 border-t border-zinc-800">
+            <div className="flex flex-col gap-2 text-zinc-200 text-xs px-3 pb-3 pt-1 border-t border-zinc-800">
+              {/* Category 1: Non-Hot-Set default cameras (≥800 cameras) */}
+              <div className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1">
+                Toàn mạng (Mặc định)
+              </div>
               <div className="flex items-center gap-2.5">
-                <span className="w-3 h-3 rounded-full bg-white shrink-0" />
+                <span
+                  className="w-3 h-3 rounded-full border border-black shrink-0"
+                  style={{ backgroundColor: FUNCTIONAL_COLORS.ONLINE_DEFAULT }}
+                />
                 <span>Camera hoạt động</span>
               </div>
               <div className="flex items-center gap-2.5">
-                <span className="w-3 h-3 rounded-full bg-zinc-600 shrink-0" />
+                <span
+                  className="w-3 h-3 rounded-full border border-black shrink-0"
+                  style={{ backgroundColor: FUNCTIONAL_COLORS.OFFLINE_DEFAULT }}
+                />
                 <span className="text-zinc-400">Camera mất tín hiệu</span>
               </div>
-              <div className="flex items-center gap-2.5">
-                <span className="w-3 h-3 rounded-full bg-green-500 shrink-0" />
-                <span>Giao thông thông thoáng</span>
+
+              {/* Category 2: Hot Set cameras with real-time AI verdict */}
+              <div className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1.5 border-t border-zinc-800/80">
+                Giám sát AI (Điểm trọng yếu / Đang xem)
               </div>
               <div className="flex items-center gap-2.5">
-                <span className="w-3 h-3 rounded-full bg-yellow-500 shrink-0" />
+                <span
+                  className="w-3 h-3 rounded-full border border-black shrink-0"
+                  style={{ backgroundColor: FUNCTIONAL_COLORS.CLEAR }}
+                />
+                <span>Thông thoáng</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="w-3 h-3 rounded-full border border-black shrink-0"
+                  style={{ backgroundColor: FUNCTIONAL_COLORS.MODERATE }}
+                />
                 <span>Đông xe / Chậm</span>
               </div>
               <div className="flex items-center gap-2.5">
-                <span className="w-3 h-3 rounded-full bg-red-500 shrink-0" />
+                <span
+                  className="w-3 h-3 rounded-full border border-black shrink-0"
+                  style={{ backgroundColor: FUNCTIONAL_COLORS.CONGESTED }}
+                />
                 <span>Ùn tắc / Kẹt xe</span>
               </div>
             </div>

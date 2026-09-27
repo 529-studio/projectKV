@@ -52,6 +52,11 @@ export const TRAFFIC_SEVERITY = Object.freeze({
   CONGESTED: 'CONGESTED',
 });
 
+export const HOTSET_CONFIG = Object.freeze({
+  VERDICT_TTL_SECONDS: 180,
+  VERDICT_TTL_MS: 180 * 1000,
+});
+
 export const FUNCTIONAL_COLORS = Object.freeze({
   CLEAR: '#22c55e',      
   MODERATE: '#eab308',   
