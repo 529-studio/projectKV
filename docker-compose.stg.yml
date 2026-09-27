@@ -9,7 +9,7 @@ services:
     environment:
       - PORT=3000
       - GIN_MODE=release
-      - CAMERAS_FILE_PATH=/app/cameras_all.json
+      - CAMERAS_FILE_PATH=/app/cameras_enriched.json
       - STATIC_WEB_DIR=/app/web
       - SQLITE_PATH=/app/data/camera-view.db
       - SNAPSHOT_UPSTREAM_BASE_URL=https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx
