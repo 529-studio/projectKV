@@ -3,8 +3,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Camera } from '../hooks/useCameras';
-import { TrafficVerdict } from '../hooks/useTraffic';
-import { MAP_CONFIG, FUNCTIONAL_COLORS } from '../config/constants';
+import { TrafficVerdict, isVerdictValid } from '../hooks/useTraffic';
+import { MAP_CONFIG, FUNCTIONAL_COLORS, TRAFFIC_SEVERITY } from '../config/constants';
 
 interface MapComponentProps {
   onCameraClick?: (cam: Camera) => void;
@@ -19,11 +19,11 @@ export default function MapComponent({ cameras, verdicts, onCameraClick }: MapCo
 
   const getTrafficColor = useCallback((camId: string, isOnline: boolean) => {
     const verdict = verdicts.get(camId);
-    if (verdict?.severity) {
+    if (isVerdictValid(verdict)) {
       const sev = verdict.severity.toUpperCase();
-      if (sev === 'CLEAR') return FUNCTIONAL_COLORS.CLEAR;
-      if (sev === 'MODERATE') return FUNCTIONAL_COLORS.MODERATE;
-      if (sev === 'HEAVY' || sev === 'CONGESTED') return FUNCTIONAL_COLORS.CONGESTED;
+      if (sev === TRAFFIC_SEVERITY.CLEAR) return FUNCTIONAL_COLORS.CLEAR;
+      if (sev === TRAFFIC_SEVERITY.MODERATE) return FUNCTIONAL_COLORS.MODERATE;
+      if (sev === TRAFFIC_SEVERITY.HEAVY || sev === TRAFFIC_SEVERITY.CONGESTED) return FUNCTIONAL_COLORS.CONGESTED;
     }
     return isOnline ? FUNCTIONAL_COLORS.ONLINE_DEFAULT : FUNCTIONAL_COLORS.OFFLINE_DEFAULT;
   }, [verdicts]);
@@ -117,7 +117,7 @@ export default function MapComponent({ cameras, verdicts, onCameraClick }: MapCo
 
       const verdict = verdicts.get(cam.id);
       let trafficInfo = '';
-      if (verdict?.severity) {
+      if (isVerdictValid(verdict)) {
         trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">Traffic: ${verdict.severity}</span>`;
       }
       if (cam.isGhost) {
@@ -132,7 +132,12 @@ export default function MapComponent({ cameras, verdicts, onCameraClick }: MapCo
       });
 
       marker.on('mouseover', () => {
-        marker.setStyle({ radius: getRadius(mapRef.current!.getZoom(), isFew) + 4, fillColor: '#ffffff', color: '#ffffff', weight: 2.5 });
+        marker.setStyle({ 
+          radius: getRadius(mapRef.current!.getZoom(), isFew) + 3, 
+          color: '#ffffff', 
+          weight: 2.5 
+        });
+        marker.bringToFront();
       });
 
       marker.on('mouseout', () => {
