@@ -363,3 +363,133 @@ func TestCatalog_DeduplicationAndGhost(t *testing.T) {
 		t.Errorf("expected regular camera not to be ghost or duplicate, got ghost=%v, dup=%s", regCam.IsGhost, regCam.DuplicateOf)
 	}
 }
+
+func TestCatalog_Phuongs(t *testing.T) {
+	pBenNghe := "Phường Bến Nghé"
+	pTanDinh := "Phường Tân Định"
+	cams := []Camera{
+		{ID: "c1", PhuongName: &pBenNghe},
+		{ID: "c2", PhuongName: &pTanDinh},
+		{ID: "c3", PhuongName: &pBenNghe}, // duplicate should be deduplicated
+		{ID: "c4", PhuongName: nil},       // nil should be excluded
+	}
+
+	cat := NewCatalog(cams)
+	phuongs := cat.Phuongs()
+
+	expected := []string{"Phường Bến Nghé", "Phường Tân Định"}
+	if !reflect.DeepEqual(phuongs, expected) {
+		t.Errorf("expected phuongs %v, got %v", expected, phuongs)
+	}
+}
+
+func TestCatalog_FilterByPhuong(t *testing.T) {
+	pBenNghe := "Phường Bến Nghé"
+	pTanDinh := "Phường Tân Định"
+	cams := []Camera{
+		{ID: "c1", DisplayName: "Cam 1", PhuongName: &pBenNghe},
+		{ID: "c2", DisplayName: "Cam 2", PhuongName: &pTanDinh},
+		{ID: "c3", DisplayName: "Cam 3", PhuongName: &pBenNghe},
+		{ID: "c4", DisplayName: "Cam 4", PhuongName: nil},
+	}
+
+	cat := NewCatalog(cams)
+
+	// Filter case-insensitive
+	matches := cat.FilterByPhuong("phường bến nghé")
+	if len(matches) != 2 {
+		t.Fatalf("expected 2 matches for Phường Bến Nghé, got %d", len(matches))
+	}
+	if matches[0].ID != "c1" || matches[1].ID != "c3" {
+		t.Errorf("unexpected matches: %v", matches)
+	}
+
+	// Filter empty string
+	emptyMatches := cat.FilterByPhuong("")
+	if len(emptyMatches) != 0 {
+		t.Errorf("expected 0 matches for empty string, got %d", len(emptyMatches))
+	}
+
+	// Filter non-existent
+	noMatches := cat.FilterByPhuong("Không tồn tại")
+	if len(noMatches) != 0 {
+		t.Errorf("expected 0 matches for non-existent phuong, got %d", len(noMatches))
+	}
+}
+
+func TestCamera_JSONSerialization_PhuongFields(t *testing.T) {
+	pID := "P_001"
+	pName := "Phường Bến Nghé"
+
+	camWithPhuong := Camera{
+		ID:          "cam-with-p",
+		DisplayName: "Nguyễn Huệ",
+		PhuongID:    &pID,
+		PhuongName:  &pName,
+	}
+
+	camWithoutPhuong := Camera{
+		ID:          "cam-without-p",
+		DisplayName: "Quốc lộ 1",
+		PhuongID:    nil,
+		PhuongName:  nil,
+	}
+
+	// 1. Serialization of camera with Phường
+	dataWith, err := json.Marshal(camWithPhuong)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	var mapWith map[string]interface{}
+	if err := json.Unmarshal(dataWith, &mapWith); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if mapWith["phuong_id"] != "P_001" || mapWith["phuong_name"] != "Phường Bến Nghé" {
+		t.Errorf("expected phuong fields in json, got %v", mapWith)
+	}
+
+	// 2. Serialization and deserialization of camera without Phường
+	dataWithout, err := json.Marshal(camWithoutPhuong)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	var unmarshaled Camera
+	if err := json.Unmarshal(dataWithout, &unmarshaled); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if unmarshaled.PhuongID != nil {
+		t.Errorf("expected nil PhuongID, got %v", *unmarshaled.PhuongID)
+	}
+	if unmarshaled.PhuongName != nil {
+		t.Errorf("expected nil PhuongName, got %v", *unmarshaled.PhuongName)
+	}
+}
+
+func TestLoadCatalog_GracefulFallback(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create base cameras_all.json in tempDir
+	baseCameras := []Camera{
+		{ID: "base-1", DisplayName: "Base Camera 1"},
+	}
+	baseJSON, _ := json.Marshal(baseCameras)
+	basePath := filepath.Join(tempDir, "cameras_all.json")
+	if err := os.WriteFile(basePath, baseJSON, 0644); err != nil {
+		t.Fatalf("failed to write base file: %v", err)
+	}
+
+	// Request missing enriched file in same directory
+	missingEnrichedPath := filepath.Join(tempDir, "cameras_enriched.json")
+	cat, err := LoadCatalog(missingEnrichedPath)
+	if err != nil {
+		t.Fatalf("expected graceful fallback to cameras_all.json without error, got: %v", err)
+	}
+
+	cams := cat.All()
+	if len(cams) != 1 || cams[0].ID != "base-1" {
+		t.Errorf("expected 1 camera from base catalog, got %v", cams)
+	}
+	if cams[0].PhuongID != nil || cams[0].PhuongName != nil {
+		t.Errorf("expected nil phuong fields in fallback, got id=%v name=%v", cams[0].PhuongID, cams[0].PhuongName)
+	}
+}

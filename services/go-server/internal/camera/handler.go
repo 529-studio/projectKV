@@ -2,6 +2,7 @@ package camera
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +24,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET(RouteCameras, h.GetCameras)
 	rg.GET(RouteCameraDetail, h.GetCameraByID)
 	rg.GET(RouteZones, h.GetZones)
+	rg.GET(RoutePhuong, h.GetPhuongs)
 }
 
 // RegisterRoutes is a convenience package-level function to mount camera endpoints.
@@ -33,18 +35,47 @@ func RegisterRoutes(rg *gin.RouterGroup, reader Reader) {
 
 // GetCameras godoc
 // @Summary List cameras
-// @Description Retrieve full camera catalog with optional zone and corridor filters
+// @Description Retrieve full camera catalog with optional zone, corridor, and phuong filters
 // @Tags Camera
 // @Produce json
 // @Param zone query string false "Filter by administrative or geographic zone"
 // @Param corridor query string false "Filter by corridor keyword"
+// @Param phuong query string false "Filter by post-reform Phường name"
 // @Success 200 {array} Camera
 // @Router /api/cameras [get]
 func (h *Handler) GetCameras(c *gin.Context) {
 	zone := c.Query(ParamZone)
 	corridor := c.Query(ParamCorridor)
+	phuong := c.Query(ParamPhuong)
 
-	cameras := h.reader.Filter(zone, corridor)
+	var cameras []Camera
+	if phuong != "" {
+		cameras = h.reader.FilterByPhuong(phuong)
+		if zone != "" || corridor != "" {
+			var filtered []Camera
+			corridorLower := strings.ToLower(strings.TrimSpace(corridor))
+			for _, cam := range cameras {
+				if zone != "" && !strings.EqualFold(cam.Zone, zone) {
+					continue
+				}
+				if corridorLower != "" {
+					name := strings.ToLower(cam.DisplayName)
+					title := strings.ToLower(cam.Title)
+					if !strings.Contains(name, corridorLower) && !strings.Contains(title, corridorLower) {
+						continue
+					}
+				}
+				filtered = append(filtered, cam)
+			}
+			cameras = filtered
+		}
+	} else {
+		cameras = h.reader.Filter(zone, corridor)
+	}
+
+	if cameras == nil {
+		cameras = []Camera{}
+	}
 	c.JSON(http.StatusOK, cameras)
 }
 
@@ -75,4 +106,19 @@ func (h *Handler) GetCameraByID(c *gin.Context) {
 // @Router /api/zones [get]
 func (h *Handler) GetZones(c *gin.Context) {
 	c.JSON(http.StatusOK, h.reader.Zones())
+}
+
+// GetPhuongs godoc
+// @Summary List camera wards (Phường)
+// @Description Retrieve sorted list of distinct post-reform Phường names
+// @Tags Camera
+// @Produce json
+// @Success 200 {array} string
+// @Router /api/phuong [get]
+func (h *Handler) GetPhuongs(c *gin.Context) {
+	phuongs := h.reader.Phuongs()
+	if phuongs == nil {
+		phuongs = []string{}
+	}
+	c.JSON(http.StatusOK, phuongs)
 }

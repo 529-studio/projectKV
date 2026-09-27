@@ -3,7 +3,9 @@ package camera
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -14,7 +16,9 @@ type Reader interface {
 	All() []Camera
 	ByID(id string) (*Camera, bool)
 	Zones() []string
+	Phuongs() []string
 	Filter(zone, corridor string) []Camera
+	FilterByPhuong(phuongName string) []Camera
 }
 
 // Camera represents a single traffic camera entity.
@@ -30,6 +34,8 @@ type Camera struct {
 	Zone        string  `json:"zone,omitempty"`
 	DuplicateOf string  `json:"duplicateOf,omitempty"`
 	IsGhost     bool    `json:"isGhost,omitempty"`
+	PhuongID    *string `json:"phuong_id,omitempty"`
+	PhuongName  *string `json:"phuong_name,omitempty"`
 }
 
 // KnownDuplicateStreams maps secondary camera IDs to their primary canonical camera ID.
@@ -64,9 +70,10 @@ var KnownGhostCameras = map[string]struct{}{
 
 // Catalog holds an in-memory repository of traffic cameras with fast index lookups.
 type Catalog struct {
-	list  []Camera
-	dict  map[string]*Camera
-	zones []string
+	list    []Camera
+	dict    map[string]*Camera
+	zones   []string
+	phuongs []string
 }
 
 // Ensure Catalog implements Reader.
@@ -92,6 +99,7 @@ func NewCatalogWithClassifier(cameras []Camera, classifier ZoneClassifier) *Cata
 	copy(c.list, cameras)
 
 	zoneSet := make(map[string]struct{})
+	phuongSet := make(map[string]struct{})
 	for i := range c.list {
 		cam := &c.list[i]
 		if cam.Zone == "" {
@@ -109,6 +117,9 @@ func NewCatalogWithClassifier(cameras []Camera, classifier ZoneClassifier) *Cata
 		if cam.Zone != "" {
 			zoneSet[cam.Zone] = struct{}{}
 		}
+		if cam.PhuongName != nil && *cam.PhuongName != "" {
+			phuongSet[*cam.PhuongName] = struct{}{}
+		}
 	}
 
 	c.zones = make([]string, 0, len(zoneSet))
@@ -116,6 +127,12 @@ func NewCatalogWithClassifier(cameras []Camera, classifier ZoneClassifier) *Cata
 		c.zones = append(c.zones, z)
 	}
 	sort.Strings(c.zones)
+
+	c.phuongs = make([]string, 0, len(phuongSet))
+	for p := range phuongSet {
+		c.phuongs = append(c.phuongs, p)
+	}
+	sort.Strings(c.phuongs)
 
 	return c
 }
@@ -129,7 +146,15 @@ func LoadCatalog(path string) (*Catalog, error) {
 func LoadCatalogWithClassifier(path string, classifier ZoneClassifier) (*Catalog, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("read file: %w", err)
+		// Graceful fallback: if enriched data file is missing, try falling back to cameras_all.json
+		if fallback := findFallbackCatalogPath(path); fallback != "" {
+			slog.Warn("camera: catalog file missing, falling back to base cameras_all.json",
+				"requested", path, "fallback", fallback)
+			data, err = os.ReadFile(fallback)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read file: %w", err)
+		}
 	}
 
 	var list []Camera
@@ -200,4 +225,49 @@ func (c *Catalog) Filter(zone, corridor string) []Camera {
 		res = append(res, cam)
 	}
 	return res
+}
+
+// Phuongs returns a sorted slice of unique Phường names (excluding nil and empty).
+func (c *Catalog) Phuongs() []string {
+	res := make([]string, len(c.phuongs))
+	copy(res, c.phuongs)
+	return res
+}
+
+// FilterByPhuong returns cameras belonging to the specified Phường name (case-insensitive).
+func (c *Catalog) FilterByPhuong(phuongName string) []Camera {
+	res := make([]Camera, 0, len(c.list))
+	phuongName = strings.TrimSpace(phuongName)
+	if phuongName == "" {
+		return res
+	}
+
+	for _, cam := range c.list {
+		if cam.PhuongName != nil && strings.EqualFold(*cam.PhuongName, phuongName) {
+			res = append(res, cam)
+		}
+	}
+	return res
+}
+
+// findFallbackCatalogPath searches for the base cameras_all.json dataset if the requested catalog file is missing.
+func findFallbackCatalogPath(requestedPath string) string {
+	baseName := filepath.Base(requestedPath)
+	if baseName == "cameras_all.json" {
+		return ""
+	}
+
+	candidates := []string{
+		filepath.Join(filepath.Dir(requestedPath), "cameras_all.json"),
+		"cameras_all.json",
+		filepath.Join("..", "cameras_all.json"),
+		filepath.Join("..", "..", "cameras_all.json"),
+	}
+
+	for _, candidate := range candidates {
+		if fi, err := os.Stat(candidate); err == nil && !fi.IsDir() {
+			return candidate
+		}
+	}
+	return ""
 }
