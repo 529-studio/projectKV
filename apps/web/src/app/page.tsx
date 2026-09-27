@@ -8,6 +8,7 @@ import CameraModal from '../components/CameraModal';
 import PinnedDock from '../components/PinnedDock';
 import MapLegend from '../components/MapLegend';
 import MobileCameraDrawer from '../components/MobileCameraDrawer';
+import PhuongTreeFilter, { OUTSIDE_HCMC_KEY, extractCorridor } from '../components/PhuongTreeFilter';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 
@@ -21,14 +22,28 @@ export default function Home() {
   const [legendOpen, setLegendOpen] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
-  const filteredCameras = useMemo(() => {
-    if (!searchTerm) return cameras;
-    const lower = searchTerm.toLowerCase();
-    return cameras.filter(c => 
-      (c.displayName || c.title || '').toLowerCase().includes(lower) || 
-      (c.zone || '').toLowerCase().includes(lower)
-    );
-  }, [cameras, searchTerm]);
+  // Hierarchical Filter State (D3 - Issue #41)
+  const [selectedPhuong, setSelectedPhuong] = useState<string | null>(null);
+  const [selectedCorridor, setSelectedCorridor] = useState<string | null>(null);
+  const [lang, setLang] = useState<'vi' | 'en'>('vi');
+
+  // Filter map cameras based on Phường / corridor selection
+  const mapCameras = useMemo(() => {
+    let result = cameras;
+    if (selectedPhuong) {
+      if (selectedPhuong === OUTSIDE_HCMC_KEY) {
+        result = result.filter(c => !c.phuong_name);
+      } else {
+        result = result.filter(c => c.phuong_name === selectedPhuong);
+      }
+    }
+    if (selectedCorridor) {
+      result = result.filter(c => extractCorridor(c.displayName, c.title) === selectedCorridor);
+    }
+    return result;
+  }, [cameras, selectedPhuong, selectedCorridor]);
+
+  const isFiltered = Boolean(selectedPhuong || selectedCorridor);
 
   const pinnedCameras = useMemo(() => {
     return pinnedCameraIds.map(id => cameras.find(c => c.id === id)).filter(Boolean) as Camera[];
@@ -44,47 +59,47 @@ export default function Home() {
     <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-300">
       <LandingOverlay />
       
-      {/* SIDEBAR */}
-      <aside className="w-72 lg:w-80 border-r border-zinc-800 bg-zinc-900/50 flex flex-col z-10 shrink-0 hidden md:flex">
-        <div className="p-4 border-b border-zinc-800 bg-zinc-950">
+      {/* SIDEBAR — Desktop Tree Filter */}
+      <aside className="w-80 lg:w-96 border-r border-zinc-800 bg-zinc-950 flex flex-col z-10 shrink-0 hidden md:flex">
+        <div className="p-4 border-b border-zinc-800 bg-zinc-950 shrink-0">
           <div className="flex items-center gap-2">
             <img src="/wared-icon.png" alt="Warded Logo" className="w-6 h-6 object-contain" />
             <h1 className="text-xl font-mono font-bold text-white tracking-tight">Warded</h1>
           </div>
-          <p className="text-[11px] font-mono text-zinc-500 mt-1">Giúp đoạn đường của bạn đỡ chông gai hơn mỗi ngày.</p>
+          <p className="text-[11px] font-mono text-zinc-500 mt-1">
+            {lang === 'vi'
+              ? 'Giúp đoạn đường của bạn đỡ chông gai hơn mỗi ngày.'
+              : 'Making your commute smoother every day.'}
+          </p>
         </div>
-        <div className="p-3 border-b border-zinc-800 bg-zinc-900">
-          <input 
-            type="text" 
-            placeholder="Tìm kiếm camera..." 
-            className="w-full bg-zinc-950 border border-zinc-700 rounded px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500 font-mono"
-            onChange={(e) => setSearchTerm(e.target.value)}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <PhuongTreeFilter
+            cameras={cameras}
+            loading={loading}
+            error={error}
+            selectedPhuong={selectedPhuong}
+            selectedCorridor={selectedCorridor}
+            onSelectPhuong={setSelectedPhuong}
+            onSelectCorridor={setSelectedCorridor}
+            onCameraClick={setSelectedCamera}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            lang={lang}
+            onLangChange={setLang}
           />
-        </div>
-        <div className="flex-1 p-2 overflow-y-auto space-y-1">
-          {loading ? (
-            <p className="text-xs text-yellow-500 font-mono p-2">Đang tải {cameras.length} camera...</p>
-          ) : error ? (
-            <p className="text-xs text-red-500 font-mono p-2">Lỗi: {error.message}</p>
-          ) : (
-            filteredCameras.map(cam => (
-              <div 
-                key={cam.id} 
-                onClick={() => setSelectedCamera(cam)}
-                className="p-2 border border-zinc-800 bg-zinc-950 hover:bg-zinc-800 cursor-pointer rounded flex flex-col gap-1"
-              >
-                <span className="text-xs font-bold text-white truncate">{cam.displayName || cam.title}</span>
-                <span className="text-[10px] text-zinc-500 truncate">{cam.zone}</span>
-              </div>
-            ))
-          )}
         </div>
       </aside>
 
       {/* MAP WORKSPACE */}
       <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-zinc-950">
         <div className="flex-1 w-full h-full relative z-0">
-          <MapComponent cameras={cameras} verdicts={verdicts} onCameraClick={setSelectedCamera} />
+          <MapComponent
+            cameras={mapCameras}
+            verdicts={verdicts}
+            onCameraClick={setSelectedCamera}
+            selectedCamera={selectedCamera}
+            isFiltered={isFiltered}
+          />
         </div>
         
         {/* BOTTOM DOCK */}
@@ -117,8 +132,14 @@ export default function Home() {
           isOpen={mobileDrawerOpen}
           onClose={() => setMobileDrawerOpen(false)}
           onCameraClick={setSelectedCamera}
+          selectedPhuong={selectedPhuong}
+          selectedCorridor={selectedCorridor}
+          onSelectPhuong={setSelectedPhuong}
+          onSelectCorridor={setSelectedCorridor}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
+          lang={lang}
+          onLangChange={setLang}
         />
       </main>
 
