@@ -8,7 +8,7 @@ import CameraModal from '../components/CameraModal';
 import PinnedDock from '../components/PinnedDock';
 import MapLegend from '../components/MapLegend';
 import MobileCameraDrawer from '../components/MobileCameraDrawer';
-import PhuongTreeFilter, { OUTSIDE_HCMC_KEY, extractCorridor } from '../components/PhuongTreeFilter';
+import PhuongTreeFilter, { OTHER_WARDS_KEY, OUTSIDE_HCMC_KEY, extractCorridor } from '../components/PhuongTreeFilter';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 
@@ -31,7 +31,7 @@ export default function Home() {
   const mapCameras = useMemo(() => {
     let result = cameras;
     if (selectedPhuong) {
-      if (selectedPhuong === OUTSIDE_HCMC_KEY) {
+      if (selectedPhuong === OTHER_WARDS_KEY || selectedPhuong === OUTSIDE_HCMC_KEY) {
         result = result.filter(c => !c.phuong_name);
       } else {
         result = result.filter(c => c.phuong_name === selectedPhuong);

@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Camera } from '../hooks/useCameras';
 import { usePhuongs } from '../hooks/usePhuongs';
 
-export const OUTSIDE_HCMC_KEY = '__OUTSIDE_HCMC__';
+export const OTHER_WARDS_KEY = '__OTHER_WARDS__';
+export const OUTSIDE_HCMC_KEY = OTHER_WARDS_KEY;
 
 export interface PhuongTreeFilterProps {
   cameras: Camera[];
@@ -36,13 +37,50 @@ interface PhuongGroup {
 }
 
 /**
- * Extracts primary street name from camera displayName (split on ' - ').
+ * Extracts primary street name from camera displayName (split on ' - ', ' – ', ' — ', ' − ').
  */
 export function extractCorridor(displayName?: string, title?: string): string {
   const raw = (displayName || title || '').trim();
   if (!raw) return 'Khác';
-  const parts = raw.split(' - ');
+  const parts = raw.split(/\s+[-–—−]\s+/);
   return parts[0].trim() || raw;
+}
+
+/**
+ * Strips Vietnamese diacritics for insensitive search.
+ */
+export function removeVietnameseDiacritics(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D');
+}
+
+/**
+ * Checks whether target string matches search query considering Vietnamese diacritics and multiple words.
+ */
+export function matchesVietnameseSearch(target: string, query: string): boolean {
+  const cleanQuery = query.trim().replace(/\s+/g, ' ');
+  if (!cleanQuery) return true;
+  const lowerTarget = (target || '').toLowerCase();
+  const lowerQuery = cleanQuery.toLowerCase();
+
+  // 1. Direct substring match (supports exact accented search)
+  if (lowerTarget.includes(lowerQuery)) return true;
+
+  // 2. Normalized diacritics match (supports unaccented search)
+  const normTarget = removeVietnameseDiacritics(lowerTarget);
+  const normQuery = removeVietnameseDiacritics(lowerQuery);
+  if (normTarget.includes(normQuery)) return true;
+
+  // 3. Multi-word search (all words in query must appear in target)
+  const queryWords = normQuery.split(' ').filter(Boolean);
+  if (queryWords.length > 1 && queryWords.every(w => normTarget.includes(w))) {
+    return true;
+  }
+
+  return false;
 }
 
 export default function PhuongTreeFilter({
@@ -74,7 +112,8 @@ export default function PhuongTreeFilter({
     return {
       title: lang === 'vi' ? 'Lọc theo Phường' : 'Filter by Ward',
       street: lang === 'vi' ? 'Đường' : 'Street',
-      outsideHcm: lang === 'vi' ? 'Ngoài TP.HCM' : 'Outside HCMC',
+      otherWards: lang === 'vi' ? 'Các Phường khác (cập nhật sau)' : 'Other Wards (to be updated)',
+      outsideHcm: lang === 'vi' ? 'Các Phường khác (cập nhật sau)' : 'Other Wards (to be updated)',
       noCameras: lang === 'vi' ? 'Không có camera' : 'No cameras',
       allCameras: lang === 'vi' ? 'Tất cả camera' : 'All cameras',
       searchPlaceholder: lang === 'vi' ? 'Tìm kiếm camera, đường, phường...' : 'Search camera, street, ward...',
@@ -86,22 +125,19 @@ export default function PhuongTreeFilter({
 
   // Group cameras into: Phường → Đường → Camera
   const treeData = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    const term = searchTerm.trim();
 
     // Map: phuongKey -> Map: corridorName -> Camera[]
     const phuongMap = new Map<string, Map<string, Camera[]>>();
 
     cameras.forEach(cam => {
-      const phuongKey = cam.phuong_name ? cam.phuong_name.trim() : OUTSIDE_HCMC_KEY;
+      const phuongKey = cam.phuong_name ? cam.phuong_name.trim() : OTHER_WARDS_KEY;
       const corridor = extractCorridor(cam.displayName, cam.title);
 
-      // Search filtering
+      // Search filtering with Vietnamese diacritics tolerance
       if (term) {
-        const matchName = (cam.displayName || '').toLowerCase().includes(term);
-        const matchTitle = (cam.title || '').toLowerCase().includes(term);
-        const matchCorridor = corridor.toLowerCase().includes(term);
-        const matchPhuong = (cam.phuong_name || t.outsideHcm).toLowerCase().includes(term);
-        if (!matchName && !matchTitle && !matchCorridor && !matchPhuong) {
+        const fullSearchable = `${cam.displayName || ''} ${cam.title || ''} ${corridor} ${cam.phuong_name || t.otherWards}`;
+        if (!matchesVietnameseSearch(fullSearchable, term)) {
           return;
         }
       }
@@ -156,29 +192,29 @@ export default function PhuongTreeFilter({
       });
     });
 
-    // 2. Fallback group for cameras with null/empty phuong_name (Ngoài TP.HCM)
-    const outsideMap = phuongMap.get(OUTSIDE_HCMC_KEY);
-    if (outsideMap) {
+    // 2. Fallback group for cameras without phuong_name (Các Phường khác)
+    const otherMap = phuongMap.get(OTHER_WARDS_KEY);
+    if (otherMap) {
       const corridors: CorridorGroup[] = [];
       let totalCameras = 0;
-      const sortedCorridors = Array.from(outsideMap.keys()).sort((a, b) => a.localeCompare(b, 'vi'));
+      const sortedCorridors = Array.from(otherMap.keys()).sort((a, b) => a.localeCompare(b, 'vi'));
       sortedCorridors.forEach(corrName => {
-        const cams = outsideMap.get(corrName)!;
+        const cams = otherMap.get(corrName)!;
         cams.sort((a, b) => (a.displayName || a.title || '').localeCompare(b.displayName || b.title || '', 'vi'));
         corridors.push({ name: corrName, cameras: cams });
         totalCameras += cams.length;
       });
 
       groups.push({
-        key: OUTSIDE_HCMC_KEY,
-        displayName: t.outsideHcm,
+        key: OTHER_WARDS_KEY,
+        displayName: t.otherWards,
         corridors,
         totalCameras,
       });
     }
 
     return groups;
-  }, [cameras, apiPhuongs, searchTerm, t.outsideHcm]);
+  }, [cameras, apiPhuongs, searchTerm, t.otherWards]);
 
   // When searching, auto-expand matching phuongs and corridors for easy exploration
   useEffect(() => {
@@ -258,7 +294,10 @@ export default function PhuongTreeFilter({
 
   const activeFilterLabel = useMemo(() => {
     if (!selectedPhuong) return null;
-    const phuongName = selectedPhuong === OUTSIDE_HCMC_KEY ? t.outsideHcm : selectedPhuong;
+    const phuongName =
+      selectedPhuong === OTHER_WARDS_KEY || selectedPhuong === OUTSIDE_HCMC_KEY
+        ? t.otherWards
+        : selectedPhuong;
     if (selectedCorridor) {
       return `${phuongName} → ${t.street} ${selectedCorridor}`;
     }
@@ -284,17 +323,60 @@ export default function PhuongTreeFilter({
         </div>
       </div>
 
-      {/* Optional Search Bar */}
+      {/* Prominent Search Bar with SVG Search Icon & Reset Button */}
       {onSearchChange && (
-        <div className="p-2 border-b border-zinc-800 bg-zinc-900/30 shrink-0">
-          <input
-            type="text"
-            placeholder={t.searchPlaceholder}
-            value={searchTerm}
-            onChange={e => onSearchChange(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-700 rounded px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500 font-mono"
-            autoComplete="off"
-          />
+        <div className="p-2.5 border-b border-zinc-800 bg-zinc-950/70 shrink-0">
+          <div className="relative flex items-center bg-zinc-900 border border-zinc-700/80 rounded-md px-2.5 py-1.5 focus-within:border-zinc-400 focus-within:ring-1 focus-within:ring-zinc-400/30 transition-all shadow-inner group">
+            {/* SVG Search Icon */}
+            <svg
+              className="w-3.5 h-3.5 text-zinc-400 group-focus-within:text-white mr-2 shrink-0 transition-colors pointer-events-none"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+
+            {/* Search Input */}
+            <input
+              type="text"
+              placeholder={t.searchPlaceholder}
+              value={searchTerm}
+              onChange={e => onSearchChange(e.target.value)}
+              className="w-full bg-transparent text-xs text-white placeholder-zinc-500 focus:outline-none font-mono"
+              autoComplete="off"
+              spellCheck={false}
+            />
+
+            {/* SVG Reset / Clear Button */}
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => onSearchChange('')}
+                className="ml-1 text-zinc-400 hover:text-white p-0.5 rounded hover:bg-zinc-800 transition-colors shrink-0 focus:outline-none"
+                aria-label={lang === 'vi' ? 'Xóa từ khóa tìm kiếm' : 'Clear search keyword'}
+                title={lang === 'vi' ? 'Xóa tìm kiếm' : 'Clear search'}
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  viewBox="0 0 24 24"
+                >
+                  <circle cx="12" cy="12" r="9" className="opacity-25 fill-zinc-700" />
+                  <path d="M15 9l-6 6M9 9l6 6" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
