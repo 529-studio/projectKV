@@ -106,6 +106,18 @@ For each modified package, verify:
 - Leaf packages (`camera`, `i18n`, `config`, `platform`) have **zero** imports
   of other `internal/` packages.
 
+### 6. Swagger API Documentation Synchronization
+
+Reference: `AGENTS.md` Section 3 (Mandatory Swagger Synchronization for Backend APIs).
+
+If any HTTP endpoint was added, modified, or removed under `services/go-server/`:
+1. Verify that the handler function has accurate godoc Swagger annotations (`@Summary`, `@Description`, `@Tags`, `@Produce`, `@Success`, `@Router`, etc.).
+2. Verify that `make swagger` was executed and generated artifacts under `services/go-server/docs/` (`docs.go`, `swagger.json`, `swagger.yaml`) are committed.
+
+**Violation**: Any API route added, modified, or removed without corresponding Swagger annotations or regenerated Swagger artifacts. Report:
+- Affected route and handler
+- Suggested fix: "Add Swagger godoc comments to handler and run `make swagger`"
+
 ---
 
 ## Output Format

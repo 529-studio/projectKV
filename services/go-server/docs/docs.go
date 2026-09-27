@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/api/cameras": {
             "get": {
-                "description": "Retrieve full camera catalog with optional zone and corridor filters",
+                "description": "Retrieve full camera catalog with optional zone, corridor, and phuong filters",
                 "produces": [
                     "application/json"
                 ],
@@ -36,6 +36,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Filter by corridor keyword",
                         "name": "corridor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by post-reform Phường name",
+                        "name": "phuong",
                         "in": "query"
                     }
                 ],
@@ -160,6 +166,49 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/live/stream": {
+            "get": {
+                "description": "Server-Sent Events (SSE) stream delivering real-time Hot Set verdict updates. Emits 'camera_update' events with verdict JSON payload and periodic heartbeat comments (: heartbeat).",
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Live"
+                ],
+                "summary": "Real-time camera verdict SSE stream",
+                "responses": {
+                    "200": {
+                        "description": "text/event-stream stream",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/phuong": {
+            "get": {
+                "description": "Retrieve sorted list of distinct post-reform Phường names",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Camera"
+                ],
+                "summary": "List camera wards (Phường)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/snapshot/{id}": {
             "get": {
                 "description": "Proxy and cache a real-time traffic camera snapshot from the upstream DOT portal (TTL ≥ 10 s). Also triggers HotSet Touch for automatic AI analysis.",
@@ -182,6 +231,76 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "JPEG image data",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/tiles/{z}/{x}/{y}": {
+            "get": {
+                "description": "Serves OpenStreetMap raster tiles (PNG) cached on local disk with 30-day immutable HTTP cache headers.",
+                "produces": [
+                    "image/png"
+                ],
+                "tags": [
+                    "Map"
+                ],
+                "summary": "Get map tile (cached proxy)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Zoom level (0-19)",
+                        "name": "z",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "X coordinate",
+                        "name": "x",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Y coordinate (with or without .png extension)",
+                        "name": "y",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PNG image data",
                         "schema": {
                             "type": "string"
                         }
@@ -293,8 +412,14 @@ const docTemplate = `{
                 "displayName": {
                     "type": "string"
                 },
+                "duplicateOf": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
+                },
+                "isGhost": {
+                    "type": "boolean"
                 },
                 "isOnline": {
                     "type": "boolean"
@@ -304,6 +429,12 @@ const docTemplate = `{
                 },
                 "longitude": {
                     "type": "number"
+                },
+                "phuong_id": {
+                    "type": "string"
+                },
+                "phuong_name": {
+                    "type": "string"
                 },
                 "snapshotUrl": {
                     "type": "string"
@@ -350,6 +481,8 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "Ho Chi Minh City Traffic Camera & Flood Alert API",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
+	LeftDelim:        "{{",
+	RightDelim:       "}}",
 }
 
 func init() {
