@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_ENDPOINTS, getApiUrl, getWsUrl } from '../config/constants';
+import { API_ENDPOINTS, getApiUrl } from '../config/constants';
 
 export interface TrafficVerdict {
   camera_id: string;
@@ -24,8 +24,7 @@ export function useTraffic() {
   }, []);
 
   useEffect(() => {
-    let ws: WebSocket;
-    let reconnectTimeout: NodeJS.Timeout;
+    let es: EventSource | null = null;
 
     async function fetchInitial() {
       try {
@@ -45,33 +44,47 @@ export function useTraffic() {
       }
     }
 
-    function initWs() {
-      ws = new WebSocket(getWsUrl(API_ENDPOINTS.WS_LIVE));
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (Array.isArray(payload)) {
-            payload.forEach(updateVerdict);
-          } else if (payload.data) {
-            if (Array.isArray(payload.data)) payload.data.forEach(updateVerdict);
-            else updateVerdict(payload.data);
-          } else {
-            updateVerdict(payload);
+    function initSSE() {
+      if (typeof window === 'undefined' || typeof EventSource === 'undefined') {
+        return;
+      }
+
+      try {
+        es = new EventSource(getApiUrl(API_ENDPOINTS.SSE_LIVE));
+
+        es.addEventListener('camera_update', (event: MessageEvent) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (Array.isArray(payload)) {
+              payload.forEach(updateVerdict);
+            } else if (payload.data) {
+              if (Array.isArray(payload.data)) payload.data.forEach(updateVerdict);
+              else updateVerdict(payload.data);
+            } else {
+              updateVerdict(payload);
+            }
+          } catch (err) {
+            console.warn('Failed to parse SSE camera_update message:', err);
           }
-        } catch (err) {
-          console.warn('Failed to parse WS message:', err);
-        }
-      };
-      ws.onclose = () => {
-        reconnectTimeout = setTimeout(initWs, 5000);
-      };
+        });
+
+        es.onerror = (err) => {
+          // EventSource automatically attempts to reconnect on transient errors per the SSE spec.
+          if (es?.readyState === EventSource.CLOSED) {
+            console.warn('SSE connection closed:', err);
+          }
+        };
+      } catch (err) {
+        console.warn('Failed to initialize EventSource:', err);
+      }
     }
 
-    fetchInitial().then(() => initWs());
+    fetchInitial().then(() => initSSE());
 
     return () => {
-      if (ws) ws.close();
-      clearTimeout(reconnectTimeout);
+      if (es) {
+        es.close();
+      }
     };
   }, [updateVerdict]);
 
