@@ -92,11 +92,7 @@ jobs:
             -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
             -H "User-Agent: Mozilla/5.0")
 
-          STACK_FILE=$(curl -sS -f -X GET "https://REDACTED_ADMIN_HOST/api/stacks/${STACK_ID}/file" \
-            -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
-            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
-            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
-            -H "User-Agent: Mozilla/5.0" | jq -r .StackFileContent)
+          STACK_FILE=$(cat docker-compose.stg.yml)
 
           ENV_JSON=$(echo "$STACK_RES" | jq .Env)
 

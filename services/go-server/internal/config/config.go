@@ -174,12 +174,12 @@ func LoadConfig() *ServerConfig {
 	}
 
 	camerasPath := os.Getenv("CAMERAS_FILE_PATH")
-	if camerasPath == "" {
+	if camerasPath == "" || filepath.Base(camerasPath) == "cameras_all.json" {
 		// Prefer enriched catalog if available (ADR-003 Decision 3), otherwise fall back to base catalog
 		enrichedPath := resolvePath("cameras_enriched.json")
 		if fi, err := os.Stat(enrichedPath); err == nil && !fi.IsDir() {
 			camerasPath = enrichedPath
-		} else {
+		} else if camerasPath == "" {
 			camerasPath = resolvePath("cameras_all.json")
 		}
 	}
