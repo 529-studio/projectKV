@@ -11,6 +11,8 @@ export interface Camera {
   isOnline: boolean;
   duplicateOf?: string;
   isGhost?: boolean;
+  phuong_id?: string | null;
+  phuong_name?: string | null;
 }
 
 export function useCameras() {
@@ -33,6 +35,8 @@ export function useCameras() {
           duplicateOf: c.duplicateOf,
           isGhost: Boolean(c.isGhost),
           isOnline: (c.status === 'UP' || c.isOnline === true) && !c.isGhost,
+          phuong_id: c.phuong_id ?? null,
+          phuong_name: c.phuong_name ?? null,
         }));
         setCameras(parsed);
       } catch (err) {
