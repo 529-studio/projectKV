@@ -28,7 +28,7 @@ export default function MapComponent({
 
   const getTrafficColor = useCallback((camId: string, isOnline: boolean) => {
     const verdict = verdicts.get(camId);
-    if (isVerdictValid(verdict)) {
+    if (isVerdictValid(verdict) && verdict.source !== 'mock') {
       const sev = verdict.severity.toUpperCase();
       if (sev === TRAFFIC_SEVERITY.CLEAR) return FUNCTIONAL_COLORS.CLEAR;
       if (sev === TRAFFIC_SEVERITY.MODERATE) return FUNCTIONAL_COLORS.MODERATE;
@@ -160,7 +160,7 @@ export default function MapComponent({
 
       const verdict = verdicts.get(cam.id);
       let trafficInfo = '';
-      if (isVerdictValid(verdict)) {
+      if (isVerdictValid(verdict) && verdict.source !== 'mock') {
         trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">Traffic: ${verdict.severity}</span>`;
       }
       if (cam.isGhost) {

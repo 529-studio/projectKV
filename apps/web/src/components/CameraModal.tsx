@@ -60,7 +60,8 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
 
   if (!camera) return null;
 
-  const severity = verdict?.severity || 'UNKNOWN';
+  const hasRealVerdict = Boolean(verdict && verdict.severity && verdict.source !== 'mock');
+  const severity = hasRealVerdict ? verdict!.severity : 'UNKNOWN';
   let severityLabel = 'BÌNH THƯỜNG';
   let severityColor: string = FUNCTIONAL_COLORS.CLEAR;
   
@@ -129,7 +130,7 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
                 </span>
               )}
 
-              {isActuallyAvailable && verdict && (
+              {isActuallyAvailable && hasRealVerdict && (
                 <span className="px-2 py-0.5 rounded border" style={{ borderColor: severityColor, color: severityColor, backgroundColor: `${severityColor}20` }}>
                   {severityLabel}
                 </span>

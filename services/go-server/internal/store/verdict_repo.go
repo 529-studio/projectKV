@@ -13,6 +13,7 @@ type Verdict struct {
 	CameraID   string
 	Severity   string
 	Confidence float64
+	Source     string
 	Timestamp  time.Time
 }
 
@@ -28,16 +29,17 @@ func NewVerdictRepo(db *sql.DB) *VerdictRepo {
 }
 
 // Save upserts a single verdict into camera_verdicts.  If a row for
-// camera_id already exists, severity, confidence and updated_at are updated.
+// camera_id already exists, severity, confidence, source and updated_at are updated.
 func (r *VerdictRepo) Save(ctx context.Context, v Verdict) error {
-	query := fmt.Sprintf(`INSERT INTO %s (camera_id, severity, confidence, updated_at)
-		 VALUES (?, ?, ?, ?)
+	query := fmt.Sprintf(`INSERT INTO %s (camera_id, severity, confidence, source, updated_at)
+		 VALUES (?, ?, ?, ?, ?)
 		 ON CONFLICT(camera_id) DO UPDATE SET
 		 	severity   = excluded.severity,
 		 	confidence = excluded.confidence,
+		 	source     = excluded.source,
 		 	updated_at = excluded.updated_at`, TableCameraVerdicts)
 
-	_, err := r.db.ExecContext(ctx, query, v.CameraID, v.Severity, v.Confidence, v.Timestamp)
+	_, err := r.db.ExecContext(ctx, query, v.CameraID, v.Severity, v.Confidence, v.Source, v.Timestamp)
 	if err != nil {
 		return fmt.Errorf("save verdict %s: %w", v.CameraID, err)
 	}
@@ -47,7 +49,7 @@ func (r *VerdictRepo) Save(ctx context.Context, v Verdict) error {
 // GetLatest returns the most recent verdict for every camera currently in the
 // camera_verdicts table, ordered by updated_at descending.
 func (r *VerdictRepo) GetLatest() ([]Verdict, error) {
-	query := fmt.Sprintf(`SELECT camera_id, severity, confidence, updated_at
+	query := fmt.Sprintf(`SELECT camera_id, severity, confidence, COALESCE(source, ''), updated_at
 		 FROM %s
 		 ORDER BY updated_at DESC`, TableCameraVerdicts)
 
@@ -60,7 +62,7 @@ func (r *VerdictRepo) GetLatest() ([]Verdict, error) {
 	var out []Verdict
 	for rows.Next() {
 		var v Verdict
-		if err := rows.Scan(&v.CameraID, &v.Severity, &v.Confidence, &v.Timestamp); err != nil {
+		if err := rows.Scan(&v.CameraID, &v.Severity, &v.Confidence, &v.Source, &v.Timestamp); err != nil {
 			return nil, fmt.Errorf("scan verdict: %w", err)
 		}
 		out = append(out, v)
