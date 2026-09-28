@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	_ "modernc.org/sqlite"
@@ -43,6 +44,32 @@ func NewDB(dbPath string) (*sql.DB, error) {
 }
 
 func runMigrations(db *sql.DB) error {
+	initQuery := `CREATE TABLE IF NOT EXISTS schema_migrations (
+		version     INTEGER PRIMARY KEY,
+		applied_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);`
+	if _, err := db.Exec(initQuery); err != nil {
+		return fmt.Errorf("create schema_migrations table: %w", err)
+	}
+
+	rows, err := db.Query("SELECT version FROM schema_migrations")
+	if err != nil {
+		return fmt.Errorf("query schema_migrations: %w", err)
+	}
+	defer rows.Close() //nolint:errcheck
+
+	applied := make(map[int]bool)
+	for rows.Next() {
+		var ver int
+		if err := rows.Scan(&ver); err != nil {
+			return fmt.Errorf("scan migration version: %w", err)
+		}
+		applied[ver] = true
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("rows error: %w", err)
+	}
+
 	entries, err := migrationFiles.ReadDir("migrations")
 	if err != nil {
 		return fmt.Errorf("read migrations dir: %w", err)
@@ -57,12 +84,23 @@ func runMigrations(db *sql.DB) error {
 	sort.Strings(files)
 
 	for _, file := range files {
+		var ver int
+		parts := strings.SplitN(file, "_", 2)
+		if len(parts) > 0 {
+			if v, err := strconv.Atoi(parts[0]); err == nil {
+				ver = v
+			}
+		}
+		if ver > 0 && applied[ver] {
+			continue
+		}
+
 		content, err := migrationFiles.ReadFile("migrations/" + file)
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", file, err)
 		}
 
-		if err := applyMigration(db, string(content)); err != nil {
+		if err := applyMigration(db, ver, string(content)); err != nil {
 			return fmt.Errorf("apply migration %s: %w", file, err)
 		}
 	}
@@ -70,7 +108,7 @@ func runMigrations(db *sql.DB) error {
 	return nil
 }
 
-func applyMigration(db *sql.DB, query string) error {
+func applyMigration(db *sql.DB, version int, query string) error {
 	tx, err := db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return err
@@ -81,6 +119,12 @@ func applyMigration(db *sql.DB, query string) error {
 
 	if _, err := tx.Exec(query); err != nil {
 		return err
+	}
+
+	if version > 0 {
+		if _, err := tx.Exec("INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)", version); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit()

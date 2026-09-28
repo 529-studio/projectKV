@@ -5,6 +5,7 @@ export interface TrafficVerdict {
   camera_id: string;
   severity: string;
   confidence: number;
+  source?: string;
   timestamp: string;
 }
 
@@ -23,6 +24,7 @@ export function isVerdictValid(v?: TrafficVerdict | null): v is TrafficVerdict {
 
 export function useTraffic() {
   const [verdicts, setVerdicts] = useState<Map<string, TrafficVerdict>>(new Map());
+  const [analysisEnabled, setAnalysisEnabled] = useState(false);
 
   const updateVerdict = useCallback((v: TrafficVerdict) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +32,8 @@ export function useTraffic() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const id = v.camera_id || (v as any).cameraId;
     if (!isVerdictValid(v)) return;
+    // Strict trust & safety rule: ignore verdicts from mock analyzer
+    if (v.source === 'mock') return;
     setVerdicts((prev) => {
       const next = new Map(prev);
       next.set(id, v);
@@ -39,18 +43,27 @@ export function useTraffic() {
 
   useEffect(() => {
     let es: EventSource | null = null;
+    let isCancelled = false;
 
     async function fetchInitial() {
       try {
         const res = await fetch(getApiUrl(API_ENDPOINTS.TRAFFIC_STATUS));
         if (!res.ok) return;
         const data = await res.json();
+        if (isCancelled) return;
+
+        if (typeof data === 'object' && data !== null && 'analysis_enabled' in data) {
+          setAnalysisEnabled(Boolean(data.analysis_enabled));
+        }
+
         const list = Array.isArray(data) ? data : (data.verdicts || []);
         const initialMap = new Map<string, TrafficVerdict>();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         list.forEach((v: any) => {
           const id = v.camera_id || v.cameraId;
-          if (id && isVerdictValid(v)) initialMap.set(id, v);
+          if (id && isVerdictValid(v) && v.source !== 'mock') {
+            initialMap.set(id, v);
+          }
         });
         setVerdicts(initialMap);
       } catch (err) {
@@ -93,7 +106,11 @@ export function useTraffic() {
       }
     }
 
-    fetchInitial().then(() => initSSE());
+    fetchInitial().then(() => {
+      if (!isCancelled) {
+        initSSE();
+      }
+    });
 
     // Periodically prune verdicts that have exceeded their Hot Set TTL
     const pruneInterval = setInterval(() => {
@@ -109,7 +126,7 @@ export function useTraffic() {
         if (!hasExpired) return prev;
         const next = new Map<string, TrafficVerdict>();
         for (const [id, v] of prev.entries()) {
-          if (isVerdictValid(v)) {
+          if (isVerdictValid(v) && v.source !== 'mock') {
             next.set(id, v);
           }
         }
@@ -118,6 +135,7 @@ export function useTraffic() {
     }, 15000);
 
     return () => {
+      isCancelled = true;
       clearInterval(pruneInterval);
       if (es) {
         es.close();
@@ -125,5 +143,5 @@ export function useTraffic() {
     };
   }, [updateVerdict]);
 
-  return { verdicts };
+  return { verdicts, analysisEnabled };
 }

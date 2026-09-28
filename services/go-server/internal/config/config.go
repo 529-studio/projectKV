@@ -142,6 +142,8 @@ type ServerConfig struct {
 	CacheTTL           time.Duration
 	CacheEvictInterval time.Duration
 	CacheMaxAge        time.Duration
+	Analyzer           string // "none" | "mock" (default: "none")
+	AppEnv             string // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
 }
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -199,6 +201,20 @@ func LoadConfig() *ServerConfig {
 		tileCacheDir = resolvePath("data/tiles")
 	}
 
+	analyzer := strings.ToLower(strings.TrimSpace(os.Getenv("ANALYZER")))
+	if analyzer == "" {
+		analyzer = "none"
+	}
+
+	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	if appEnv == "" {
+		if os.Getenv("GIN_MODE") == "release" {
+			appEnv = "production"
+		} else {
+			appEnv = "dev"
+		}
+	}
+
 	return &ServerConfig{
 		Port:               port,
 		CamerasFilePath:    camerasPath,
@@ -208,5 +224,7 @@ func LoadConfig() *ServerConfig {
 		CacheTTL:           10 * time.Second,
 		CacheEvictInterval: 60 * time.Second,
 		CacheMaxAge:        15 * time.Second,
+		Analyzer:           analyzer,
+		AppEnv:             appEnv,
 	}
 }

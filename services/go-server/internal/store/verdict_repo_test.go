@@ -23,6 +23,7 @@ func openTestDB(t *testing.T) *sql.DB {
 			camera_id   TEXT PRIMARY KEY,
 			severity    TEXT NOT NULL,
 			confidence  REAL NOT NULL,
+			source      TEXT NOT NULL DEFAULT '',
 			updated_at  TIMESTAMP NOT NULL
 		);
 	`)
@@ -44,6 +45,7 @@ func TestVerdictRepo_Save_InsertsRow(t *testing.T) {
 		CameraID:   "cam1",
 		Severity:   "HEAVY",
 		Confidence: 0.91,
+		Source:     "vlm",
 		Timestamp:  time.Now().UTC().Truncate(time.Second),
 	}
 	if err := repo.Save(ctx, v); err != nil {
@@ -66,6 +68,9 @@ func TestVerdictRepo_Save_InsertsRow(t *testing.T) {
 	}
 	if got.Confidence != v.Confidence {
 		t.Errorf("Confidence mismatch: want %f, got %f", v.Confidence, got.Confidence)
+	}
+	if got.Source != v.Source {
+		t.Errorf("Source mismatch: want %q, got %q", v.Source, got.Source)
 	}
 }
 

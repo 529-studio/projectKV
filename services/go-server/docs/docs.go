@@ -143,6 +143,27 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/config": {
+            "get": {
+                "description": "Returns lightweight runtime configuration including whether AI analysis is enabled.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Get system analysis configuration",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/flood-status": {
             "get": {
                 "description": "Placeholder — flood detection shares the same verdict store; this endpoint is out of scope for issue #8 and returns an empty list.",
@@ -160,6 +181,15 @@ const docTemplate = `{
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/hotset.Verdict"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
                             }
                         }
                     }
@@ -328,7 +358,7 @@ const docTemplate = `{
         },
         "/api/traffic-status": {
             "get": {
-                "description": "Returns the most recent AI-analyzed congestion verdict for every camera in the Hot Set (all cameras with a stored verdict).",
+                "description": "Returns the most recent AI-analyzed congestion verdict for cameras in the Hot Set along with analysis_enabled status. When APP_ENV is not dev, verdicts with source=mock are strictly omitted.",
                 "produces": [
                     "application/json"
                 ],
@@ -340,10 +370,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/hotset.Verdict"
-                            }
+                            "$ref": "#/definitions/hotset.TrafficStatusResponse"
                         }
                     },
                     "500": {
@@ -450,6 +477,20 @@ const docTemplate = `{
                 }
             }
         },
+        "hotset.TrafficStatusResponse": {
+            "type": "object",
+            "properties": {
+                "analysis_enabled": {
+                    "type": "boolean"
+                },
+                "verdicts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/hotset.Verdict"
+                    }
+                }
+            }
+        },
         "hotset.Verdict": {
             "type": "object",
             "properties": {
@@ -461,6 +502,10 @@ const docTemplate = `{
                 },
                 "severity": {
                     "description": "e.g. \"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\", or \"DRY\" | \"WET\" | \"FLOODED_SHALLOW\" | \"FLOODED_DEEP\"",
+                    "type": "string"
+                },
+                "source": {
+                    "description": "\"mock\" | \"vlm\" | \"onnx\"",
                     "type": "string"
                 },
                 "timestamp": {
