@@ -1,7 +1,9 @@
 package hotset
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,37 +18,83 @@ type VerdictStorer interface {
 	GetLatest() []Verdict
 }
 
+// TrafficStatusResponse represents the response payload for GET /api/traffic-status.
+type TrafficStatusResponse struct {
+	AnalysisEnabled bool      `json:"analysis_enabled"`
+	Verdicts        []Verdict `json:"verdicts"`
+}
+
 // Handler exposes the verdict query endpoints defined in §4 of
 // docs/GO_BACKEND_ARCHITECTURE.md.
 type Handler struct {
-	storer VerdictStorer
+	storer          VerdictStorer
+	analysisEnabled bool
+	appEnv          string
 }
 
-// NewHandler constructs a Handler with an injected VerdictStorer.
+// NewHandler constructs a Handler with an injected VerdictStorer (default analysis disabled).
 func NewHandler(storer VerdictStorer) *Handler {
-	return &Handler{storer: storer}
+	return NewHandlerWithConfig(storer, false, "production")
+}
+
+// NewHandlerWithConfig constructs a Handler with explicit analysis state and environment.
+func NewHandlerWithConfig(storer VerdictStorer, analysisEnabled bool, appEnv string) *Handler {
+	return &Handler{
+		storer:          storer,
+		analysisEnabled: analysisEnabled,
+		appEnv:          appEnv,
+	}
 }
 
 // RegisterRoutes mounts traffic and flood status endpoints onto rg.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET(RouteTrafficStatus, h.GetTrafficStatus)
 	rg.GET(RouteFloodStatus, h.GetFloodStatus)
+	rg.GET("/config", h.GetConfig)
 }
 
 // GetTrafficStatus godoc
 // @Summary Get latest traffic congestion verdicts
-// @Description Returns the most recent AI-analyzed congestion verdict for every camera in the Hot Set (all cameras with a stored verdict).
+// @Description Returns the most recent AI-analyzed congestion verdict for cameras in the Hot Set along with analysis_enabled status. When APP_ENV is not dev, verdicts with source=mock are strictly omitted.
 // @Tags Traffic
 // @Produce json
-// @Success 200 {array} hotset.Verdict
+// @Success 200 {object} hotset.TrafficStatusResponse
 // @Failure 500 {object} map[string]string
 // @Router /api/traffic-status [get]
 func (h *Handler) GetTrafficStatus(c *gin.Context) {
-	verdicts := h.storer.GetLatest()
-	if verdicts == nil {
-		verdicts = []Verdict{} // return [] not null in JSON
+	allVerdicts := h.storer.GetLatest()
+	if allVerdicts == nil {
+		allVerdicts = []Verdict{}
 	}
-	c.JSON(http.StatusOK, verdicts)
+
+	filtered := make([]Verdict, 0, len(allVerdicts))
+	for _, v := range allVerdicts {
+		// Provenance safety rule: filter out source=mock when appEnv is not "dev"
+		if strings.ToLower(v.Source) == "mock" && strings.ToLower(h.appEnv) != "dev" {
+			continue
+		}
+		filtered = append(filtered, v)
+	}
+
+	c.Header("X-Analysis-Enabled", fmt.Sprintf("%t", h.analysisEnabled))
+	c.JSON(http.StatusOK, TrafficStatusResponse{
+		AnalysisEnabled: h.analysisEnabled,
+		Verdicts:        filtered,
+	})
+}
+
+// GetConfig godoc
+// @Summary Get system analysis configuration
+// @Description Returns lightweight runtime configuration including whether AI analysis is enabled.
+// @Tags System
+// @Produce json
+// @Success 200 {object} map[string]any
+// @Router /api/config [get]
+func (h *Handler) GetConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"analysis_enabled": h.analysisEnabled,
+		"app_env":          h.appEnv,
+	})
 }
 
 // GetFloodStatus godoc
@@ -55,6 +103,7 @@ func (h *Handler) GetTrafficStatus(c *gin.Context) {
 // @Tags Traffic
 // @Produce json
 // @Success 200 {array} hotset.Verdict
+// @Failure 500 {object} map[string]string
 // @Router /api/flood-status [get]
 func (h *Handler) GetFloodStatus(c *gin.Context) {
 	// Out of scope (issue #8) — flood severity values come from a separate

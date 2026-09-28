@@ -14,7 +14,7 @@ const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: 
 
 export default function Home() {
   const { cameras, loading, error } = useCameras();
-  const { verdicts } = useTraffic();
+  const { verdicts, analysisEnabled } = useTraffic();
   
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -113,6 +113,8 @@ export default function Home() {
         <MapLegend
           isOpen={legendOpen}
           onToggle={() => setLegendOpen(prev => !prev)}
+          analysisEnabled={analysisEnabled}
+          lang={lang}
         />
 
         {/* MOBILE CAMERA LIST — trigger button (hidden on md+) */}
