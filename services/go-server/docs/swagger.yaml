@@ -29,6 +29,15 @@ definitions:
       zone:
         type: string
     type: object
+  hotset.TrafficStatusResponse:
+    properties:
+      analysis_enabled:
+        type: boolean
+      verdicts:
+        items:
+          $ref: '#/definitions/hotset.Verdict'
+        type: array
+    type: object
   hotset.Verdict:
     properties:
       camera_id:
@@ -38,6 +47,9 @@ definitions:
       severity:
         description: e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED", or "DRY" |
           "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP"
+        type: string
+      source:
+        description: '"mock" | "vlm" | "onnx"'
         type: string
       timestamp:
         type: string
@@ -134,6 +146,21 @@ paths:
       summary: Get camera snapshot image
       tags:
       - Camera
+  /api/config:
+    get:
+      description: Returns lightweight runtime configuration including whether AI
+        analysis is enabled.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get system analysis configuration
+      tags:
+      - System
   /api/flood-status:
     get:
       description: 'Placeholder — flood detection shares the same verdict store; this
@@ -147,6 +174,12 @@ paths:
             items:
               $ref: '#/definitions/hotset.Verdict'
             type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Get latest flood-detection verdicts
       tags:
       - Traffic
@@ -262,17 +295,16 @@ paths:
       - Map
   /api/traffic-status:
     get:
-      description: Returns the most recent AI-analyzed congestion verdict for every
-        camera in the Hot Set (all cameras with a stored verdict).
+      description: Returns the most recent AI-analyzed congestion verdict for cameras
+        in the Hot Set along with analysis_enabled status. When APP_ENV is not dev,
+        verdicts with source=mock are strictly omitted.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/hotset.Verdict'
-            type: array
+            $ref: '#/definitions/hotset.TrafficStatusResponse'
         "500":
           description: Internal Server Error
           schema:

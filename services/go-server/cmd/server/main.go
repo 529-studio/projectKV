@@ -56,6 +56,7 @@ func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
 			CameraID:   v.CameraID,
 			Severity:   v.Severity,
 			Confidence: v.Confidence,
+			Source:     v.Source,
 			Timestamp:  v.Timestamp,
 		}
 	}
@@ -120,7 +121,26 @@ func main() {
 		verdictRepo = store.NewVerdictRepo(db)
 		defer db.Close()
 	}
-	hotsetHandler := hotset.NewHandler(&verdictStoreAdapter{repo: verdictRepo})
+
+	// 5b. Analyzer selection and environment validation (ADR-004 H0)
+	var analyzer hotset.Analyzer
+	analysisEnabled := false
+
+	switch cfg.Analyzer {
+	case "mock":
+		if cfg.AppEnv != "dev" {
+			log.Fatalf("[FATAL] Refusing to start: ANALYZER=mock is strictly forbidden when APP_ENV is %q (only allowed in 'dev'). Fabricated mock verdicts must never run on non-dev environments.", cfg.AppEnv)
+		}
+		analyzer = cvclient.NewMockAnalyzer()
+		analysisEnabled = true
+		log.Println("[INIT] ANALYZER=mock active in 'dev' environment. Hot Set scheduler will run mock analysis.")
+	case "none", "":
+		log.Println("[INIT] ANALYZER=none: Analysis scheduler is disabled. No camera_verdicts will be recorded and no SSE camera_update will be emitted.")
+	default:
+		log.Fatalf("[FATAL] Unknown ANALYZER=%q (valid options: none, mock)", cfg.Analyzer)
+	}
+
+	hotsetHandler := hotset.NewHandlerWithConfig(&verdictStoreAdapter{repo: verdictRepo}, analysisEnabled, cfg.AppEnv)
 
 	// 6. Initialize WebSocket Hub for real-time verdict streaming (Issue #9).
 	// Kept in place — will be retired after D1 (EventSource migration) is verified.
@@ -132,36 +152,41 @@ func main() {
 	liveHub := live.NewHub()
 	defer liveHub.Close()
 
-	// 6c. Wire the Hot Set scheduler with OnVerdict.
-	// OnVerdict fans out to: (1) SSE live broadcast, (2) SQLite verdict store.
-	// The ws hub broadcast is intentionally NOT wired here — it will be cleaned up
-	// once D1 (EventSource frontend migration) is merged and verified.
-	mockAnalyzer := cvclient.NewMockAnalyzer()
-	onVerdict := func(v hotset.Verdict) {
-		// Fan-out 1: push to all SSE clients immediately.
-		liveHub.Broadcast(v)
+	// 6c. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
+	if analysisEnabled && analyzer != nil {
+		onVerdict := func(v hotset.Verdict) {
+			// Fan-out 1: push to all SSE clients immediately.
+			liveHub.Broadcast(v)
 
-		// Fan-out 2: persist to SQLite for GET /api/traffic-status hydration.
-		if verdictRepo != nil {
-			sv := store.Verdict{
-				CameraID:   v.CameraID,
-				Severity:   v.Severity,
-				Confidence: v.Confidence,
-				Timestamp:  v.Timestamp,
-			}
-			if err := verdictRepo.Save(context.Background(), sv); err != nil {
-				log.Printf("[WARN] Failed to persist verdict for %s: %v", v.CameraID, err)
+			// Fan-out 2: persist to SQLite for GET /api/traffic-status hydration.
+			if verdictRepo != nil {
+				sv := store.Verdict{
+					CameraID:   v.CameraID,
+					Severity:   v.Severity,
+					Confidence: v.Confidence,
+					Source:     v.Source,
+					Timestamp:  v.Timestamp,
+				}
+				if err := verdictRepo.Save(context.Background(), sv); err != nil {
+					log.Printf("[WARN] Failed to persist verdict for %s: %v", v.CameraID, err)
+				}
 			}
 		}
+
+		hotsetScheduler := hotset.NewScheduler(
+			hotsetRegistry,
+			analyzer,
+			30*time.Second,
+			10,
+			onVerdict,
+			nil, // uses slog.Default()
+		)
+
+		// Start the Hot Set scheduler in background; cancelled on graceful shutdown.
+		schedulerCtx, cancelScheduler := context.WithCancel(context.Background())
+		defer cancelScheduler()
+		go hotsetScheduler.Run(schedulerCtx)
 	}
-	hotsetScheduler := hotset.NewScheduler(
-		hotsetRegistry,
-		mockAnalyzer,
-		30*time.Second,
-		10,
-		onVerdict,
-		nil, // uses slog.Default()
-	)
 
 	cameraHandler := handlers.NewCameraHandler(camStore, snapCache)
 
@@ -179,11 +204,6 @@ func main() {
 
 	// SSE Live Stream (ADR-003 Decision 1: GET /api/live/stream).
 	liveHub.RegisterRoutes(router)
-
-	// Start the Hot Set scheduler in background; cancelled on graceful shutdown.
-	schedulerCtx, cancelScheduler := context.WithCancel(context.Background())
-	defer cancelScheduler()
-	go hotsetScheduler.Run(schedulerCtx)
 
 	// Swagger documentation UI
 	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)

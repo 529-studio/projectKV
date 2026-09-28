@@ -2,6 +2,8 @@ package cvclient
 
 import (
 	"context"
+	"time"
+
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 )
 
@@ -11,5 +13,5 @@ func NewCloudVisionAnalyzer(apiKey string) *CloudVisionAnalyzer {
 	return &CloudVisionAnalyzer{apiKey: apiKey}
 }
 func (a *CloudVisionAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hotset.Verdict, error) {
-	return hotset.Verdict{CameraID: cam.ID, Severity: "CLEAR", Confidence: 0.8}, nil
+	return hotset.Verdict{CameraID: cam.ID, Severity: "CLEAR", Confidence: 0.8, Source: "vlm", Timestamp: time.Now()}, nil
 }

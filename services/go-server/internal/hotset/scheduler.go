@@ -43,6 +43,7 @@ type Verdict struct {
 	CameraID   string    `json:"camera_id"`
 	Severity   string    `json:"severity"` // e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED", or "DRY" | "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP"
 	Confidence float64   `json:"confidence"`
+	Source     string    `json:"source"` // "mock" | "vlm" | "onnx"
 	Timestamp  time.Time `json:"timestamp"`
 }
 
