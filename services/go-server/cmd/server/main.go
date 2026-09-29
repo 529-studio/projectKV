@@ -63,6 +63,88 @@ func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
 	return out
 }
 
+// criticalKeywords are used to prioritise well-known traffic choke points
+// (e.g. An Suong, Cat Lai port cluster, My Thuy, major corridors) when
+// seeding the Hot Set at startup. Vietnamese keywords are normalised to
+// lowercase for case-insensitive matching.
+var criticalKeywords = []string{
+	"an sương", "cát lái", "mỹ thủy", "ngã 4 ga", "quốc lộ 1",
+	"nguyễn văn linh", "điện biên phủ", "võ văn kiệt", "phạm văn đồng",
+	"cầu sài gòn", "xô viết nghệ tĩnh", "hành trình", "bình thái",
+}
+
+// buildFixedHotSet selects a deterministic set of critical cameras from the
+// loaded catalog to seed the Hot Set registry at startup. This guarantees the
+// mock/dev scheduler has cameras to analyse immediately, instead of waiting
+// for a user to view/pin a feed.
+func buildFixedHotSet(reader camera.Reader, maxCameras int) []hotset.Camera {
+	if reader == nil {
+		return nil
+	}
+	all := reader.All()
+	if len(all) == 0 {
+		return nil
+	}
+
+	// Filter out offline, ghost and duplicate streams so the Hot Set only
+	// contains feeds that can actually produce snapshots.
+	eligible := make([]camera.Camera, 0, len(all))
+	for _, c := range all {
+		if !c.IsOnline || c.IsGhost || c.DuplicateOf != "" {
+			continue
+		}
+		eligible = append(eligible, c)
+	}
+
+	// First pass: prefer known critical choke points.
+	var critical []hotset.Camera
+	for _, c := range eligible {
+		name := strings.ToLower(c.DisplayName)
+		if name == "" {
+			name = strings.ToLower(c.Title)
+		}
+		for _, kw := range criticalKeywords {
+			if strings.Contains(name, kw) {
+				critical = append(critical, cameraToHotSet(c))
+				break
+			}
+		}
+		if maxCameras > 0 && len(critical) >= maxCameras {
+			break
+		}
+	}
+
+	// Second pass: pad with the remaining eligible cameras up to maxCameras.
+	used := make(map[string]struct{}, len(critical))
+	for _, c := range critical {
+		used[c.ID] = struct{}{}
+	}
+	for _, c := range eligible {
+		if _, ok := used[c.ID]; ok {
+			continue
+		}
+		critical = append(critical, cameraToHotSet(c))
+		if maxCameras > 0 && len(critical) >= maxCameras {
+			break
+		}
+	}
+
+	return critical
+}
+
+func cameraToHotSet(c camera.Camera) hotset.Camera {
+	name := strings.TrimSpace(c.DisplayName)
+	if name == "" {
+		name = strings.TrimSpace(c.Title)
+	}
+	return hotset.Camera{
+		ID:          c.ID,
+		Name:        name,
+		Zone:        c.Zone,
+		SnapshotURL: c.SnapshotURL,
+	}
+}
+
 func main() {
 	cfg := config.LoadConfig()
 
@@ -88,8 +170,13 @@ func main() {
 	}
 
 	// 2. Initialize HotSet registry for active camera tracking.
-	// activeTTL = 120 s; no fixed cameras at startup for this server.
-	hotsetRegistry := hotset.NewRegistry(nil, 120*time.Second)
+	// activeTTL = 120 s; seed fixed critical cameras when analysis is enabled
+	// (e.g. mock/dev mode) so the scheduler has work immediately at startup.
+	var fixedCameras []hotset.Camera
+	if camCatalog != nil {
+		fixedCameras = buildFixedHotSet(camCatalog, 40)
+	}
+	hotsetRegistry := hotset.NewRegistry(fixedCameras, 120*time.Second)
 
 	// 3. Initialize in-memory cache with singleflight dedup (legacy handler).
 	snapCache := cache.NewSnapshotCache(cfg.CacheTTL)
