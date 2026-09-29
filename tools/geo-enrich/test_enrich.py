@@ -15,6 +15,7 @@ from enrich import (
     load_boundaries,
     point_in_polygon,
     point_in_ring,
+    write_unmatched_report,
 )
 
 
@@ -148,6 +149,49 @@ class TestGeoEnrich(unittest.TestCase):
         names = [f.phuong_name for f in features]
         self.assertIn("Phường Bến Nghé", names)
         self.assertIn("Phường Tân Định", names)
+
+    def test_write_unmatched_report(self):
+        cameras = [
+            {
+                "id": "c_matched",
+                "title": "Camera Matched",
+                "displayName": "Matched Cam",
+                "latitude": 10.7,
+                "longitude": 106.6,
+                "phuong_name": "Phường Tân Định",
+            },
+            {
+                "id": "c_outside",
+                "title": "Camera Outside",
+                "displayName": "Outside Cam",
+                "latitude": 10.5,
+                "longitude": 106.2,
+                "phuong_name": None,
+            },
+            {
+                "id": "c_no_coords",
+                "title": "Camera No Coords",
+                "displayName": "No Coords Cam",
+                "latitude": None,
+                "longitude": None,
+                "phuong_name": None,
+            },
+        ]
+        with tempfile.NamedTemporaryFile("w+", suffix=".csv", delete=False) as tf:
+            report_path = tf.name
+
+        try:
+            write_unmatched_report(cameras, report_path)
+            with open(report_path, "r", encoding="utf-8") as f:
+                content = f.read().splitlines()
+
+            self.assertEqual(len(content), 3)  # Header + 2 unmatched
+            self.assertIn("id,title,displayName,latitude,longitude,zone,reason", content[0])
+            self.assertIn("Outside administrative boundary polygon extent", content[1])
+            self.assertIn("Missing coordinates in upstream catalog", content[2])
+        finally:
+            if os.path.exists(report_path):
+                os.remove(report_path)
 
 
 if __name__ == "__main__":
