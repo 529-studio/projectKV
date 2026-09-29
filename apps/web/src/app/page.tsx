@@ -1,6 +1,6 @@
 'use client';
 import dynamic from 'next/dynamic';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useCameras, Camera } from '../hooks/useCameras';
 import { useTraffic } from '../hooks/useTraffic';
 import LandingOverlay from '../components/LandingOverlay';
@@ -8,7 +8,10 @@ import CameraModal from '../components/CameraModal';
 import PinnedDock from '../components/PinnedDock';
 import MapLegend from '../components/MapLegend';
 import MobileCameraDrawer from '../components/MobileCameraDrawer';
-import PhuongTreeFilter, { OTHER_WARDS_KEY, OUTSIDE_HCMC_KEY, extractCorridor } from '../components/PhuongTreeFilter';
+import PhuongTreeFilter, {
+  computeFilteredCameraIds,
+  computeActiveFilterLabel,
+} from '../components/PhuongTreeFilter';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 
@@ -27,23 +30,65 @@ export default function Home() {
   const [selectedCorridor, setSelectedCorridor] = useState<string | null>(null);
   const [lang, setLang] = useState<'vi' | 'en'>('vi');
 
-  // Filter map cameras based on Phường / corridor selection
-  const mapCameras = useMemo(() => {
-    let result = cameras;
+  // URL sync for active filter (ADR-004 stretch goal)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get('phuong');
+    const c = params.get('corridor');
+    if (p) setSelectedPhuong(p);
+    if (c) setSelectedCorridor(c);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
     if (selectedPhuong) {
-      if (selectedPhuong === OTHER_WARDS_KEY || selectedPhuong === OUTSIDE_HCMC_KEY) {
-        result = result.filter(c => !c.phuong_name);
-      } else {
-        result = result.filter(c => c.phuong_name === selectedPhuong);
-      }
+      url.searchParams.set('phuong', selectedPhuong);
+    } else {
+      url.searchParams.delete('phuong');
     }
     if (selectedCorridor) {
-      result = result.filter(c => extractCorridor(c.displayName, c.title) === selectedCorridor);
+      url.searchParams.set('corridor', selectedCorridor);
+    } else {
+      url.searchParams.delete('corridor');
     }
-    return result;
-  }, [cameras, selectedPhuong, selectedCorridor]);
+    const newSearch = url.searchParams.toString();
+    const newPath = newSearch ? `${url.pathname}?${newSearch}` : url.pathname;
+    window.history.replaceState({}, '', newPath);
+  }, [selectedPhuong, selectedCorridor]);
 
   const isFiltered = Boolean(selectedPhuong || selectedCorridor);
+
+  const handleFilterClear = useCallback(() => {
+    setSelectedPhuong(null);
+    setSelectedCorridor(null);
+  }, []);
+
+  // Escape key clears open camera modal first, then active filter (Issue #65)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedCamera) {
+          setSelectedCamera(null);
+        } else if (isFiltered) {
+          handleFilterClear();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedCamera, isFiltered, handleFilterClear]);
+
+  // Set of camera IDs matching the active filter for focus dimming (ADR-004 A3)
+  const filteredCameraIds = useMemo(() => {
+    return computeFilteredCameraIds(cameras, selectedPhuong, selectedCorridor);
+  }, [cameras, selectedPhuong, selectedCorridor]);
+
+  // Active filter label for on-map chip
+  const activeFilterLabel = useMemo(() => {
+    return computeActiveFilterLabel(selectedPhuong, selectedCorridor, lang);
+  }, [selectedPhuong, selectedCorridor, lang]);
 
   const pinnedCameras = useMemo(() => {
     return pinnedCameraIds.map(id => cameras.find(c => c.id === id)).filter(Boolean) as Camera[];
@@ -94,11 +139,15 @@ export default function Home() {
       <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-zinc-950">
         <div className="flex-1 w-full h-full relative z-0">
           <MapComponent
-            cameras={mapCameras}
+            cameras={cameras}
             verdicts={verdicts}
             onCameraClick={setSelectedCamera}
             selectedCamera={selectedCamera}
             isFiltered={isFiltered}
+            filteredCameraIds={filteredCameraIds}
+            onFilterClear={handleFilterClear}
+            activeFilterLabel={activeFilterLabel}
+            lang={lang}
           />
         </div>
         
