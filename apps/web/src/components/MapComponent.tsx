@@ -28,7 +28,8 @@ export default function MapComponent({
 
   const getTrafficColor = useCallback((camId: string, isOnline: boolean) => {
     const verdict = verdicts.get(camId);
-    if (isVerdictValid(verdict) && verdict.source !== 'mock') {
+    const isMockSuppressed = verdict?.source === 'mock' && process.env.NODE_ENV === 'production';
+    if (isVerdictValid(verdict) && !isMockSuppressed) {
       const sev = verdict.severity.toUpperCase();
       if (sev === TRAFFIC_SEVERITY.CLEAR) return FUNCTIONAL_COLORS.CLEAR;
       if (sev === TRAFFIC_SEVERITY.MODERATE) return FUNCTIONAL_COLORS.MODERATE;
