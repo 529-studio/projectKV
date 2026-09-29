@@ -36,52 +36,23 @@ interface PhuongGroup {
   totalCameras: number;
 }
 
-/**
- * Extracts primary street name from camera displayName (split on ' - ', ' – ', ' — ', ' − ').
- */
-export function extractCorridor(displayName?: string, title?: string): string {
-  const raw = (displayName || title || '').trim();
-  if (!raw) return 'Khác';
-  const parts = raw.split(/\s+[-–—−]\s+/);
-  return parts[0].trim() || raw;
-}
+import {
+  formatPhuongName,
+  formatCorridorDisplay,
+  extractCorridor,
+  removeVietnameseDiacritics,
+  matchesVietnameseSearch,
+  type CorridorDisplay,
+} from '../utils/phuongFormatters';
 
-/**
- * Strips Vietnamese diacritics for insensitive search.
- */
-export function removeVietnameseDiacritics(str: string): string {
-  return str
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D');
-}
-
-/**
- * Checks whether target string matches search query considering Vietnamese diacritics and multiple words.
- */
-export function matchesVietnameseSearch(target: string, query: string): boolean {
-  const cleanQuery = query.trim().replace(/\s+/g, ' ');
-  if (!cleanQuery) return true;
-  const lowerTarget = (target || '').toLowerCase();
-  const lowerQuery = cleanQuery.toLowerCase();
-
-  // 1. Direct substring match (supports exact accented search)
-  if (lowerTarget.includes(lowerQuery)) return true;
-
-  // 2. Normalized diacritics match (supports unaccented search)
-  const normTarget = removeVietnameseDiacritics(lowerTarget);
-  const normQuery = removeVietnameseDiacritics(lowerQuery);
-  if (normTarget.includes(normQuery)) return true;
-
-  // 3. Multi-word search (all words in query must appear in target)
-  const queryWords = normQuery.split(' ').filter(Boolean);
-  if (queryWords.length > 1 && queryWords.every(w => normTarget.includes(w))) {
-    return true;
-  }
-
-  return false;
-}
+export {
+  formatPhuongName,
+  formatCorridorDisplay,
+  extractCorridor,
+  removeVietnameseDiacritics,
+  matchesVietnameseSearch,
+  type CorridorDisplay,
+};
 
 export default function PhuongTreeFilter({
   cameras,
@@ -134,9 +105,12 @@ export default function PhuongTreeFilter({
       const phuongKey = cam.phuong_name ? cam.phuong_name.trim() : OTHER_WARDS_KEY;
       const corridor = extractCorridor(cam.displayName, cam.title);
 
-      // Search filtering with Vietnamese diacritics tolerance
+      // Search filtering with Vietnamese diacritics and bilingual tolerance
       if (term) {
-        const fullSearchable = `${cam.displayName || ''} ${cam.title || ''} ${corridor} ${cam.phuong_name || t.otherWards}`;
+        const enPhuong = cam.phuong_name ? formatPhuongName(cam.phuong_name, 'en') : '';
+        const enCorr = formatCorridorDisplay(corridor, 'en');
+        const enCorrStr = enCorr.prefix ? `${enCorr.prefix} ${enCorr.name}` : enCorr.name;
+        const fullSearchable = `${cam.displayName || ''} ${cam.title || ''} ${corridor} ${enCorrStr} ${cam.phuong_name || t.otherWards} ${enPhuong}`;
         if (!matchesVietnameseSearch(fullSearchable, term)) {
           return;
         }
@@ -161,8 +135,12 @@ export default function PhuongTreeFilter({
 
     const groups: PhuongGroup[] = [];
 
-    // 1. Known Phườngs sorted alphabetically
-    const sortedPhuongs = Array.from(allPhuongKeys).sort((a, b) => a.localeCompare(b, 'vi'));
+    // 1. Known Phườngs sorted alphabetically by display name in current locale
+    const sortedPhuongs = Array.from(allPhuongKeys).sort((a, b) => {
+      const nameA = formatPhuongName(a, lang);
+      const nameB = formatPhuongName(b, lang);
+      return nameA.localeCompare(nameB, lang, { numeric: true });
+    });
 
     sortedPhuongs.forEach(phuongKey => {
       const corridorMap = phuongMap.get(phuongKey);
@@ -186,7 +164,7 @@ export default function PhuongTreeFilter({
 
       groups.push({
         key: phuongKey,
-        displayName: phuongKey,
+        displayName: formatPhuongName(phuongKey, lang),
         corridors,
         totalCameras,
       });
@@ -214,7 +192,7 @@ export default function PhuongTreeFilter({
     }
 
     return groups;
-  }, [cameras, apiPhuongs, searchTerm, t.otherWards]);
+  }, [cameras, apiPhuongs, searchTerm, t.otherWards, lang]);
 
   // When searching, auto-expand matching phuongs and corridors for easy exploration
   useEffect(() => {
@@ -297,12 +275,16 @@ export default function PhuongTreeFilter({
     const phuongName =
       selectedPhuong === OTHER_WARDS_KEY || selectedPhuong === OUTSIDE_HCMC_KEY
         ? t.otherWards
-        : selectedPhuong;
+        : formatPhuongName(selectedPhuong, lang);
     if (selectedCorridor) {
-      return `${phuongName} → ${t.street} ${selectedCorridor}`;
+      const corrDisplay = formatCorridorDisplay(selectedCorridor, lang);
+      const corrText = corrDisplay.prefix
+        ? `${corrDisplay.prefix} ${corrDisplay.name}`
+        : corrDisplay.name;
+      return `${phuongName} → ${corrText}`;
     }
     return phuongName;
-  }, [selectedPhuong, selectedCorridor, t]);
+  }, [selectedPhuong, selectedCorridor, lang, t]);
 
   return (
     <div className={`flex flex-col h-full bg-zinc-950 font-mono select-none ${className}`}>
@@ -433,7 +415,7 @@ export default function PhuongTreeFilter({
                       type="button"
                       onClick={e => togglePhuongExpand(group.key, e)}
                       className="text-zinc-400 hover:text-white text-xs w-4 h-4 flex items-center justify-center shrink-0 focus:outline-none"
-                      aria-label="Đóng/mở"
+                      aria-label={lang === 'vi' ? 'Đóng/mở' : 'Toggle ward'}
                     >
                       {isExpanded ? '▾' : '▸'}
                     </button>
@@ -466,6 +448,7 @@ export default function PhuongTreeFilter({
                             const isCorrExpanded = expandedCorridors.has(corridorId);
                             const isCorrSelected =
                               isPhuongSelected && selectedCorridor === corr.name;
+                            const corrDisplay = formatCorridorDisplay(corr.name, lang);
 
                             return (
                               <div key={corridorId} className="flex flex-col">
@@ -483,13 +466,15 @@ export default function PhuongTreeFilter({
                                       type="button"
                                       onClick={e => toggleCorridorExpand(corridorId, e)}
                                       className="text-zinc-500 hover:text-white text-[11px] w-3.5 h-3.5 flex items-center justify-center shrink-0 focus:outline-none"
-                                      aria-label="Đóng/mở đường"
+                                      aria-label={lang === 'vi' ? 'Đóng/mở đường' : 'Toggle corridor'}
                                     >
                                       {isCorrExpanded ? '▾' : '▸'}
                                     </button>
                                     <span className="truncate">
-                                      <span className="text-zinc-500 mr-1">{t.street}</span>
-                                      {corr.name}
+                                      {corrDisplay.prefix && (
+                                        <span className="text-zinc-500 mr-1">{corrDisplay.prefix}</span>
+                                      )}
+                                      <span>{corrDisplay.name}</span>
                                     </span>
                                   </div>
                                   <span className="text-[10px] text-zinc-500 shrink-0 ml-2">

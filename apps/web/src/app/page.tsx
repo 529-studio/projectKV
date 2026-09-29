@@ -107,6 +107,7 @@ export default function Home() {
           pinnedCameras={pinnedCameras} 
           onUnpin={togglePin} 
           onClear={() => setPinnedCameraIds([])} 
+          lang={lang}
         />
 
         {/* MAP LEGEND — collapsible */}
@@ -121,7 +122,7 @@ export default function Home() {
         <button
           onClick={() => setMobileDrawerOpen(true)}
           className="md:hidden absolute bottom-20 right-3 z-[800] w-11 h-11 bg-zinc-950 border border-zinc-700 hover:border-zinc-400 text-white rounded flex items-center justify-center shadow-2xl transition-colors"
-          aria-label="Danh sách camera"
+          aria-label={lang === 'vi' ? 'Danh sách camera' : 'Camera list'}
         >
           <span className="text-base leading-none">☰</span>
         </button>
@@ -152,6 +153,7 @@ export default function Home() {
         onClose={() => setSelectedCamera(null)} 
         isPinned={selectedCamera ? pinnedCameraIds.includes(selectedCamera.id) : false}
         onTogglePin={() => selectedCamera && togglePin(selectedCamera.id)}
+        lang={lang}
       />
     </div>
   );
