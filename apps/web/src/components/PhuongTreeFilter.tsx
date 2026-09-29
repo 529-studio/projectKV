@@ -42,6 +42,9 @@ import {
   extractCorridor,
   removeVietnameseDiacritics,
   matchesVietnameseSearch,
+  computeFilteredCameraIds,
+  computeActiveFilterLabel,
+  calculateMarkerStyle,
   type CorridorDisplay,
 } from '../utils/phuongFormatters';
 
@@ -51,6 +54,9 @@ export {
   extractCorridor,
   removeVietnameseDiacritics,
   matchesVietnameseSearch,
+  computeFilteredCameraIds,
+  computeActiveFilterLabel,
+  calculateMarkerStyle,
   type CorridorDisplay,
 };
 
