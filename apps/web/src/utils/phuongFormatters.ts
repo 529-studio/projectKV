@@ -2,6 +2,16 @@
  * Administrative and corridor display formatting helpers with bilingual (vi/en) support.
  */
 
+export const OTHER_WARDS_KEY = '__OTHER_WARDS__';
+export const OUTSIDE_HCMC_KEY = OTHER_WARDS_KEY;
+
+export interface FilterableCamera {
+  id: string;
+  displayName?: string;
+  title?: string;
+  phuong_name?: string | null;
+}
+
 export interface CorridorDisplay {
   prefix: string;
   name: string;
@@ -163,4 +173,102 @@ export function matchesVietnameseSearch(target: string, query: string): boolean 
   }
 
   return false;
+}
+
+/**
+ * Computes the Set of camera IDs that match the active Phường/Corridor filter.
+ * Returns undefined when no filter is active.
+ */
+export function computeFilteredCameraIds(
+  cameras: FilterableCamera[],
+  selectedPhuong: string | null,
+  selectedCorridor: string | null
+): Set<string> | undefined {
+  if (!selectedPhuong && !selectedCorridor) return undefined;
+
+  const set = new Set<string>();
+  cameras.forEach(c => {
+    let matchPhuong = true;
+    if (selectedPhuong) {
+      if (selectedPhuong === OTHER_WARDS_KEY || selectedPhuong === OUTSIDE_HCMC_KEY) {
+        matchPhuong = !c.phuong_name;
+      } else {
+        matchPhuong = c.phuong_name === selectedPhuong;
+      }
+    }
+    let matchCorridor = true;
+    if (selectedCorridor) {
+      matchCorridor = extractCorridor(c.displayName, c.title) === selectedCorridor;
+    }
+    if (matchPhuong && matchCorridor) {
+      set.add(c.id);
+    }
+  });
+
+  return set;
+}
+
+/**
+ * Computes localized active filter label for on-map chip and headers.
+ */
+export function computeActiveFilterLabel(
+  selectedPhuong: string | null,
+  selectedCorridor: string | null,
+  lang: 'vi' | 'en'
+): string | null {
+  if (!selectedPhuong && !selectedCorridor) return null;
+
+  const phuongName = selectedPhuong
+    ? selectedPhuong === OTHER_WARDS_KEY || selectedPhuong === OUTSIDE_HCMC_KEY
+      ? lang === 'vi'
+        ? 'Các Phường khác'
+        : 'Other Wards'
+      : formatPhuongName(selectedPhuong, lang)
+    : '';
+
+  if (selectedCorridor) {
+    const corrDisplay = formatCorridorDisplay(selectedCorridor, lang);
+    const corrText = corrDisplay.prefix
+      ? `${corrDisplay.prefix} ${corrDisplay.name}`
+      : corrDisplay.name;
+    return phuongName ? `${phuongName} → ${corrText}` : corrText;
+  }
+
+  return phuongName;
+}
+
+export interface MarkerStyleOptions {
+  radius: number;
+  weight: number;
+  opacity: number;
+  fillOpacity: number;
+  strokeColor: string;
+}
+
+/**
+ * Calculates marker style for normal vs dimmed (non-matching) cameras.
+ * Per ADR-004 A3: Dimmed markers have opacity 0.2, radius reduced by 30%.
+ */
+export function calculateMarkerStyle(
+  isDimmed: boolean,
+  baseRadius: number,
+  zoom: number
+): MarkerStyleOptions {
+  if (isDimmed) {
+    return {
+      radius: Math.max(2.5, Math.round(baseRadius * 0.7)),
+      weight: 1,
+      opacity: 0.25,
+      fillOpacity: 0.2,
+      strokeColor: '#27272a',
+    };
+  }
+
+  return {
+    radius: baseRadius,
+    weight: zoom >= 14 ? 2 : 1.5,
+    opacity: 1.0,
+    fillOpacity: 0.95,
+    strokeColor: '#000000',
+  };
 }
