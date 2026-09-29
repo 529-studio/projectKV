@@ -201,6 +201,36 @@ def enrich_cameras(
     return enriched, matched, unmatched
 
 
+def write_unmatched_report(cameras: List[Dict[str, Any]], report_path: str) -> None:
+    """Generate CSV report of unmatched cameras with reasons."""
+    import csv
+
+    report_dir = os.path.dirname(report_path)
+    if report_dir:
+        os.makedirs(report_dir, exist_ok=True)
+
+    with open(report_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["id", "title", "displayName", "latitude", "longitude", "zone", "reason"])
+        for c in cameras:
+            if not c.get("phuong_name"):
+                lat = c.get("latitude")
+                lon = c.get("longitude")
+                if lat is None or lon is None:
+                    reason = "Missing coordinates in upstream catalog"
+                else:
+                    reason = "Outside administrative boundary polygon extent (e.g. Long An expressway corridor)"
+                writer.writerow([
+                    c.get("id", ""),
+                    c.get("title", ""),
+                    c.get("displayName", ""),
+                    lat if lat is not None else "",
+                    lon if lon is not None else "",
+                    c.get("zone", ""),
+                    reason
+                ])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Enrich projectKV camera catalog with post-reform Phường boundaries (point-in-polygon)."
@@ -234,6 +264,11 @@ def main() -> int:
         "--in-place",
         action="store_true",
         help="Overwrite input camera file directly instead of writing to --output"
+    )
+    parser.add_argument(
+        "--unmatched-report",
+        default="tools/geo-enrich/unmatched_cameras.csv",
+        help="Path for unmatched cameras CSV report (default: tools/geo-enrich/unmatched_cameras.csv)"
     )
 
     args = parser.parse_args()
@@ -270,12 +305,17 @@ def main() -> int:
         json.dump(enriched, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
+    if args.unmatched_report:
+        write_unmatched_report(enriched, args.unmatched_report)
+
     print("==================================================")
     print(" geo-enrich: Batch Enrichment Completed")
     print(f" - Total cameras:   {len(cameras)}")
     print(f" - Matched Phường:  {matched}")
     print(f" - Unmatched/Null:  {unmatched}")
     print(f" - Output saved to: {output_path}")
+    if args.unmatched_report:
+        print(f" - Unmatched report: {args.unmatched_report}")
     print("==================================================")
     return 0
 
