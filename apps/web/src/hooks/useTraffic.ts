@@ -13,13 +13,22 @@ export interface TrafficVerdict {
  * Validates whether a verdict is non-stale and within the Hot Set active TTL window.
  */
 export function isVerdictValid(v?: TrafficVerdict | null): v is TrafficVerdict {
-  if (!v || !v.severity) return false;
-  if (!v.timestamp) return false;
-  const ts = new Date(v.timestamp).getTime();
-  if (isNaN(ts)) return false;
-  const ageMs = Date.now() - ts;
-  // Allow up to 1 minute of forward clock drift and ensure age does not exceed Hot Set TTL.
-  return ageMs >= -60000 && ageMs <= HOTSET_CONFIG.VERDICT_TTL_MS;
+	if (!v || !v.severity) return false;
+	if (!v.timestamp) return false;
+	const ts = new Date(v.timestamp).getTime();
+	if (isNaN(ts)) return false;
+	const ageMs = Date.now() - ts;
+	// Allow up to 1 minute of forward clock drift and ensure age does not exceed Hot Set TTL.
+	return ageMs >= -60000 && ageMs <= HOTSET_CONFIG.VERDICT_TTL_MS;
+}
+
+/**
+ * Trust & safety guard: fabricated mock verdicts must never surface on a
+ * production/staging build. Backend already refuses to run mock outside dev
+ * (main.go fatal + /api/traffic-status filter); this check is defense-in-depth.
+ */
+function isMockHidden(source?: string): boolean {
+	return source === 'mock' && process.env.NODE_ENV === 'production';
 }
 
 export function useTraffic() {
@@ -32,8 +41,8 @@ export function useTraffic() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const id = v.camera_id || (v as any).cameraId;
     if (!isVerdictValid(v)) return;
-    // Strict trust & safety rule: ignore verdicts from mock analyzer
-    if (v.source === 'mock') return;
+    // Trust & safety: hide fabricated mock verdicts on production builds.
+    if (isMockHidden(v.source)) return;
     setVerdicts((prev) => {
       const next = new Map(prev);
       next.set(id, v);
@@ -61,7 +70,7 @@ export function useTraffic() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         list.forEach((v: any) => {
           const id = v.camera_id || v.cameraId;
-          if (id && isVerdictValid(v) && v.source !== 'mock') {
+          if (id && isVerdictValid(v) && !isMockHidden(v.source)) {
             initialMap.set(id, v);
           }
         });
@@ -126,7 +135,7 @@ export function useTraffic() {
         if (!hasExpired) return prev;
         const next = new Map<string, TrafficVerdict>();
         for (const [id, v] of prev.entries()) {
-          if (isVerdictValid(v) && v.source !== 'mock') {
+          if (isVerdictValid(v) && !isMockHidden(v.source)) {
             next.set(id, v);
           }
         }
