@@ -9,9 +9,10 @@ interface CameraModalProps {
   onClose: () => void;
   isPinned: boolean;
   onTogglePin: () => void;
+  lang?: 'vi' | 'en';
 }
 
-export default function CameraModal({ camera, verdict, onClose, isPinned, onTogglePin }: CameraModalProps) {
+export default function CameraModal({ camera, verdict, onClose, isPinned, onTogglePin, lang = 'vi' }: CameraModalProps) {
   const [imgError, setImgError] = useState(false);
   const [fetchTimestamp, setFetchTimestamp] = useState<number>(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -62,14 +63,14 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
 
   const hasRealVerdict = Boolean(verdict && verdict.severity && verdict.source !== 'mock');
   const severity = hasRealVerdict ? verdict!.severity : 'UNKNOWN';
-  let severityLabel = 'BÌNH THƯỜNG';
+  let severityLabel = lang === 'vi' ? 'BÌNH THƯỜNG' : 'CLEAR';
   let severityColor: string = FUNCTIONAL_COLORS.CLEAR;
   
   if (severity === 'MODERATE') {
-    severityLabel = 'ĐÔNG XE';
+    severityLabel = lang === 'vi' ? 'ĐÔNG XE' : 'MODERATE';
     severityColor = FUNCTIONAL_COLORS.MODERATE;
   } else if (severity === 'HEAVY' || severity === 'CONGESTED') {
-    severityLabel = 'ÙN TẮC';
+    severityLabel = lang === 'vi' ? 'ÙN TẮC' : 'CONGESTED';
     severityColor = FUNCTIONAL_COLORS.CONGESTED;
   }
 
@@ -92,41 +93,61 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
             <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-zinc-400">
               {osdTime ? (
                 <>
-                  <span className="text-emerald-400 font-bold tracking-wide">THỰC ĐỊA: {osdTime}</span>
+                  <span className="text-emerald-400 font-bold tracking-wide">
+                    {lang === 'vi' ? 'THỰC ĐỊA:' : 'LIVE OSD:'} {osdTime}
+                  </span>
                   <span className="text-zinc-600">•</span>
                 </>
               ) : null}
-              <span>TẢI VỀ: {new Date(fetchTimestamp).toLocaleTimeString('vi-VN')}</span>
+              <span>
+                {lang === 'vi' ? 'TẢI VỀ:' : 'FETCHED:'}{' '}
+                {new Date(fetchTimestamp).toLocaleTimeString(lang === 'vi' ? 'vi-VN' : 'en-US')}
+              </span>
               <span className="text-zinc-600">•</span>
-              <span>{elapsedSeconds === 0 ? 'vừa xong' : `${elapsedSeconds}s trước`}</span>
+              <span>
+                {elapsedSeconds === 0
+                  ? lang === 'vi'
+                    ? 'vừa xong'
+                    : 'just now'
+                  : `${elapsedSeconds}s ${lang === 'vi' ? 'trước' : 'ago'}`}
+              </span>
               {isActuallyAvailable && (
                 <button
                   onClick={handleRefresh}
                   className="text-zinc-400 hover:text-white underline text-[11px] ml-1"
-                  title="Tải lại khung hình mới nhất"
+                  title={lang === 'vi' ? 'Tải lại khung hình mới nhất' : 'Reload latest frame'}
                 >
-                  [↻ LÀM MỚI]
+                  [{lang === 'vi' ? '↻ LÀM MỚI' : '↻ REFRESH'}]
                 </button>
               )}
             </div>
             <div className="flex flex-wrap gap-2 mt-2 text-xs font-bold items-center">
               {camera.isGhost ? (
                 <span className="px-2 py-0.5 rounded border bg-amber-950/70 border-amber-800 text-amber-400">
-                  [MẤT TÍN HIỆU THỰC ĐỊA]
+                  {lang === 'vi' ? '[MẤT TÍN HIỆU THỰC ĐỊA]' : '[NO FIELD SIGNAL]'}
                 </span>
               ) : isActuallyAvailable ? (
                 <span className="px-2 py-0.5 rounded border bg-zinc-800 border-zinc-600 text-white">
-                  [HOẠT ĐỘNG]
+                  {lang === 'vi' ? '[HOẠT ĐỘNG]' : '[ONLINE]'}
                 </span>
               ) : (
                 <span className="px-2 py-0.5 rounded border bg-red-950/70 border-red-800 text-red-400">
-                  [MẤT KẾT NỐI]
+                  {lang === 'vi' ? '[MẤT KẾT NỐI]' : '[OFFLINE]'}
                 </span>
               )}
 
               {camera.duplicateOf && (
-                <span className="px-2 py-0.5 rounded border bg-zinc-900 border-zinc-700 text-zinc-400 text-[11px]" title={`Trùng nguồn video với camera ID: ${camera.duplicateOf}`}>
-                  [TRÙNG NGUỒN VỚI: {camera.duplicateOf.slice(0, 8)}...]
+                <span
+                  className="px-2 py-0.5 rounded border bg-zinc-900 border-zinc-700 text-zinc-400 text-[11px]"
+                  title={
+                    lang === 'vi'
+                      ? `Trùng nguồn video với camera ID: ${camera.duplicateOf}`
+                      : `Duplicate video feed with camera ID: ${camera.duplicateOf}`
+                  }
+                >
+                  {lang === 'vi'
+                    ? `[TRÙNG NGUỒN VỚI: ${camera.duplicateOf.slice(0, 8)}...]`
+                    : `[DUPLICATE OF: ${camera.duplicateOf.slice(0, 8)}...]`}
                 </span>
               )}
 
@@ -137,7 +158,13 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
               )}
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white font-bold text-xl px-2">×</button>
+          <button
+            onClick={onClose}
+            className="text-zinc-500 hover:text-white font-bold text-xl px-2"
+            aria-label={lang === 'vi' ? 'Đóng' : 'Close'}
+          >
+            ×
+          </button>
         </div>
 
         {/* IMAGE WRAPPER */}
@@ -145,28 +172,34 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
           {camera.isGhost ? (
             <div className="text-center p-6 space-y-2">
               <div className="text-amber-400 font-bold text-sm">
-                MẤT TÍN HIỆU CAMERA THỰC ĐỊA
+                {lang === 'vi' ? 'MẤT TÍN HIỆU CAMERA THỰC ĐỊA' : 'FIELD CAMERA SIGNAL LOST'}
               </div>
               <div className="text-zinc-500 text-xs max-w-md">
-                Cổng thông tin trả về ảnh giữ chỗ (Image Not Available). Máy chủ đã tự động đánh dấu để tránh tải dữ liệu vô ích.
+                {lang === 'vi'
+                  ? 'Cổng thông tin trả về ảnh giữ chỗ (Image Not Available). Máy chủ đã tự động đánh dấu để tránh tải dữ liệu vô ích.'
+                  : 'Upstream portal returned a placeholder image (Image Not Available). The server has marked this camera to avoid wasteful requests.'}
               </div>
             </div>
           ) : !camera.isOnline ? (
             <div className="text-center p-6 space-y-2">
               <div className="text-zinc-400 font-bold text-sm">
-                CAMERA ĐANG BẢO TRÌ HOẶC MẤT KẾT NỐI
+                {lang === 'vi' ? 'CAMERA ĐANG BẢO TRÌ HOẶC MẤT KẾT NỐI' : 'CAMERA MAINTENANCE OR OFFLINE'}
               </div>
               <div className="text-zinc-600 text-xs">
-                Không thể kết nối đến camera tại vị trí này.
+                {lang === 'vi'
+                  ? 'Không thể kết nối đến camera tại vị trí này.'
+                  : 'Cannot connect to the camera at this location.'}
               </div>
             </div>
           ) : imgError ? (
             <div className="text-center p-6 space-y-2">
               <div className="text-red-400 font-bold text-sm">
-                KHÔNG THỂ TẢI HÌNH ẢNH SNAPSHOT
+                {lang === 'vi' ? 'KHÔNG THỂ TẢI HÌNH ẢNH SNAPSHOT' : 'UNABLE TO LOAD SNAPSHOT IMAGE'}
               </div>
               <div className="text-zinc-500 text-xs">
-                Máy chủ proxy báo lỗi 503 hoặc mất kết nối tới camera.
+                {lang === 'vi'
+                  ? 'Máy chủ proxy báo lỗi 503 hoặc mất kết nối tới camera.'
+                  : 'Proxy server reported 503 error or connection timeout to camera.'}
               </div>
             </div>
           ) : (
@@ -184,11 +217,11 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
         <div className="px-4 py-3 bg-zinc-900 border-t border-zinc-800 flex justify-between items-center text-xs">
           <div className="flex items-center gap-3 text-zinc-500">
             <span>
-              TỌA ĐỘ: {camera.latitude?.toFixed(5)}, {camera.longitude?.toFixed(5)}
+              {lang === 'vi' ? 'TỌA ĐỘ:' : 'COORDINATES:'} {camera.latitude?.toFixed(5)}, {camera.longitude?.toFixed(5)}
             </span>
             {isActuallyAvailable && (
               <span className="hidden sm:inline text-zinc-500">
-                • TỰ ĐỘNG LÀM MỚI: {15 - elapsedSeconds}s
+                • {lang === 'vi' ? 'TỰ ĐỘNG LÀM MỚI:' : 'AUTO REFRESH:'} {15 - elapsedSeconds}s
               </span>
             )}
           </div>
@@ -196,7 +229,13 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
             onClick={onTogglePin}
             className={`px-3 py-1.5 border rounded transition ${isPinned ? 'bg-zinc-200 text-black border-white hover:bg-white' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-600 text-white'}`}
           >
-            {isPinned ? '[- BỎ GHIM]' : '[+ GHIM THEO DÕI]'}
+            {isPinned
+              ? lang === 'vi'
+                ? '[- BỎ GHIM]'
+                : '[- UNPIN]'
+              : lang === 'vi'
+              ? '[+ GHIM THEO DÕI]'
+              : '[+ PIN TO DOCK]'}
           </button>
         </div>
 

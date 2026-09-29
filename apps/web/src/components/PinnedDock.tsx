@@ -3,28 +3,30 @@ import { API_ENDPOINTS, getApiUrl } from '../config/constants';
 
 interface PinnedDockProps {
   pinnedCameras: Camera[];
-  
   onUnpin: (id: string) => void;
   onClear: () => void;
+  lang?: 'vi' | 'en';
 }
 
-export default function PinnedDock({ pinnedCameras, onUnpin, onClear }: PinnedDockProps) {
+export default function PinnedDock({ pinnedCameras, onUnpin, onClear, lang = 'vi' }: PinnedDockProps) {
   if (pinnedCameras.length === 0) return null;
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-[800] bg-zinc-950/95 border-t border-zinc-800 shadow-2xl backdrop-blur-md">
       <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 font-mono text-xs select-none">
         <div className="flex items-center gap-2">
-          <span className="font-bold text-white tracking-wide">DOCK THEO DÕI</span>
+          <span className="font-bold text-white tracking-wide">
+            {lang === 'vi' ? 'DOCK THEO DÕI' : 'MONITORING DOCK'}
+          </span>
           <span className="bg-zinc-950 border border-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded">
-            [{pinnedCameras.length} CAM]
+            [{pinnedCameras.length} {lang === 'vi' ? 'CAM' : pinnedCameras.length === 1 ? 'CAM' : 'CAMS'}]
           </span>
         </div>
         <button 
           onClick={onClear}
           className="px-2 py-0.5 bg-zinc-950 border border-zinc-700 hover:border-zinc-400 text-zinc-300 hover:text-white rounded transition"
         >
-          [XÓA HẾT]
+          {lang === 'vi' ? '[XÓA HẾT]' : '[CLEAR ALL]'}
         </button>
       </div>
       <div className="flex gap-2 p-2 overflow-x-auto h-[120px]">
