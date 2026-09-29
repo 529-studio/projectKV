@@ -99,6 +99,17 @@ func (c *Cache) GetOSD(id string) (osdTime string, rawOSD string, ok bool) {
 	return "", "", false
 }
 
+// Get returns the cached image payload for id if present and not expired.
+func (c *Cache) Get(id string) ([]byte, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	entry, found := c.items[id]
+	if found && time.Now().Before(entry.expiresAt) {
+		return entry.data, true
+	}
+	return nil, false
+}
+
 // Purge removes all expired entries from the cache.  Call periodically to
 // prevent unbounded memory growth.
 func (c *Cache) Purge() {
