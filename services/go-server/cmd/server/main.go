@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	_ "github.com/529-studio/projectKV/services/go-server/docs"
+	"github.com/529-studio/projectKV/services/go-server/internal/archiver"
 	"github.com/529-studio/projectKV/services/go-server/internal/cache"
 	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
@@ -25,6 +28,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/models"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
+	"github.com/529-studio/projectKV/services/go-server/internal/storage"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
 	"github.com/529-studio/projectKV/services/go-server/internal/tilecache"
 	"github.com/529-studio/projectKV/services/go-server/internal/ws"
@@ -241,6 +245,27 @@ func main() {
 
 	// 6c. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
 	if analysisEnabled && analyzer != nil {
+		// Initialize object storage and snapshot archiver (Issue #62)
+		var arch *archiver.Archiver
+		localStorage, err := storage.NewLocalStorage(cfg.StorageLocalRoot)
+		if err != nil {
+			log.Printf("[WARN] Failed to initialize storage driver (%s): %v", cfg.StorageLocalRoot, err)
+		} else {
+			archCfg := archiver.Config{
+				SampleInterval: time.Duration(cfg.ArchiveSampleIntervalSeconds) * time.Second,
+				RetentionDays:  cfg.ArchiveRetentionDays,
+				MaxDiskMB:      cfg.ArchiveMaxDiskMB,
+				CheckInterval:  cfg.ArchiveRetentionCheckInterval,
+			}
+			arch = archiver.New(localStorage, cfg.StorageLocalRoot, archCfg, nil)
+
+			retentionCtx, cancelRetention := context.WithCancel(context.Background())
+			defer cancelRetention()
+			go arch.StartRetention(retentionCtx)
+			log.Printf("[INIT] Snapshot archiver enabled (root=%s, retention=%dd, maxDisk=%dMB, sampleInterval=%ds)",
+				cfg.StorageLocalRoot, cfg.ArchiveRetentionDays, cfg.ArchiveMaxDiskMB, cfg.ArchiveSampleIntervalSeconds)
+		}
+
 		onVerdict := func(v hotset.Verdict) {
 			// Fan-out 1: push to all SSE clients immediately.
 			liveHub.Broadcast(v)
@@ -256,6 +281,23 @@ func main() {
 				}
 				if err := verdictRepo.Save(context.Background(), sv); err != nil {
 					log.Printf("[WARN] Failed to persist verdict for %s: %v", v.CameraID, err)
+				}
+			}
+
+			// Fan-out 3: event-driven snapshot archiver with retention policy (Issue #62).
+			if arch != nil {
+				var frameReader io.Reader
+				if cachedData, ok := proxyCache.Get(v.CameraID); ok && len(cachedData) > 0 {
+					frameReader = bytes.NewReader(cachedData)
+				} else if cfg.Analyzer == "mock" {
+					// In mock analysis mode without pre-fetched proxy cache, provide a minimal mock JPEG
+					// so dev environment starts collecting proof frames immediately.
+					frameReader = bytes.NewReader(archiver.MockJPEGData)
+				}
+				if frameReader != nil {
+					if err := arch.OnVerdict(v, frameReader); err != nil {
+						log.Printf("[WARN] Archiver failed for %s: %v", v.CameraID, err)
+					}
 				}
 			}
 		}

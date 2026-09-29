@@ -58,6 +58,8 @@ ws             → hotset            (for verdict types only)
 i18n           → (leaf)
 config         → (leaf)
 platform       → (leaf — logger setup)
+storage        → (leaf — minimal object storage interface and local driver)
+archiver       → storage, hotset   (event-driven snapshot archiver and retention policy)
 ```
 If you find yourself needing an import not in this table, stop and reconsider the design — most likely you need an interface, not a direct import.
 
