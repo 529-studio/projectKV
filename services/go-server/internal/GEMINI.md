@@ -30,6 +30,7 @@ i18n           → (leaf)
 config         → (leaf)
 platform       → (leaf)
 tilecache      → (leaf)
+storage        → (leaf)
 ```
 
 ### How to apply this rule
