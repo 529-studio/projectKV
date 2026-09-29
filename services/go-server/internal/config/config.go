@@ -23,6 +23,8 @@ type Config struct {
 	SQLitePath              string
 	DedupeCooldownMinutes   int
 	LogLevel                string
+	StorageDriver           string
+	StorageLocalRoot        string
 }
 
 func loadDotEnv() {
@@ -68,6 +70,8 @@ func LoadFromEnv() (*Config, error) {
 		SQLitePath:              "./data/camera-view.db",
 		DedupeCooldownMinutes:   15,
 		LogLevel:                "info",
+		StorageDriver:           "local",
+		StorageLocalRoot:        "./data/proofs",
 	}
 
 	if portStr := os.Getenv("PORT"); portStr != "" {
@@ -126,6 +130,14 @@ func LoadFromEnv() (*Config, error) {
 		cfg.LogLevel = val
 	}
 
+	if val := os.Getenv("STORAGE_DRIVER"); val != "" {
+		cfg.StorageDriver = val
+	}
+
+	if val := os.Getenv("STORAGE_LOCAL_ROOT"); val != "" {
+		cfg.StorageLocalRoot = val
+	}
+
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -144,6 +156,8 @@ type ServerConfig struct {
 	CacheMaxAge        time.Duration
 	Analyzer           string // "none" | "mock" (default: "none")
 	AppEnv             string // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
+	StorageDriver      string // default: "local"
+	StorageLocalRoot   string // default: "./data/proofs"
 }
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -215,6 +229,16 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
+	storageDriver := strings.ToLower(strings.TrimSpace(os.Getenv("STORAGE_DRIVER")))
+	if storageDriver == "" {
+		storageDriver = "local"
+	}
+
+	storageLocalRoot := os.Getenv("STORAGE_LOCAL_ROOT")
+	if storageLocalRoot == "" {
+		storageLocalRoot = resolvePath("data/proofs")
+	}
+
 	return &ServerConfig{
 		Port:               port,
 		CamerasFilePath:    camerasPath,
@@ -226,5 +250,7 @@ func LoadConfig() *ServerConfig {
 		CacheMaxAge:        15 * time.Second,
 		Analyzer:           analyzer,
 		AppEnv:             appEnv,
+		StorageDriver:      storageDriver,
+		StorageLocalRoot:   storageLocalRoot,
 	}
 }
