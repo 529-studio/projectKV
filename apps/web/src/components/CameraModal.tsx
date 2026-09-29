@@ -60,7 +60,7 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
 
   if (!camera) return null;
 
-  const hasRealVerdict = Boolean(verdict && verdict.severity && verdict.source !== 'mock');
+  const hasRealVerdict = Boolean(verdict && verdict.severity);
   const severity = hasRealVerdict ? verdict!.severity : 'UNKNOWN';
   let severityLabel = 'BÌNH THƯỜNG';
   let severityColor: string = FUNCTIONAL_COLORS.CLEAR;
