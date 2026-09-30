@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-api build-go test-go lint-go swagger geo-enrich test-enrich normalize-roads
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-api build-go test-go lint-go swagger geo-enrich test-enrich normalize-roads hex-polygons
 
 help:
 	@echo "========================================================"
@@ -19,6 +19,7 @@ help:
 	@echo "  make crawl           - Update camera dataset from traffic portal"
 	@echo "  make geo-enrich      - Run batch Phường point-in-polygon enrichment"
 	@echo "  make normalize-roads - Run road name normalization (road_key)"
+	@echo "  make hex-polygons    - Precompute H3 hex polygon boundaries"
 	@echo "  make test-enrich     - Run unit tests for geo-enrich tool"
 
 install:
@@ -68,6 +69,9 @@ geo-enrich:
 
 normalize-roads:
 	python3 tools/geo-enrich/normalize_roads.py --input cameras_enriched.json --output cameras_enriched.json
+
+hex-polygons:
+	python3 tools/geo-enrich/generate_hex_polygons.py --cameras cameras_enriched.json --output h3_hex_polygons.json
 
 test-enrich:
 	python3 -m unittest discover -s tools/geo-enrich -p "test_*.py"

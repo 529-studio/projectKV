@@ -13,3 +13,9 @@ const HeartbeatInterval = 15 * time.Second
 // DefaultClientBuffer is the number of serialized events buffered per client
 // before a slow client is considered dropped (non-blocking broadcast).
 const DefaultClientBuffer = 32
+
+// SSE event names emitted over RouteStream.
+const (
+	EventCameraUpdate = "camera_update"
+	EventHexUpdate    = "hex_update"
+)
