@@ -6,6 +6,7 @@ const (
 	SeverityModerate       = "MODERATE"
 	SeverityHeavy          = "HEAVY"
 	SeverityCongested      = "CONGESTED"
+	SeverityUnknown        = "UNKNOWN"
 	SeverityDry            = "DRY"
 	SeverityWet            = "WET"
 	SeverityFloodedShallow = "FLOODED_SHALLOW"

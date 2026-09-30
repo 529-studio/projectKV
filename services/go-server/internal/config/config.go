@@ -146,18 +146,21 @@ func LoadFromEnv() (*Config, error) {
 
 // ServerConfig represents runtime configuration for the snapshot/web server.
 type ServerConfig struct {
-	Port               string
-	CamerasFilePath    string
-	StaticWebDir       string
-	SQLitePath         string
-	TileCacheDir       string
-	CacheTTL           time.Duration
-	CacheEvictInterval time.Duration
-	CacheMaxAge        time.Duration
-	Analyzer           string // "none" | "mock" (default: "none")
-	AppEnv             string // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
-	StorageDriver      string // default: "local"
-	StorageLocalRoot   string // default: "./data/proofs"
+	Port                string
+	CamerasFilePath     string
+	StaticWebDir        string
+	SQLitePath          string
+	TileCacheDir        string
+	CacheTTL            time.Duration
+	CacheEvictInterval  time.Duration
+	CacheMaxAge         time.Duration
+	Analyzer            string // "none" | "mock" (default: "none")
+	AppEnv              string // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
+	StorageDriver       string // default: "local"
+	StorageLocalRoot    string // default: "./data/proofs"
+	RateLimitRPS        int    // default: 10
+	RateLimitBurst      int    // default: 30
+	AnalyzerDailyBudget int    // default: 5000
 }
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -239,18 +242,42 @@ func LoadConfig() *ServerConfig {
 		storageLocalRoot = resolvePath("data/proofs")
 	}
 
+	rateLimitRPS := 10
+	if val := os.Getenv("RATE_LIMIT_RPS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			rateLimitRPS = v
+		}
+	}
+
+	rateLimitBurst := 30
+	if val := os.Getenv("RATE_LIMIT_BURST"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			rateLimitBurst = v
+		}
+	}
+
+	analyzerDailyBudget := 5000
+	if val := os.Getenv("ANALYZER_DAILY_BUDGET"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			analyzerDailyBudget = v
+		}
+	}
+
 	return &ServerConfig{
-		Port:               port,
-		CamerasFilePath:    camerasPath,
-		StaticWebDir:       staticDir,
-		SQLitePath:         sqlitePath,
-		TileCacheDir:       tileCacheDir,
-		CacheTTL:           10 * time.Second,
-		CacheEvictInterval: 60 * time.Second,
-		CacheMaxAge:        15 * time.Second,
-		Analyzer:           analyzer,
-		AppEnv:             appEnv,
-		StorageDriver:      storageDriver,
-		StorageLocalRoot:   storageLocalRoot,
+		Port:                port,
+		CamerasFilePath:     camerasPath,
+		StaticWebDir:        staticDir,
+		SQLitePath:          sqlitePath,
+		TileCacheDir:        tileCacheDir,
+		CacheTTL:            10 * time.Second,
+		CacheEvictInterval:  60 * time.Second,
+		CacheMaxAge:         15 * time.Second,
+		Analyzer:            analyzer,
+		AppEnv:              appEnv,
+		StorageDriver:       storageDriver,
+		StorageLocalRoot:    storageLocalRoot,
+		RateLimitRPS:        rateLimitRPS,
+		RateLimitBurst:      rateLimitBurst,
+		AnalyzerDailyBudget: analyzerDailyBudget,
 	}
 }
