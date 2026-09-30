@@ -45,6 +45,7 @@ snapshots/
 bin/
 services/go-server/bin/
 services/go-server/data/
+services/go-server/server
 *.db
 *.db-journal
 *.db-wal

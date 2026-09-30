@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +22,7 @@ type VerdictStorer interface {
 // TrafficStatusResponse represents the response payload for GET /api/traffic-status.
 type TrafficStatusResponse struct {
 	AnalysisEnabled bool      `json:"analysis_enabled"`
+	AppEnv          string    `json:"app_env,omitempty"`
 	Verdicts        []Verdict `json:"verdicts"`
 }
 
@@ -30,6 +32,7 @@ type Handler struct {
 	storer          VerdictStorer
 	analysisEnabled bool
 	appEnv          string
+	staleTTL        time.Duration
 }
 
 // NewHandler constructs a Handler with an injected VerdictStorer (default analysis disabled).
@@ -43,6 +46,14 @@ func NewHandlerWithConfig(storer VerdictStorer, analysisEnabled bool, appEnv str
 		storer:          storer,
 		analysisEnabled: analysisEnabled,
 		appEnv:          appEnv,
+		staleTTL:        180 * time.Second,
+	}
+}
+
+// SetStaleTTL sets the duration after which a verdict is marked stale.
+func (h *Handler) SetStaleTTL(d time.Duration) {
+	if d > 0 {
+		h.staleTTL = d
 	}
 }
 
@@ -67,18 +78,37 @@ func (h *Handler) GetTrafficStatus(c *gin.Context) {
 		allVerdicts = []Verdict{}
 	}
 
+	staleThreshold := h.staleTTL
+	if staleThreshold <= 0 {
+		staleThreshold = 180 * time.Second
+	}
+
 	filtered := make([]Verdict, 0, len(allVerdicts))
 	for _, v := range allVerdicts {
 		// Provenance safety rule: filter out source=mock when appEnv is not "dev"
 		if strings.ToLower(v.Source) == "mock" && strings.ToLower(h.appEnv) != "dev" {
 			continue
 		}
+
+		if v.ObservedAt.IsZero() && !v.Timestamp.IsZero() {
+			v.ObservedAt = v.Timestamp
+		}
+
+		obs := v.ObservedAt
+		if obs.IsZero() {
+			obs = v.Timestamp
+		}
+		if !v.Stale && !obs.IsZero() && time.Since(obs) > staleThreshold {
+			v.Stale = true
+		}
+
 		filtered = append(filtered, v)
 	}
 
 	c.Header("X-Analysis-Enabled", fmt.Sprintf("%t", h.analysisEnabled))
 	c.JSON(http.StatusOK, TrafficStatusResponse{
 		AnalysisEnabled: h.analysisEnabled,
+		AppEnv:          h.appEnv,
 		Verdicts:        filtered,
 	})
 }

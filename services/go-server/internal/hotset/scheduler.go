@@ -44,6 +44,8 @@ type Verdict struct {
 	Severity   string    `json:"severity"` // e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED", or "DRY" | "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP"
 	Confidence float64   `json:"confidence"`
 	Source     string    `json:"source"` // "mock" | "vlm" | "onnx"
+	ObservedAt time.Time `json:"observed_at"`
+	Stale      bool      `json:"stale"`
 	Timestamp  time.Time `json:"timestamp"`
 }
 
@@ -192,12 +194,15 @@ func (s *Scheduler) runOnce(ctx context.Context) {
 
 			if s.budget != nil && !s.budget.Allow() {
 				if s.onVerdict != nil {
+					now := time.Now()
 					s.onVerdict(Verdict{
 						CameraID:   cam.ID,
 						Severity:   SeverityUnknown,
 						Confidence: 0,
 						Source:     "",
-						Timestamp:  time.Now(),
+						ObservedAt: now,
+						Stale:      false,
+						Timestamp:  now,
 					})
 				}
 				return
@@ -207,6 +212,12 @@ func (s *Scheduler) runOnce(ctx context.Context) {
 			if err != nil {
 				s.log.Warn("analysis failed", "camera", cam.ID, "error", err)
 				return
+			}
+			if verdict.ObservedAt.IsZero() {
+				verdict.ObservedAt = time.Now()
+			}
+			if verdict.Timestamp.IsZero() {
+				verdict.Timestamp = verdict.ObservedAt
 			}
 			if s.onVerdict != nil {
 				s.onVerdict(verdict)

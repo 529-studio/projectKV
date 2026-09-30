@@ -17,7 +17,7 @@ const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: 
 
 export default function Home() {
   const { cameras, loading, error } = useCameras();
-  const { verdicts, analysisEnabled } = useTraffic();
+  const { verdicts, analysisEnabled, appEnv } = useTraffic();
   
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -148,6 +148,7 @@ export default function Home() {
             onFilterClear={handleFilterClear}
             activeFilterLabel={activeFilterLabel}
             lang={lang}
+            appEnv={appEnv}
           />
         </div>
         
@@ -203,6 +204,7 @@ export default function Home() {
         isPinned={selectedCamera ? pinnedCameraIds.includes(selectedCamera.id) : false}
         onTogglePin={() => selectedCamera && togglePin(selectedCamera.id)}
         lang={lang}
+        appEnv={appEnv}
       />
     </div>
   );

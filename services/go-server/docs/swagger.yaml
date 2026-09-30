@@ -6,6 +6,10 @@ definitions:
         type: string
       duplicateOf:
         type: string
+      h3_res7:
+        type: string
+      h3_res9:
+        type: string
       id:
         type: string
       isGhost:
@@ -33,6 +37,8 @@ definitions:
     properties:
       analysis_enabled:
         type: boolean
+      app_env:
+        type: string
       verdicts:
         items:
           $ref: '#/definitions/hotset.Verdict'
@@ -44,6 +50,8 @@ definitions:
         type: string
       confidence:
         type: number
+      observed_at:
+        type: string
       severity:
         description: e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED", or "DRY" |
           "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP"
@@ -51,6 +59,8 @@ definitions:
       source:
         description: '"mock" | "vlm" | "onnx"'
         type: string
+      stale:
+        type: boolean
       timestamp:
         type: string
     type: object
