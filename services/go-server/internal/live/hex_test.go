@@ -260,6 +260,9 @@ func TestHexAggregator_ThreeFreshCameras_EmitsEvent(t *testing.T) {
 	if broadcaster.count() != 1 {
 		t.Errorf("expected 1 broadcast event, got %d", broadcaster.count())
 	}
+	if latest := broadcaster.latest(); latest == nil || latest.H3ID != cell.H3ID {
+		t.Errorf("expected broadcasted cell H3ID %s, got %v", cell.H3ID, latest)
+	}
 }
 
 // 4. Mixed severities -> worst-of is selected.
