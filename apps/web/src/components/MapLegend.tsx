@@ -1,7 +1,7 @@
 'use client';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { FUNCTIONAL_COLORS } from '../config/constants';
+import { FUNCTIONAL_COLORS, VERDICT_I18N } from '../config/constants';
 
 interface MapLegendProps {
   isOpen: boolean;
@@ -94,6 +94,14 @@ export default function MapLegend({
                       style={{ backgroundColor: FUNCTIONAL_COLORS.CONGESTED }}
                     />
                     <span>{lang === 'vi' ? 'Ùn tắc / Kẹt xe' : 'Congested'}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="w-3 h-3 rounded-full border-2 border-zinc-400 bg-transparent shrink-0"
+                    />
+                    <span className="text-zinc-400">
+                      {lang === 'vi' ? VERDICT_I18N.STALE_DESC.vi : VERDICT_I18N.STALE_DESC.en}
+                    </span>
                   </div>
                 </>
               )}

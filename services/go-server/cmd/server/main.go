@@ -61,6 +61,7 @@ func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
 			Severity:   v.Severity,
 			Confidence: v.Confidence,
 			Source:     v.Source,
+			ObservedAt: v.ObservedAt,
 			Timestamp:  v.Timestamp,
 		}
 	}
@@ -231,7 +232,9 @@ func main() {
 		log.Fatalf("[FATAL] Unknown ANALYZER=%q (valid options: none, mock)", cfg.Analyzer)
 	}
 
+	frozenDetector := hotset.NewFrozenDetector(cfg.FrozenFrameThreshold)
 	hotsetHandler := hotset.NewHandlerWithConfig(&verdictStoreAdapter{repo: verdictRepo}, analysisEnabled, cfg.AppEnv)
+	hotsetHandler.SetStaleTTL(time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second)
 
 	// 6. Initialize WebSocket Hub for real-time verdict streaming (Issue #9).
 	// Kept in place — will be retired after D1 (EventSource migration) is verified.
@@ -267,6 +270,21 @@ func main() {
 		}
 
 		onVerdict := func(v hotset.Verdict) {
+			now := time.Now()
+			if v.ObservedAt.IsZero() {
+				v.ObservedAt = now
+			}
+			if v.Timestamp.IsZero() {
+				v.Timestamp = v.ObservedAt
+			}
+
+			// Check frozen frame detector if cached frame data is available
+			if cachedData, ok := proxyCache.Get(v.CameraID); ok && len(cachedData) > 0 {
+				if frozenDetector.CheckBytes(v.CameraID, cachedData) {
+					v.Stale = true
+				}
+			}
+
 			// Fan-out 1: push to all SSE clients immediately.
 			liveHub.Broadcast(v)
 
@@ -277,6 +295,7 @@ func main() {
 					Severity:   v.Severity,
 					Confidence: v.Confidence,
 					Source:     v.Source,
+					ObservedAt: v.ObservedAt,
 					Timestamp:  v.Timestamp,
 				}
 				if err := verdictRepo.Save(context.Background(), sv); err != nil {

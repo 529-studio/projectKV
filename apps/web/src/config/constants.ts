@@ -82,4 +82,17 @@ export const MAP_CONFIG = Object.freeze({
   REFRESH_INTERVAL_SECONDS: 10,
 });
 
-
+export const VERDICT_I18N = Object.freeze({
+  STALE_BADGE: {
+    vi: '⏳ Dữ liệu cũ',
+    en: '⏳ Stale data',
+  },
+  STALE_DESC: {
+    vi: 'Dữ liệu cũ (>3 phút)',
+    en: 'Stale (>3 min)',
+  },
+  DEMO_BADGE: {
+    vi: 'DỮ LIỆU MẪU',
+    en: 'DEMO',
+  },
+});

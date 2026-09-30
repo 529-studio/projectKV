@@ -29,6 +29,8 @@ type Config struct {
 	ArchiveRetentionDays          int
 	ArchiveMaxDiskMB              int64
 	ArchiveRetentionCheckInterval time.Duration
+	VerdictStaleTTLSeconds        int
+	FrozenFrameThreshold          int
 }
 
 func loadDotEnv() {
@@ -80,6 +82,8 @@ func LoadFromEnv() (*Config, error) {
 		ArchiveRetentionDays:          14,
 		ArchiveMaxDiskMB:              20000,
 		ArchiveRetentionCheckInterval: 1 * time.Hour,
+		VerdictStaleTTLSeconds:        180,
+		FrozenFrameThreshold:          3,
 	}
 
 	if portStr := os.Getenv("PORT"); portStr != "" {
@@ -170,6 +174,18 @@ func LoadFromEnv() (*Config, error) {
 		}
 	}
 
+	if val := os.Getenv("VERDICT_STALE_TTL_SECONDS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			cfg.VerdictStaleTTLSeconds = v
+		}
+	}
+
+	if val := os.Getenv("FROZEN_FRAME_THRESHOLD"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			cfg.FrozenFrameThreshold = v
+		}
+	}
+
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -197,6 +213,8 @@ type ServerConfig struct {
 	ArchiveRetentionDays          int           // default: 14
 	ArchiveMaxDiskMB              int64         // default: 20000
 	ArchiveRetentionCheckInterval time.Duration // default: 1h
+	VerdictStaleTTLSeconds        int           // default: 180
+	FrozenFrameThreshold          int           // default: 3
 }
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -326,6 +344,20 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
+	verdictStaleTTLSeconds := 180
+	if val := os.Getenv("VERDICT_STALE_TTL_SECONDS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			verdictStaleTTLSeconds = v
+		}
+	}
+
+	frozenFrameThreshold := 3
+	if val := os.Getenv("FROZEN_FRAME_THRESHOLD"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			frozenFrameThreshold = v
+		}
+	}
+
 	return &ServerConfig{
 		Port:                          port,
 		CamerasFilePath:               camerasPath,
@@ -346,5 +378,7 @@ func LoadConfig() *ServerConfig {
 		ArchiveRetentionDays:          retentionDays,
 		ArchiveMaxDiskMB:              maxDiskMB,
 		ArchiveRetentionCheckInterval: retentionCheckInterval,
+		VerdictStaleTTLSeconds:        verdictStaleTTLSeconds,
+		FrozenFrameThreshold:          frozenFrameThreshold,
 	}
 }

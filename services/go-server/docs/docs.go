@@ -442,6 +442,12 @@ const docTemplate = `{
                 "duplicateOf": {
                     "type": "string"
                 },
+                "h3_res7": {
+                    "type": "string"
+                },
+                "h3_res9": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -483,6 +489,9 @@ const docTemplate = `{
                 "analysis_enabled": {
                     "type": "boolean"
                 },
+                "app_env": {
+                    "type": "string"
+                },
                 "verdicts": {
                     "type": "array",
                     "items": {
@@ -500,6 +509,9 @@ const docTemplate = `{
                 "confidence": {
                     "type": "number"
                 },
+                "observed_at": {
+                    "type": "string"
+                },
                 "severity": {
                     "description": "e.g. \"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\", or \"DRY\" | \"WET\" | \"FLOODED_SHALLOW\" | \"FLOODED_DEEP\"",
                     "type": "string"
@@ -507,6 +519,9 @@ const docTemplate = `{
                 "source": {
                     "description": "\"mock\" | \"vlm\" | \"onnx\"",
                     "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
                 },
                 "timestamp": {
                     "type": "string"

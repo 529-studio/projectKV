@@ -27,6 +27,7 @@ func openTestDB(t *testing.T) *sql.DB {
 			severity    TEXT NOT NULL,
 			confidence  REAL NOT NULL,
 			source      TEXT NOT NULL DEFAULT '',
+			observed_at TIMESTAMP,
 			updated_at  TIMESTAMP NOT NULL
 		);
 	`)
@@ -44,12 +45,14 @@ func TestVerdictRepo_Save_InsertsRow(t *testing.T) {
 	repo := store.NewVerdictRepo(db)
 	ctx := context.Background()
 
+	now := time.Now().UTC().Truncate(time.Second)
 	v := store.Verdict{
 		CameraID:   "cam1",
 		Severity:   "HEAVY",
 		Confidence: 0.91,
 		Source:     "vlm",
-		Timestamp:  time.Now().UTC().Truncate(time.Second),
+		ObservedAt: now,
+		Timestamp:  now,
 	}
 	if err := repo.Save(ctx, v); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -74,6 +77,9 @@ func TestVerdictRepo_Save_InsertsRow(t *testing.T) {
 	}
 	if got.Source != v.Source {
 		t.Errorf("Source mismatch: want %q, got %q", v.Source, got.Source)
+	}
+	if !got.ObservedAt.Equal(v.ObservedAt) {
+		t.Errorf("ObservedAt mismatch: want %v, got %v", v.ObservedAt, got.ObservedAt)
 	}
 }
 
