@@ -126,6 +126,7 @@ type Scheduler struct {
 	interval    time.Duration
 	maxParallel int
 	onVerdict   OnVerdict
+	budget      *AnalysisBudget
 	log         *slog.Logger
 }
 
@@ -141,6 +142,13 @@ func NewScheduler(registry *Registry, analyzer Analyzer, interval time.Duration,
 		onVerdict:   onVerdict,
 		log:         log,
 	}
+}
+
+// SetBudget wires an optional daily analyzer budget. When the budget is
+// exhausted the scheduler degrades to UNKNOWN verdicts without invoking the
+// analyzer.
+func (s *Scheduler) SetBudget(b *AnalysisBudget) {
+	s.budget = b
 }
 
 // Run blocks until ctx is cancelled. Intended to be started once from main
@@ -181,6 +189,19 @@ func (s *Scheduler) runOnce(ctx context.Context) {
 			// the entire cycle or pile up across ticks.
 			callCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
+
+			if s.budget != nil && !s.budget.Allow() {
+				if s.onVerdict != nil {
+					s.onVerdict(Verdict{
+						CameraID:   cam.ID,
+						Severity:   SeverityUnknown,
+						Confidence: 0,
+						Source:     "",
+						Timestamp:  time.Now(),
+					})
+				}
+				return
+			}
 
 			verdict, err := s.analyzer.Analyze(callCtx, cam)
 			if err != nil {
