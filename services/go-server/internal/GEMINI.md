@@ -31,6 +31,7 @@ config         → (leaf)
 platform       → (leaf)
 tilecache      → (leaf)
 storage        → (leaf)
+archiver       → storage, hotset
 ```
 
 ### How to apply this rule

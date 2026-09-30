@@ -11,20 +11,24 @@ import (
 )
 
 type Config struct {
-	Port                    int
-	SnapshotUpstreamBaseURL string
-	SnapshotCacheTTLSeconds int
-	HotsetIntervalSeconds   int
-	HotsetMaxParallel       int
-	HotsetActiveTTLSeconds  int
-	TelegramBotToken        string
-	CloudVisionAPIKey       string
-	CVEngineURL             string
-	SQLitePath              string
-	DedupeCooldownMinutes   int
-	LogLevel                string
-	StorageDriver           string
-	StorageLocalRoot        string
+	Port                          int
+	SnapshotUpstreamBaseURL       string
+	SnapshotCacheTTLSeconds       int
+	HotsetIntervalSeconds         int
+	HotsetMaxParallel             int
+	HotsetActiveTTLSeconds        int
+	TelegramBotToken              string
+	CloudVisionAPIKey             string
+	CVEngineURL                   string
+	SQLitePath                    string
+	DedupeCooldownMinutes         int
+	LogLevel                      string
+	StorageDriver                 string
+	StorageLocalRoot              string
+	ArchiveSampleIntervalSeconds  int
+	ArchiveRetentionDays          int
+	ArchiveMaxDiskMB              int64
+	ArchiveRetentionCheckInterval time.Duration
 }
 
 func loadDotEnv() {
@@ -61,17 +65,21 @@ func LoadFromEnv() (*Config, error) {
 
 	var errs []error
 	cfg := &Config{
-		Port:                    3000,
-		SnapshotCacheTTLSeconds: 10,
-		HotsetIntervalSeconds:   30,
-		HotsetMaxParallel:       10,
-		HotsetActiveTTLSeconds:  120,
-		CVEngineURL:             "http://localhost:8001",
-		SQLitePath:              "./data/camera-view.db",
-		DedupeCooldownMinutes:   15,
-		LogLevel:                "info",
-		StorageDriver:           "local",
-		StorageLocalRoot:        "./data/proofs",
+		Port:                          3000,
+		SnapshotCacheTTLSeconds:       10,
+		HotsetIntervalSeconds:         30,
+		HotsetMaxParallel:             10,
+		HotsetActiveTTLSeconds:        120,
+		CVEngineURL:                   "http://localhost:8001",
+		SQLitePath:                    "./data/camera-view.db",
+		DedupeCooldownMinutes:         15,
+		LogLevel:                      "info",
+		StorageDriver:                 "local",
+		StorageLocalRoot:              "./data/proofs",
+		ArchiveSampleIntervalSeconds:  300,
+		ArchiveRetentionDays:          14,
+		ArchiveMaxDiskMB:              20000,
+		ArchiveRetentionCheckInterval: 1 * time.Hour,
 	}
 
 	if portStr := os.Getenv("PORT"); portStr != "" {
@@ -138,6 +146,30 @@ func LoadFromEnv() (*Config, error) {
 		cfg.StorageLocalRoot = val
 	}
 
+	if val := os.Getenv("ARCHIVE_SAMPLE_INTERVAL_SECONDS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			cfg.ArchiveSampleIntervalSeconds = v
+		}
+	}
+
+	if val := os.Getenv("ARCHIVE_RETENTION_DAYS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			cfg.ArchiveRetentionDays = v
+		}
+	}
+
+	if val := os.Getenv("ARCHIVE_MAX_DISK_MB"); val != "" {
+		if v, err := strconv.ParseInt(val, 10, 64); err == nil {
+			cfg.ArchiveMaxDiskMB = v
+		}
+	}
+
+	if val := os.Getenv("ARCHIVE_RETENTION_CHECK_INTERVAL"); val != "" {
+		if d, err := time.ParseDuration(val); err == nil {
+			cfg.ArchiveRetentionCheckInterval = d
+		}
+	}
+
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -146,21 +178,25 @@ func LoadFromEnv() (*Config, error) {
 
 // ServerConfig represents runtime configuration for the snapshot/web server.
 type ServerConfig struct {
-	Port                string
-	CamerasFilePath     string
-	StaticWebDir        string
-	SQLitePath          string
-	TileCacheDir        string
-	CacheTTL            time.Duration
-	CacheEvictInterval  time.Duration
-	CacheMaxAge         time.Duration
-	Analyzer            string // "none" | "mock" (default: "none")
-	AppEnv              string // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
-	StorageDriver       string // default: "local"
-	StorageLocalRoot    string // default: "./data/proofs"
-	RateLimitRPS        int    // default: 10
-	RateLimitBurst      int    // default: 30
-	AnalyzerDailyBudget int    // default: 5000
+	Port                          string
+	CamerasFilePath               string
+	StaticWebDir                  string
+	SQLitePath                    string
+	TileCacheDir                  string
+	CacheTTL                      time.Duration
+	CacheEvictInterval            time.Duration
+	CacheMaxAge                   time.Duration
+	Analyzer                      string        // "none" | "mock" (default: "none")
+	AppEnv                        string        // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
+	StorageDriver                 string        // default: "local"
+	StorageLocalRoot              string        // default: "./data/proofs"
+	RateLimitRPS                  int           // default: 10
+	RateLimitBurst                int           // default: 30
+	AnalyzerDailyBudget           int           // default: 5000
+	ArchiveSampleIntervalSeconds  int           // default: 300
+	ArchiveRetentionDays          int           // default: 14
+	ArchiveMaxDiskMB              int64         // default: 20000
+	ArchiveRetentionCheckInterval time.Duration // default: 1h
 }
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -241,6 +277,33 @@ func LoadConfig() *ServerConfig {
 	if storageLocalRoot == "" {
 		storageLocalRoot = resolvePath("data/proofs")
 	}
+	sampleInterval := 300
+	if val := os.Getenv("ARCHIVE_SAMPLE_INTERVAL_SECONDS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			sampleInterval = v
+		}
+	}
+
+	retentionDays := 14
+	if val := os.Getenv("ARCHIVE_RETENTION_DAYS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			retentionDays = v
+		}
+	}
+
+	maxDiskMB := int64(20000)
+	if val := os.Getenv("ARCHIVE_MAX_DISK_MB"); val != "" {
+		if v, err := strconv.ParseInt(val, 10, 64); err == nil {
+			maxDiskMB = v
+		}
+	}
+
+	retentionCheckInterval := 1 * time.Hour
+	if val := os.Getenv("ARCHIVE_RETENTION_CHECK_INTERVAL"); val != "" {
+		if d, err := time.ParseDuration(val); err == nil {
+			retentionCheckInterval = d
+		}
+	}
 
 	rateLimitRPS := 10
 	if val := os.Getenv("RATE_LIMIT_RPS"); val != "" {
@@ -264,20 +327,24 @@ func LoadConfig() *ServerConfig {
 	}
 
 	return &ServerConfig{
-		Port:                port,
-		CamerasFilePath:     camerasPath,
-		StaticWebDir:        staticDir,
-		SQLitePath:          sqlitePath,
-		TileCacheDir:        tileCacheDir,
-		CacheTTL:            10 * time.Second,
-		CacheEvictInterval:  60 * time.Second,
-		CacheMaxAge:         15 * time.Second,
-		Analyzer:            analyzer,
-		AppEnv:              appEnv,
-		StorageDriver:       storageDriver,
-		StorageLocalRoot:    storageLocalRoot,
-		RateLimitRPS:        rateLimitRPS,
-		RateLimitBurst:      rateLimitBurst,
-		AnalyzerDailyBudget: analyzerDailyBudget,
+		Port:                          port,
+		CamerasFilePath:               camerasPath,
+		StaticWebDir:                  staticDir,
+		SQLitePath:                    sqlitePath,
+		TileCacheDir:                  tileCacheDir,
+		CacheTTL:                      10 * time.Second,
+		CacheEvictInterval:            60 * time.Second,
+		CacheMaxAge:                   15 * time.Second,
+		Analyzer:                      analyzer,
+		AppEnv:                        appEnv,
+		StorageDriver:                 storageDriver,
+		StorageLocalRoot:              storageLocalRoot,
+		RateLimitRPS:                  rateLimitRPS,
+		RateLimitBurst:                rateLimitBurst,
+		AnalyzerDailyBudget:           analyzerDailyBudget,
+		ArchiveSampleIntervalSeconds:  sampleInterval,
+		ArchiveRetentionDays:          retentionDays,
+		ArchiveMaxDiskMB:              maxDiskMB,
+		ArchiveRetentionCheckInterval: retentionCheckInterval,
 	}
 }

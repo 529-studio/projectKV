@@ -27,9 +27,27 @@ func NewDB(dbPath string) (*sql.DB, error) {
 		}
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	dsn := dbPath
+	if dbPath != ":memory:" && !strings.Contains(dbPath, "?") {
+		dsn = fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)", dbPath)
+	}
+
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite %s: %w", dbPath, err)
+	}
+
+	// Configure PRAGMAs for high concurrency to eliminate SQLITE_BUSY lock errors
+	pragmas := []string{
+		"PRAGMA journal_mode = WAL;",
+		"PRAGMA busy_timeout = 5000;",
+		"PRAGMA synchronous = NORMAL;",
+		"PRAGMA foreign_keys = ON;",
+	}
+	for _, p := range pragmas {
+		if _, err := db.Exec(p); err != nil {
+			return nil, fmt.Errorf("execute pragma %s: %w", p, err)
+		}
 	}
 
 	if err := db.Ping(); err != nil {
