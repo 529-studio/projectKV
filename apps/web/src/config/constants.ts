@@ -95,4 +95,26 @@ export const VERDICT_I18N = Object.freeze({
     vi: 'DỮ LIỆU MẪU',
     en: 'DEMO',
   },
+  TRAFFIC_PREFIX: {
+    vi: 'Giao thông',
+    en: 'Traffic',
+  },
+  SEVERITY: {
+    CLEAR: {
+      vi: 'Thông thoáng',
+      en: 'Clear',
+    },
+    MODERATE: {
+      vi: 'Đông xe',
+      en: 'Moderate',
+    },
+    HEAVY: {
+      vi: 'Ùn tắc',
+      en: 'Congested',
+    },
+    CONGESTED: {
+      vi: 'Ùn tắc',
+      en: 'Congested',
+    },
+  },
 });
