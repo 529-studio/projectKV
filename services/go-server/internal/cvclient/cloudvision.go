@@ -20,7 +20,7 @@ import (
 const geminiEndpointTemplate = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
 
 // defaultGeminiModel is the production default.
-const defaultGeminiModel = "gemini-3.5-flash-lite"
+const defaultGeminiModel = "gemini-3.6-flash"
 
 // confidenceThreshold — verdicts below this are degraded to SeverityUnknown.
 const confidenceThreshold = 0.5
