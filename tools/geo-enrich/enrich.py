@@ -11,8 +11,110 @@ The operation is strictly idempotent: running multiple times yields byte-identic
 import argparse
 import json
 import os
+import re
 import sys
 from typing import Any, Dict, List, Optional, Tuple
+
+
+def parse_phuong_name(full_name: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Splits administrative unit prefix from Phường/Xã/Thị trấn name.
+    Returns (phuong_type, prefix_less_name).
+    If no prefix is detected, returns (None, full_name).
+    If full_name is None, returns (None, None).
+    """
+    if not full_name:
+        return None, None
+    raw = full_name.strip()
+    if not raw:
+        return None, None
+
+    m = re.match(r'^(?:Phường|phường)\s+(.+)$', raw)
+    if m:
+        return "Phường", m.group(1).strip()
+
+    m = re.match(r'^(?:Xã|xã)\s+(.+)$', raw)
+    if m:
+        return "Xã", m.group(1).strip()
+
+    m = re.match(r'^(?:Thị\s*trấn|thị\s*trấn)\s+(.+)$', raw)
+    if m:
+        return "Thị trấn", m.group(1).strip()
+
+    return None, raw
+
+
+def extract_road_fields(display_name: Optional[str], title: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Extracts road_type and prefix-less road_name from camera displayName (format 'A - B').
+    Returns (road_type, road_name).
+    """
+    raw = (display_name or title or "").strip()
+    if not raw:
+        return None, None
+
+    parts = re.split(r'\s+[-–—−]\s+', raw)
+    first_segment = parts[0].strip() if parts else raw
+    if not first_segment:
+        return None, None
+
+    # Check known road type prefixes
+    m = re.match(r'^(?:Cầu\s+vượt)\s+(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Cầu vượt", m.group(1).strip()
+
+    m = re.match(r'^(?:Cầu)\s+(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Cầu", m.group(1).strip()
+
+    m = re.match(r'^(?:Nút\s+giao)\s+(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Nút giao", m.group(1).strip()
+
+    m = re.match(r'^(?:Vòng\s+xoay)\s+(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Vòng xoay", m.group(1).strip()
+
+    m = re.match(r'^(?:Cao\s+tốc)\s+(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Cao tốc", m.group(1).strip()
+
+    m = re.match(r'^(?:Quốc\s*lộ|QL)\s*(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Quốc lộ", m.group(1).strip()
+
+    m = re.match(r'^(?:Tỉnh\s*lộ|TL)\s*(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Tỉnh lộ", m.group(1).strip()
+
+    m = re.match(r'^(?:Hương\s*lộ|HL)\s*(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Hương lộ", m.group(1).strip()
+
+    m = re.match(r'^(?:Xa\s+lộ)\s+(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Xa lộ", m.group(1).strip()
+
+    m = re.match(r'^(?:Đại\s+lộ)\s+(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Đại lộ", m.group(1).strip()
+
+    m = re.match(r'^(?:Đường\s+hầm|Hầm)(?:\s+(.+))?$', first_segment, re.IGNORECASE)
+    if m:
+        sub = (m.group(1) or "").strip()
+        return "Hầm", sub if sub else first_segment
+
+    m = re.match(r'^(?:Đường\s+số)\s+(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Đường", f"số {m.group(1).strip()}"
+
+    m = re.match(r'^(?:Đường)\s+(.+)$', first_segment, re.IGNORECASE)
+    if m:
+        return "Đường", m.group(1).strip()
+
+    # Default to standard street
+    return "Đường", first_segment
+
 
 # Optional shapely import for high-performance vectorized operations
 try:
@@ -210,7 +312,10 @@ def enrich_cameras(
         lon = item.get("longitude")
 
         phuong_id = None
+        phuong_type = None
         phuong_name = None
+
+        road_type, road_name = extract_road_fields(item.get("displayName"), item.get("title"))
 
         valid_coords = False
         px = py = 0.0
@@ -227,7 +332,7 @@ def enrich_cameras(
             for b in boundaries:
                 if b.contains_point(px, py):
                     phuong_id = b.phuong_id
-                    phuong_name = b.phuong_name
+                    phuong_type, phuong_name = parse_phuong_name(b.phuong_name)
                     break
 
         if phuong_id is not None or phuong_name is not None:
@@ -237,7 +342,10 @@ def enrich_cameras(
 
         # Strict specification: outside or missing -> null, not fabricated values
         item["phuong_id"] = phuong_id
+        item["phuong_type"] = phuong_type
         item["phuong_name"] = phuong_name
+        item["road_type"] = road_type
+        item["road_name"] = road_name
 
         # Compute H3 cell IDs if requested
         if h3_resolutions:

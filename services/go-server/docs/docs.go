@@ -218,7 +218,7 @@ const docTemplate = `{
         },
         "/api/phuong": {
             "get": {
-                "description": "Retrieve sorted list of distinct post-reform Phường names",
+                "description": "Retrieve sorted list of distinct post-reform Phường structured pairs",
                 "produces": [
                     "application/json"
                 ],
@@ -232,7 +232,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "type": "string"
+                                "$ref": "#/definitions/camera.Phuong"
                             }
                         }
                     }
@@ -469,6 +469,24 @@ const docTemplate = `{
                 "phuong_name": {
                     "type": "string"
                 },
+                "phuong_type": {
+                    "type": "string"
+                },
+                "road_key": {
+                    "type": "string"
+                },
+                "road_keys": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "road_name": {
+                    "type": "string"
+                },
+                "road_type": {
+                    "type": "string"
+                },
                 "snapshotUrl": {
                     "type": "string"
                 },
@@ -479,6 +497,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "zone": {
+                    "type": "string"
+                }
+            }
+        },
+        "camera.Phuong": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 }
             }

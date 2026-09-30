@@ -39,6 +39,8 @@ interface PhuongGroup {
 import {
   formatPhuongName,
   formatCorridorDisplay,
+  formatRoadName,
+  I18N_NAMES,
   extractCorridor,
   removeVietnameseDiacritics,
   matchesVietnameseSearch,
@@ -51,6 +53,8 @@ import {
 export {
   formatPhuongName,
   formatCorridorDisplay,
+  formatRoadName,
+  I18N_NAMES,
   extractCorridor,
   removeVietnameseDiacritics,
   matchesVietnameseSearch,
@@ -101,22 +105,42 @@ export default function PhuongTreeFilter({
   }, [lang]);
 
   // Group cameras into: Phường → Đường → Camera
-  const treeData = useMemo(() => {
+  const { treeData, phuongTypeMap } = useMemo(() => {
     const term = searchTerm.trim();
+
+    // Map of phuong name -> phuong type
+    const pTypeMap = new Map<string, string>();
+    apiPhuongs.forEach(p => {
+      const name = p.name.trim();
+      pTypeMap.set(name, p.type);
+    });
+    cameras.forEach(c => {
+      if (c.phuong_name) {
+        const name = c.phuong_name.trim();
+        if (c.phuong_type && !pTypeMap.has(name)) {
+          pTypeMap.set(name, c.phuong_type);
+        }
+      }
+    });
 
     // Map: phuongKey -> Map: corridorName -> Camera[]
     const phuongMap = new Map<string, Map<string, Camera[]>>();
 
     cameras.forEach(cam => {
       const phuongKey = cam.phuong_name ? cam.phuong_name.trim() : OTHER_WARDS_KEY;
-      const corridor = extractCorridor(cam.displayName, cam.title);
+      const corridor = cam.road_name ? cam.road_name.trim() : extractCorridor(cam.displayName, cam.title);
+      const roadType = cam.road_type || null;
 
       // Search filtering with Vietnamese diacritics and bilingual tolerance
       if (term) {
-        const enPhuong = cam.phuong_name ? formatPhuongName(cam.phuong_name, 'en') : '';
-        const enCorr = formatCorridorDisplay(corridor, 'en');
+        const phuongType = cam.phuong_type || pTypeMap.get(phuongKey);
+        const enPhuong = cam.phuong_name ? formatPhuongName(cam.phuong_name, 'en', phuongType) : '';
+        const viPhuong = cam.phuong_name ? formatPhuongName(cam.phuong_name, 'vi', phuongType) : '';
+        const enCorr = formatCorridorDisplay(corridor, 'en', roadType);
         const enCorrStr = enCorr.prefix ? `${enCorr.prefix} ${enCorr.name}` : enCorr.name;
-        const fullSearchable = `${cam.displayName || ''} ${cam.title || ''} ${corridor} ${enCorrStr} ${cam.phuong_name || t.otherWards} ${enPhuong}`;
+        const viCorr = formatCorridorDisplay(corridor, 'vi', roadType);
+        const viCorrStr = viCorr.prefix ? `${viCorr.prefix} ${viCorr.name}` : viCorr.name;
+        const fullSearchable = `${cam.displayName || ''} ${cam.title || ''} ${corridor} ${viCorrStr} ${enCorrStr} ${cam.phuong_name || t.otherWards} ${viPhuong} ${enPhuong}`;
         if (!matchesVietnameseSearch(fullSearchable, term)) {
           return;
         }
@@ -134,7 +158,7 @@ export default function PhuongTreeFilter({
 
     // Build ordered list of Phườngs starting with official apiPhuongs
     const allPhuongKeys = new Set<string>();
-    apiPhuongs.forEach(p => allPhuongKeys.add(p.trim()));
+    apiPhuongs.forEach(p => allPhuongKeys.add(p.name.trim()));
     cameras.forEach(c => {
       if (c.phuong_name) allPhuongKeys.add(c.phuong_name.trim());
     });
@@ -143,8 +167,10 @@ export default function PhuongTreeFilter({
 
     // 1. Known Phườngs sorted alphabetically by display name in current locale
     const sortedPhuongs = Array.from(allPhuongKeys).sort((a, b) => {
-      const nameA = formatPhuongName(a, lang);
-      const nameB = formatPhuongName(b, lang);
+      const typeA = pTypeMap.get(a) || 'Phường';
+      const typeB = pTypeMap.get(b) || 'Phường';
+      const nameA = formatPhuongName(a, lang, typeA);
+      const nameB = formatPhuongName(b, lang, typeB);
       return nameA.localeCompare(nameB, lang, { numeric: true });
     });
 
@@ -168,9 +194,10 @@ export default function PhuongTreeFilter({
         });
       }
 
+      const pType = pTypeMap.get(phuongKey) || 'Phường';
       groups.push({
         key: phuongKey,
-        displayName: formatPhuongName(phuongKey, lang),
+        displayName: formatPhuongName(phuongKey, lang, pType),
         corridors,
         totalCameras,
       });
@@ -197,7 +224,7 @@ export default function PhuongTreeFilter({
       });
     }
 
-    return groups;
+    return { treeData: groups, phuongTypeMap: pTypeMap };
   }, [cameras, apiPhuongs, searchTerm, t.otherWards, lang]);
 
   // When searching, auto-expand matching phuongs and corridors for easy exploration
@@ -278,19 +305,23 @@ export default function PhuongTreeFilter({
 
   const activeFilterLabel = useMemo(() => {
     if (!selectedPhuong) return null;
+    const pType = phuongTypeMap.get(selectedPhuong) || 'Phường';
     const phuongName =
       selectedPhuong === OTHER_WARDS_KEY || selectedPhuong === OUTSIDE_HCMC_KEY
         ? t.otherWards
-        : formatPhuongName(selectedPhuong, lang);
+        : formatPhuongName(selectedPhuong, lang, pType);
     if (selectedCorridor) {
       const corrDisplay = formatCorridorDisplay(selectedCorridor, lang);
-      const corrText = corrDisplay.prefix
-        ? `${corrDisplay.prefix} ${corrDisplay.name}`
-        : corrDisplay.name;
+      const corrText =
+        lang === 'en' && corrDisplay.prefix === I18N_NAMES.en.road_type_duong
+          ? `${corrDisplay.name} ${corrDisplay.prefix}`
+          : corrDisplay.prefix
+          ? `${corrDisplay.prefix} ${corrDisplay.name}`
+          : corrDisplay.name;
       return `${phuongName} → ${corrText}`;
     }
     return phuongName;
-  }, [selectedPhuong, selectedCorridor, lang, t]);
+  }, [selectedPhuong, selectedCorridor, lang, t, phuongTypeMap]);
 
   return (
     <div className={`flex flex-col h-full bg-zinc-950 font-mono select-none ${className}`}>
@@ -477,10 +508,19 @@ export default function PhuongTreeFilter({
                                       {isCorrExpanded ? '▾' : '▸'}
                                     </button>
                                     <span className="truncate">
-                                      {corrDisplay.prefix && (
-                                        <span className="text-zinc-500 mr-1">{corrDisplay.prefix}</span>
+                                      {lang === 'en' && corrDisplay.prefix === I18N_NAMES.en.road_type_duong ? (
+                                        <>
+                                          <span>{corrDisplay.name}</span>
+                                          <span className="text-zinc-500 ml-1">{corrDisplay.prefix}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          {corrDisplay.prefix && (
+                                            <span className="text-zinc-500 mr-1">{corrDisplay.prefix}</span>
+                                          )}
+                                          <span>{corrDisplay.name}</span>
+                                        </>
                                       )}
-                                      <span>{corrDisplay.name}</span>
                                     </span>
                                   </div>
                                   <span className="text-[10px] text-zinc-500 shrink-0 ml-2">

@@ -110,15 +110,15 @@ func (h *Handler) GetZones(c *gin.Context) {
 
 // GetPhuongs godoc
 // @Summary List camera wards (Phường)
-// @Description Retrieve sorted list of distinct post-reform Phường names
+// @Description Retrieve sorted list of distinct post-reform Phường structured pairs
 // @Tags Camera
 // @Produce json
-// @Success 200 {array} string
+// @Success 200 {array} Phuong
 // @Router /api/phuong [get]
 func (h *Handler) GetPhuongs(c *gin.Context) {
 	phuongs := h.reader.Phuongs()
 	if phuongs == nil {
-		phuongs = []string{}
+		phuongs = []Phuong{}
 	}
 	c.JSON(http.StatusOK, phuongs)
 }

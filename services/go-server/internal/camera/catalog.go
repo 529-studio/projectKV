@@ -10,34 +10,45 @@ import (
 	"strings"
 )
 
+// Phuong represents a structured administrative ward/commune/town.
+type Phuong struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
+}
+
 // Reader defines query capabilities on the camera catalog.
 // (Interface Segregation Principle: callers only depend on what they read)
 type Reader interface {
 	All() []Camera
 	ByID(id string) (*Camera, bool)
 	Zones() []string
-	Phuongs() []string
+	Phuongs() []Phuong
 	Filter(zone, corridor string) []Camera
 	FilterByPhuong(phuongName string) []Camera
 }
 
 // Camera represents a single traffic camera entity.
 type Camera struct {
-	ID          string  `json:"id"`
-	Title       string  `json:"title"`
-	DisplayName string  `json:"displayName"`
-	Status      string  `json:"status"`
-	IsOnline    bool    `json:"isOnline"`
-	Latitude    float64 `json:"latitude"`
-	Longitude   float64 `json:"longitude"`
-	SnapshotURL string  `json:"snapshotUrl"`
-	Zone        string  `json:"zone,omitempty"`
-	DuplicateOf string  `json:"duplicateOf,omitempty"`
-	IsGhost     bool    `json:"isGhost,omitempty"`
-	PhuongID    *string `json:"phuong_id,omitempty"`
-	PhuongName  *string `json:"phuong_name,omitempty"`
-	H3Res7      string  `json:"h3_res7,omitempty"`
-	H3Res9      string  `json:"h3_res9,omitempty"`
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	DisplayName string   `json:"displayName"`
+	Status      string   `json:"status"`
+	IsOnline    bool     `json:"isOnline"`
+	Latitude    float64  `json:"latitude"`
+	Longitude   float64  `json:"longitude"`
+	SnapshotURL string   `json:"snapshotUrl"`
+	Zone        string   `json:"zone,omitempty"`
+	DuplicateOf string   `json:"duplicateOf,omitempty"`
+	IsGhost     bool     `json:"isGhost,omitempty"`
+	PhuongID    *string  `json:"phuong_id,omitempty"`
+	PhuongType  string   `json:"phuong_type,omitempty"`
+	PhuongName  string   `json:"phuong_name,omitempty"`
+	RoadType    string   `json:"road_type,omitempty"`
+	RoadName    string   `json:"road_name,omitempty"`
+	H3Res7      string   `json:"h3_res7,omitempty"`
+	H3Res9      string   `json:"h3_res9,omitempty"`
+	RoadKey     string   `json:"road_key,omitempty"`
+	RoadKeys    []string `json:"road_keys,omitempty"`
 }
 
 // KnownDuplicateStreams maps secondary camera IDs to their primary canonical camera ID.
@@ -75,7 +86,7 @@ type Catalog struct {
 	list    []Camera
 	dict    map[string]*Camera
 	zones   []string
-	phuongs []string
+	phuongs []Phuong
 }
 
 // Ensure Catalog implements Reader.
@@ -101,7 +112,7 @@ func NewCatalogWithClassifier(cameras []Camera, classifier ZoneClassifier) *Cata
 	copy(c.list, cameras)
 
 	zoneSet := make(map[string]struct{})
-	phuongSet := make(map[string]struct{})
+	phuongMap := make(map[string]string)
 	for i := range c.list {
 		cam := &c.list[i]
 		if cam.Zone == "" {
@@ -119,8 +130,12 @@ func NewCatalogWithClassifier(cameras []Camera, classifier ZoneClassifier) *Cata
 		if cam.Zone != "" {
 			zoneSet[cam.Zone] = struct{}{}
 		}
-		if cam.PhuongName != nil && *cam.PhuongName != "" {
-			phuongSet[*cam.PhuongName] = struct{}{}
+		if cam.PhuongName != "" {
+			pType := cam.PhuongType
+			if pType == "" {
+				pType = "Phường"
+			}
+			phuongMap[cam.PhuongName] = pType
 		}
 	}
 
@@ -130,11 +145,13 @@ func NewCatalogWithClassifier(cameras []Camera, classifier ZoneClassifier) *Cata
 	}
 	sort.Strings(c.zones)
 
-	c.phuongs = make([]string, 0, len(phuongSet))
-	for p := range phuongSet {
-		c.phuongs = append(c.phuongs, p)
+	c.phuongs = make([]Phuong, 0, len(phuongMap))
+	for name, pType := range phuongMap {
+		c.phuongs = append(c.phuongs, Phuong{Type: pType, Name: name})
 	}
-	sort.Strings(c.phuongs)
+	sort.Slice(c.phuongs, func(i, j int) bool {
+		return c.phuongs[i].Name < c.phuongs[j].Name
+	})
 
 	return c
 }
@@ -229,14 +246,15 @@ func (c *Catalog) Filter(zone, corridor string) []Camera {
 	return res
 }
 
-// Phuongs returns a sorted slice of unique Phường names (excluding nil and empty).
-func (c *Catalog) Phuongs() []string {
-	res := make([]string, len(c.phuongs))
+// Phuongs returns a sorted slice of distinct Phường structured objects.
+func (c *Catalog) Phuongs() []Phuong {
+	res := make([]Phuong, len(c.phuongs))
 	copy(res, c.phuongs)
 	return res
 }
 
 // FilterByPhuong returns cameras belonging to the specified Phường name (case-insensitive).
+// Handles both prefix-less name (e.g. "Bến Nghé") and prefixed name (e.g. "Phường Bến Nghé").
 func (c *Catalog) FilterByPhuong(phuongName string) []Camera {
 	res := make([]Camera, 0, len(c.list))
 	phuongName = strings.TrimSpace(phuongName)
@@ -244,9 +262,20 @@ func (c *Catalog) FilterByPhuong(phuongName string) []Camera {
 		return res
 	}
 
+	target := phuongName
+	lowerTarget := strings.ToLower(target)
+	for _, prefix := range []string{"phường ", "xã ", "thị trấn "} {
+		if strings.HasPrefix(lowerTarget, prefix) {
+			target = strings.TrimSpace(target[len(prefix):])
+			break
+		}
+	}
+
 	for _, cam := range c.list {
-		if cam.PhuongName != nil && strings.EqualFold(*cam.PhuongName, phuongName) {
-			res = append(res, cam)
+		if cam.PhuongName != "" {
+			if strings.EqualFold(cam.PhuongName, phuongName) || strings.EqualFold(cam.PhuongName, target) {
+				res = append(res, cam)
+			}
 		}
 	}
 	return res

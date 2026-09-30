@@ -13,7 +13,7 @@ type dummyCameraReader struct {
 func (d *dummyCameraReader) All() []camera.Camera                         { return d.cameras }
 func (d *dummyCameraReader) ByID(id string) (*camera.Camera, bool)        { return nil, false }
 func (d *dummyCameraReader) Zones() []string                              { return nil }
-func (d *dummyCameraReader) Phuongs() []string                            { return nil }
+func (d *dummyCameraReader) Phuongs() []camera.Phuong                     { return nil }
 func (d *dummyCameraReader) Filter(zone, corridor string) []camera.Camera { return nil }
 func (d *dummyCameraReader) FilterByPhuong(phuongName string) []camera.Camera {
 	return nil
