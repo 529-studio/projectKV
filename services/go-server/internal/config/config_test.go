@@ -119,3 +119,16 @@ func TestLoadConfig_CloudVisionAPIKey(t *testing.T) {
 		t.Errorf("expected Analyzer='vlm', got %q", cfg.Analyzer)
 	}
 }
+
+func TestLoadConfig_GeminiAPIKey_Fallback(t *testing.T) {
+	_ = os.Unsetenv("CLOUD_VISION_API_KEY")
+	_ = os.Setenv("GEMINI_API_KEY", "fallback-gemini-key-456")
+	defer func() {
+		_ = os.Unsetenv("GEMINI_API_KEY")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.CloudVisionAPIKey != "fallback-gemini-key-456" {
+		t.Errorf("expected fallback to GEMINI_API_KEY, got %q", cfg.CloudVisionAPIKey)
+	}
+}
