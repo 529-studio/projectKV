@@ -311,6 +311,11 @@ func main() {
 			nil, // uses slog.Default()
 		)
 
+		// Global daily analyzer budget (ADR-004 §D9). When exhausted the
+		// scheduler degrades to UNKNOWN verdicts instead of invoking the analyzer.
+		analysisBudget := hotset.NewAnalysisBudget(cfg.AnalyzerDailyBudget)
+		hotsetScheduler.SetBudget(analysisBudget)
+
 		// Start the Hot Set scheduler in background; cancelled on graceful shutdown.
 		schedulerCtx, cancelScheduler := context.WithCancel(context.Background())
 		defer cancelScheduler()
@@ -322,6 +327,7 @@ func main() {
 	// 8. Setup Gin Engine
 	router := gin.Default()
 	router.Use(middleware.CORSMiddleware())
+	router.Use(middleware.RateLimitMiddleware(cfg.RateLimitRPS, cfg.RateLimitBurst))
 
 	// Health check
 	router.GET("/health", cameraHandler.HealthCheck)
