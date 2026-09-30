@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
-import { API_ENDPOINTS, FUNCTIONAL_COLORS, getApiUrl } from '../config/constants';
+import { API_ENDPOINTS, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
 
 interface CameraModalProps {
   camera: Camera | null;
@@ -10,9 +10,10 @@ interface CameraModalProps {
   isPinned: boolean;
   onTogglePin: () => void;
   lang?: 'vi' | 'en';
+  appEnv?: string;
 }
 
-export default function CameraModal({ camera, verdict, onClose, isPinned, onTogglePin, lang = 'vi' }: CameraModalProps) {
+export default function CameraModal({ camera, verdict, onClose, isPinned, onTogglePin, lang = 'vi', appEnv = 'production' }: CameraModalProps) {
   const [imgError, setImgError] = useState(false);
   const [fetchTimestamp, setFetchTimestamp] = useState<number>(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -99,6 +100,15 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
                   <span className="text-zinc-600">•</span>
                 </>
               ) : null}
+              {verdict?.observed_at ? (
+                <>
+                  <span className="text-zinc-400">
+                    {lang === 'vi' ? 'QUAN SÁT:' : 'OBSERVED:'}{' '}
+                    {new Date(verdict.observed_at).toLocaleTimeString(lang === 'vi' ? 'vi-VN' : 'en-US')}
+                  </span>
+                  <span className="text-zinc-600">•</span>
+                </>
+              ) : null}
               <span>
                 {lang === 'vi' ? 'TẢI VỀ:' : 'FETCHED:'}{' '}
                 {new Date(fetchTimestamp).toLocaleTimeString(lang === 'vi' ? 'vi-VN' : 'en-US')}
@@ -152,9 +162,27 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
               )}
 
               {isActuallyAvailable && hasRealVerdict && (
-                <span className="px-2 py-0.5 rounded border" style={{ borderColor: severityColor, color: severityColor, backgroundColor: `${severityColor}20` }}>
-                  {severityLabel}
-                </span>
+                <>
+                  <span className="px-2 py-0.5 rounded border" style={{ borderColor: severityColor, color: severityColor, backgroundColor: `${severityColor}20` }}>
+                    {severityLabel}
+                  </span>
+                  {verdict?.stale && (
+                    <span
+                      className="px-2 py-0.5 rounded border border-zinc-600 bg-zinc-900 text-zinc-400 text-xs font-bold"
+                      title={lang === 'vi' ? 'Dữ liệu phân tích đã cũ (>3 phút hoặc mất cập nhật)' : 'Analysis verdict is stale (>3 min or frame frozen)'}
+                    >
+                      [{lang === 'vi' ? VERDICT_I18N.STALE_BADGE.vi : VERDICT_I18N.STALE_BADGE.en}]
+                    </span>
+                  )}
+                  {verdict?.source === 'mock' && appEnv === 'dev' && (
+                    <span
+                      className="px-2 py-0.5 rounded border border-yellow-500/80 bg-yellow-500/10 text-yellow-400 text-xs font-bold tracking-wider"
+                      title={lang === 'vi' ? 'Dữ liệu giả lập chạy trong môi trường dev' : 'Simulated verdict in dev mode'}
+                    >
+                      [{lang === 'vi' ? VERDICT_I18N.DEMO_BADGE.vi : VERDICT_I18N.DEMO_BADGE.en}]
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>

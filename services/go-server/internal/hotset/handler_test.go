@@ -196,3 +196,120 @@ func TestGetFloodStatus_ReturnsEmptyArray(t *testing.T) {
 		t.Errorf("expected empty JSON array [], got %q", body)
 	}
 }
+
+func TestGetTrafficStatus_MarksStaleWhenOlderThanTTL(t *testing.T) {
+	now := time.Now().UTC()
+	store := &mockStorer{
+		verdicts: []hotset.Verdict{
+			{
+				CameraID:   "fresh_cam",
+				Severity:   "CLEAR",
+				Confidence: 0.9,
+				Source:     "vlm",
+				ObservedAt: now.Add(-30 * time.Second),
+				Timestamp:  now.Add(-30 * time.Second),
+				Stale:      false,
+			},
+			{
+				CameraID:   "old_cam",
+				Severity:   "HEAVY",
+				Confidence: 0.85,
+				Source:     "vlm",
+				ObservedAt: now.Add(-200 * time.Second),
+				Timestamp:  now.Add(-200 * time.Second),
+				Stale:      false,
+			},
+		},
+	}
+	h := hotset.NewHandlerWithConfig(store, true, "production")
+	r := newTestRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/traffic-status", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp hotset.TrafficStatusResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if len(resp.Verdicts) != 2 {
+		t.Fatalf("expected 2 verdicts, got %d", len(resp.Verdicts))
+	}
+
+	verdictMap := make(map[string]hotset.Verdict)
+	for _, v := range resp.Verdicts {
+		verdictMap[v.CameraID] = v
+	}
+
+	if verdictMap["fresh_cam"].Stale {
+		t.Errorf("expected fresh_cam to have stale=false, got true")
+	}
+	if !verdictMap["old_cam"].Stale {
+		t.Errorf("expected old_cam to have stale=true, got false")
+	}
+	if resp.AppEnv != "production" {
+		t.Errorf("expected app_env production, got %s", resp.AppEnv)
+	}
+}
+
+func TestGetTrafficStatus_CustomStaleTTLAndFrozenPreserved(t *testing.T) {
+	now := time.Now().UTC()
+	store := &mockStorer{
+		verdicts: []hotset.Verdict{
+			{
+				CameraID:   "frozen_fresh",
+				Severity:   "CLEAR",
+				Confidence: 0.9,
+				Source:     "vlm",
+				ObservedAt: now.Add(-10 * time.Second),
+				Timestamp:  now.Add(-10 * time.Second),
+				Stale:      true, // Already marked stale by frozen-frame detector
+			},
+			{
+				CameraID:   "medium_age",
+				Severity:   "MODERATE",
+				Confidence: 0.8,
+				Source:     "vlm",
+				ObservedAt: now.Add(-70 * time.Second),
+				Timestamp:  now.Add(-70 * time.Second),
+				Stale:      false,
+			},
+		},
+	}
+	h := hotset.NewHandlerWithConfig(store, true, "dev")
+	h.SetStaleTTL(60 * time.Second) // 1 minute TTL
+	r := newTestRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/traffic-status", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp hotset.TrafficStatusResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	verdictMap := make(map[string]hotset.Verdict)
+	for _, v := range resp.Verdicts {
+		verdictMap[v.CameraID] = v
+	}
+
+	if !verdictMap["frozen_fresh"].Stale {
+		t.Errorf("expected frozen_fresh to preserve stale=true")
+	}
+	if !verdictMap["medium_age"].Stale {
+		t.Errorf("expected medium_age (70s > 60s TTL) to be marked stale=true")
+	}
+	if resp.AppEnv != "dev" {
+		t.Errorf("expected app_env dev, got %s", resp.AppEnv)
+	}
+}

@@ -21,6 +21,7 @@ interface MapComponentProps {
   onFilterClear?: () => void;
   activeFilterLabel?: string | null;
   lang?: 'vi' | 'en';
+  appEnv?: string;
 }
 
 export default function MapComponent({
@@ -33,6 +34,7 @@ export default function MapComponent({
   onFilterClear,
   activeFilterLabel,
   lang = 'vi',
+  appEnv = 'production',
 }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -41,14 +43,16 @@ export default function MapComponent({
 
   const getTrafficColor = useCallback((camId: string, isOnline: boolean) => {
     const verdict = verdicts.get(camId);
-    if (isVerdictValid(verdict) && verdict.source !== 'mock') {
-      const sev = verdict.severity.toUpperCase();
-      if (sev === TRAFFIC_SEVERITY.CLEAR) return FUNCTIONAL_COLORS.CLEAR;
-      if (sev === TRAFFIC_SEVERITY.MODERATE) return FUNCTIONAL_COLORS.MODERATE;
-      if (sev === TRAFFIC_SEVERITY.HEAVY || sev === TRAFFIC_SEVERITY.CONGESTED) return FUNCTIONAL_COLORS.CONGESTED;
+    if (isVerdictValid(verdict) && !verdict.stale) {
+      if (verdict.source !== 'mock' || appEnv === 'dev') {
+        const sev = verdict.severity.toUpperCase();
+        if (sev === TRAFFIC_SEVERITY.CLEAR) return FUNCTIONAL_COLORS.CLEAR;
+        if (sev === TRAFFIC_SEVERITY.MODERATE) return FUNCTIONAL_COLORS.MODERATE;
+        if (sev === TRAFFIC_SEVERITY.HEAVY || sev === TRAFFIC_SEVERITY.CONGESTED) return FUNCTIONAL_COLORS.CONGESTED;
+      }
     }
     return isOnline ? FUNCTIONAL_COLORS.ONLINE_DEFAULT : FUNCTIONAL_COLORS.OFFLINE_DEFAULT;
-  }, [verdicts]);
+  }, [verdicts, appEnv]);
 
   const getRadius = (z: number, isFew: boolean = false) => {
     let r = 4;
@@ -197,8 +201,12 @@ export default function MapComponent({
 
       const verdict = verdicts.get(cam.id);
       let trafficInfo = '';
-      if (isVerdictValid(verdict) && verdict.source !== 'mock') {
-        trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">Traffic: ${verdict.severity}</span>`;
+      if (isVerdictValid(verdict)) {
+        if (verdict.stale) {
+          trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">Traffic: ${lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data'}</span>`;
+        } else if (verdict.source !== 'mock' || appEnv === 'dev') {
+          trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">Traffic: ${verdict.severity}</span>`;
+        }
       }
       if (cam.isGhost) {
         trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">[MẤT TÍN HIỆU THỰC ĐỊA]</span>`;
@@ -249,7 +257,7 @@ export default function MapComponent({
 
       markersLayerRef.current?.addLayer(marker);
     });
-  }, [cameras, verdicts, getTrafficColor, onCameraClick, isFiltered, filteredCameraIds, onFilterClear]);
+  }, [cameras, verdicts, getTrafficColor, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang]);
 
   return (
     <div className="relative w-full h-full overflow-hidden">
