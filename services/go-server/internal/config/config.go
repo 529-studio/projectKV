@@ -219,6 +219,8 @@ type ServerConfig struct {
 	ArchiveRetentionCheckInterval time.Duration // default: 1h
 	VerdictStaleTTLSeconds        int           // default: 180
 	FrozenFrameThreshold          int           // default: 3
+	HotsetIntervalSeconds         int           // default: 30 or 60
+	HotsetMaxParallel             int           // default: 10 or 2
 }
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -367,6 +369,26 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
+	hotsetIntervalSeconds := 30
+	if analyzer == "vlm" {
+		hotsetIntervalSeconds = 60 // safe default for free tier
+	}
+	if val := os.Getenv("HOTSET_INTERVAL_SECONDS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			hotsetIntervalSeconds = v
+		}
+	}
+
+	hotsetMaxParallel := 10
+	if analyzer == "vlm" {
+		hotsetMaxParallel = 2 // safe default for free tier
+	}
+	if val := os.Getenv("HOTSET_MAX_PARALLEL"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			hotsetMaxParallel = v
+		}
+	}
+
 	return &ServerConfig{
 		Port:                          port,
 		CamerasFilePath:               camerasPath,
@@ -390,5 +412,7 @@ func LoadConfig() *ServerConfig {
 		ArchiveRetentionCheckInterval: retentionCheckInterval,
 		VerdictStaleTTLSeconds:        verdictStaleTTLSeconds,
 		FrozenFrameThreshold:          frozenFrameThreshold,
+		HotsetIntervalSeconds:         hotsetIntervalSeconds,
+		HotsetMaxParallel:             hotsetMaxParallel,
 	}
 }

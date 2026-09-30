@@ -331,8 +331,8 @@ func main() {
 		hotsetScheduler := hotset.NewScheduler(
 			hotsetRegistry,
 			analyzer,
-			30*time.Second,
-			10,
+			time.Duration(cfg.HotsetIntervalSeconds)*time.Second,
+			cfg.HotsetMaxParallel,
 			onVerdict,
 			nil, // uses slog.Default()
 		)
