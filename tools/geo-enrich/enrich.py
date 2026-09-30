@@ -22,6 +22,35 @@ try:
 except ImportError:
     HAS_SHAPELY = False
 
+# Optional h3 import for hexagonal spatial indexing (offline enrichment)
+try:
+    import h3
+    HAS_H3 = True
+except ImportError:
+    HAS_H3 = False
+
+
+def parse_h3_resolutions(res_str: Optional[str]) -> List[int]:
+    """
+    Parse comma-separated H3 resolution integers (e.g. '7,9').
+    Returns an empty list if res_str is empty or represents disabling ('none', 'false', 'off').
+    """
+    if not res_str or res_str.strip().lower() in ("none", "false", "off", "0", ""):
+        return []
+    resolutions: List[int] = []
+    for item in res_str.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            val = int(item)
+            if not (0 <= val <= 15):
+                raise ValueError(f"Resolution must be between 0 and 15, got {val}")
+            resolutions.append(val)
+        except ValueError as err:
+            raise ValueError(f"Invalid H3 resolution value '{item}': {err}")
+    return sorted(list(set(resolutions)))
+
 
 def point_in_ring(px: float, py: float, ring: List[List[float]]) -> bool:
     """Ray casting algorithm to determine if point (px, py) is inside a polygon ring."""
@@ -157,12 +186,19 @@ def load_boundaries(path: str, id_prop: Optional[str] = None, name_prop: Optiona
 
 def enrich_cameras(
     cameras: List[Dict[str, Any]],
-    boundaries: Optional[List[BoundaryFeature]] = None
+    boundaries: Optional[List[BoundaryFeature]] = None,
+    h3_resolutions: Optional[List[int]] = None,
 ) -> Tuple[List[Dict[str, Any]], int, int]:
     """
-    Enrich camera records with phuong_id and phuong_name.
+    Enrich camera records with phuong_id, phuong_name, and H3 cell IDs.
     Returns (enriched_cameras, matched_count, unmatched_count).
     """
+    if h3_resolutions and not HAS_H3:
+        raise ImportError(
+            "The 'h3' package is required to compute H3 cell IDs. "
+            "Install it via 'pip install -r tools/geo-enrich/requirements.txt' or 'pip install h3>=4.0.0'."
+        )
+
     enriched: List[Dict[str, Any]] = []
     matched = 0
     unmatched = 0
@@ -176,17 +212,23 @@ def enrich_cameras(
         phuong_id = None
         phuong_name = None
 
-        if boundaries and lat is not None and lon is not None:
+        valid_coords = False
+        px = py = 0.0
+
+        if lat is not None and lon is not None:
             try:
                 px = float(lon)
                 py = float(lat)
-                for b in boundaries:
-                    if b.contains_point(px, py):
-                        phuong_id = b.phuong_id
-                        phuong_name = b.phuong_name
-                        break
+                valid_coords = True
             except (ValueError, TypeError):
-                pass
+                valid_coords = False
+
+        if boundaries and valid_coords:
+            for b in boundaries:
+                if b.contains_point(px, py):
+                    phuong_id = b.phuong_id
+                    phuong_name = b.phuong_name
+                    break
 
         if phuong_id is not None or phuong_name is not None:
             matched += 1
@@ -196,6 +238,17 @@ def enrich_cameras(
         # Strict specification: outside or missing -> null, not fabricated values
         item["phuong_id"] = phuong_id
         item["phuong_name"] = phuong_name
+
+        # Compute H3 cell IDs if requested
+        if h3_resolutions:
+            for res in h3_resolutions:
+                field_name = f"h3_res{res}"
+                if valid_coords:
+                    # h3.latlng_to_cell expects (lat, lng, resolution)
+                    item[field_name] = h3.latlng_to_cell(py, px, res)
+                else:
+                    item[field_name] = None
+
         enriched.append(item)
 
     return enriched, matched, unmatched
@@ -270,8 +323,19 @@ def main() -> int:
         default="tools/geo-enrich/unmatched_cameras.csv",
         help="Path for unmatched cameras CSV report (default: tools/geo-enrich/unmatched_cameras.csv)"
     )
+    parser.add_argument(
+        "--h3-resolutions",
+        default="7,9",
+        help="Comma-separated H3 resolutions to compute (default: '7,9'; pass 'none' or '' to disable)"
+    )
 
     args = parser.parse_args()
+
+    try:
+        h3_res = parse_h3_resolutions(args.h3_resolutions)
+    except ValueError as err:
+        print(f"Error: {err}", file=sys.stderr)
+        return 1
 
     if not os.path.exists(args.cameras):
         print(f"Error: Cameras file not found: {args.cameras}", file=sys.stderr)
@@ -293,7 +357,7 @@ def main() -> int:
         print(f"Notice: Boundary file not found at '{args.boundaries}'.", file=sys.stderr)
         print("All cameras will be enriched with null phuong_id/phuong_name per specification.", file=sys.stderr)
 
-    enriched, matched, unmatched = enrich_cameras(cameras, boundaries)
+    enriched, matched, unmatched = enrich_cameras(cameras, boundaries, h3_resolutions=h3_res)
 
     output_path = args.cameras if args.in_place else args.output
     output_dir = os.path.dirname(output_path)
@@ -313,6 +377,8 @@ def main() -> int:
     print(f" - Total cameras:   {len(cameras)}")
     print(f" - Matched Phường:  {matched}")
     print(f" - Unmatched/Null:  {unmatched}")
+    if h3_res:
+        print(f" - H3 resolutions:  {h3_res}")
     print(f" - Output saved to: {output_path}")
     if args.unmatched_report:
         print(f" - Unmatched report: {args.unmatched_report}")
