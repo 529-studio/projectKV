@@ -207,6 +207,7 @@ type ServerConfig struct {
 	CacheMaxAge                   time.Duration
 	Analyzer                      string // "none" | "mock" | "vlm" (default: "none")
 	CloudVisionAPIKey             string
+	GeminiModel                   string        // default: "gemini-3.5-flash-lite"
 	AppEnv                        string        // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
 	StorageDriver                 string        // default: "local"
 	StorageLocalRoot              string        // default: "./data/proofs"
@@ -284,6 +285,11 @@ func LoadConfig() *ServerConfig {
 	cloudVisionAPIKey := strings.TrimSpace(os.Getenv("CLOUD_VISION_API_KEY"))
 	if cloudVisionAPIKey == "" {
 		cloudVisionAPIKey = strings.TrimSpace(os.Getenv("GEMINI_API_KEY"))
+	}
+
+	geminiModel := strings.TrimSpace(os.Getenv("GEMINI_MODEL"))
+	if geminiModel == "" {
+		geminiModel = "gemini-3.5-flash-lite"
 	}
 
 	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
@@ -378,6 +384,7 @@ func LoadConfig() *ServerConfig {
 		CacheMaxAge:                   15 * time.Second,
 		Analyzer:                      analyzer,
 		CloudVisionAPIKey:             cloudVisionAPIKey,
+		GeminiModel:                   geminiModel,
 		AppEnv:                        appEnv,
 		StorageDriver:                 storageDriver,
 		StorageLocalRoot:              storageLocalRoot,
