@@ -220,6 +220,9 @@ type ServerConfig struct {
 	ArchiveRetentionCheckInterval time.Duration // default: 1h
 	VerdictStaleTTLSeconds        int           // default: 180
 	FrozenFrameThreshold          int           // default: 3
+	HotsetIntervalSeconds         int           // default: 30 (mock) or 60 (vlm)
+	HotsetMaxParallel             int           // default: 10 (mock) or 1 (vlm)
+	HotsetFixedMaxCameras         int           // default: 40 (mock) or 2 (vlm)
 }
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -373,6 +376,38 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
+	hotsetIntervalSeconds := 30
+	if analyzer == "vlm" {
+		hotsetIntervalSeconds = 60 // safe default for free tier
+	}
+	if val := os.Getenv("HOTSET_INTERVAL_SECONDS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			hotsetIntervalSeconds = v
+		}
+	}
+
+	hotsetMaxParallel := 10
+	if analyzer == "vlm" {
+		hotsetMaxParallel = 1 // 1 worker avoids concurrent burst calls against 15 RPM limit
+	}
+	if val := os.Getenv("HOTSET_MAX_PARALLEL"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			hotsetMaxParallel = v
+		}
+	}
+
+	hotsetFixedMaxCameras := 40
+	if analyzer == "vlm" {
+		hotsetFixedMaxCameras = 2 // 2 choke points prevents burning through 500 RPD daily quota
+	} else if analyzer == "none" || analyzer == "" {
+		hotsetFixedMaxCameras = 0
+	}
+	if val := os.Getenv("HOTSET_FIXED_MAX_CAMERAS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+			hotsetFixedMaxCameras = v
+		}
+	}
+
 	return &ServerConfig{
 		Port:                          port,
 		CamerasFilePath:               camerasPath,
@@ -397,5 +432,8 @@ func LoadConfig() *ServerConfig {
 		ArchiveRetentionCheckInterval: retentionCheckInterval,
 		VerdictStaleTTLSeconds:        verdictStaleTTLSeconds,
 		FrozenFrameThreshold:          frozenFrameThreshold,
+		HotsetIntervalSeconds:         hotsetIntervalSeconds,
+		HotsetMaxParallel:             hotsetMaxParallel,
+		HotsetFixedMaxCameras:         hotsetFixedMaxCameras,
 	}
 }
