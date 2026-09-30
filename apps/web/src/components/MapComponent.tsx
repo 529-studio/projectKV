@@ -3,8 +3,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Camera } from '../hooks/useCameras';
-import { TrafficVerdict, isVerdictValid } from '../hooks/useTraffic';
-import { MAP_CONFIG, FUNCTIONAL_COLORS, TRAFFIC_SEVERITY } from '../config/constants';
+import { TrafficVerdict, isVerdictValid, getSeverityLabel } from '../hooks/useTraffic';
+import { MAP_CONFIG, FUNCTIONAL_COLORS, TRAFFIC_SEVERITY, VERDICT_I18N } from '../config/constants';
 
 interface CustomCircleMarker extends L.CircleMarker {
   isDimmed?: boolean;
@@ -202,10 +202,13 @@ export default function MapComponent({
       const verdict = verdicts.get(cam.id);
       let trafficInfo = '';
       if (isVerdictValid(verdict)) {
+        const prefix = lang === 'vi' ? VERDICT_I18N.TRAFFIC_PREFIX.vi : VERDICT_I18N.TRAFFIC_PREFIX.en;
         if (verdict.stale) {
-          trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">Traffic: ${lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data'}</span>`;
+          const staleText = lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data';
+          trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${staleText}</span>`;
         } else if (verdict.source !== 'mock' || appEnv === 'dev') {
-          trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">Traffic: ${verdict.severity}</span>`;
+          const sevLabel = getSeverityLabel(verdict.severity, lang);
+          trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">${prefix}: ${sevLabel}</span>`;
         }
       }
       if (cam.isGhost) {

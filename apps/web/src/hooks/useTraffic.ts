@@ -6,11 +6,12 @@ import {
   isVerdictStale,
   isMockHidden,
   normalizeVerdict,
+  getSeverityLabel,
 } from '../utils/trafficUtils';
 
 // Re-export pure utilities so existing imports of isVerdictValid from this module still work.
 export type { TrafficVerdict };
-export { isVerdictValid, isVerdictStale, isMockHidden, normalizeVerdict };
+export { isVerdictValid, isVerdictStale, isMockHidden, normalizeVerdict, getSeverityLabel };
 
 export function useTraffic() {
   const [verdicts, setVerdicts] = useState<Map<string, TrafficVerdict>>(new Map());

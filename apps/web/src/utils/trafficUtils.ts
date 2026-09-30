@@ -62,3 +62,14 @@ export function normalizeVerdict(raw: any, ttlMs: number = DEFAULT_VERDICT_TTL_M
     stale: isStale,
   };
 }
+
+/**
+ * Localizes traffic severity enum into human-readable label with correct Vietnamese diacritics.
+ */
+export function getSeverityLabel(severity?: string, lang: 'vi' | 'en' = 'vi'): string {
+  const sev = (severity || '').toUpperCase();
+  if (sev === 'CLEAR') return lang === 'vi' ? 'Thông thoáng' : 'Clear';
+  if (sev === 'MODERATE') return lang === 'vi' ? 'Đông xe' : 'Moderate';
+  if (sev === 'HEAVY' || sev === 'CONGESTED') return lang === 'vi' ? 'Ùn tắc' : 'Congested';
+  return severity || '';
+}
