@@ -123,6 +123,9 @@ func LoadFromEnv() (*Config, error) {
 
 	cfg.TelegramBotToken = os.Getenv("TELEGRAM_BOT_TOKEN")
 	cfg.CloudVisionAPIKey = os.Getenv("CLOUD_VISION_API_KEY")
+	if cfg.CloudVisionAPIKey == "" {
+		cfg.CloudVisionAPIKey = os.Getenv("GEMINI_API_KEY")
+	}
 
 	if val := os.Getenv("CV_ENGINE_URL"); val != "" {
 		cfg.CVEngineURL = val
@@ -279,6 +282,9 @@ func LoadConfig() *ServerConfig {
 	}
 
 	cloudVisionAPIKey := strings.TrimSpace(os.Getenv("CLOUD_VISION_API_KEY"))
+	if cloudVisionAPIKey == "" {
+		cloudVisionAPIKey = strings.TrimSpace(os.Getenv("GEMINI_API_KEY"))
+	}
 
 	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if appEnv == "" {
