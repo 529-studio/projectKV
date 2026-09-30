@@ -25,7 +25,7 @@ notify         → i18n
 subscription   → store, camera, notify
 store          → camera
 ws             → hotset
-live           → hotset
+live           → hotset, camera
 i18n           → (leaf)
 config         → (leaf)
 platform       → (leaf)

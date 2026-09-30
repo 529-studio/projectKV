@@ -215,8 +215,8 @@ paths:
   /api/live/stream:
     get:
       description: 'Server-Sent Events (SSE) stream delivering real-time Hot Set verdict
-        updates. Emits ''camera_update'' events with verdict JSON payload and periodic
-        heartbeat comments (: heartbeat).'
+        updates and H3 hex cell aggregations. Emits ''camera_update'' and ''hex_update''
+        events with JSON payloads and periodic heartbeat comments (: heartbeat).'
       produces:
       - text/event-stream
       responses:
@@ -224,7 +224,7 @@ paths:
           description: text/event-stream stream
           schema:
             type: string
-      summary: Real-time camera verdict SSE stream
+      summary: Real-time camera verdict and hex cell SSE stream
       tags:
       - Live
   /api/phuong:

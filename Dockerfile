@@ -48,6 +48,7 @@ COPY --from=server-builder /build/server /app/server
 # Copy camera dataset catalog and compiled static web assets
 COPY cameras_all.json /app/cameras_all.json
 COPY cameras_enriched.json /app/cameras_enriched.json
+COPY h3_hex_polygons.json /app/h3_hex_polygons.json
 COPY --from=web-builder /app/web/out /app/web
 
 # Create persistent storage directory for SQLite
@@ -57,6 +58,7 @@ RUN mkdir -p /app/data
 ENV PORT=3000 \
     GIN_MODE=release \
     CAMERAS_FILE_PATH=/app/cameras_enriched.json \
+    HEX_POLYGON_FILE_PATH=/app/h3_hex_polygons.json \
     STATIC_WEB_DIR=/app/web \
     SQLITE_PATH=/app/data/camera-view.db \
     SNAPSHOT_UPSTREAM_BASE_URL=https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx
