@@ -217,3 +217,80 @@ func TestLoadConfig_HotSet_Custom(t *testing.T) {
 		t.Errorf("expected HotsetFixedMaxCameras=5, got %d", cfg.HotsetFixedMaxCameras)
 	}
 }
+
+func TestLoadConfig_Hex_Defaults(t *testing.T) {
+	_ = os.Unsetenv("HEX_RESOLUTION")
+	_ = os.Unsetenv("HEX_MIN_CAMERAS")
+	_ = os.Unsetenv("HEX_POLYGON_FILE_PATH")
+
+	cfg := config.LoadConfig()
+	if cfg.HexResolution != 7 {
+		t.Errorf("expected default HexResolution=7, got %d", cfg.HexResolution)
+	}
+	if cfg.HexMinCameras != 3 {
+		t.Errorf("expected default HexMinCameras=3, got %d", cfg.HexMinCameras)
+	}
+	if cfg.HexPolygonFilePath == "" {
+		t.Errorf("expected default HexPolygonFilePath not empty, got %q", cfg.HexPolygonFilePath)
+	}
+}
+
+func TestLoadConfig_Hex_Custom(t *testing.T) {
+	_ = os.Setenv("HEX_RESOLUTION", "9")
+	_ = os.Setenv("HEX_MIN_CAMERAS", "5")
+	_ = os.Setenv("HEX_POLYGON_FILE_PATH", "/tmp/custom_hex.json")
+	defer func() {
+		_ = os.Unsetenv("HEX_RESOLUTION")
+		_ = os.Unsetenv("HEX_MIN_CAMERAS")
+		_ = os.Unsetenv("HEX_POLYGON_FILE_PATH")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.HexResolution != 9 {
+		t.Errorf("expected HexResolution=9, got %d", cfg.HexResolution)
+	}
+	if cfg.HexMinCameras != 5 {
+		t.Errorf("expected HexMinCameras=5, got %d", cfg.HexMinCameras)
+	}
+	if cfg.HexPolygonFilePath != "/tmp/custom_hex.json" {
+		t.Errorf("expected HexPolygonFilePath=/tmp/custom_hex.json, got %q", cfg.HexPolygonFilePath)
+	}
+}
+
+func TestLoadFromEnv_Hex_DefaultsAndCustom(t *testing.T) {
+	_ = os.Setenv("SNAPSHOT_UPSTREAM_BASE_URL", "http://example.com")
+	_ = os.Unsetenv("HEX_RESOLUTION")
+	_ = os.Unsetenv("HEX_MIN_CAMERAS")
+	defer func() {
+		_ = os.Unsetenv("SNAPSHOT_UPSTREAM_BASE_URL")
+	}()
+
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.HexResolution != 7 {
+		t.Errorf("expected default HexResolution=7, got %d", cfg.HexResolution)
+	}
+	if cfg.HexMinCameras != 3 {
+		t.Errorf("expected default HexMinCameras=3, got %d", cfg.HexMinCameras)
+	}
+
+	_ = os.Setenv("HEX_RESOLUTION", "9")
+	_ = os.Setenv("HEX_MIN_CAMERAS", "4")
+	defer func() {
+		_ = os.Unsetenv("HEX_RESOLUTION")
+		_ = os.Unsetenv("HEX_MIN_CAMERAS")
+	}()
+
+	cfg2, err := config.LoadFromEnv()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg2.HexResolution != 9 {
+		t.Errorf("expected HexResolution=9, got %d", cfg2.HexResolution)
+	}
+	if cfg2.HexMinCameras != 4 {
+		t.Errorf("expected HexMinCameras=4, got %d", cfg2.HexMinCameras)
+	}
+}

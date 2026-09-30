@@ -49,6 +49,7 @@ For every modified `.go` file under `internal/`:
    subscription   → store, camera, notify
    store          → camera
    ws             → hotset
+   live           → hotset, camera
    i18n           → (leaf)
    config         → (leaf)
    platform       → (leaf)

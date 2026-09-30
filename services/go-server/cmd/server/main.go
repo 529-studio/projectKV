@@ -257,7 +257,22 @@ func main() {
 	liveHub := live.NewHub()
 	defer liveHub.Close()
 
-	// 6c. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
+	// 6c. Initialize H3 Hex Aggregator for aggregated spatial overlay (Sprint 2 Issue #73).
+	var hexPolygons map[string][][]float64
+	if hexPolygonsData, err := live.LoadPolygons(cfg.HexPolygonFilePath); err != nil {
+		log.Printf("[WARN] Failed to load H3 hex polygon lookup from %s: %v", cfg.HexPolygonFilePath, err)
+	} else {
+		hexPolygons = hexPolygonsData
+		log.Printf("[INIT] Loaded %d H3 hex polygon boundaries from %s", len(hexPolygons), cfg.HexPolygonFilePath)
+	}
+
+	var allCameras []camera.Camera
+	if camCatalog != nil {
+		allCameras = camCatalog.All()
+	}
+	hexAggregator := live.NewHexAggregator(allCameras, hexPolygons, cfg.HexResolution, cfg.HexMinCameras, liveHub, nil)
+
+	// 6d. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
 	if analysisEnabled && analyzer != nil {
 		// Initialize object storage and snapshot archiver (Issue #62)
 		var arch *archiver.Archiver
@@ -298,6 +313,11 @@ func main() {
 
 			// Fan-out 1: push to all SSE clients immediately.
 			liveHub.Broadcast(v)
+
+			// Fan-out 1b: push hex cell update if floor of qualifying cameras is met.
+			if hexAggregator != nil {
+				hexAggregator.OnVerdict(v)
+			}
 
 			// Fan-out 2: persist to SQLite for GET /api/traffic-status hydration.
 			if verdictRepo != nil {

@@ -31,6 +31,8 @@ type Config struct {
 	ArchiveRetentionCheckInterval time.Duration
 	VerdictStaleTTLSeconds        int
 	FrozenFrameThreshold          int
+	HexResolution                 int
+	HexMinCameras                 int
 }
 
 func loadDotEnv() {
@@ -84,6 +86,8 @@ func LoadFromEnv() (*Config, error) {
 		ArchiveRetentionCheckInterval: 1 * time.Hour,
 		VerdictStaleTTLSeconds:        180,
 		FrozenFrameThreshold:          3,
+		HexResolution:                 7,
+		HexMinCameras:                 3,
 	}
 
 	if portStr := os.Getenv("PORT"); portStr != "" {
@@ -189,6 +193,18 @@ func LoadFromEnv() (*Config, error) {
 		}
 	}
 
+	if val := os.Getenv("HEX_RESOLUTION"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			cfg.HexResolution = v
+		}
+	}
+
+	if val := os.Getenv("HEX_MIN_CAMERAS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			cfg.HexMinCameras = v
+		}
+	}
+
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -223,6 +239,9 @@ type ServerConfig struct {
 	HotsetIntervalSeconds         int           // default: 30 (mock) or 60 (vlm)
 	HotsetMaxParallel             int           // default: 10 (mock) or 1 (vlm)
 	HotsetFixedMaxCameras         int           // default: 40 (mock) or 2 (vlm)
+	HexResolution                 int           // default: 7 (HEX_RESOLUTION)
+	HexMinCameras                 int           // default: 3 (HEX_MIN_CAMERAS)
+	HexPolygonFilePath            string        // default: resolvePath("h3_hex_polygons.json")
 }
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -408,6 +427,25 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
+	hexResolution := 7
+	if val := os.Getenv("HEX_RESOLUTION"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			hexResolution = v
+		}
+	}
+
+	hexMinCameras := 3
+	if val := os.Getenv("HEX_MIN_CAMERAS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			hexMinCameras = v
+		}
+	}
+
+	hexPolygonFilePath := os.Getenv("HEX_POLYGON_FILE_PATH")
+	if hexPolygonFilePath == "" {
+		hexPolygonFilePath = resolvePath("h3_hex_polygons.json")
+	}
+
 	return &ServerConfig{
 		Port:                          port,
 		CamerasFilePath:               camerasPath,
@@ -435,5 +473,8 @@ func LoadConfig() *ServerConfig {
 		HotsetIntervalSeconds:         hotsetIntervalSeconds,
 		HotsetMaxParallel:             hotsetMaxParallel,
 		HotsetFixedMaxCameras:         hotsetFixedMaxCameras,
+		HexResolution:                 hexResolution,
+		HexMinCameras:                 hexMinCameras,
+		HexPolygonFilePath:            hexPolygonFilePath,
 	}
 }
