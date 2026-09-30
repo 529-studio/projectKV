@@ -3,6 +3,9 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -170,5 +173,52 @@ func TestVerdictRepo_GetLatest_OrderedByUpdatedAtDesc(t *testing.T) {
 	}
 	if got[2].CameraID != "old" {
 		t.Errorf("expected oldest last, got %q", got[2].CameraID)
+	}
+}
+
+func TestVerdictRepo_ConcurrentSaves(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "concurrent_test.db")
+	db, err := store.NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("NewDB: %v", err)
+	}
+	defer db.Close()
+
+	repo := store.NewVerdictRepo(db)
+	workers := 20
+	var wg sync.WaitGroup
+	errCh := make(chan error, workers)
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		camID := fmt.Sprintf("cam_%d", i)
+		go func(id string) {
+			defer wg.Done()
+			v := store.Verdict{
+				CameraID:   id,
+				Severity:   "CONGESTED",
+				Confidence: 0.95,
+				Source:     "mock",
+				Timestamp:  time.Now().UTC(),
+			}
+			if err := repo.Save(context.Background(), v); err != nil {
+				errCh <- err
+			}
+		}(camID)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Errorf("concurrent save failed: %v", err)
+	}
+
+	latest, err := repo.GetLatest()
+	if err != nil {
+		t.Fatalf("GetLatest: %v", err)
+	}
+	if len(latest) != workers {
+		t.Errorf("expected %d saved verdicts, got %d", workers, len(latest))
 	}
 }
