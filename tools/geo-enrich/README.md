@@ -94,4 +94,85 @@ or
 ```bash
 python3 -m unittest discover -s tools/geo-enrich -p "test_*.py"
 ```
-Verifies point-in-ring, polygon holes, bounding box reject, null fallback, sample fixture loading, unmatched CSV reporting, and deterministic idempotency.
+Verifies point-in-ring, polygon holes, bounding box reject, null fallback, sample fixture loading, unmatched CSV reporting, road name normalization, alias mapping, and deterministic idempotency.
+
+---
+
+## 6. Road Name Normalization & Corridor Keys (Issue #68 / ADR-004 §1)
+
+`tools/geo-enrich/normalize_roads.py` computes stable, canonical `road_key` and `road_keys` for every camera in `cameras_enriched.json`, enabling robust corridor grouping and addressing data quality anomalies identified in ADR-004 §1.
+
+### Normalization Rules
+
+1. **Diacritics & Punctuation Stripping**:
+   - Converts Vietnamese characters to ASCII (`đ`/`Đ` -> `d`/`D`, Unicode NFD diacritics stripped).
+   - Replaces non-alphanumeric characters with underscores (`_`).
+2. **Alias Unification (`ALIAS_TABLE`)**:
+   - Highway abbreviations (`QL1`, `QL 1`, `Quốc Lộ 1`, `QL1A`, `Quốc Lộ 1A`, `IDICO-QL1`) all map to `quoc_lo_1`.
+   - Provincial & rural routes (`TL10` -> `tinh_lo_10`, `HL2` -> `huong_lo_2`).
+   - Urban arterials & acronyms:
+     - `XLHN`, `Xa Lộ Hà Nội` -> `xa_lo_ha_noi`
+     - `VVK`, `Võ Văn Kiệt`, `Đại Lộ Đông Tây` -> `vo_van_kiet`
+     - `PVĐ`, `PVD`, `Phạm Văn Đồng` -> `pham_van_dong`
+     - `ĐBP`, `Điện Biên Phủ` -> `dien_bien_phu`
+     - `CMTT`, `Cách Mạng Tháng Tám`, `Cách Mạng Tháng 8` -> `cach_mang_thang_tam`
+     - `MCT`, `Mai Chí Thọ` -> `mai_chi_tho`
+     - `NVL`, `Nguyễn Văn Linh` -> `nguyen_van_linh`
+     - `NTMK`, `Nguyễn Thị Minh Khai` -> `nguyen_thi_minh_khai`
+     - `NKKN`, `Nam Kỳ Khởi Nghĩa` -> `nam_ky_khoi_nghia`
+     - `THD`, `Trần Hưng Đạo` -> `tran_hung_dao`
+     - `Cao tốc LTDG`, `CT LTDG` -> `cao_toc_long_thanh_dau_giay`
+     - `TTH 48.4`, `Cao tốc Trung Lương` -> `cao_toc_trung_luong`
+3. **Intersection Decomposition (`road_key` vs `road_keys`)**:
+   - Camera names formatted as `A - B` (or with en-dash `–`, em-dash `—`, minus `−`) are split into individual road segments.
+   - `road_key`: Primary corridor key (first valid road segment).
+   - `road_keys`: Array of distinct road keys for the camera (e.g. `["nguyen_hue", "le_loi"]` for `"Nguyễn Huệ - Lê Lợi"`).
+4. **Disambiguation: Designated Route Numbers vs. Camera Indexing**:
+   - Numbered streets (`Đường số 10` -> `duong_so_10`), provincial highways (`Tỉnh lộ 10` -> `tinh_lo_10`), canals (`Kênh 4` -> `kenh_4`), and dates (`Tháng 8` -> `thang_tam`) preserve their numerical designations.
+   - Suffix camera instances (e.g., `An Dương Vương 2` -> `an_duong_vuong`, `Đỗ Xuân Hợp (1)` -> `do_xuan_hop`) are cleanly stripped.
+5. **Deterministic Handling of ADR-004 §1 Duplicate Titles**:
+   - 6 camera title pairs appear multiple times in the catalog:
+     - `"Nút giao Ngã sáu Cộng Hòa"`
+     - `"Nút giao Công Trường Dân Chủ"`
+     - `"Đường hầm (Đầu hầm Tp Thủ Đức)"`
+     - `"Nút giao Ngã sáu Nguyễn Tri Phương"`
+     - `"Cộng Hòa - Hoàng Hoa Thám"`
+     - `"Nút giao Ngã bảy Lý Thái Tổ"`
+   - Each physical camera retains its distinct camera `id` and coordinates while receiving identical, deterministic `road_key` and `road_keys` values.
+
+### Alias Reference Table
+
+| Raw Input Pattern | Canonical `road_key` | Description |
+|---|---|---|
+| `QL1`, `Quốc Lộ 1`, `QL1A`, `IDICO-QL1` | `quoc_lo_1` | National Highway 1 |
+| `QL1K`, `Quốc Lộ 1K` | `quoc_lo_1k` | National Highway 1K |
+| `QL13`, `Quốc Lộ 13` | `quoc_lo_13` | National Highway 13 |
+| `QL22`, `Quốc Lộ 22` | `quoc_lo_22` | National Highway 22 |
+| `QL50`, `Quốc Lộ 50` | `quoc_lo_50` | National Highway 50 |
+| `QL51`, `Quốc Lộ 51` | `quoc_lo_51` | National Highway 51 |
+| `TL10`, `Tỉnh Lộ 10` | `tinh_lo_10` | Provincial Route 10 |
+| `TL8`, `Tỉnh Lộ 8` | `tinh_lo_8` | Provincial Route 8 |
+| `HL2`, `Hương Lộ 2` | `huong_lo_2` | Rural Route 2 |
+| `Cao tốc LTDG`, `CT LTDG` | `cao_toc_long_thanh_dau_giay` | Long Thành - Dầu Giây Expressway |
+| `TTH 48.4`, `Cao tốc Trung Lương` | `cao_toc_trung_luong` | TP.HCM - Trung Lương Expressway |
+| `XLHN`, `Xa Lộ Hà Nội` | `xa_lo_ha_noi` | Hanoi Highway |
+| `VVK`, `Võ Văn Kiệt`, `Đại Lộ Đông Tây` | `vo_van_kiet` | Vo Van Kiet Boulevard |
+| `PVĐ`, `PVD`, `Phạm Văn Đồng` | `pham_van_dong` | Pham Van Dong Boulevard |
+| `ĐBP`, `DBP`, `Điện Biên Phủ` | `dien_bien_phu` | Dien Bien Phu |
+| `CMTT`, `Cách Mạng Tháng Tám`, `Cách Mạng Tháng 8` | `cach_mang_thang_tam` | Cach Mang Thang Tam |
+| `MCT`, `Mai Chí Thọ` | `mai_chi_tho` | Mai Chi Tho Boulevard |
+| `NVL`, `Nguyễn Văn Linh` | `nguyen_van_linh` | Nguyen Van Linh Parkway |
+| `NTMK`, `Nguyễn Thị Minh Khai` | `nguyen_thi_minh_khai` | Nguyen Thi Minh Khai |
+| `NKKN`, `Nam Kỳ Khởi Nghĩa` | `nam_ky_khoi_nghia` | Nam Ky Khoi Nghia |
+| `THD`, `Trần Hưng Đạo` | `tran_hung_dao` | Tran Hung Dao |
+
+### Running Normalization
+
+```bash
+# Via Makefile:
+make normalize-roads
+
+# Via CLI:
+python3 tools/geo-enrich/normalize_roads.py --input cameras_enriched.json --output cameras_enriched.json
+```
+
