@@ -190,6 +190,9 @@ type ServerConfig struct {
 	AppEnv                        string        // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
 	StorageDriver                 string        // default: "local"
 	StorageLocalRoot              string        // default: "./data/proofs"
+	RateLimitRPS                  int           // default: 10
+	RateLimitBurst                int           // default: 30
+	AnalyzerDailyBudget           int           // default: 5000
 	ArchiveSampleIntervalSeconds  int           // default: 300
 	ArchiveRetentionDays          int           // default: 14
 	ArchiveMaxDiskMB              int64         // default: 20000
@@ -274,7 +277,6 @@ func LoadConfig() *ServerConfig {
 	if storageLocalRoot == "" {
 		storageLocalRoot = resolvePath("data/proofs")
 	}
-
 	sampleInterval := 300
 	if val := os.Getenv("ARCHIVE_SAMPLE_INTERVAL_SECONDS"); val != "" {
 		if v, err := strconv.Atoi(val); err == nil {
@@ -303,6 +305,27 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
+	rateLimitRPS := 10
+	if val := os.Getenv("RATE_LIMIT_RPS"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			rateLimitRPS = v
+		}
+	}
+
+	rateLimitBurst := 30
+	if val := os.Getenv("RATE_LIMIT_BURST"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			rateLimitBurst = v
+		}
+	}
+
+	analyzerDailyBudget := 5000
+	if val := os.Getenv("ANALYZER_DAILY_BUDGET"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
+			analyzerDailyBudget = v
+		}
+	}
+
 	return &ServerConfig{
 		Port:                          port,
 		CamerasFilePath:               camerasPath,
@@ -316,6 +339,9 @@ func LoadConfig() *ServerConfig {
 		AppEnv:                        appEnv,
 		StorageDriver:                 storageDriver,
 		StorageLocalRoot:              storageLocalRoot,
+		RateLimitRPS:                  rateLimitRPS,
+		RateLimitBurst:                rateLimitBurst,
+		AnalyzerDailyBudget:           analyzerDailyBudget,
 		ArchiveSampleIntervalSeconds:  sampleInterval,
 		ArchiveRetentionDays:          retentionDays,
 		ArchiveMaxDiskMB:              maxDiskMB,
