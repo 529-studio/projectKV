@@ -320,6 +320,41 @@ func TestCloudVisionAnalyzer_Analyze_GeminiAPIError(t *testing.T) {
 	}
 }
 
+func TestCloudVisionAnalyzer_Analyze_GeminiRateLimit429(t *testing.T) {
+	ctx := context.Background()
+	cam := hotset.Camera{
+		ID:          "cam-429",
+		SnapshotURL: "http://proxy.test/snapshot/cam-429.jpg",
+	}
+
+	mockClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.String(), "snapshot") {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte("jpeg-data"))),
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       io.NopCloser(strings.NewReader(`{"error": {"code": 429, "message": "Resource has been exhausted (e.g. check quota)."}}`)),
+			}, nil
+		}),
+	}
+
+	analyzer := cvclient.NewCloudVisionAnalyzer("test-key", cvclient.WithHTTPClient(mockClient))
+	v, err := analyzer.Analyze(ctx, cam)
+	if err == nil {
+		t.Fatal("expected error on Gemini 429, got nil")
+	}
+	if !strings.Contains(err.Error(), "429") {
+		t.Errorf("expected error to mention 429 rate limit, got %v", err)
+	}
+	if v.Severity != hotset.SeverityUnknown {
+		t.Errorf("expected UNKNOWN on 429 error, got %q", v.Severity)
+	}
+}
+
 func TestCloudVisionAnalyzer_Analyze_GeminiMalformedJSON(t *testing.T) {
 	ctx := context.Background()
 	cam := hotset.Camera{

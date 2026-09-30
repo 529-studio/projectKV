@@ -153,3 +153,67 @@ func TestLoadConfig_GeminiModel_Custom(t *testing.T) {
 		t.Errorf("expected custom GeminiModel='gemini-3.8-flash', got %q", cfg.GeminiModel)
 	}
 }
+
+func TestLoadConfig_HotSet_Defaults_Mock(t *testing.T) {
+	_ = os.Setenv("ANALYZER", "mock")
+	_ = os.Unsetenv("HOTSET_INTERVAL_SECONDS")
+	_ = os.Unsetenv("HOTSET_MAX_PARALLEL")
+	_ = os.Unsetenv("HOTSET_FIXED_MAX_CAMERAS")
+	defer func() {
+		_ = os.Unsetenv("ANALYZER")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.HotsetIntervalSeconds != 30 {
+		t.Errorf("expected HotsetIntervalSeconds=30 for mock, got %d", cfg.HotsetIntervalSeconds)
+	}
+	if cfg.HotsetMaxParallel != 10 {
+		t.Errorf("expected HotsetMaxParallel=10 for mock, got %d", cfg.HotsetMaxParallel)
+	}
+	if cfg.HotsetFixedMaxCameras != 40 {
+		t.Errorf("expected HotsetFixedMaxCameras=40 for mock, got %d", cfg.HotsetFixedMaxCameras)
+	}
+}
+
+func TestLoadConfig_HotSet_Defaults_VLM(t *testing.T) {
+	_ = os.Setenv("ANALYZER", "vlm")
+	_ = os.Unsetenv("HOTSET_INTERVAL_SECONDS")
+	_ = os.Unsetenv("HOTSET_MAX_PARALLEL")
+	_ = os.Unsetenv("HOTSET_FIXED_MAX_CAMERAS")
+	defer func() {
+		_ = os.Unsetenv("ANALYZER")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.HotsetIntervalSeconds != 60 {
+		t.Errorf("expected HotsetIntervalSeconds=60 for vlm, got %d", cfg.HotsetIntervalSeconds)
+	}
+	if cfg.HotsetMaxParallel != 1 {
+		t.Errorf("expected HotsetMaxParallel=1 for vlm, got %d", cfg.HotsetMaxParallel)
+	}
+	if cfg.HotsetFixedMaxCameras != 2 {
+		t.Errorf("expected HotsetFixedMaxCameras=2 for vlm, got %d", cfg.HotsetFixedMaxCameras)
+	}
+}
+
+func TestLoadConfig_HotSet_Custom(t *testing.T) {
+	_ = os.Setenv("HOTSET_INTERVAL_SECONDS", "45")
+	_ = os.Setenv("HOTSET_MAX_PARALLEL", "4")
+	_ = os.Setenv("HOTSET_FIXED_MAX_CAMERAS", "5")
+	defer func() {
+		_ = os.Unsetenv("HOTSET_INTERVAL_SECONDS")
+		_ = os.Unsetenv("HOTSET_MAX_PARALLEL")
+		_ = os.Unsetenv("HOTSET_FIXED_MAX_CAMERAS")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.HotsetIntervalSeconds != 45 {
+		t.Errorf("expected HotsetIntervalSeconds=45, got %d", cfg.HotsetIntervalSeconds)
+	}
+	if cfg.HotsetMaxParallel != 4 {
+		t.Errorf("expected HotsetMaxParallel=4, got %d", cfg.HotsetMaxParallel)
+	}
+	if cfg.HotsetFixedMaxCameras != 5 {
+		t.Errorf("expected HotsetFixedMaxCameras=5, got %d", cfg.HotsetFixedMaxCameras)
+	}
+}

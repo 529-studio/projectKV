@@ -178,8 +178,8 @@ func main() {
 	// activeTTL = 120 s; seed fixed critical cameras when analysis is enabled
 	// (e.g. mock/dev mode) so the scheduler has work immediately at startup.
 	var fixedCameras []hotset.Camera
-	if camCatalog != nil {
-		fixedCameras = buildFixedHotSet(camCatalog, 40)
+	if camCatalog != nil && cfg.HotsetFixedMaxCameras > 0 {
+		fixedCameras = buildFixedHotSet(camCatalog, cfg.HotsetFixedMaxCameras)
 	}
 	hotsetRegistry := hotset.NewRegistry(fixedCameras, 120*time.Second)
 
@@ -235,7 +235,8 @@ func main() {
 			cvclient.WithModel(cfg.GeminiModel),
 		)
 		analysisEnabled = true
-		log.Printf("[INIT] ANALYZER=vlm active (model=%s). Hot Set scheduler will run Gemini multimodal vision analysis.", cfg.GeminiModel)
+		log.Printf("[INIT] ANALYZER=vlm active (model=%s, interval=%ds, maxParallel=%d, fixedCameras=%d). Hot Set scheduler will run Gemini multimodal vision analysis.",
+			cfg.GeminiModel, cfg.HotsetIntervalSeconds, cfg.HotsetMaxParallel, cfg.HotsetFixedMaxCameras)
 	case "none", "":
 		log.Println("[INIT] ANALYZER=none: Analysis scheduler is disabled. No camera_verdicts will be recorded and no SSE camera_update will be emitted.")
 	default:
@@ -334,8 +335,8 @@ func main() {
 		hotsetScheduler := hotset.NewScheduler(
 			hotsetRegistry,
 			analyzer,
-			30*time.Second,
-			10,
+			time.Duration(cfg.HotsetIntervalSeconds)*time.Second,
+			cfg.HotsetMaxParallel,
 			onVerdict,
 			nil, // uses slog.Default()
 		)

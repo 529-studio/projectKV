@@ -274,6 +274,9 @@ func (a *CloudVisionAnalyzer) callGemini(ctx context.Context, imgBytes []byte, m
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return nil, fmt.Errorf("gemini rate limit or quota exceeded (429): %s", string(respBytes))
+		}
 		return nil, fmt.Errorf("gemini status %d: %s", resp.StatusCode, string(respBytes))
 	}
 
