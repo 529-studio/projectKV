@@ -72,3 +72,33 @@ func TestLoadConfig_CustomAbuseGuardValues(t *testing.T) {
 		t.Errorf("expected AnalyzerDailyBudget=10000, got %d", cfg.AnalyzerDailyBudget)
 	}
 }
+
+func TestLoadConfig_VerdictProvenanceDefaults(t *testing.T) {
+	_ = os.Unsetenv("VERDICT_STALE_TTL_SECONDS")
+	_ = os.Unsetenv("FROZEN_FRAME_THRESHOLD")
+
+	cfg := config.LoadConfig()
+	if cfg.VerdictStaleTTLSeconds != 180 {
+		t.Errorf("expected default VerdictStaleTTLSeconds=180, got %d", cfg.VerdictStaleTTLSeconds)
+	}
+	if cfg.FrozenFrameThreshold != 3 {
+		t.Errorf("expected default FrozenFrameThreshold=3, got %d", cfg.FrozenFrameThreshold)
+	}
+}
+
+func TestLoadConfig_CustomVerdictProvenanceValues(t *testing.T) {
+	_ = os.Setenv("VERDICT_STALE_TTL_SECONDS", "300")
+	_ = os.Setenv("FROZEN_FRAME_THRESHOLD", "5")
+	defer func() {
+		_ = os.Unsetenv("VERDICT_STALE_TTL_SECONDS")
+		_ = os.Unsetenv("FROZEN_FRAME_THRESHOLD")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.VerdictStaleTTLSeconds != 300 {
+		t.Errorf("expected VerdictStaleTTLSeconds=300, got %d", cfg.VerdictStaleTTLSeconds)
+	}
+	if cfg.FrozenFrameThreshold != 5 {
+		t.Errorf("expected FrozenFrameThreshold=5, got %d", cfg.FrozenFrameThreshold)
+	}
+}

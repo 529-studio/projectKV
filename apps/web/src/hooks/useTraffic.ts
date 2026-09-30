@@ -1,54 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_ENDPOINTS, getApiUrl, HOTSET_CONFIG } from '../config/constants';
+import { API_ENDPOINTS, getApiUrl } from '../config/constants';
+import {
+  type TrafficVerdict,
+  isVerdictValid,
+  isVerdictStale,
+  isMockHidden,
+  normalizeVerdict,
+} from '../utils/trafficUtils';
 
-export interface TrafficVerdict {
-  camera_id: string;
-  severity: string;
-  confidence: number;
-  source?: string;
-  timestamp: string;
-}
-
-/**
- * Validates whether a verdict is non-stale and within the Hot Set active TTL window.
- */
-export function isVerdictValid(v?: TrafficVerdict | null): v is TrafficVerdict {
-	if (!v || !v.severity) return false;
-	if (!v.timestamp) return false;
-	const ts = new Date(v.timestamp).getTime();
-	if (isNaN(ts)) return false;
-	const ageMs = Date.now() - ts;
-	// Allow up to 1 minute of forward clock drift and ensure age does not exceed Hot Set TTL.
-	return ageMs >= -60000 && ageMs <= HOTSET_CONFIG.VERDICT_TTL_MS;
-}
-
-/**
- * Trust & safety guard: fabricated mock verdicts must never surface on a
- * production/staging build. Backend already refuses to run mock outside dev
- * (main.go fatal + /api/traffic-status filter); this check is defense-in-depth.
- */
-function isMockHidden(source?: string): boolean {
-	return source === 'mock' && process.env.NODE_ENV === 'production';
-}
+// Re-export pure utilities so existing imports of isVerdictValid from this module still work.
+export type { TrafficVerdict };
+export { isVerdictValid, isVerdictStale, isMockHidden, normalizeVerdict };
 
 export function useTraffic() {
   const [verdicts, setVerdicts] = useState<Map<string, TrafficVerdict>>(new Map());
   const [analysisEnabled, setAnalysisEnabled] = useState(false);
+  const [appEnv, setAppEnv] = useState<string>('production');
 
-  const updateVerdict = useCallback((v: TrafficVerdict) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (!v || (!v.camera_id && !(v as any).cameraId)) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const id = v.camera_id || (v as any).cameraId;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateVerdict = useCallback((raw: any) => {
+    if (!raw || (!raw.camera_id && !raw.cameraId)) return;
+    const v = normalizeVerdict(raw);
+    const id = v.camera_id;
     if (!isVerdictValid(v)) return;
-    // Trust & safety: hide fabricated mock verdicts on production builds.
-    if (isMockHidden(v.source)) return;
+    if (isMockHidden(v.source, appEnv)) return;
     setVerdicts((prev) => {
       const next = new Map(prev);
       next.set(id, v);
       return next;
     });
-  }, []);
+  }, [appEnv]);
 
   useEffect(() => {
     let es: EventSource | null = null;
@@ -61,16 +42,24 @@ export function useTraffic() {
         const data = await res.json();
         if (isCancelled) return;
 
-        if (typeof data === 'object' && data !== null && 'analysis_enabled' in data) {
-          setAnalysisEnabled(Boolean(data.analysis_enabled));
+        let currentEnv = 'production';
+        if (typeof data === 'object' && data !== null) {
+          if ('analysis_enabled' in data) {
+            setAnalysisEnabled(Boolean(data.analysis_enabled));
+          }
+          if ('app_env' in data && typeof data.app_env === 'string') {
+            currentEnv = data.app_env;
+            setAppEnv(data.app_env);
+          }
         }
 
         const list = Array.isArray(data) ? data : (data.verdicts || []);
         const initialMap = new Map<string, TrafficVerdict>();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        list.forEach((v: any) => {
-          const id = v.camera_id || v.cameraId;
-          if (id && isVerdictValid(v) && !isMockHidden(v.source)) {
+        list.forEach((raw: any) => {
+          const v = normalizeVerdict(raw);
+          const id = v.camera_id;
+          if (id && isVerdictValid(v) && !isMockHidden(v.source, currentEnv)) {
             initialMap.set(id, v);
           }
         });
@@ -121,25 +110,26 @@ export function useTraffic() {
       }
     });
 
-    // Periodically prune verdicts that have exceeded their Hot Set TTL
+    // Periodically update staleness and prune expired verdicts
     const pruneInterval = setInterval(() => {
       setVerdicts((prev) => {
         if (prev.size === 0) return prev;
-        let hasExpired = false;
-        for (const v of prev.values()) {
-          if (!isVerdictValid(v)) {
-            hasExpired = true;
-            break;
-          }
-        }
-        if (!hasExpired) return prev;
+        let changed = false;
         const next = new Map<string, TrafficVerdict>();
         for (const [id, v] of prev.entries()) {
-          if (isVerdictValid(v) && !isMockHidden(v.source)) {
+          if (!isVerdictValid(v) || isMockHidden(v.source, appEnv)) {
+            changed = true;
+            continue;
+          }
+          const stale = isVerdictStale(v);
+          if (stale !== v.stale) {
+            changed = true;
+            next.set(id, { ...v, stale });
+          } else {
             next.set(id, v);
           }
         }
-        return next;
+        return changed ? next : prev;
       });
     }, 15000);
 
@@ -150,7 +140,7 @@ export function useTraffic() {
         es.close();
       }
     };
-  }, [updateVerdict]);
+  }, [updateVerdict, appEnv]);
 
-  return { verdicts, analysisEnabled };
+  return { verdicts, analysisEnabled, appEnv };
 }
