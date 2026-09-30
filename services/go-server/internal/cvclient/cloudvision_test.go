@@ -51,6 +51,12 @@ func TestCloudVisionAnalyzer_Analyze_Success(t *testing.T) {
 	mockClient := &http.Client{
 		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 			if strings.Contains(req.URL.String(), "snapshot") {
+				if req.Header.Get("User-Agent") == "" {
+					t.Error("expected User-Agent header on snapshot request")
+				}
+				if req.Header.Get("Referer") == "" {
+					t.Error("expected Referer header on snapshot request")
+				}
 				return &http.Response{
 					StatusCode: http.StatusOK,
 					Header:     http.Header{"Content-Type": []string{"image/jpeg"}},
@@ -372,6 +378,35 @@ func TestCloudVisionAnalyzer_Analyze_EmptyCandidates(t *testing.T) {
 	v, err := analyzer.Analyze(ctx, cam)
 	if err == nil {
 		t.Fatal("expected error on empty candidates, got nil")
+	}
+	if v.Severity != hotset.SeverityUnknown {
+		t.Errorf("expected UNKNOWN, got %q", v.Severity)
+	}
+}
+
+func TestCloudVisionAnalyzer_Analyze_GhostImagePlaceholder(t *testing.T) {
+	ctx := context.Background()
+	cam := hotset.Camera{
+		ID:          "cam-110",
+		SnapshotURL: "http://proxy.test/snapshot/cam-110.jpg",
+	}
+
+	mockClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.String(), "snapshot") {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte("\x89PNG\r\n\x1a\nplaceholder-bytes"))),
+				}, nil
+			}
+			return nil, errors.New("should not reach gemini")
+		}),
+	}
+
+	analyzer := cvclient.NewCloudVisionAnalyzer("test-key", cvclient.WithHTTPClient(mockClient))
+	v, err := analyzer.Analyze(ctx, cam)
+	if err == nil {
+		t.Fatal("expected error on ghost image placeholder, got nil")
 	}
 	if v.Severity != hotset.SeverityUnknown {
 		t.Errorf("expected UNKNOWN, got %q", v.Severity)

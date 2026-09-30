@@ -188,6 +188,8 @@ func (a *CloudVisionAnalyzer) fetchSnapshot(ctx context.Context, url string) ([]
 	if err != nil {
 		return nil, "", fmt.Errorf("build request: %w", err)
 	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CameraViewProxy/1.0)")
+	req.Header.Set("Referer", "https://giaothong.hochiminhcity.gov.vn/")
 
 	resp, err := a.httpClient.Do(req)
 	if err != nil {
@@ -202,6 +204,10 @@ func (a *CloudVisionAnalyzer) fetchSnapshot(ctx context.Context, url string) ([]
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10 MiB max
 	if err != nil {
 		return nil, "", fmt.Errorf("read body: %w", err)
+	}
+
+	if len(data) >= 8 && string(data[:8]) == "\x89PNG\r\n\x1a\n" {
+		return nil, "", fmt.Errorf("upstream returned placeholder image: camera stream offline")
 	}
 
 	ct := resp.Header.Get("Content-Type")
