@@ -55,9 +55,11 @@ notify         → i18n              (defines SubscriptionStore interface itself
 subscription   → store, camera, notify
 store          → camera            (implements notify.SubscriptionStore + verdict repo interfaces defined by hotset/httpserver as needed)
 ws             → hotset            (for verdict types only)
+live           → hotset, camera    (verdict types, SSE hub, H3 hex cell aggregation)
 i18n           → (leaf)
 config         → (leaf)
 platform       → (leaf — logger setup)
+tilecache      → (leaf)
 storage        → (leaf — minimal object storage interface and local driver)
 archiver       → storage, hotset   (event-driven snapshot archiver and retention policy)
 ```

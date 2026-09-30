@@ -74,8 +74,8 @@ func (h *Hub) RegisterRoutes(r gin.IRouter) {
 }
 
 // HandleSSE godoc
-// @Summary Real-time camera verdict SSE stream
-// @Description Server-Sent Events (SSE) stream delivering real-time Hot Set verdict updates. Emits 'camera_update' events with verdict JSON payload and periodic heartbeat comments (: heartbeat).
+// @Summary Real-time camera verdict and hex cell SSE stream
+// @Description Server-Sent Events (SSE) stream delivering real-time Hot Set verdict updates and H3 hex cell aggregations. Emits 'camera_update' and 'hex_update' events with JSON payloads and periodic heartbeat comments (: heartbeat).
 // @Tags Live
 // @Produce text/event-stream
 // @Success 200 {string} string "text/event-stream stream"
@@ -152,7 +152,7 @@ func (h *Hub) Broadcast(v hotset.Verdict) {
 		return
 	}
 
-	frame := fmt.Sprintf("event: camera_update\ndata: %s\n\n", data)
+	frame := fmt.Sprintf("event: %s\ndata: %s\n\n", EventCameraUpdate, data)
 	frameBytes := []byte(frame)
 
 	h.mu.RLock()
@@ -164,6 +164,37 @@ func (h *Hub) Broadcast(v hotset.Verdict) {
 		default:
 			// Buffer full — drop this frame for this slow client.
 			// The next verdict will arrive within the scheduler interval anyway.
+		}
+	}
+}
+
+// BroadcastHex serialises cell as a named SSE event (hex_update) and delivers it
+// to all connected clients. Delivery is non-blocking: if a client's send buffer
+// is full the event is dropped for that client to avoid stalling the broadcast loop.
+//
+// SSE frame format:
+//
+//	event: hex_update\n
+//	data: <json>\n
+//	\n
+func (h *Hub) BroadcastHex(cell HexCell) {
+	data, err := json.Marshal(cell)
+	if err != nil {
+		h.log.Error("live: failed to marshal hex cell", "error", err)
+		return
+	}
+
+	frame := fmt.Sprintf("event: %s\ndata: %s\n\n", EventHexUpdate, data)
+	frameBytes := []byte(frame)
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for cl := range h.clients {
+		select {
+		case cl.send <- frameBytes:
+		default:
+			// Buffer full — drop this frame for this slow client.
 		}
 	}
 }
