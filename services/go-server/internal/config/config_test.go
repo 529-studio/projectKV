@@ -102,3 +102,20 @@ func TestLoadConfig_CustomVerdictProvenanceValues(t *testing.T) {
 		t.Errorf("expected FrozenFrameThreshold=5, got %d", cfg.FrozenFrameThreshold)
 	}
 }
+
+func TestLoadConfig_CloudVisionAPIKey(t *testing.T) {
+	_ = os.Setenv("CLOUD_VISION_API_KEY", "test-gemini-key-123")
+	_ = os.Setenv("ANALYZER", "vlm")
+	defer func() {
+		_ = os.Unsetenv("CLOUD_VISION_API_KEY")
+		_ = os.Unsetenv("ANALYZER")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.CloudVisionAPIKey != "test-gemini-key-123" {
+		t.Errorf("expected CloudVisionAPIKey='test-gemini-key-123', got %q", cfg.CloudVisionAPIKey)
+	}
+	if cfg.Analyzer != "vlm" {
+		t.Errorf("expected Analyzer='vlm', got %q", cfg.Analyzer)
+	}
+}
