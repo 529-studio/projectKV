@@ -15,12 +15,12 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 )
 
-// geminiEndpoint is the Gemini 2.0 Flash multimodal generateContent REST endpoint.
+// geminiEndpoint is the Gemini multimodal generateContent REST endpoint.
 // Model can be overridden at construction time via WithModel.
 const geminiEndpointTemplate = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
 
 // defaultGeminiModel is the production default.
-const defaultGeminiModel = "gemini-2.0-flash-lite"
+const defaultGeminiModel = "gemini-3.5-flash-lite"
 
 // confidenceThreshold — verdicts below this are degraded to SeverityUnknown.
 const confidenceThreshold = 0.5
