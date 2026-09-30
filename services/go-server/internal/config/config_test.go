@@ -102,3 +102,33 @@ func TestLoadConfig_CustomVerdictProvenanceValues(t *testing.T) {
 		t.Errorf("expected FrozenFrameThreshold=5, got %d", cfg.FrozenFrameThreshold)
 	}
 }
+
+func TestLoadConfig_CloudVisionAPIKey(t *testing.T) {
+	_ = os.Setenv("CLOUD_VISION_API_KEY", "test-gemini-key-123")
+	_ = os.Setenv("ANALYZER", "vlm")
+	defer func() {
+		_ = os.Unsetenv("CLOUD_VISION_API_KEY")
+		_ = os.Unsetenv("ANALYZER")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.CloudVisionAPIKey != "test-gemini-key-123" {
+		t.Errorf("expected CloudVisionAPIKey='test-gemini-key-123', got %q", cfg.CloudVisionAPIKey)
+	}
+	if cfg.Analyzer != "vlm" {
+		t.Errorf("expected Analyzer='vlm', got %q", cfg.Analyzer)
+	}
+}
+
+func TestLoadConfig_GeminiAPIKey_Fallback(t *testing.T) {
+	_ = os.Unsetenv("CLOUD_VISION_API_KEY")
+	_ = os.Setenv("GEMINI_API_KEY", "fallback-gemini-key-456")
+	defer func() {
+		_ = os.Unsetenv("GEMINI_API_KEY")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.CloudVisionAPIKey != "fallback-gemini-key-456" {
+		t.Errorf("expected fallback to GEMINI_API_KEY, got %q", cfg.CloudVisionAPIKey)
+	}
+}

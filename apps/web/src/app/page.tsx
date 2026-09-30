@@ -30,6 +30,13 @@ export default function Home() {
   const [selectedCorridor, setSelectedCorridor] = useState<string | null>(null);
   const [lang, setLang] = useState<'vi' | 'en'>('vi');
 
+  // Open map legend by default on desktop view (>= 768px)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
+      setLegendOpen(true);
+    }
+  }, []);
+
   // URL sync for active filter (ADR-004 stretch goal)
   useEffect(() => {
     if (typeof window === 'undefined') return;

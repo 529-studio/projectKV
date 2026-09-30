@@ -123,6 +123,9 @@ func LoadFromEnv() (*Config, error) {
 
 	cfg.TelegramBotToken = os.Getenv("TELEGRAM_BOT_TOKEN")
 	cfg.CloudVisionAPIKey = os.Getenv("CLOUD_VISION_API_KEY")
+	if cfg.CloudVisionAPIKey == "" {
+		cfg.CloudVisionAPIKey = os.Getenv("GEMINI_API_KEY")
+	}
 
 	if val := os.Getenv("CV_ENGINE_URL"); val != "" {
 		cfg.CVEngineURL = val
@@ -202,7 +205,8 @@ type ServerConfig struct {
 	CacheTTL                      time.Duration
 	CacheEvictInterval            time.Duration
 	CacheMaxAge                   time.Duration
-	Analyzer                      string        // "none" | "mock" (default: "none")
+	Analyzer                      string // "none" | "mock" | "vlm" (default: "none")
+	CloudVisionAPIKey             string
 	AppEnv                        string        // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
 	StorageDriver                 string        // default: "local"
 	StorageLocalRoot              string        // default: "./data/proofs"
@@ -275,6 +279,11 @@ func LoadConfig() *ServerConfig {
 	analyzer := strings.ToLower(strings.TrimSpace(os.Getenv("ANALYZER")))
 	if analyzer == "" {
 		analyzer = "none"
+	}
+
+	cloudVisionAPIKey := strings.TrimSpace(os.Getenv("CLOUD_VISION_API_KEY"))
+	if cloudVisionAPIKey == "" {
+		cloudVisionAPIKey = strings.TrimSpace(os.Getenv("GEMINI_API_KEY"))
 	}
 
 	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
@@ -368,6 +377,7 @@ func LoadConfig() *ServerConfig {
 		CacheEvictInterval:            60 * time.Second,
 		CacheMaxAge:                   15 * time.Second,
 		Analyzer:                      analyzer,
+		CloudVisionAPIKey:             cloudVisionAPIKey,
 		AppEnv:                        appEnv,
 		StorageDriver:                 storageDriver,
 		StorageLocalRoot:              storageLocalRoot,
