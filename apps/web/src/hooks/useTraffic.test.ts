@@ -5,6 +5,7 @@ import {
   isVerdictStale,
   isMockHidden,
   normalizeVerdict,
+  getSeverityLabel,
   DEFAULT_VERDICT_TTL_MS,
   type TrafficVerdict,
 } from '../utils/trafficUtils.ts';
@@ -125,5 +126,33 @@ describe('Traffic Verdict Provenance and Staleness (Issue #64)', () => {
 
     assert.equal(VERDICT_I18N.DEMO_BADGE.vi, 'DỮ LIỆU MẪU');
     assert.equal(VERDICT_I18N.DEMO_BADGE.en, 'DEMO');
+
+    assert.equal(VERDICT_I18N.TRAFFIC_PREFIX.vi, 'Giao thông');
+    assert.equal(VERDICT_I18N.TRAFFIC_PREFIX.en, 'Traffic');
+
+    assert.equal(VERDICT_I18N.SEVERITY.CONGESTED.vi, 'Ùn tắc');
+    assert.equal(VERDICT_I18N.SEVERITY.CONGESTED.en, 'Congested');
+  });
+
+  test('getSeverityLabel localizes severities correctly with Vietnamese diacritics', () => {
+    assert.equal(getSeverityLabel('CLEAR', 'vi'), 'Thông thoáng');
+    assert.equal(getSeverityLabel('CLEAR', 'en'), 'Clear');
+
+    assert.equal(getSeverityLabel('MODERATE', 'vi'), 'Đông xe');
+    assert.equal(getSeverityLabel('MODERATE', 'en'), 'Moderate');
+
+    assert.equal(getSeverityLabel('HEAVY', 'vi'), 'Ùn tắc');
+    assert.equal(getSeverityLabel('HEAVY', 'en'), 'Congested');
+
+    assert.equal(getSeverityLabel('CONGESTED', 'vi'), 'Ùn tắc');
+    assert.equal(getSeverityLabel('CONGESTED', 'en'), 'Congested');
+
+    // Case insensitivity
+    assert.equal(getSeverityLabel('congested', 'vi'), 'Ùn tắc');
+    assert.equal(getSeverityLabel('clear', 'vi'), 'Thông thoáng');
+
+    // Fallback for unknown / empty
+    assert.equal(getSeverityLabel('UNKNOWN', 'vi'), 'UNKNOWN');
+    assert.equal(getSeverityLabel('', 'vi'), '');
   });
 });
