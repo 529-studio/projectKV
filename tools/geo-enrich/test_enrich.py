@@ -13,6 +13,7 @@ from enrich import (
     compute_bbox,
     enrich_cameras,
     load_boundaries,
+    parse_h3_resolutions,
     point_in_polygon,
     point_in_ring,
     write_unmatched_report,
@@ -192,6 +193,109 @@ class TestGeoEnrich(unittest.TestCase):
         finally:
             if os.path.exists(report_path):
                 os.remove(report_path)
+
+    def test_parse_h3_resolutions(self):
+        self.assertEqual(parse_h3_resolutions("7,9"), [7, 9])
+        self.assertEqual(parse_h3_resolutions("9, 7"), [7, 9])
+        self.assertEqual(parse_h3_resolutions("7, 7, 9"), [7, 9])
+        self.assertEqual(parse_h3_resolutions("none"), [])
+        self.assertEqual(parse_h3_resolutions(""), [])
+        self.assertEqual(parse_h3_resolutions(None), [])
+        self.assertEqual(parse_h3_resolutions("0"), [])
+        self.assertEqual(parse_h3_resolutions("false"), [])
+
+        with self.assertRaises(ValueError):
+            parse_h3_resolutions("invalid")
+        with self.assertRaises(ValueError):
+            parse_h3_resolutions("7,16")
+        with self.assertRaises(ValueError):
+            parse_h3_resolutions("-1,7")
+
+    def test_h3_enrichment_known_coordinates(self):
+        cameras = [
+            {
+                "id": "cam_district_1",
+                "title": "District 1 Center",
+                "latitude": 10.776889,
+                "longitude": 106.700806,
+            },
+            {
+                "id": "cam_tan_dinh",
+                "title": "Tan Dinh Intersection",
+                "latitude": 10.7918902432446,
+                "longitude": 106.691054105759,
+            },
+        ]
+        enriched, _, _ = enrich_cameras(cameras, h3_resolutions=[7, 9])
+
+        self.assertEqual(len(enriched), 2)
+        # Known pre-calculated H3 cell IDs
+        self.assertEqual(enriched[0]["h3_res7"], "8765b5662ffffff")
+        self.assertEqual(enriched[0]["h3_res9"], "8965b5662abffff")
+
+        self.assertEqual(enriched[1]["h3_res7"], "8765b5644ffffff")
+        self.assertEqual(enriched[1]["h3_res9"], "8965b564483ffff")
+
+    def test_h3_enrichment_missing_and_invalid_coordinates(self):
+        cameras = [
+            {
+                "id": "cam_null",
+                "title": "Camera without coordinates",
+                "latitude": None,
+                "longitude": None,
+            },
+            {
+                "id": "cam_invalid",
+                "title": "Camera with invalid coordinates",
+                "latitude": "not-a-float",
+                "longitude": 106.69,
+            },
+        ]
+        enriched, _, _ = enrich_cameras(cameras, h3_resolutions=[7, 9])
+
+        self.assertEqual(len(enriched), 2)
+        self.assertIsNone(enriched[0]["h3_res7"])
+        self.assertIsNone(enriched[0]["h3_res9"])
+        self.assertIsNone(enriched[1]["h3_res7"])
+        self.assertIsNone(enriched[1]["h3_res9"])
+
+    def test_h3_resolution_hierarchy(self):
+        import h3
+        cameras = [
+            {
+                "id": "cam_1",
+                "latitude": 10.82,
+                "longitude": 106.65,
+            }
+        ]
+        enriched, _, _ = enrich_cameras(cameras, h3_resolutions=[7, 9])
+        res7 = enriched[0]["h3_res7"]
+        res9 = enriched[0]["h3_res9"]
+        self.assertIsNotNone(res7)
+        self.assertIsNotNone(res9)
+        # Res 7 must be the ancestor/parent of Res 9
+        self.assertEqual(h3.cell_to_parent(res9, 7), res7)
+
+    def test_h3_enrichment_idempotent(self):
+        cameras = [
+            {"id": "c1", "latitude": 10.776889, "longitude": 106.700806},
+            {"id": "c2", "latitude": None, "longitude": None},
+        ]
+        run1, _, _ = enrich_cameras(cameras, h3_resolutions=[7, 9])
+        run2, _, _ = enrich_cameras(cameras, h3_resolutions=[7, 9])
+
+        self.assertEqual(run1, run2)
+        str1 = json.dumps(run1, indent=2, ensure_ascii=False)
+        str2 = json.dumps(run2, indent=2, ensure_ascii=False)
+        self.assertEqual(str1, str2)
+
+    def test_enrich_cameras_disabled_h3(self):
+        cameras = [
+            {"id": "c1", "latitude": 10.776889, "longitude": 106.700806}
+        ]
+        enriched, _, _ = enrich_cameras(cameras, h3_resolutions=[])
+        self.assertNotIn("h3_res7", enriched[0])
+        self.assertNotIn("h3_res9", enriched[0])
 
 
 if __name__ == "__main__":

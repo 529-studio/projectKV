@@ -80,6 +80,7 @@ python3 tools/geo-enrich/enrich.py \
 - `--unmatched-report`: Path for unmatched cameras CSV report (default: `tools/geo-enrich/unmatched_cameras.csv`).
 - `--id-prop`: (Optional) Explicit GeoJSON property name for ward ID.
 - `--name-prop`: (Optional) Explicit GeoJSON property name for ward name.
+- `--h3-resolutions`: (Optional) Comma-separated H3 resolutions to compute (default: `7,9`; pass `'none'` or `''` to disable).
 - `--in-place`: (Optional) Overwrite `--cameras` in place instead of creating a separate file.
 
 ---
@@ -175,4 +176,40 @@ make normalize-roads
 # Via CLI:
 python3 tools/geo-enrich/normalize_roads.py --input cameras_enriched.json --output cameras_enriched.json
 ```
+
+---
+
+## 7. H3 Hexagonal Cell ID Spatial Enrichment (Issue #66 / Sprint 2 C2 / ADR-004 §D11)
+
+Offline hexagonal spatial cell ID generation for high-performance map hex overlays.
+
+### Architectural Constraint (ADR-004 §D11)
+- **Zero cgo in Go Server**: Banned `uber/h3-go` from `services/go-server/` (`GO_BACKEND_ARCHITECTURE.md` §1). All cell IDs are precomputed offline and loaded into memory as static camera attributes (`h3_res7`, `h3_res9`).
+- **Zero `h3-js` in Web Client**: Frontend does not compute or index coordinates at runtime; it receives indexed cell IDs directly from backend catalog and query responses.
+
+### Resolution Rationale
+- **Resolution 7** (~5.16 km² cell area, edge length ~1.22 km): Macro zoom (11–13) overview for city-wide corridor clustering and regional traffic density heatmaps.
+- **Resolution 9** (~0.105 km² cell area, edge length ~0.17 km): Mid-to-high zoom (14+) detail for street-level bottlenecks and intersection corridor evaluation.
+- Both resolutions are computed and stored. The client dynamically toggles the rendered hex layer based on the current map zoom level.
+
+### Coverage & Statistics
+- **Total cameras**: 837
+- **Cameras with valid coordinates**: 797 (100% assigned deterministic `h3_res7` and `h3_res9` cells).
+- **Cameras lacking coordinates**: 40 (assigned `h3_res7: null` and `h3_res9: null`).
+
+### Installation & Usage
+Dependencies are listed in `tools/geo-enrich/requirements.txt`:
+```bash
+pip install -r tools/geo-enrich/requirements.txt
+```
+
+Run enrichment with default resolutions (7, 9):
+```bash
+# Via Makefile:
+make geo-enrich
+
+# Via CLI with explicit resolutions:
+python3 tools/geo-enrich/enrich.py --h3-resolutions 7,9
+```
+
 

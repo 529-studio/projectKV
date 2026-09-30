@@ -36,6 +36,8 @@ type Camera struct {
 	IsGhost     bool    `json:"isGhost,omitempty"`
 	PhuongID    *string `json:"phuong_id,omitempty"`
 	PhuongName  *string `json:"phuong_name,omitempty"`
+	H3Res7      string  `json:"h3_res7,omitempty"`
+	H3Res9      string  `json:"h3_res9,omitempty"`
 }
 
 // KnownDuplicateStreams maps secondary camera IDs to their primary canonical camera ID.

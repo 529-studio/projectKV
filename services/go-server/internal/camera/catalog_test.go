@@ -465,6 +465,59 @@ func TestCamera_JSONSerialization_PhuongFields(t *testing.T) {
 	}
 }
 
+func TestCamera_JSONSerialization_H3Fields(t *testing.T) {
+	camWithH3 := Camera{
+		ID:          "cam-with-h3",
+		DisplayName: "Nguyễn Huệ",
+		H3Res7:      "8765b5662ffffff",
+		H3Res9:      "8965b5662abffff",
+	}
+
+	camWithoutH3 := Camera{
+		ID:          "cam-without-h3",
+		DisplayName: "Quốc lộ 1",
+	}
+
+	// 1. Serialization with H3
+	dataWith, err := json.Marshal(camWithH3)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	var mapWith map[string]interface{}
+	if err := json.Unmarshal(dataWith, &mapWith); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if mapWith["h3_res7"] != "8765b5662ffffff" || mapWith["h3_res9"] != "8965b5662abffff" {
+		t.Errorf("expected H3 fields in json, got %v", mapWith)
+	}
+
+	// 2. Serialization without H3 (omitempty)
+	dataWithout, err := json.Marshal(camWithoutH3)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	var mapWithout map[string]interface{}
+	if err := json.Unmarshal(dataWithout, &mapWithout); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if _, ok := mapWithout["h3_res7"]; ok {
+		t.Errorf("expected h3_res7 to be omitted when empty, got %v", mapWithout["h3_res7"])
+	}
+	if _, ok := mapWithout["h3_res9"]; ok {
+		t.Errorf("expected h3_res9 to be omitted when empty, got %v", mapWithout["h3_res9"])
+	}
+
+	// 3. Deserialization of null H3 fields
+	jsonWithNull := []byte(`{"id": "cam-null", "h3_res7": null, "h3_res9": null}`)
+	var unmarshaledNull Camera
+	if err := json.Unmarshal(jsonWithNull, &unmarshaledNull); err != nil {
+		t.Fatalf("unmarshal error with null H3: %v", err)
+	}
+	if unmarshaledNull.H3Res7 != "" || unmarshaledNull.H3Res9 != "" {
+		t.Errorf("expected empty string for null H3 fields, got res7=%q, res9=%q", unmarshaledNull.H3Res7, unmarshaledNull.H3Res9)
+	}
+}
+
 func TestLoadCatalog_GracefulFallback(t *testing.T) {
 	tempDir := t.TempDir()
 
