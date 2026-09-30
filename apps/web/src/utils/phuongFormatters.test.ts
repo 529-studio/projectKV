@@ -3,6 +3,8 @@ import { test, describe } from 'node:test';
 import {
   formatPhuongName,
   formatCorridorDisplay,
+  formatRoadName,
+  I18N_NAMES,
   extractCorridor,
   removeVietnameseDiacritics,
   matchesVietnameseSearch,
@@ -37,6 +39,17 @@ describe('formatPhuongName', () => {
   test('formats Towns (Thị trấn) into <Name> Town in English (en) locale', () => {
     assert.equal(formatPhuongName('Thị trấn Cần Thạnh', 'en'), 'Cần Thạnh Town');
     assert.equal(formatPhuongName('Thị trấn Củ Chi', 'en'), 'Củ Chi Town');
+  });
+
+  test('formats prefix-less names with explicit types in vi and en', () => {
+    assert.equal(formatPhuongName('Bến Nghé', 'vi', 'Phường'), 'Phường Bến Nghé');
+    assert.equal(formatPhuongName('Bến Nghé', 'en', 'Phường'), 'Bến Nghé Ward');
+    assert.equal(formatPhuongName('14', 'vi', 'Phường'), 'Phường 14');
+    assert.equal(formatPhuongName('14', 'en', 'Phường'), 'Ward 14');
+    assert.equal(formatPhuongName('Tân An Hội', 'vi', 'Xã'), 'Xã Tân An Hội');
+    assert.equal(formatPhuongName('Tân An Hội', 'en', 'Xã'), 'Tân An Hội Commune');
+    assert.equal(formatPhuongName('Củ Chi', 'vi', 'Thị trấn'), 'Thị trấn Củ Chi');
+    assert.equal(formatPhuongName('Củ Chi', 'en', 'Thị trấn'), 'Củ Chi Town');
   });
 
   test('handles empty or non-matching inputs gracefully', () => {
@@ -108,11 +121,11 @@ describe('formatCorridorDisplay', () => {
       name: '13',
     });
     assert.deepEqual(formatCorridorDisplay('Quốc Lộ 13', 'en'), {
-      prefix: 'Route',
+      prefix: 'National Route',
       name: '13',
     });
     assert.deepEqual(formatCorridorDisplay('QL1', 'en'), {
-      prefix: 'Route',
+      prefix: 'National Route',
       name: '1',
     });
   });
@@ -200,4 +213,31 @@ describe('extractCorridor', () => {
     assert.equal(extractCorridor(undefined, undefined), 'Khác');
   });
 });
+
+describe('formatRoadName & I18N_NAMES', () => {
+  test('contains all 6 required i18n keys for vi and en', () => {
+    assert.equal(I18N_NAMES.vi.ward_type_phuong, 'Phường');
+    assert.equal(I18N_NAMES.en.ward_type_phuong, 'Ward');
+    assert.equal(I18N_NAMES.vi.ward_type_xa, 'Xã');
+    assert.equal(I18N_NAMES.en.ward_type_xa, 'Commune');
+    assert.equal(I18N_NAMES.vi.ward_type_thi_tran, 'Thị trấn');
+    assert.equal(I18N_NAMES.en.ward_type_thi_tran, 'Town');
+    assert.equal(I18N_NAMES.vi.road_type_duong, 'Đường');
+    assert.equal(I18N_NAMES.en.road_type_duong, 'Street');
+    assert.equal(I18N_NAMES.vi.road_type_quoc_lo, 'Quốc lộ');
+    assert.equal(I18N_NAMES.en.road_type_quoc_lo, 'National Route');
+    assert.equal(I18N_NAMES.vi.road_type_xa_lo, 'Xa lộ');
+    assert.equal(I18N_NAMES.en.road_type_xa_lo, 'Highway');
+  });
+
+  test('formats full road names with localization', () => {
+    assert.equal(formatRoadName('Trần Quang Khải', 'vi', 'Đường'), 'Đường Trần Quang Khải');
+    assert.equal(formatRoadName('Trần Quang Khải', 'en', 'Đường'), 'Trần Quang Khải Street');
+    assert.equal(formatRoadName('13', 'vi', 'Quốc lộ'), 'Quốc lộ 13');
+    assert.equal(formatRoadName('13', 'en', 'Quốc lộ'), 'National Route 13');
+    assert.equal(formatRoadName('Hà Nội', 'vi', 'Xa lộ'), 'Xa lộ Hà Nội');
+    assert.equal(formatRoadName('Hà Nội', 'en', 'Xa lộ'), 'Hà Nội Highway');
+  });
+});
+
 

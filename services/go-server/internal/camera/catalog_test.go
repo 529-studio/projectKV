@@ -365,43 +365,48 @@ func TestCatalog_DeduplicationAndGhost(t *testing.T) {
 }
 
 func TestCatalog_Phuongs(t *testing.T) {
-	pBenNghe := "Phường Bến Nghé"
-	pTanDinh := "Phường Tân Định"
 	cams := []Camera{
-		{ID: "c1", PhuongName: &pBenNghe},
-		{ID: "c2", PhuongName: &pTanDinh},
-		{ID: "c3", PhuongName: &pBenNghe}, // duplicate should be deduplicated
-		{ID: "c4", PhuongName: nil},       // nil should be excluded
+		{ID: "c1", PhuongName: "Bến Nghé", PhuongType: "Phường"},
+		{ID: "c2", PhuongName: "Tân Định", PhuongType: "Phường"},
+		{ID: "c3", PhuongName: "Bến Nghé", PhuongType: "Phường"}, // duplicate should be deduplicated
+		{ID: "c4", PhuongName: ""},                               // empty should be excluded
 	}
 
 	cat := NewCatalog(cams)
 	phuongs := cat.Phuongs()
 
-	expected := []string{"Phường Bến Nghé", "Phường Tân Định"}
+	expected := []Phuong{
+		{Type: "Phường", Name: "Bến Nghé"},
+		{Type: "Phường", Name: "Tân Định"},
+	}
 	if !reflect.DeepEqual(phuongs, expected) {
 		t.Errorf("expected phuongs %v, got %v", expected, phuongs)
 	}
 }
 
 func TestCatalog_FilterByPhuong(t *testing.T) {
-	pBenNghe := "Phường Bến Nghé"
-	pTanDinh := "Phường Tân Định"
 	cams := []Camera{
-		{ID: "c1", DisplayName: "Cam 1", PhuongName: &pBenNghe},
-		{ID: "c2", DisplayName: "Cam 2", PhuongName: &pTanDinh},
-		{ID: "c3", DisplayName: "Cam 3", PhuongName: &pBenNghe},
-		{ID: "c4", DisplayName: "Cam 4", PhuongName: nil},
+		{ID: "c1", DisplayName: "Cam 1", PhuongName: "Bến Nghé", PhuongType: "Phường"},
+		{ID: "c2", DisplayName: "Cam 2", PhuongName: "Tân Định", PhuongType: "Phường"},
+		{ID: "c3", DisplayName: "Cam 3", PhuongName: "Bến Nghé", PhuongType: "Phường"},
+		{ID: "c4", DisplayName: "Cam 4", PhuongName: ""},
 	}
 
 	cat := NewCatalog(cams)
 
-	// Filter case-insensitive
-	matches := cat.FilterByPhuong("phường bến nghé")
+	// Filter case-insensitive (prefix-less)
+	matches := cat.FilterByPhuong("bến nghé")
 	if len(matches) != 2 {
-		t.Fatalf("expected 2 matches for Phường Bến Nghé, got %d", len(matches))
+		t.Fatalf("expected 2 matches for bến nghé, got %d", len(matches))
 	}
 	if matches[0].ID != "c1" || matches[1].ID != "c3" {
 		t.Errorf("unexpected matches: %v", matches)
+	}
+
+	// Filter with prefix
+	matchesPrefix := cat.FilterByPhuong("phường bến nghé")
+	if len(matchesPrefix) != 2 {
+		t.Fatalf("expected 2 matches for phường bến nghé, got %d", len(matchesPrefix))
 	}
 
 	// Filter empty string
@@ -419,23 +424,24 @@ func TestCatalog_FilterByPhuong(t *testing.T) {
 
 func TestCamera_JSONSerialization_PhuongFields(t *testing.T) {
 	pID := "P_001"
-	pName := "Phường Bến Nghé"
 
 	camWithPhuong := Camera{
 		ID:          "cam-with-p",
 		DisplayName: "Nguyễn Huệ",
 		PhuongID:    &pID,
-		PhuongName:  &pName,
+		PhuongType:  "Phường",
+		PhuongName:  "Bến Nghé",
+		RoadType:    "Đường",
+		RoadName:    "Nguyễn Huệ",
 	}
 
 	camWithoutPhuong := Camera{
 		ID:          "cam-without-p",
 		DisplayName: "Quốc lộ 1",
 		PhuongID:    nil,
-		PhuongName:  nil,
 	}
 
-	// 1. Serialization of camera with Phường
+	// 1. Serialization of camera with Phường and Road fields
 	dataWith, err := json.Marshal(camWithPhuong)
 	if err != nil {
 		t.Fatalf("marshal error: %v", err)
@@ -444,14 +450,27 @@ func TestCamera_JSONSerialization_PhuongFields(t *testing.T) {
 	if err := json.Unmarshal(dataWith, &mapWith); err != nil {
 		t.Fatalf("unmarshal error: %v", err)
 	}
-	if mapWith["phuong_id"] != "P_001" || mapWith["phuong_name"] != "Phường Bến Nghé" {
+	if mapWith["phuong_id"] != "P_001" || mapWith["phuong_name"] != "Bến Nghé" || mapWith["phuong_type"] != "Phường" {
 		t.Errorf("expected phuong fields in json, got %v", mapWith)
+	}
+	if mapWith["road_type"] != "Đường" || mapWith["road_name"] != "Nguyễn Huệ" {
+		t.Errorf("expected road fields in json, got %v", mapWith)
 	}
 
 	// 2. Serialization and deserialization of camera without Phường
 	dataWithout, err := json.Marshal(camWithoutPhuong)
 	if err != nil {
 		t.Fatalf("marshal error: %v", err)
+	}
+	var mapWithout map[string]interface{}
+	if err := json.Unmarshal(dataWithout, &mapWithout); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if _, ok := mapWithout["phuong_name"]; ok {
+		t.Errorf("expected phuong_name to be omitted, got %v", mapWithout["phuong_name"])
+	}
+	if _, ok := mapWithout["phuong_type"]; ok {
+		t.Errorf("expected phuong_type to be omitted, got %v", mapWithout["phuong_type"])
 	}
 	var unmarshaled Camera
 	if err := json.Unmarshal(dataWithout, &unmarshaled); err != nil {
@@ -460,8 +479,11 @@ func TestCamera_JSONSerialization_PhuongFields(t *testing.T) {
 	if unmarshaled.PhuongID != nil {
 		t.Errorf("expected nil PhuongID, got %v", *unmarshaled.PhuongID)
 	}
-	if unmarshaled.PhuongName != nil {
-		t.Errorf("expected nil PhuongName, got %v", *unmarshaled.PhuongName)
+	if unmarshaled.PhuongName != "" {
+		t.Errorf("expected empty PhuongName, got %v", unmarshaled.PhuongName)
+	}
+	if unmarshaled.PhuongType != "" {
+		t.Errorf("expected empty PhuongType, got %v", unmarshaled.PhuongType)
 	}
 }
 
@@ -542,7 +564,7 @@ func TestLoadCatalog_GracefulFallback(t *testing.T) {
 	if len(cams) != 1 || cams[0].ID != "base-1" {
 		t.Errorf("expected 1 camera from base catalog, got %v", cams)
 	}
-	if cams[0].PhuongID != nil || cams[0].PhuongName != nil {
-		t.Errorf("expected nil phuong fields in fallback, got id=%v name=%v", cams[0].PhuongID, cams[0].PhuongName)
+	if cams[0].PhuongID != nil || cams[0].PhuongName != "" {
+		t.Errorf("expected empty phuong fields in fallback, got id=%v name=%v", cams[0].PhuongID, cams[0].PhuongName)
 	}
 }

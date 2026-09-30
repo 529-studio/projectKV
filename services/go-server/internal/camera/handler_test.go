@@ -15,9 +15,7 @@ func setupTestRouter() (*gin.Engine, *Catalog) {
 	router.Use(gin.Recovery())
 
 	pBenNgheID := "P_BEN_NGHE"
-	pBenNgheName := "Phường Bến Nghé"
 	pCatLaiID := "P_CAT_LAI"
-	pCatLaiName := "Phường Cát Lái"
 
 	cams := []Camera{
 		{
@@ -31,7 +29,10 @@ func setupTestRouter() (*gin.Engine, *Catalog) {
 			SnapshotURL: "http://example.com/d1.jpg",
 			Zone:        ZoneNoiThanh,
 			PhuongID:    &pBenNgheID,
-			PhuongName:  &pBenNgheName,
+			PhuongType:  "Phường",
+			PhuongName:  "Bến Nghé",
+			RoadType:    "Đường",
+			RoadName:    "Nguyễn Huệ",
 		},
 		{
 			ID:          "cam-cl",
@@ -44,7 +45,10 @@ func setupTestRouter() (*gin.Engine, *Catalog) {
 			SnapshotURL: "http://example.com/cl.jpg",
 			Zone:        ZoneCatLai,
 			PhuongID:    &pCatLaiID,
-			PhuongName:  &pCatLaiName,
+			PhuongType:  "Phường",
+			PhuongName:  "Cát Lái",
+			RoadType:    "Đường",
+			RoadName:    "Cát Lái",
 		},
 		{
 			ID:          "cam-bd",
@@ -258,8 +262,10 @@ func (m *mockReader) Zones() []string {
 	return []string{"MockZone"}
 }
 
-func (m *mockReader) Phuongs() []string {
-	return []string{"MockPhuong"}
+func (m *mockReader) Phuongs() []Phuong {
+	return []Phuong{
+		{Type: "Phường", Name: "MockPhuong"},
+	}
 }
 
 func (m *mockReader) Filter(zone, corridor string) []Camera {
@@ -300,7 +306,7 @@ func TestGetPhuongs(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	var phuongs []string
+	var phuongs []Phuong
 	if err := json.Unmarshal(rec.Body.Bytes(), &phuongs); err != nil {
 		t.Fatalf("failed to decode JSON response: %v", err)
 	}
@@ -308,8 +314,11 @@ func TestGetPhuongs(t *testing.T) {
 	if len(phuongs) != 2 {
 		t.Fatalf("expected 2 phuongs, got %d (%v)", len(phuongs), phuongs)
 	}
-	if phuongs[0] != "Phường Bến Nghé" || phuongs[1] != "Phường Cát Lái" {
+	if phuongs[0].Name != "Bến Nghé" || phuongs[1].Name != "Cát Lái" {
 		t.Errorf("unexpected sorted phuongs: %v", phuongs)
+	}
+	if phuongs[0].Type != "Phường" || phuongs[1].Type != "Phường" {
+		t.Errorf("unexpected phuong types: %v", phuongs)
 	}
 }
 
@@ -344,15 +353,19 @@ func TestGetCameras_IncludesPhuongFields(t *testing.T) {
 	if d1 == nil {
 		t.Fatal("cam-d1 not found in response")
 	}
-	if d1["phuong_id"] != "P_BEN_NGHE" || d1["phuong_name"] != "Phường Bến Nghé" {
+	if d1["phuong_id"] != "P_BEN_NGHE" || d1["phuong_name"] != "Bến Nghé" || d1["phuong_type"] != "Phường" {
 		t.Errorf("expected phuong fields for cam-d1, got %v", d1)
+	}
+	if d1["road_name"] != "Nguyễn Huệ" || d1["road_type"] != "Đường" {
+		t.Errorf("expected road fields for cam-d1, got %v", d1)
 	}
 }
 
 func TestGetCameras_FilterPhuong(t *testing.T) {
 	router, _ := setupTestRouter()
 
-	req, _ := http.NewRequest(http.MethodGet, "/api/cameras?phuong=Phường+Bến+Nghé", nil)
+	// 1. Filter by prefix-less name
+	req, _ := http.NewRequest(http.MethodGet, "/api/cameras?phuong=Bến+Nghé", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -364,8 +377,22 @@ func TestGetCameras_FilterPhuong(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &cameras); err != nil {
 		t.Fatalf("failed to decode JSON response: %v", err)
 	}
-
 	if len(cameras) != 1 || cameras[0].ID != "cam-d1" {
-		t.Errorf("expected 1 camera (cam-d1), got %v", cameras)
+		t.Errorf("expected 1 camera (cam-d1) for prefix-less phuong, got %d (%v)", len(cameras), cameras)
+	}
+
+	// 2. Filter with prefix: "Phường Bến Nghé"
+	req2, _ := http.NewRequest(http.MethodGet, "/api/cameras?phuong=Phường+Bến+Nghé", nil)
+	rec2 := httptest.NewRecorder()
+	router.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec2.Code)
+	}
+	var cameras2 []Camera
+	if err := json.Unmarshal(rec2.Body.Bytes(), &cameras2); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+	if len(cameras2) != 1 || cameras2[0].ID != "cam-d1" {
+		t.Errorf("expected 1 camera (cam-d1) with prefix, got %d (%v)", len(cameras2), cameras2)
 	}
 }

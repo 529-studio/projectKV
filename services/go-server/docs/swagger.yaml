@@ -24,6 +24,18 @@ definitions:
         type: string
       phuong_name:
         type: string
+      phuong_type:
+        type: string
+      road_key:
+        type: string
+      road_keys:
+        items:
+          type: string
+        type: array
+      road_name:
+        type: string
+      road_type:
+        type: string
       snapshotUrl:
         type: string
       status:
@@ -31,6 +43,13 @@ definitions:
       title:
         type: string
       zone:
+        type: string
+    type: object
+  camera.Phuong:
+    properties:
+      name:
+        type: string
+      type:
         type: string
     type: object
   hotset.TrafficStatusResponse:
@@ -210,7 +229,8 @@ paths:
       - Live
   /api/phuong:
     get:
-      description: Retrieve sorted list of distinct post-reform Phường names
+      description: Retrieve sorted list of distinct post-reform Phường structured
+        pairs
       produces:
       - application/json
       responses:
@@ -218,7 +238,7 @@ paths:
           description: OK
           schema:
             items:
-              type: string
+              $ref: '#/definitions/camera.Phuong'
             type: array
       summary: List camera wards (Phường)
       tags:

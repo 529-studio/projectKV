@@ -12,7 +12,10 @@ export interface Camera {
   duplicateOf?: string;
   isGhost?: boolean;
   phuong_id?: string | null;
+  phuong_type?: string | null;
   phuong_name?: string | null;
+  road_type?: string | null;
+  road_name?: string | null;
 }
 
 export function useCameras() {
@@ -36,7 +39,10 @@ export function useCameras() {
           isGhost: Boolean(c.isGhost),
           isOnline: (c.status === 'UP' || c.isOnline === true) && !c.isGhost,
           phuong_id: c.phuong_id ?? null,
+          phuong_type: c.phuong_type ?? null,
           phuong_name: c.phuong_name ?? null,
+          road_type: c.road_type ?? null,
+          road_name: c.road_name ?? null,
         }));
         setCameras(parsed);
       } catch (err) {
