@@ -230,9 +230,12 @@ func main() {
 		if cfg.CloudVisionAPIKey == "" {
 			log.Fatalf("[FATAL] Refusing to start: ANALYZER=vlm requires CLOUD_VISION_API_KEY to be set.")
 		}
-		analyzer = cvclient.NewCloudVisionAnalyzer(cfg.CloudVisionAPIKey)
+		analyzer = cvclient.NewCloudVisionAnalyzer(
+			cfg.CloudVisionAPIKey,
+			cvclient.WithModel(cfg.GeminiModel),
+		)
 		analysisEnabled = true
-		log.Println("[INIT] ANALYZER=vlm active. Hot Set scheduler will run Gemini multimodal vision analysis.")
+		log.Printf("[INIT] ANALYZER=vlm active (model=%s). Hot Set scheduler will run Gemini multimodal vision analysis.", cfg.GeminiModel)
 	case "none", "":
 		log.Println("[INIT] ANALYZER=none: Analysis scheduler is disabled. No camera_verdicts will be recorded and no SSE camera_update will be emitted.")
 	default:

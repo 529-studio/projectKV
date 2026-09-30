@@ -132,3 +132,24 @@ func TestLoadConfig_GeminiAPIKey_Fallback(t *testing.T) {
 		t.Errorf("expected fallback to GEMINI_API_KEY, got %q", cfg.CloudVisionAPIKey)
 	}
 }
+
+func TestLoadConfig_GeminiModel_Default(t *testing.T) {
+	_ = os.Unsetenv("GEMINI_MODEL")
+
+	cfg := config.LoadConfig()
+	if cfg.GeminiModel != "gemini-3.5-flash-lite" {
+		t.Errorf("expected default GeminiModel='gemini-3.5-flash-lite', got %q", cfg.GeminiModel)
+	}
+}
+
+func TestLoadConfig_GeminiModel_Custom(t *testing.T) {
+	_ = os.Setenv("GEMINI_MODEL", "gemini-3.8-flash")
+	defer func() {
+		_ = os.Unsetenv("GEMINI_MODEL")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.GeminiModel != "gemini-3.8-flash" {
+		t.Errorf("expected custom GeminiModel='gemini-3.8-flash', got %q", cfg.GeminiModel)
+	}
+}
