@@ -12,8 +12,10 @@ from enrich import (
     BoundaryFeature,
     compute_bbox,
     enrich_cameras,
+    extract_road_fields,
     load_boundaries,
     parse_h3_resolutions,
+    parse_phuong_name,
     point_in_polygon,
     point_in_ring,
     write_unmatched_report,
@@ -114,17 +116,42 @@ class TestGeoEnrich(unittest.TestCase):
         self.assertEqual(matched, 1)
         self.assertEqual(unmatched, 2)
 
-        # Matched camera gets Phường attributes
+        # Matched camera gets Phường attributes (split into phuong_type and prefix-less phuong_name)
         self.assertEqual(enriched[0]["phuong_id"], "P01")
-        self.assertEqual(enriched[0]["phuong_name"], "Phường Bến Nghé")
+        self.assertEqual(enriched[0]["phuong_type"], "Phường")
+        self.assertEqual(enriched[0]["phuong_name"], "Bến Nghé")
 
         # Outside camera gets null (never fabricated values)
         self.assertIsNone(enriched[1]["phuong_id"])
+        self.assertIsNone(enriched[1]["phuong_type"])
         self.assertIsNone(enriched[1]["phuong_name"])
 
         # Missing coords camera gets null
         self.assertIsNone(enriched[2]["phuong_id"])
+        self.assertIsNone(enriched[2]["phuong_type"])
         self.assertIsNone(enriched[2]["phuong_name"])
+
+    def test_parse_phuong_name(self):
+        self.assertEqual(parse_phuong_name("Phường Bến Nghé"), ("Phường", "Bến Nghé"))
+        self.assertEqual(parse_phuong_name("phường Tân Định"), ("Phường", "Tân Định"))
+        self.assertEqual(parse_phuong_name("Phường 14"), ("Phường", "14"))
+        self.assertEqual(parse_phuong_name("Xã Tân An Hội"), ("Xã", "Tân An Hội"))
+        self.assertEqual(parse_phuong_name("Thị trấn Củ Chi"), ("Thị trấn", "Củ Chi"))
+        self.assertEqual(parse_phuong_name("Bến Nghé"), (None, "Bến Nghé"))
+        self.assertEqual(parse_phuong_name(None), (None, None))
+        self.assertEqual(parse_phuong_name(""), (None, None))
+
+    def test_extract_road_fields(self):
+        self.assertEqual(extract_road_fields("Trần Quang Khải - Trần Khắc Chân"), ("Đường", "Trần Quang Khải"))
+        self.assertEqual(extract_road_fields("Quốc Lộ 13 - cầu Ông Dầu"), ("Quốc lộ", "13"))
+        self.assertEqual(extract_road_fields("QL1 - Tỉnh lộ 10 B (2)"), ("Quốc lộ", "1"))
+        self.assertEqual(extract_road_fields("Xa lộ Hà Nội - Cát Lái"), ("Xa lộ", "Hà Nội"))
+        self.assertEqual(extract_road_fields("Cao tốc LTDG - Võ Chí Công"), ("Cao tốc", "LTDG"))
+        self.assertEqual(extract_road_fields("Cầu Sài Gòn - Dạ cầu"), ("Cầu", "Sài Gòn"))
+        self.assertEqual(extract_road_fields("Cầu vượt Tân Thới Hiệp 1"), ("Cầu vượt", "Tân Thới Hiệp 1"))
+        self.assertEqual(extract_road_fields("Nút giao Hàng Xanh 1"), ("Nút giao", "Hàng Xanh 1"))
+        self.assertEqual(extract_road_fields("Đường số 7 - An Dương Vương"), ("Đường", "số 7"))
+        self.assertEqual(extract_road_fields(None, None), (None, None))
 
     def test_enrichment_idempotency(self):
         feat = BoundaryFeature(self.sample_feature)

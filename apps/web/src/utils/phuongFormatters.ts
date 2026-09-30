@@ -17,50 +17,105 @@ export interface CorridorDisplay {
   name: string;
 }
 
+export const I18N_NAMES = {
+  vi: {
+    ward_type_phuong: 'Phường',
+    ward_type_xa: 'Xã',
+    ward_type_thi_tran: 'Thị trấn',
+    road_type_duong: 'Đường',
+    road_type_quoc_lo: 'Quốc lộ',
+    road_type_xa_lo: 'Xa lộ',
+  },
+  en: {
+    ward_type_phuong: 'Ward',
+    ward_type_xa: 'Commune',
+    ward_type_thi_tran: 'Town',
+    road_type_duong: 'Street',
+    road_type_quoc_lo: 'National Route',
+    road_type_xa_lo: 'Highway',
+  },
+} as const;
+
 /**
- * Formats Vietnamese administrative unit names to English locale.
- * - Phường <Name> -> <Name> Ward (or Ward <N> if numeric)
- * - Xã <Name> -> <Name> Commune (or Commune <N> if numeric)
- * - Thị trấn <Name> -> <Name> Town
+ * Formats Vietnamese administrative unit names with proper i18n support.
+ * - In vi: 'Phường X', 'Xã Y', 'Thị trấn Z'
+ * - In en: 'X Ward' (or 'Ward <N>' if numeric), 'Y Commune', 'Z Town'
+ * Supports prefix-less rawName when type is specified, as well as legacy prefixed rawName.
  */
-export function formatPhuongName(rawName: string, lang: 'vi' | 'en'): string {
+export function formatPhuongName(
+  rawName: string,
+  lang: 'vi' | 'en',
+  type?: string | null
+): string {
   if (!rawName) return '';
-  if (lang === 'vi') return rawName;
+  const trimmed = rawName.trim();
 
-  // 1. Phường (Ward)
-  const phuongMatch = rawName.match(/^(?:Phường|phường)\s+(.+)$/i);
+  let detectedType = type;
+  let core = trimmed;
+
+  const phuongMatch = trimmed.match(/^(?:Phường|phường)\s+(.+)$/i);
   if (phuongMatch) {
-    const core = phuongMatch[1].trim();
-    return /^\d+$/.test(core) ? `Ward ${core}` : `${core} Ward`;
+    detectedType = 'Phường';
+    core = phuongMatch[1].trim();
+  } else {
+    const xaMatch = trimmed.match(/^(?:Xã|xã)\s+(.+)$/i);
+    if (xaMatch) {
+      detectedType = 'Xã';
+      core = xaMatch[1].trim();
+    } else {
+      const ttMatch = trimmed.match(/^(?:Thị\s*trấn|thị\s*trấn)\s+(.+)$/i);
+      if (ttMatch) {
+        detectedType = 'Thị trấn';
+        core = ttMatch[1].trim();
+      }
+    }
   }
 
-  // 2. Xã (Commune)
-  const xaMatch = rawName.match(/^(?:Xã|xã)\s+(.+)$/i);
-  if (xaMatch) {
-    const core = xaMatch[1].trim();
-    return /^\d+$/.test(core) ? `Commune ${core}` : `${core} Commune`;
+  const isNumeric = /^\d+$/.test(core);
+
+  // If numeric with no prefix/type, default to Phường/Ward
+  if (isNumeric && !detectedType) {
+    detectedType = 'Phường';
   }
 
-  // 3. Thị trấn (Town)
-  const ttMatch = rawName.match(/^(?:Thị\s*trấn|thị\s*trấn)\s+(.+)$/i);
-  if (ttMatch) {
-    const core = ttMatch[1].trim();
-    return `${core} Town`;
+  // If no prefix and no explicit type was provided, return rawName
+  if (!detectedType) {
+    return rawName;
   }
 
-  // 4. Standalone digits (e.g. "14")
-  if (/^\d+$/.test(rawName.trim())) {
-    return `Ward ${rawName.trim()}`;
+  if (lang === 'vi') {
+    if (detectedType === 'Xã') {
+      return `${I18N_NAMES.vi.ward_type_xa} ${core}`;
+    }
+    if (detectedType === 'Thị trấn') {
+      return `${I18N_NAMES.vi.ward_type_thi_tran} ${core}`;
+    }
+    return `${I18N_NAMES.vi.ward_type_phuong} ${core}`;
   }
 
-  return rawName;
+  // lang === 'en'
+  if (detectedType === 'Xã') {
+    return isNumeric
+      ? `${I18N_NAMES.en.ward_type_xa} ${core}`
+      : `${core} ${I18N_NAMES.en.ward_type_xa}`;
+  }
+  if (detectedType === 'Thị trấn') {
+    return `${core} ${I18N_NAMES.en.ward_type_thi_tran}`;
+  }
+  return isNumeric
+    ? `${I18N_NAMES.en.ward_type_phuong} ${core}`
+    : `${core} ${I18N_NAMES.en.ward_type_phuong}`;
 }
 
 /**
  * Formats corridor/street names with localized type prefixes.
- * Handles Bridges, Overpasses, Junctions, Roundabouts, Expressways, Routes, and Streets.
+ * Handles Bridges, Overpasses, Junctions, Roundabouts, Expressways, National Routes, Highways, and Streets.
  */
-export function formatCorridorDisplay(rawCorridor: string, lang: 'vi' | 'en'): CorridorDisplay {
+export function formatCorridorDisplay(
+  rawCorridor: string,
+  lang: 'vi' | 'en',
+  roadType?: string | null
+): CorridorDisplay {
   const raw = (rawCorridor || '').trim();
   if (!raw || raw.toLowerCase() === 'khác') {
     return { prefix: '', name: lang === 'vi' ? 'Khác' : 'Other' };
@@ -68,64 +123,110 @@ export function formatCorridorDisplay(rawCorridor: string, lang: 'vi' | 'en'): C
 
   // 1. Cầu vượt (Overpass / Flyover)
   let m = raw.match(/^Cầu\s+vượt\s+(.+)$/i);
-  if (m) {
-    return { prefix: lang === 'vi' ? 'Cầu vượt' : 'Overpass', name: m[1].trim() };
+  if (m || roadType === 'Cầu vượt') {
+    const name = m ? m[1].trim() : raw;
+    return { prefix: lang === 'vi' ? 'Cầu vượt' : 'Overpass', name };
   }
 
   // 2. Cầu (Bridge)
   m = raw.match(/^Cầu\s+(.+)$/i);
-  if (m) {
-    return { prefix: lang === 'vi' ? 'Cầu' : 'Bridge', name: m[1].trim() };
+  if (m || roadType === 'Cầu') {
+    const name = m ? m[1].trim() : raw;
+    return { prefix: lang === 'vi' ? 'Cầu' : 'Bridge', name };
   }
 
   // 3. Nút giao (Junction)
   m = raw.match(/^Nút\s+giao\s+(.+)$/i);
-  if (m) {
-    return { prefix: lang === 'vi' ? 'Nút giao' : 'Junction', name: m[1].trim() };
+  if (m || roadType === 'Nút giao') {
+    const name = m ? m[1].trim() : raw;
+    return { prefix: lang === 'vi' ? 'Nút giao' : 'Junction', name };
   }
 
   // 4. Vòng xoay (Roundabout)
   m = raw.match(/^Vòng\s+xoay\s+(.+)$/i);
-  if (m) {
-    return { prefix: lang === 'vi' ? 'Vòng xoay' : 'Roundabout', name: m[1].trim() };
+  if (m || roadType === 'Vòng xoay') {
+    const name = m ? m[1].trim() : raw;
+    return { prefix: lang === 'vi' ? 'Vòng xoay' : 'Roundabout', name };
   }
 
   // 5. Cao tốc (Expressway)
   m = raw.match(/^Cao\s+tốc\s+(.+)$/i);
-  if (m) {
-    return { prefix: lang === 'vi' ? 'Cao tốc' : 'Expressway', name: m[1].trim() };
+  if (m || roadType === 'Cao tốc') {
+    const name = m ? m[1].trim() : raw;
+    return { prefix: lang === 'vi' ? 'Cao tốc' : 'Expressway', name };
   }
 
-  // 6. Quốc lộ / QL (Route)
+  // 6. Xa lộ (Highway)
+  m = raw.match(/^(?:Xa\s*lộ|XL)\s*(.+)$/i);
+  if (m || roadType === 'Xa lộ') {
+    const name = m ? m[1].trim() : raw;
+    return {
+      prefix: lang === 'vi' ? I18N_NAMES.vi.road_type_xa_lo : I18N_NAMES.en.road_type_xa_lo,
+      name,
+    };
+  }
+
+  // 7. Quốc lộ / QL (National Route)
   m = raw.match(/^(?:Quốc\s*lộ|QL)\s*(.+)$/i);
-  if (m) {
-    return { prefix: lang === 'vi' ? 'Quốc lộ' : 'Route', name: m[1].trim() };
+  if (m || roadType === 'Quốc lộ') {
+    const name = m ? m[1].trim() : raw;
+    return {
+      prefix: lang === 'vi' ? I18N_NAMES.vi.road_type_quoc_lo : I18N_NAMES.en.road_type_quoc_lo,
+      name,
+    };
   }
 
-  // 7. Đường hầm / Hầm (Tunnel)
+  // 8. Đường hầm / Hầm (Tunnel)
   m = raw.match(/^(?:Đường\s+hầm|Hầm)(?:\s+(.+))?$/i);
-  if (m) {
-    const sub = (m[1] || '').trim();
+  if (m || roadType === 'Hầm' || roadType === 'Đường hầm') {
+    const sub = m ? (m[1] || '').trim() : raw;
     return { prefix: lang === 'vi' ? 'Đường hầm' : 'Tunnel', name: sub };
   }
 
-  // 8. Đường số (Street No.)
+  // 9. Đường số (Street No.)
   m = raw.match(/^Đường\s+số\s+(.+)$/i);
   if (m) {
     return {
-      prefix: lang === 'vi' ? 'Đường' : 'Street',
+      prefix: lang === 'vi' ? I18N_NAMES.vi.road_type_duong : I18N_NAMES.en.road_type_duong,
       name: lang === 'vi' ? `số ${m[1].trim()}` : `No. ${m[1].trim()}`,
     };
   }
 
-  // 9. Đường <Name> (e.g. đường dẫn cao tốc, Đường D1)
+  // 10. Đường <Name> (e.g. đường dẫn cao tốc, Đường D1)
   m = raw.match(/^Đường\s+(.+)$/i);
   if (m) {
-    return { prefix: lang === 'vi' ? 'Đường' : 'Street', name: m[1].trim() };
+    return {
+      prefix: lang === 'vi' ? I18N_NAMES.vi.road_type_duong : I18N_NAMES.en.road_type_duong,
+      name: m[1].trim(),
+    };
   }
 
-  // 10. Default street
-  return { prefix: lang === 'vi' ? 'Đường' : 'Street', name: raw };
+  // 11. Default street
+  return {
+    prefix: lang === 'vi' ? I18N_NAMES.vi.road_type_duong : I18N_NAMES.en.road_type_duong,
+    name: raw,
+  };
+}
+
+/**
+ * Formats full localized road name: "Đường {name}" (vi) / "{name} Street" (en).
+ */
+export function formatRoadName(
+  roadName: string,
+  lang: 'vi' | 'en' = 'vi',
+  roadType: string = 'Đường'
+): string {
+  if (!roadName) return '';
+  const display = formatCorridorDisplay(roadName, lang, roadType);
+  if (!display.prefix) return display.name;
+
+  if (lang === 'en') {
+    if (display.prefix === I18N_NAMES.en.road_type_duong || display.prefix === I18N_NAMES.en.road_type_xa_lo) {
+      return `${display.name} ${display.prefix}`;
+    }
+  }
+
+  return `${display.prefix} ${display.name}`;
 }
 
 /**
