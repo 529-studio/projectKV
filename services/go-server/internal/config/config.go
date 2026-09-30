@@ -202,7 +202,8 @@ type ServerConfig struct {
 	CacheTTL                      time.Duration
 	CacheEvictInterval            time.Duration
 	CacheMaxAge                   time.Duration
-	Analyzer                      string        // "none" | "mock" (default: "none")
+	Analyzer                      string // "none" | "mock" | "vlm" (default: "none")
+	CloudVisionAPIKey             string
 	AppEnv                        string        // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
 	StorageDriver                 string        // default: "local"
 	StorageLocalRoot              string        // default: "./data/proofs"
@@ -276,6 +277,8 @@ func LoadConfig() *ServerConfig {
 	if analyzer == "" {
 		analyzer = "none"
 	}
+
+	cloudVisionAPIKey := strings.TrimSpace(os.Getenv("CLOUD_VISION_API_KEY"))
 
 	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if appEnv == "" {
@@ -368,6 +371,7 @@ func LoadConfig() *ServerConfig {
 		CacheEvictInterval:            60 * time.Second,
 		CacheMaxAge:                   15 * time.Second,
 		Analyzer:                      analyzer,
+		CloudVisionAPIKey:             cloudVisionAPIKey,
 		AppEnv:                        appEnv,
 		StorageDriver:                 storageDriver,
 		StorageLocalRoot:              storageLocalRoot,

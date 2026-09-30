@@ -226,10 +226,17 @@ func main() {
 		analyzer = cvclient.NewMockAnalyzer()
 		analysisEnabled = true
 		log.Println("[INIT] ANALYZER=mock active in 'dev' environment. Hot Set scheduler will run mock analysis.")
+	case "vlm":
+		if cfg.CloudVisionAPIKey == "" {
+			log.Fatalf("[FATAL] Refusing to start: ANALYZER=vlm requires CLOUD_VISION_API_KEY to be set.")
+		}
+		analyzer = cvclient.NewCloudVisionAnalyzer(cfg.CloudVisionAPIKey)
+		analysisEnabled = true
+		log.Println("[INIT] ANALYZER=vlm active. Hot Set scheduler will run Gemini multimodal vision analysis.")
 	case "none", "":
 		log.Println("[INIT] ANALYZER=none: Analysis scheduler is disabled. No camera_verdicts will be recorded and no SSE camera_update will be emitted.")
 	default:
-		log.Fatalf("[FATAL] Unknown ANALYZER=%q (valid options: none, mock)", cfg.Analyzer)
+		log.Fatalf("[FATAL] Unknown ANALYZER=%q (valid options: none, mock, vlm)", cfg.Analyzer)
 	}
 
 	frozenDetector := hotset.NewFrozenDetector(cfg.FrozenFrameThreshold)
