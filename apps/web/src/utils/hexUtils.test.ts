@@ -4,6 +4,7 @@ import {
   normalizeHexCell,
   getHexColorAndOpacity,
   isHexVisibleAtZoom,
+  getHexInteractivityState,
   formatHexTooltip,
   HEX_I18N,
   type HexCell,
@@ -107,6 +108,25 @@ describe('Hex Overlay Utilities (Issue #74)', () => {
     assert.equal(isHexVisibleAtZoom(14), false);
     assert.equal(isHexVisibleAtZoom(15), false);
     assert.equal(isHexVisibleAtZoom(18), false);
+  });
+
+  test('getHexInteractivityState controls visibility, pointerEvents, and CSS classes across zoom levels', () => {
+    // Macro zoom (<= 13)
+    const macroState = getHexInteractivityState(13);
+    assert.equal(macroState.isVisible, true);
+    assert.equal(macroState.pointerEvents, 'auto');
+    assert.equal(macroState.className, 'hex-cell-polygon');
+
+    // Micro zoom (>= 14)
+    const microState = getHexInteractivityState(14);
+    assert.equal(microState.isVisible, false);
+    assert.equal(microState.pointerEvents, 'none');
+    assert.equal(microState.className, 'hex-cell-polygon hex-cell-hidden');
+
+    const deepMicroState = getHexInteractivityState(16);
+    assert.equal(deepMicroState.isVisible, false);
+    assert.equal(deepMicroState.pointerEvents, 'none');
+    assert.equal(deepMicroState.className, 'hex-cell-polygon hex-cell-hidden');
   });
 
   test('formatHexTooltip shows camera count and worst camera, never a ward name', () => {

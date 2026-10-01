@@ -1,10 +1,11 @@
 'use client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera } from '../hooks/useCameras';
-import PhuongTreeFilter from './PhuongTreeFilter';
+import PhuongTreeFilter, { type TrafficVerdictLike } from './PhuongTreeFilter';
 
 interface MobileCameraDrawerProps {
   cameras: Camera[];
+  verdicts?: Map<string, TrafficVerdictLike>;
   loading: boolean;
   error: Error | null;
   isOpen: boolean;
@@ -22,6 +23,7 @@ interface MobileCameraDrawerProps {
 
 export default function MobileCameraDrawer({
   cameras,
+  verdicts,
   loading,
   error,
   isOpen,
@@ -82,6 +84,7 @@ export default function MobileCameraDrawer({
             <div className="flex-1 min-h-0 overflow-hidden">
               <PhuongTreeFilter
                 cameras={cameras}
+                verdicts={verdicts}
                 loading={loading}
                 error={error}
                 selectedPhuong={selectedPhuong}

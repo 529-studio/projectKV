@@ -57,3 +57,4 @@ __pycache__/
 *$py.class
 # Spike & Temporary Sandbox Directories
 .tmp_*
+.tmp_spike_routing/

@@ -126,6 +126,24 @@ export function isHexVisibleAtZoom(zoom: number): boolean {
 }
 
 /**
+ * Returns whether pointer events and interactivity should be active for hex cells.
+ * At macro zoom (<= 13): cells are visible and interactive.
+ * At micro zoom (>= 14): cells are hidden, pointer-events are disabled ('none') so camera markers are never blocked.
+ */
+export function getHexInteractivityState(zoom: number): {
+  isVisible: boolean;
+  pointerEvents: 'auto' | 'none';
+  className: string;
+} {
+  const isVisible = isHexVisibleAtZoom(zoom);
+  return {
+    isVisible,
+    pointerEvents: isVisible ? 'auto' : 'none',
+    className: `hex-cell-polygon${isVisible ? '' : ' hex-cell-hidden'}`,
+  };
+}
+
+/**
  * Formats hex cell tooltip content.
  * Requirement: Shows camera count and worst camera name.
  * Strictly NEVER shows a ward name (ADR-004 §D11 Correction 2).

@@ -9,6 +9,7 @@ import CameraModal from '../components/CameraModal';
 import PinnedDock from '../components/PinnedDock';
 import MapLegend from '../components/MapLegend';
 import MobileCameraDrawer from '../components/MobileCameraDrawer';
+import TrafficSyncBanner from '../components/TrafficSyncBanner';
 import PhuongTreeFilter, {
   computeFilteredCameraIds,
   computeActiveFilterLabel,
@@ -22,7 +23,7 @@ export default function Home() {
   const { verdicts, hexCells, analysisEnabled, appEnv } = useTraffic();
   
   const [map, setMap] = useState<L.Map | null>(null);
-  const [hexOverlayEnabled, setHexOverlayEnabled] = useState(false);
+  const [hexOverlayEnabled, setHexOverlayEnabled] = useState(true);
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pinnedCameraIds, setPinnedCameraIds] = useState<string[]>([]);
@@ -39,6 +40,25 @@ export default function Home() {
     if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
       setLegendOpen(true);
     }
+  }, []);
+
+  // Zone Overview default & persistence (ADR-004 §D11)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = localStorage.getItem('warded_hex_overlay_enabled');
+    if (saved === 'false') {
+      setHexOverlayEnabled(false);
+    }
+  }, []);
+
+  const handleToggleHexOverlay = useCallback(() => {
+    setHexOverlayEnabled(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('warded_hex_overlay_enabled', String(next));
+      }
+      return next;
+    });
   }, []);
 
   // URL sync for active filter (ADR-004 stretch goal)
@@ -131,6 +151,7 @@ export default function Home() {
         <div className="flex-1 min-h-0 overflow-hidden">
           <PhuongTreeFilter
             cameras={cameras}
+            verdicts={verdicts}
             loading={loading}
             error={error}
             selectedPhuong={selectedPhuong}
@@ -161,12 +182,13 @@ export default function Home() {
             lang={lang}
             appEnv={appEnv}
             onMapReady={setMap}
+            hexOverlayEnabled={hexOverlayEnabled}
           >
             <HexOverlay
               map={map}
               hexCells={hexCells}
               enabled={hexOverlayEnabled}
-              onToggle={() => setHexOverlayEnabled(prev => !prev)}
+              onToggle={handleToggleHexOverlay}
               lang={lang}
             />
           </MapComponent>
@@ -180,12 +202,20 @@ export default function Home() {
           lang={lang}
         />
 
+        {/* FLOATING STATUS PILL — Non-blocking background AI sync notification */}
+        <TrafficSyncBanner
+          analysisEnabled={analysisEnabled}
+          verdictsCount={verdicts.size}
+          lang={lang}
+        />
+
         {/* MAP LEGEND — collapsible */}
         <MapLegend
           isOpen={legendOpen}
           onToggle={() => setLegendOpen(prev => !prev)}
           analysisEnabled={analysisEnabled}
           hexOverlayEnabled={hexOverlayEnabled}
+          verdictsCount={verdicts.size}
           lang={lang}
         />
 
@@ -201,6 +231,7 @@ export default function Home() {
         {/* MOBILE CAMERA DRAWER */}
         <MobileCameraDrawer
           cameras={cameras}
+          verdicts={verdicts}
           loading={loading}
           error={error}
           isOpen={mobileDrawerOpen}
@@ -226,6 +257,7 @@ export default function Home() {
         onTogglePin={() => selectedCamera && togglePin(selectedCamera.id)}
         lang={lang}
         appEnv={appEnv}
+        analysisEnabled={analysisEnabled}
       />
     </div>
   );
