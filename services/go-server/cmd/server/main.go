@@ -293,6 +293,41 @@ func main() {
 	}
 	liveHub.SetFloodHexAggregator(floodHexAggregator)
 
+	// Pre-seed aggregators with latest stored verdicts from SQLite so GET /api/flood-hex
+	// and GET /api/traffic-status return cached data immediately on cold boot.
+	if verdictRepo != nil {
+		if storedVerdicts, err := verdictRepo.GetLatest(); err == nil && len(storedVerdicts) > 0 {
+			staleThreshold := time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second
+			if staleThreshold <= 0 {
+				staleThreshold = 180 * time.Second
+			}
+			now := time.Now()
+			for _, sv := range storedVerdicts {
+				obs := sv.ObservedAt
+				if obs.IsZero() {
+					obs = sv.Timestamp
+				}
+				isStale := false
+				if !obs.IsZero() && now.Sub(obs) > staleThreshold {
+					isStale = true
+				}
+				hv := hotset.Verdict{
+					CameraID:      sv.CameraID,
+					Severity:      sv.Severity,
+					FloodSeverity: sv.FloodSeverity,
+					Confidence:    sv.Confidence,
+					Source:        sv.Source,
+					ObservedAt:    obs,
+					Timestamp:     sv.Timestamp,
+					Stale:         isStale,
+				}
+				hexAggregator.OnVerdict(hv)
+				floodHexAggregator.OnVerdict(hv)
+			}
+			log.Printf("[INIT] Pre-seeded hex aggregators with %d stored verdicts from database", len(storedVerdicts))
+		}
+	}
+
 	// 6d. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
 	if analysisEnabled && analyzer != nil {
 		// Initialize object storage and snapshot archiver (Issue #62)
