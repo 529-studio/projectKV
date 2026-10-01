@@ -116,24 +116,24 @@ export default function MapLegend({
                   </div>
                   <div className="flex items-center gap-2.5">
                     <span
-                      className="w-3.5 h-3.5 rounded-sm border border-zinc-500 shrink-0"
-                      style={{ backgroundColor: 'rgba(34, 197, 94, 0.25)' }}
+                      className="w-3.5 h-3.5 rounded-sm border border-emerald-500/60 shrink-0"
+                      style={{ backgroundColor: 'rgba(34, 197, 94, 0.35)' }}
                     />
-                    <span>{HEX_I18N.ZONE_CLEAR[lang]}</span>
+                    <span className="text-zinc-300">{HEX_I18N.ZONE_CLEAR[lang]}</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <span
-                      className="w-3.5 h-3.5 rounded-sm border border-zinc-500 shrink-0"
-                      style={{ backgroundColor: 'rgba(234, 179, 8, 0.25)' }}
+                      className="w-3.5 h-3.5 rounded-sm border border-amber-500/60 shrink-0"
+                      style={{ backgroundColor: 'rgba(234, 179, 8, 0.35)' }}
                     />
-                    <span>{HEX_I18N.ZONE_MODERATE[lang]}</span>
+                    <span className="text-zinc-300">{HEX_I18N.ZONE_MODERATE[lang]}</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <span
-                      className="w-3.5 h-3.5 rounded-sm border border-zinc-500 shrink-0"
-                      style={{ backgroundColor: 'rgba(239, 68, 68, 0.3)' }}
+                      className="w-3.5 h-3.5 rounded-sm border border-rose-500/60 shrink-0"
+                      style={{ backgroundColor: 'rgba(239, 68, 68, 0.4)' }}
                     />
-                    <span>{HEX_I18N.ZONE_CONGESTED[lang]}</span>
+                    <span className="text-zinc-300">{HEX_I18N.ZONE_CONGESTED[lang]}</span>
                   </div>
                 </>
               )}
