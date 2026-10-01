@@ -8,13 +8,15 @@ import {
   normalizeVerdict,
   getSeverityLabel,
 } from '../utils/trafficUtils';
+import { type HexCell, normalizeHexCell } from '../utils/hexUtils';
 
 // Re-export pure utilities so existing imports of isVerdictValid from this module still work.
-export type { TrafficVerdict };
-export { isVerdictValid, isVerdictStale, isMockHidden, normalizeVerdict, getSeverityLabel };
+export type { TrafficVerdict, HexCell };
+export { isVerdictValid, isVerdictStale, isMockHidden, normalizeVerdict, getSeverityLabel, normalizeHexCell };
 
 export function useTraffic() {
   const [verdicts, setVerdicts] = useState<Map<string, TrafficVerdict>>(new Map());
+  const [hexCells, setHexCells] = useState<Map<string, HexCell>>(new Map());
   const [analysisEnabled, setAnalysisEnabled] = useState(false);
   const [appEnv, setAppEnv] = useState<string>('production');
 
@@ -31,6 +33,17 @@ export function useTraffic() {
       return next;
     });
   }, [appEnv]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateHexCell = useCallback((raw: any) => {
+    const cell = normalizeHexCell(raw);
+    if (!cell) return;
+    setHexCells((prev) => {
+      const next = new Map(prev);
+      next.set(cell.h3_id, cell);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     let es: EventSource | null = null;
@@ -94,6 +107,22 @@ export function useTraffic() {
           }
         });
 
+        es.addEventListener('hex_update', (event: MessageEvent) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (Array.isArray(payload)) {
+              payload.forEach(updateHexCell);
+            } else if (payload.data) {
+              if (Array.isArray(payload.data)) payload.data.forEach(updateHexCell);
+              else updateHexCell(payload.data);
+            } else {
+              updateHexCell(payload);
+            }
+          } catch (err) {
+            console.warn('Failed to parse SSE hex_update message:', err);
+          }
+        });
+
         es.onerror = (err) => {
           // EventSource automatically attempts to reconnect on transient errors per the SSE spec.
           if (es?.readyState === EventSource.CLOSED) {
@@ -141,7 +170,7 @@ export function useTraffic() {
         es.close();
       }
     };
-  }, [updateVerdict, appEnv]);
+  }, [updateVerdict, updateHexCell, appEnv]);
 
-  return { verdicts, analysisEnabled, appEnv };
+  return { verdicts, hexCells, analysisEnabled, appEnv };
 }

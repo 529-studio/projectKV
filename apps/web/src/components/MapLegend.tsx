@@ -1,12 +1,13 @@
 'use client';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { FUNCTIONAL_COLORS, VERDICT_I18N } from '../config/constants';
+import { FUNCTIONAL_COLORS, VERDICT_I18N, HEX_I18N } from '../config/constants';
 
 interface MapLegendProps {
   isOpen: boolean;
   onToggle: () => void;
   analysisEnabled?: boolean;
+  hexOverlayEnabled?: boolean;
   lang?: 'vi' | 'en';
 }
 
@@ -14,6 +15,7 @@ export default function MapLegend({
   isOpen,
   onToggle,
   analysisEnabled = false,
+  hexOverlayEnabled = false,
   lang = 'vi',
 }: MapLegendProps) {
   return (
@@ -102,6 +104,36 @@ export default function MapLegend({
                     <span className="text-zinc-400">
                       {lang === 'vi' ? VERDICT_I18N.STALE_DESC.vi : VERDICT_I18N.STALE_DESC.en}
                     </span>
+                  </div>
+                </>
+              )}
+
+              {/* Category 3: H3 Hex Overlay (Only rendered when hexOverlayEnabled is true) */}
+              {hexOverlayEnabled && (
+                <>
+                  <div className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1.5 border-t border-zinc-800/80">
+                    {lang === 'vi' ? 'Vùng tổng hợp (H3)' : 'Zone Overview (H3)'}
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="w-3.5 h-3.5 rounded-sm border border-zinc-500 shrink-0"
+                      style={{ backgroundColor: 'rgba(34, 197, 94, 0.25)' }}
+                    />
+                    <span>{HEX_I18N.ZONE_CLEAR[lang]}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="w-3.5 h-3.5 rounded-sm border border-zinc-500 shrink-0"
+                      style={{ backgroundColor: 'rgba(234, 179, 8, 0.25)' }}
+                    />
+                    <span>{HEX_I18N.ZONE_MODERATE[lang]}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="w-3.5 h-3.5 rounded-sm border border-zinc-500 shrink-0"
+                      style={{ backgroundColor: 'rgba(239, 68, 68, 0.3)' }}
+                    />
+                    <span>{HEX_I18N.ZONE_CONGESTED[lang]}</span>
                   </div>
                 </>
               )}

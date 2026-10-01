@@ -210,6 +210,43 @@ func TestHexAggregator_MockExclusion_BelowFloor(t *testing.T) {
 	}
 }
 
+// 2b. AllowMock in dev mode qualifies mock cameras.
+func TestHexAggregator_AllowMock_EmitsEvent(t *testing.T) {
+	cams := sampleCameras()[:3]
+	broadcaster := &mockBroadcaster{}
+	agg := live.NewHexAggregator(cams, samplePolygons(), 7, 3, broadcaster, nil)
+	agg.SetAllowMock(true)
+
+	agg.OnVerdict(hotset.Verdict{
+		CameraID:   "cam-1",
+		Severity:   hotset.SeverityClear,
+		Confidence: 0.9,
+		Source:     "mock",
+		Timestamp:  time.Now(),
+	})
+	agg.OnVerdict(hotset.Verdict{
+		CameraID:   "cam-2",
+		Severity:   hotset.SeverityClear,
+		Confidence: 0.85,
+		Source:     "mock",
+		Timestamp:  time.Now(),
+	})
+	cell, ok := agg.ProcessVerdict(hotset.Verdict{
+		CameraID:   "cam-3",
+		Severity:   hotset.SeverityCongested,
+		Confidence: 0.99,
+		Source:     "mock",
+		Timestamp:  time.Now(),
+	})
+
+	if !ok || cell == nil {
+		t.Fatalf("expected event when SetAllowMock(true) and 3 mock cameras present, got ok=%v", ok)
+	}
+	if cell.Severity != hotset.SeverityCongested {
+		t.Errorf("expected worst severity %s, got %s", hotset.SeverityCongested, cell.Severity)
+	}
+}
+
 // 3. Cell with 3 fresh cameras -> event with worst severity.
 func TestHexAggregator_ThreeFreshCameras_EmitsEvent(t *testing.T) {
 	cams := sampleCameras()[:3]
