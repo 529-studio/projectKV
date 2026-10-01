@@ -99,6 +99,12 @@ export default function MapComponent({
         updateWhenZooming: false,
       }).addTo(map);
 
+      // Dedicated pane for camera markers to ensure they always stay on top of overlay polygons
+      if (!map.getPane('cameraMarkersPane')) {
+        const cameraPane = map.createPane('cameraMarkersPane');
+        cameraPane.style.zIndex = '600';
+      }
+
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
       onMapReady?.(map);
@@ -235,6 +241,7 @@ export default function MapComponent({
         weight,
         opacity,
         fillOpacity,
+        pane: 'cameraMarkersPane',
       });
 
       const customMarker = marker as CustomCircleMarker;
