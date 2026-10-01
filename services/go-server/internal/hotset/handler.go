@@ -26,6 +26,13 @@ type TrafficStatusResponse struct {
 	Verdicts        []Verdict `json:"verdicts"`
 }
 
+// FloodStatusResponse represents the response payload for GET /api/flood-status.
+type FloodStatusResponse struct {
+	AnalysisEnabled bool      `json:"analysis_enabled"`
+	AppEnv          string    `json:"app_env,omitempty"`
+	Verdicts        []Verdict `json:"verdicts"`
+}
+
 // Handler exposes the verdict query endpoints defined in §4 of
 // docs/GO_BACKEND_ARCHITECTURE.md.
 type Handler struct {
@@ -129,14 +136,64 @@ func (h *Handler) GetConfig(c *gin.Context) {
 
 // GetFloodStatus godoc
 // @Summary Get latest flood-detection verdicts
-// @Description Placeholder — flood detection shares the same verdict store; this endpoint is out of scope for issue #8 and returns an empty list.
-// @Tags Traffic
+// @Description Returns the most recent AI-analyzed flood and rain verdicts for cameras in the Hot Set along with analysis_enabled status. When APP_ENV is not dev, verdicts with source=mock are strictly omitted. Unverified cameras are omitted per honesty rules.
+// @Tags Flood
 // @Produce json
-// @Success 200 {array} hotset.Verdict
+// @Success 200 {object} hotset.FloodStatusResponse
 // @Failure 500 {object} map[string]string
 // @Router /api/flood-status [get]
 func (h *Handler) GetFloodStatus(c *gin.Context) {
-	// Out of scope (issue #8) — flood severity values come from a separate
-	// Analyzer and will be wired in a later issue.
-	c.JSON(http.StatusOK, []Verdict{})
+	allVerdicts := h.storer.GetLatest()
+	if allVerdicts == nil {
+		allVerdicts = []Verdict{}
+	}
+
+	staleThreshold := h.staleTTL
+	if staleThreshold <= 0 {
+		staleThreshold = 180 * time.Second
+	}
+
+	filtered := make([]Verdict, 0, len(allVerdicts))
+	for _, v := range allVerdicts {
+		// Provenance safety rule: filter out source=mock when appEnv is not "dev"
+		if strings.ToLower(v.Source) == "mock" && strings.ToLower(h.appEnv) != "dev" {
+			continue
+		}
+
+		// Normalize/determine flood severity
+		floodSev := v.FloodSeverity
+		if floodSev == "" {
+			switch strings.ToUpper(strings.TrimSpace(v.Severity)) {
+			case SeverityDry, SeverityWet, SeverityFloodedShallow, SeverityFloodedDeep:
+				floodSev = strings.ToUpper(strings.TrimSpace(v.Severity))
+			}
+		}
+
+		// Honesty rule: Unverified cameras (empty or unknown flood severity) are omitted.
+		if floodSev == "" || floodSev == SeverityUnknown {
+			continue
+		}
+		v.FloodSeverity = floodSev
+
+		if v.ObservedAt.IsZero() && !v.Timestamp.IsZero() {
+			v.ObservedAt = v.Timestamp
+		}
+
+		obs := v.ObservedAt
+		if obs.IsZero() {
+			obs = v.Timestamp
+		}
+		if !v.Stale && !obs.IsZero() && time.Since(obs) > staleThreshold {
+			v.Stale = true
+		}
+
+		filtered = append(filtered, v)
+	}
+
+	c.Header("X-Analysis-Enabled", fmt.Sprintf("%t", h.analysisEnabled))
+	c.JSON(http.StatusOK, FloodStatusResponse{
+		AnalysisEnabled: h.analysisEnabled,
+		AppEnv:          h.appEnv,
+		Verdicts:        filtered,
+	})
 }

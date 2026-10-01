@@ -157,24 +157,44 @@
                 }
             }
         },
-        "/api/flood-status": {
+        "/api/flood-hex": {
             "get": {
-                "description": "Placeholder — flood detection shares the same verdict store; this endpoint is out of scope for issue #8 and returns an empty list.",
+                "description": "Returns the snapshot of all currently active H3 hexagonal cells with qualifying flood observations for immediate client hydration on startup.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Traffic"
+                    "Flood"
                 ],
-                "summary": "Get latest flood-detection verdicts",
+                "summary": "Snapshot of all active flood hex cells",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/hotset.Verdict"
+                                "$ref": "#/definitions/live.FloodHexCell"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/flood-status": {
+            "get": {
+                "description": "Returns the most recent AI-analyzed flood and rain verdicts for cameras in the Hot Set along with analysis_enabled status. When APP_ENV is not dev, verdicts with source=mock are strictly omitted. Unverified cameras are omitted per honesty rules.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Flood"
+                ],
+                "summary": "Get latest flood-detection verdicts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/hotset.FloodStatusResponse"
                         }
                     },
                     "500": {
@@ -505,6 +525,23 @@
                 }
             }
         },
+        "hotset.FloodStatusResponse": {
+            "type": "object",
+            "properties": {
+                "analysis_enabled": {
+                    "type": "boolean"
+                },
+                "app_env": {
+                    "type": "string"
+                },
+                "verdicts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/hotset.Verdict"
+                    }
+                }
+            }
+        },
         "hotset.TrafficStatusResponse": {
             "type": "object",
             "properties": {
@@ -531,11 +568,15 @@
                 "confidence": {
                     "type": "number"
                 },
+                "flood_severity": {
+                    "description": "Flood severity: \"DRY\" | \"WET\" | \"FLOODED_SHALLOW\" | \"FLOODED_DEEP\" | \"UNKNOWN\"",
+                    "type": "string"
+                },
                 "observed_at": {
                     "type": "string"
                 },
                 "severity": {
-                    "description": "e.g. \"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\", or \"DRY\" | \"WET\" | \"FLOODED_SHALLOW\" | \"FLOODED_DEEP\"",
+                    "description": "Traffic severity: e.g. \"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\"",
                     "type": "string"
                 },
                 "source": {
@@ -546,6 +587,44 @@
                     "type": "boolean"
                 },
                 "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "live.FloodHexCell": {
+            "type": "object",
+            "properties": {
+                "camera_count": {
+                    "description": "qualifying cameras",
+                    "type": "integer"
+                },
+                "flood_severity": {
+                    "description": "worst-of: FLOODED_DEEP \u003e FLOODED_SHALLOW \u003e WET",
+                    "type": "string"
+                },
+                "h3_id": {
+                    "type": "string"
+                },
+                "polygon": {
+                    "description": "[[lat,lng], ...] boundary for rendering",
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "number",
+                            "format": "float64"
+                        }
+                    }
+                },
+                "resolution": {
+                    "type": "integer"
+                },
+                "worst_camera": {
+                    "description": "camera_id of worst flood verdict",
+                    "type": "string"
+                },
+                "worst_camera_name": {
+                    "description": "display name",
                     "type": "string"
                 }
             }

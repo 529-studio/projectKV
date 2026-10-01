@@ -167,14 +167,16 @@ func (a *CloudVisionAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (h
 
 	// 4. Normalise severity string (the VLM may return lowercase).
 	sev := normaliseSeverity(vj.TrafficSeverity)
+	floodSev := normaliseFloodSeverity(vj.FloodSeverity)
 
 	return hotset.Verdict{
-		CameraID:   cam.ID,
-		Severity:   sev,
-		Confidence: vj.Confidence,
-		Source:     "vlm",
-		ObservedAt: now,
-		Timestamp:  now,
+		CameraID:      cam.ID,
+		Severity:      sev,
+		FloodSeverity: floodSev,
+		Confidence:    vj.Confidence,
+		Source:        "vlm",
+		ObservedAt:    now,
+		Timestamp:     now,
 	}, nil
 }
 
@@ -326,6 +328,24 @@ func normaliseSeverity(s string) string {
 		return hotset.SeverityHeavy
 	case hotset.SeverityCongested:
 		return hotset.SeverityCongested
+	default:
+		return hotset.SeverityUnknown
+	}
+}
+
+// normaliseFloodSeverity maps the VLM's string to one of the canonical hotset
+// flood severity constants (uppercase). Falls back to SeverityUnknown for any
+// unrecognised value.
+func normaliseFloodSeverity(s string) string {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case hotset.SeverityFloodedDeep:
+		return hotset.SeverityFloodedDeep
+	case hotset.SeverityFloodedShallow:
+		return hotset.SeverityFloodedShallow
+	case hotset.SeverityWet:
+		return hotset.SeverityWet
+	case hotset.SeverityDry:
+		return hotset.SeverityDry
 	default:
 		return hotset.SeverityUnknown
 	}

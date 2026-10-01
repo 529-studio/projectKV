@@ -97,6 +97,9 @@ func TestCloudVisionAnalyzer_Analyze_Success(t *testing.T) {
 	if v.Severity != hotset.SeverityCongested {
 		t.Errorf("expected severity %q, got %q", hotset.SeverityCongested, v.Severity)
 	}
+	if v.FloodSeverity != hotset.SeverityDry {
+		t.Errorf("expected flood severity %q, got %q", hotset.SeverityDry, v.FloodSeverity)
+	}
 	if v.Confidence != 0.95 {
 		t.Errorf("expected confidence 0.95, got %f", v.Confidence)
 	}

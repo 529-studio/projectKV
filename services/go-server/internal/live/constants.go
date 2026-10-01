@@ -16,6 +16,7 @@ const DefaultClientBuffer = 32
 
 // SSE event names emitted over RouteStream.
 const (
-	EventCameraUpdate = "camera_update"
-	EventHexUpdate    = "hex_update"
+	EventCameraUpdate   = "camera_update"
+	EventHexUpdate      = "hex_update"
+	EventFloodHexUpdate = "flood_hex_update"
 )

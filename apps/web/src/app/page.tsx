@@ -4,6 +4,9 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import type L from 'leaflet';
 import { useCameras, Camera } from '../hooks/useCameras';
 import { useTraffic } from '../hooks/useTraffic';
+import { useFlood } from '../hooks/useFlood';
+import { type HexOverlayMode } from '../components/HexOverlay';
+import { FLOOD_I18N } from '../utils/floodUtils';
 import LandingOverlay from '../components/LandingOverlay';
 import CameraModal from '../components/CameraModal';
 import PinnedDock from '../components/PinnedDock';
@@ -21,9 +24,12 @@ const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: fals
 export default function Home() {
   const { cameras, loading, error } = useCameras();
   const { verdicts, hexCells, analysisEnabled, appEnv } = useTraffic();
+  const { floodVerdicts, floodHexCells, floodedCameraIds, floodedCameraCount } = useFlood();
   
   const [map, setMap] = useState<L.Map | null>(null);
   const [hexOverlayEnabled, setHexOverlayEnabled] = useState(true);
+  const [hexOverlayMode, setHexOverlayMode] = useState<HexOverlayMode>('traffic');
+  const [isFloodFilterActive, setIsFloodFilterActive] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pinnedCameraIds, setPinnedCameraIds] = useState<string[]>([]);
@@ -49,6 +55,10 @@ export default function Home() {
     if (saved === 'false') {
       setHexOverlayEnabled(false);
     }
+    const savedMode = localStorage.getItem('warded_hex_mode');
+    if (savedMode === 'traffic' || savedMode === 'flood') {
+      setHexOverlayMode(savedMode);
+    }
   }, []);
 
   const handleToggleHexOverlay = useCallback(() => {
@@ -59,6 +69,13 @@ export default function Home() {
       }
       return next;
     });
+  }, []);
+
+  const handleHexModeChange = useCallback((newMode: HexOverlayMode) => {
+    setHexOverlayMode(newMode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('warded_hex_mode', newMode);
+    }
   }, []);
 
   // URL sync for active filter (ADR-004 stretch goal)
@@ -89,11 +106,12 @@ export default function Home() {
     window.history.replaceState({}, '', newPath);
   }, [selectedPhuong, selectedCorridor]);
 
-  const isFiltered = Boolean(selectedPhuong || selectedCorridor);
+  const isFiltered = Boolean(selectedPhuong || selectedCorridor || isFloodFilterActive);
 
   const handleFilterClear = useCallback(() => {
     setSelectedPhuong(null);
     setSelectedCorridor(null);
+    setIsFloodFilterActive(false);
   }, []);
 
   // Escape key clears open camera modal first, then active filter (Issue #65)
@@ -113,13 +131,28 @@ export default function Home() {
 
   // Set of camera IDs matching the active filter for focus dimming (ADR-004 A3)
   const filteredCameraIds = useMemo(() => {
-    return computeFilteredCameraIds(cameras, selectedPhuong, selectedCorridor);
-  }, [cameras, selectedPhuong, selectedCorridor]);
+    const baseSet = computeFilteredCameraIds(cameras, selectedPhuong, selectedCorridor);
+    if (!isFloodFilterActive) return baseSet;
+    if (!baseSet) return floodedCameraIds;
+    const intersected = new Set<string>();
+    baseSet.forEach(id => {
+      if (floodedCameraIds.has(id)) intersected.add(id);
+    });
+    return intersected;
+  }, [cameras, selectedPhuong, selectedCorridor, isFloodFilterActive, floodedCameraIds]);
 
   // Active filter label for on-map chip
   const activeFilterLabel = useMemo(() => {
-    return computeActiveFilterLabel(selectedPhuong, selectedCorridor, lang);
-  }, [selectedPhuong, selectedCorridor, lang]);
+    const baseLabel = computeActiveFilterLabel(selectedPhuong, selectedCorridor, lang);
+    const floodLabel = FLOOD_I18N.FILTER_CHIP[lang](floodedCameraCount);
+    if (isFloodFilterActive && baseLabel) {
+      return `${baseLabel} • ${floodLabel}`;
+    }
+    if (isFloodFilterActive) {
+      return floodLabel;
+    }
+    return baseLabel;
+  }, [selectedPhuong, selectedCorridor, lang, isFloodFilterActive, floodedCameraCount]);
 
   const pinnedCameras = useMemo(() => {
     return pinnedCameraIds.map(id => cameras.find(c => c.id === id)).filter(Boolean) as Camera[];
@@ -130,6 +163,22 @@ export default function Home() {
       prev.includes(camId) ? prev.filter(id => id !== camId) : [...prev, camId]
     );
   };
+
+  const selectedCameraVerdict = useMemo(() => {
+    if (!selectedCamera) return undefined;
+    const tv = verdicts.get(selectedCamera.id);
+    const fv = floodVerdicts.get(selectedCamera.id);
+    if (!tv && !fv) return undefined;
+    return {
+      ...(tv || {}),
+      ...(fv || {}),
+      camera_id: selectedCamera.id,
+      severity: tv?.severity || 'CLEAR',
+      flood_severity: fv?.flood_severity || tv?.flood_severity,
+      confidence: tv?.confidence ?? fv?.confidence ?? 1.0,
+      timestamp: fv?.timestamp || tv?.timestamp || new Date().toISOString(),
+    };
+  }, [selectedCamera, verdicts, floodVerdicts]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-300">
@@ -152,6 +201,9 @@ export default function Home() {
           <PhuongTreeFilter
             cameras={cameras}
             verdicts={verdicts}
+            floodedCameraIds={floodedCameraIds}
+            isFloodFilterActive={isFloodFilterActive}
+            onToggleFloodFilter={() => setIsFloodFilterActive(prev => !prev)}
             loading={loading}
             error={error}
             selectedPhuong={selectedPhuong}
@@ -187,8 +239,11 @@ export default function Home() {
             <HexOverlay
               map={map}
               hexCells={hexCells}
+              floodHexCells={floodHexCells}
               enabled={hexOverlayEnabled}
               onToggle={handleToggleHexOverlay}
+              mode={hexOverlayMode}
+              onModeChange={handleHexModeChange}
               lang={lang}
             />
           </MapComponent>
@@ -215,6 +270,7 @@ export default function Home() {
           onToggle={() => setLegendOpen(prev => !prev)}
           analysisEnabled={analysisEnabled}
           hexOverlayEnabled={hexOverlayEnabled}
+          hexOverlayMode={hexOverlayMode}
           verdictsCount={verdicts.size}
           lang={lang}
         />
@@ -232,6 +288,9 @@ export default function Home() {
         <MobileCameraDrawer
           cameras={cameras}
           verdicts={verdicts}
+          floodedCameraIds={floodedCameraIds}
+          isFloodFilterActive={isFloodFilterActive}
+          onToggleFloodFilter={() => setIsFloodFilterActive(prev => !prev)}
           loading={loading}
           error={error}
           isOpen={mobileDrawerOpen}
@@ -251,7 +310,7 @@ export default function Home() {
       {/* MODAL — global viewport overlay */}
       <CameraModal 
         camera={selectedCamera} 
-        verdict={selectedCamera ? verdicts.get(selectedCamera.id) : undefined} 
+        verdict={selectedCameraVerdict} 
         onClose={() => setSelectedCamera(null)} 
         isPinned={selectedCamera ? pinnedCameraIds.includes(selectedCamera.id) : false}
         onTogglePin={() => selectedCamera && togglePin(selectedCamera.id)}

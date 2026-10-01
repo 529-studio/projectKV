@@ -6,6 +6,9 @@ import PhuongTreeFilter, { type TrafficVerdictLike } from './PhuongTreeFilter';
 interface MobileCameraDrawerProps {
   cameras: Camera[];
   verdicts?: Map<string, TrafficVerdictLike>;
+  floodedCameraIds?: Set<string>;
+  isFloodFilterActive?: boolean;
+  onToggleFloodFilter?: () => void;
   loading: boolean;
   error: Error | null;
   isOpen: boolean;
@@ -24,6 +27,9 @@ interface MobileCameraDrawerProps {
 export default function MobileCameraDrawer({
   cameras,
   verdicts,
+  floodedCameraIds,
+  isFloodFilterActive,
+  onToggleFloodFilter,
   loading,
   error,
   isOpen,
@@ -85,6 +91,9 @@ export default function MobileCameraDrawer({
               <PhuongTreeFilter
                 cameras={cameras}
                 verdicts={verdicts}
+                floodedCameraIds={floodedCameraIds}
+                isFloodFilterActive={isFloodFilterActive}
+                onToggleFloodFilter={onToggleFloodFilter}
                 loading={loading}
                 error={error}
                 selectedPhuong={selectedPhuong}
