@@ -59,6 +59,14 @@ type HexAggregator struct {
 	camToCell   map[string]string   // camera ID -> h3_id
 	polygons    map[string][][]float64
 	verdicts    map[string]hotset.Verdict // camera ID -> latest verdict
+	allowMock   bool                      // allow mock verdicts when running in dev mode
+}
+
+// SetAllowMock enables or disables aggregation of mock verdicts for local development testing.
+func (h *HexAggregator) SetAllowMock(allow bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.allowMock = allow
 }
 
 // NewHexAggregator constructs a HexAggregator with indexed camera catalog and polygons.
@@ -184,8 +192,8 @@ func (h *HexAggregator) aggregateCellLocked(h3ID string) (*HexCell, bool) {
 			continue
 		}
 		// Floor criteria (ADR-004 §D11 Correction 1):
-		// Fresh (stale == false), non-mock (source != "mock"), and valid severity rank > 0.
-		if v.Stale || v.Source == "mock" || SeverityRank(v.Severity) <= 0 {
+		// Fresh (stale == false), non-mock (source != "mock" unless allowMock is enabled in dev), and valid severity rank > 0.
+		if v.Stale || (!h.allowMock && v.Source == "mock") || SeverityRank(v.Severity) <= 0 {
 			continue
 		}
 		qualifyingVerdicts = append(qualifyingVerdicts, v)
