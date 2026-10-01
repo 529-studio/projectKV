@@ -161,6 +161,7 @@ export default function Home() {
             lang={lang}
             appEnv={appEnv}
             onMapReady={setMap}
+            hexOverlayEnabled={hexOverlayEnabled}
           >
             <HexOverlay
               map={map}

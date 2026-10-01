@@ -5,9 +5,12 @@ import 'leaflet/dist/leaflet.css';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict, isVerdictValid, getSeverityLabel } from '../hooks/useTraffic';
 import { MAP_CONFIG, FUNCTIONAL_COLORS, TRAFFIC_SEVERITY, VERDICT_I18N } from '../config/constants';
+import { isHexVisibleAtZoom } from '../utils/hexUtils';
 
 interface CustomCircleMarker extends L.CircleMarker {
   isDimmed?: boolean;
+  isFilteredDimmed?: boolean;
+  hasAIVerdict?: boolean;
   camId?: string;
 }
 
@@ -23,6 +26,7 @@ interface MapComponentProps {
   lang?: 'vi' | 'en';
   appEnv?: string;
   onMapReady?: (map: L.Map | null) => void;
+  hexOverlayEnabled?: boolean;
   children?: React.ReactNode;
 }
 
@@ -38,12 +42,18 @@ export default function MapComponent({
   lang = 'vi',
   appEnv = 'production',
   onMapReady,
+  hexOverlayEnabled = false,
   children,
 }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const prevFilteredRef = useRef(false);
+  const hexOverlayEnabledRef = useRef(hexOverlayEnabled);
+
+  useEffect(() => {
+    hexOverlayEnabledRef.current = hexOverlayEnabled;
+  }, [hexOverlayEnabled]);
 
   const getTrafficColor = useCallback((camId: string, isOnline: boolean) => {
     const verdict = verdicts.get(camId);
@@ -93,20 +103,35 @@ export default function MapComponent({
       mapRef.current = map;
       onMapReady?.(map);
 
-      // Dynamically scale marker sizes on zoomend
+      // Dynamically scale marker sizes and macro dimming on zoomend
       map.on('zoomend', () => {
         if (!markersLayerRef.current) return;
         const currentZoom = map.getZoom();
         const r = getRadius(currentZoom);
         const w = currentZoom >= 14 ? 2 : 1.5;
+        const isMacro = Boolean(hexOverlayEnabledRef.current && isHexVisibleAtZoom(currentZoom));
+
         markersLayerRef.current.eachLayer((layer) => {
           const marker = layer as CustomCircleMarker;
-          const isDimmed = marker.isDimmed === true;
+          const isFilteredDimmed = marker.isFilteredDimmed === true;
+          const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !marker.hasAIVerdict);
+          const isDimmed = isFilteredDimmed || isMacroHexDimmed;
+          marker.isDimmed = isDimmed;
+
           const targetR = isDimmed ? Math.max(2.5, Math.round(r * 0.7)) : r;
           const targetW = isDimmed ? 1 : w;
+          const strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
+          const opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
+          const fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
+
           if (marker.setRadius) {
             marker.setRadius(targetR);
-            marker.setStyle({ weight: targetW });
+            marker.setStyle({
+              weight: targetW,
+              color: strokeColor,
+              opacity,
+              fillOpacity,
+            });
           }
         });
       });
@@ -170,27 +195,38 @@ export default function MapComponent({
 
     const zoom = mapRef.current.getZoom();
     const isFew = isFiltered && filteredCameraIds ? filteredCameraIds.size <= 40 : cameras.length <= 40;
+    const isMacro = Boolean(hexOverlayEnabled && isHexVisibleAtZoom(zoom));
 
-    // Render dimmed markers first, then matching markers so matching markers appear on top
+    // Render dimmed markers first, then matching/active markers so matching markers appear on top
     const sortedCameras = [...cameras].sort((a, b) => {
-      if (!isFiltered || !filteredCameraIds) return 0;
-      const aDimmed = !filteredCameraIds.has(a.id);
-      const bDimmed = !filteredCameraIds.has(b.id);
+      const aVerdict = verdicts.get(a.id);
+      const bVerdict = verdicts.get(b.id);
+      const aHasAI = isVerdictValid(aVerdict);
+      const bHasAI = isVerdictValid(bVerdict);
+      const aFilterDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(a.id));
+      const bFilterDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(b.id));
+      const aDimmed = aFilterDimmed || (isMacro && !aFilterDimmed && !aHasAI);
+      const bDimmed = bFilterDimmed || (isMacro && !bFilterDimmed && !bHasAI);
       if (aDimmed === bDimmed) return 0;
-      return aDimmed ? -1 : 1; // dimmed first (-1), matching second (+1)
+      return aDimmed ? -1 : 1; // dimmed first (-1), matching/active second (+1)
     });
 
     sortedCameras.forEach(cam => {
       if (!cam.latitude || !cam.longitude) return;
 
-      const isDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(cam.id));
+      const verdict = verdicts.get(cam.id);
+      const hasAIVerdict = isVerdictValid(verdict);
+      const isFilteredDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(cam.id));
+      const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !hasAIVerdict);
+      const isDimmed = isFilteredDimmed || isMacroHexDimmed;
+
       const baseR = getRadius(zoom, isFew);
       const radius = isDimmed ? Math.max(2.5, Math.round(baseR * 0.7)) : baseR;
       const fillColor = getTrafficColor(cam.id, cam.isOnline);
-      const strokeColor = isDimmed ? '#27272a' : FUNCTIONAL_COLORS.MAP_STROKE;
+      const strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
       const weight = isDimmed ? 1 : (zoom >= 14 ? 2 : 1.5);
-      const opacity = isDimmed ? 0.25 : 1;
-      const fillOpacity = isDimmed ? 0.2 : 0.95;
+      const opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
+      const fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
 
       const marker = L.circleMarker([cam.latitude, cam.longitude], {
         radius,
@@ -203,9 +239,10 @@ export default function MapComponent({
 
       const customMarker = marker as CustomCircleMarker;
       customMarker.isDimmed = isDimmed;
+      customMarker.isFilteredDimmed = isFilteredDimmed;
+      customMarker.hasAIVerdict = hasAIVerdict;
       customMarker.camId = cam.id;
 
-      const verdict = verdicts.get(cam.id);
       let trafficInfo = '';
       if (isVerdictValid(verdict)) {
         const prefix = lang === 'vi' ? VERDICT_I18N.TRAFFIC_PREFIX.vi : VERDICT_I18N.TRAFFIC_PREFIX.en;
@@ -231,13 +268,13 @@ export default function MapComponent({
       marker.on('mouseover', () => {
         const curZ = mapRef.current ? mapRef.current.getZoom() : zoom;
         const curBase = getRadius(curZ, isFew);
-        const hoverRadius = isDimmed ? Math.max(2.5, Math.round(curBase * 0.7)) + 2 : curBase + 3;
+        const hoverRadius = customMarker.isDimmed ? Math.max(2.5, Math.round(curBase * 0.7)) + 2 : curBase + 3;
         marker.setStyle({ 
           radius: hoverRadius, 
           color: '#ffffff', 
-          weight: isDimmed ? 2 : 2.5,
-          opacity: isDimmed ? 0.8 : 1,
-          fillOpacity: isDimmed ? 0.6 : 1,
+          weight: customMarker.isDimmed ? 2 : 2.5,
+          opacity: customMarker.isDimmed ? 0.8 : 1,
+          fillOpacity: customMarker.isDimmed ? 0.6 : 1,
         });
         marker.bringToFront();
       });
@@ -245,18 +282,28 @@ export default function MapComponent({
       marker.on('mouseout', () => {
         const curZ = mapRef.current ? mapRef.current.getZoom() : zoom;
         const curBase = getRadius(curZ, isFew);
+        const isFilteredDim = customMarker.isFilteredDimmed === true;
+        const isMacroNow = Boolean(hexOverlayEnabledRef.current && isHexVisibleAtZoom(curZ));
+        const isMacroDim = Boolean(isMacroNow && !isFilteredDim && !customMarker.hasAIVerdict);
+        const isDim = isFilteredDim || isMacroDim;
+        customMarker.isDimmed = isDim;
+
+        const strokeColor = isFilteredDim ? '#27272a' : (isMacroDim ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
+        const opacity = isFilteredDim ? 0.25 : (isMacroDim ? 0.35 : 1);
+        const fillOpacity = isFilteredDim ? 0.2 : (isMacroDim ? 0.25 : 0.95);
+
         marker.setStyle({ 
-          radius: isDimmed ? Math.max(2.5, Math.round(curBase * 0.7)) : curBase, 
+          radius: isDim ? Math.max(2.5, Math.round(curBase * 0.7)) : curBase, 
           fillColor: getTrafficColor(cam.id, cam.isOnline), 
-          color: isDimmed ? '#27272a' : FUNCTIONAL_COLORS.MAP_STROKE, 
-          weight: isDimmed ? 1 : (curZ >= 14 ? 2 : 1.5),
-          opacity: isDimmed ? 0.25 : 1,
-          fillOpacity: isDimmed ? 0.2 : 0.95,
+          color: strokeColor, 
+          weight: isDim ? 1 : (curZ >= 14 ? 2 : 1.5),
+          opacity,
+          fillOpacity,
         });
       });
 
       marker.on('click', () => {
-        if (isDimmed && onFilterClear) {
+        if (customMarker.isFilteredDimmed && onFilterClear) {
           onFilterClear();
         }
         if (onCameraClick) {
@@ -266,7 +313,7 @@ export default function MapComponent({
 
       markersLayerRef.current?.addLayer(marker);
     });
-  }, [cameras, verdicts, getTrafficColor, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang]);
+  }, [cameras, verdicts, getTrafficColor, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled]);
 
   return (
     <div className="relative w-full h-full overflow-hidden">
