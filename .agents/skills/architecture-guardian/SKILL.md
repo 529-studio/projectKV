@@ -51,6 +51,7 @@ For every modified `.go` file under `internal/`:
    tilecache      → (leaf)
    storage        → (leaf)
    archiver       → storage, hotset
+   corridor       → camera, hotset
    i18n           → (leaf)
    config         → (leaf)
    platform       → (leaf)

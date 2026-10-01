@@ -30,6 +30,7 @@ platform       → (leaf)
 tilecache      → (leaf)
 storage        → (leaf)
 archiver       → storage, hotset
+corridor       → camera, hotset
 ```
 
 ### How to apply this rule

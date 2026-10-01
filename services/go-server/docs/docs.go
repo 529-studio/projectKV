@@ -259,6 +259,64 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/roads": {
+            "get": {
+                "description": "Returns list of all known road keys with associated camera counts, sorted by camera density descending.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Corridor"
+                ],
+                "summary": "List all known road keys",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/corridor.RoadsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/roads/{road_key}/status": {
+            "get": {
+                "description": "Returns the aggregated traffic status for a named road corridor identified by road_key, including worst severity, coverage percentage, oldest observation age, and per-camera verdicts. Enforces ADR-004 §D4 honesty rules.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Corridor"
+                ],
+                "summary": "Get corridor traffic status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Road Key identifier (e.g. vo_van_kiet, quoc_lo_1)",
+                        "name": "road_key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/corridor.CorridorStatus"
+                        }
+                    },
+                    "404": {
+                        "description": "Corridor not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/snapshot/{id}": {
             "get": {
                 "description": "Proxy and cache a real-time traffic camera snapshot from the upstream DOT portal (TTL ≥ 10 s). Also triggers HotSet Touch for automatic AI analysis.",
@@ -529,6 +587,91 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "corridor.CameraVerdict": {
+            "type": "object",
+            "properties": {
+                "camera_id": {
+                    "type": "string"
+                },
+                "confidence": {
+                    "type": "number"
+                },
+                "flood_severity": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "observed_at": {
+                    "type": "string"
+                },
+                "severity": {
+                    "description": "\"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\" | \"UNKNOWN\"",
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "corridor.CorridorStatus": {
+            "type": "object",
+            "properties": {
+                "cameras": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/corridor.CameraVerdict"
+                    }
+                },
+                "coverage_pct": {
+                    "type": "number"
+                },
+                "oldest_observation_age_s": {
+                    "type": "integer"
+                },
+                "road_key": {
+                    "type": "string"
+                },
+                "total_cameras": {
+                    "type": "integer"
+                },
+                "verified_cameras": {
+                    "type": "integer"
+                },
+                "worst_severity": {
+                    "description": "\"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\" | \"UNKNOWN\"",
+                    "type": "string"
+                }
+            }
+        },
+        "corridor.RoadSummary": {
+            "type": "object",
+            "properties": {
+                "camera_count": {
+                    "type": "integer"
+                },
+                "road_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "corridor.RoadsResponse": {
+            "type": "object",
+            "properties": {
+                "roads": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/corridor.RoadSummary"
+                    }
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
