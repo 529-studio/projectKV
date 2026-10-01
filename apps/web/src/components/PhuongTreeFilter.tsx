@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera } from '../hooks/useCameras';
 import { usePhuongs } from '../hooks/usePhuongs';
@@ -105,6 +105,38 @@ export default function PhuongTreeFilter({
     return groupCamerasByCityCorridors(cameras, verdicts, searchTerm);
   }, [cameras, verdicts, searchTerm]);
 
+  // Arterial corridors state & horizontal scroll controller
+  const [isArterialsExpanded, setIsArterialsExpanded] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const checkScrollButtons = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  };
+
+  const scrollArterials = (direction: 'left' | 'right') => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const offset = direction === 'left' ? -200 : 200;
+    el.scrollBy({ left: offset, behavior: 'smooth' });
+  };
+
+  const arterialStatusMap = useMemo(() => {
+    const map = new Map<string, { count: number; congested: boolean; moderate: boolean }>();
+    cityCorridors.forEach(c => {
+      map.set(c.name, {
+        count: c.totalCameras,
+        congested: c.congestedCount > 0,
+        moderate: c.moderateCount > 0,
+      });
+    });
+    return map;
+  }, [cityCorridors]);
+
   // i18n text resources
   const t = useMemo(() => {
     return {
@@ -112,7 +144,9 @@ export default function PhuongTreeFilter({
       tabCorridors: lang === 'vi' ? 'Tuyến đường' : 'Corridors',
       tabPhuongs: lang === 'vi' ? 'Phường / Xã' : 'Wards',
       street: lang === 'vi' ? 'Đường' : 'Street',
-      quickArterials: lang === 'vi' ? 'Trục chính:' : 'Arterials:',
+      quickArterials: lang === 'vi' ? 'Trục huyết mạch' : 'Major Arterials',
+      expandAll: lang === 'vi' ? 'Xem tất cả' : 'View all',
+      collapse: lang === 'vi' ? 'Thu gọn' : 'Collapse',
       otherWards: lang === 'vi' ? 'Các Phường khác (cập nhật sau)' : 'Other Wards (to be updated)',
       outsideHcm: lang === 'vi' ? 'Các Phường khác (cập nhật sau)' : 'Other Wards (to be updated)',
       noCameras: lang === 'vi' ? 'Không có camera' : 'No cameras',
@@ -496,31 +530,137 @@ export default function PhuongTreeFilter({
         </div>
       )}
 
-      {/* Quick Arterial Corridors Chips (Horizontal Scrollable) */}
-      <div className="px-2.5 py-1.5 border-b border-zinc-800/80 bg-zinc-950 shrink-0">
-        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5" style={{ scrollbarWidth: 'none' }}>
-          <span className="text-[10px] text-zinc-500 font-bold uppercase shrink-0 mr-0.5">
-            {t.quickArterials}
-          </span>
-          {ARTERIAL_CORRIDORS.map(corrName => {
-            const isSelected = selectedCorridor === corrName && !selectedPhuong;
-            return (
-              <button
-                key={corrName}
-                type="button"
-                onClick={() => handleSelectCityCorridor(corrName)}
-                className={`px-2 py-0.5 rounded text-[10.5px] font-semibold whitespace-nowrap transition-colors border shrink-0 ${
-                  isSelected
-                    ? 'bg-white text-black border-white font-bold'
-                    : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
-                }`}
-              >
-                {corrName}
-              </button>
-            );
-          })}
-        </div>
+      {/* Quick Arterial Corridors Header & Expand/Collapse Toggle */}
+      <div className="px-3 pt-2 pb-1 bg-zinc-950 border-b border-zinc-900 flex items-center justify-between shrink-0">
+        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+          {t.quickArterials} ({ARTERIAL_CORRIDORS.length})
+        </span>
+        <button
+          type="button"
+          onClick={() => setIsArterialsExpanded(!isArterialsExpanded)}
+          className="text-[10.5px] text-zinc-400 hover:text-white transition-colors flex items-center gap-1 font-medium cursor-pointer"
+        >
+          <span>{isArterialsExpanded ? t.collapse : t.expandAll}</span>
+          <svg
+            className={`w-3 h-3 transition-transform duration-200 ${isArterialsExpanded ? 'rotate-180' : ''}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
       </div>
+
+      {/* Arterials Content: Compact Horizontal Scroll vs Expanded 2-Column Grid */}
+      {!isArterialsExpanded ? (
+        <div className="relative px-2.5 pb-2 pt-1 border-b border-zinc-800/80 bg-zinc-950 shrink-0 group">
+          {canScrollLeft && (
+            <button
+              type="button"
+              onClick={() => scrollArterials('left')}
+              className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-5 h-6 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 rounded-r flex items-center justify-center border-y border-r border-zinc-700 shadow-md text-xs cursor-pointer"
+              aria-label="Scroll left"
+            >
+              ‹
+            </button>
+          )}
+
+          <div
+            ref={scrollContainerRef}
+            onScroll={checkScrollButtons}
+            className="flex items-center gap-1.5 overflow-x-auto py-0.5 scroll-smooth"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            {ARTERIAL_CORRIDORS.map(corrName => {
+              const isSelected = selectedCorridor === corrName && !selectedPhuong;
+              const status = arterialStatusMap.get(corrName);
+              return (
+                <button
+                  key={corrName}
+                  type="button"
+                  title={corrName}
+                  onClick={() => handleSelectCityCorridor(corrName)}
+                  className={`px-2.5 py-1 rounded text-[11px] font-semibold whitespace-nowrap transition-colors border shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                    isSelected
+                      ? 'bg-white text-black border-white font-bold'
+                      : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:text-white hover:border-zinc-600'
+                  }`}
+                >
+                  {status?.congested ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                  ) : status?.moderate ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 shrink-0" />
+                  ) : null}
+                  <span>{corrName}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {canScrollRight && (
+            <>
+              <div className="pointer-events-none absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-zinc-950 via-zinc-950/80 to-transparent" />
+              <button
+                type="button"
+                onClick={() => scrollArterials('right')}
+                className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-5 h-6 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 rounded-l flex items-center justify-center border-y border-l border-zinc-700 shadow-md text-xs cursor-pointer"
+                aria-label="Scroll right"
+              >
+                ›
+              </button>
+            </>
+          )}
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="px-2.5 pb-2.5 pt-1.5 border-b border-zinc-800/80 bg-zinc-950 shrink-0"
+        >
+          <div className="grid grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-1">
+            {ARTERIAL_CORRIDORS.map(corrName => {
+              const isSelected = selectedCorridor === corrName && !selectedPhuong;
+              const status = arterialStatusMap.get(corrName);
+              return (
+                <button
+                  key={corrName}
+                  type="button"
+                  title={corrName}
+                  onClick={() => handleSelectCityCorridor(corrName)}
+                  className={`px-2 py-1.5 rounded text-[10.5px] font-semibold transition-colors border flex items-center justify-between text-left cursor-pointer ${
+                    isSelected
+                      ? 'bg-white text-black border-white font-bold'
+                      : 'bg-zinc-900/90 text-zinc-300 border-zinc-800 hover:text-white hover:border-zinc-600'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 truncate mr-1">
+                    {status?.congested ? (
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 animate-pulse" />
+                    ) : status?.moderate ? (
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 shrink-0" />
+                    ) : null}
+                    <span className="truncate">{corrName}</span>
+                  </div>
+                  {status?.count ? (
+                    <span
+                      className={`text-[9.5px] px-1 rounded shrink-0 font-normal ${
+                        isSelected ? 'bg-zinc-200 text-zinc-900' : 'bg-zinc-800 text-zinc-400'
+                      }`}
+                    >
+                      {status.count}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
 
       {/* Active Filter Bar (if a Phường or Corridor is selected) */}
       {activeFilterLabel && (
