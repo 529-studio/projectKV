@@ -1,0 +1,111 @@
+{
+  "timestamp": "2026-10-01T16:22:03.810127+00:00",
+  "analyzer": "mock",
+  "model": "mock-dev-engine",
+  "total_frames": 5,
+  "flood_gate": {
+    "actual_positives": 2,
+    "detected_positives": 2,
+    "false_negatives": 0,
+    "false_positives": 0,
+    "true_negatives": 3,
+    "false_negative_rate": 0.0,
+    "max_fnr_threshold": 0.05,
+    "passed": true,
+    "status_label": "PASS \u2705 (0.0% FNR \u2264 5.0%)",
+    "missed_frames": []
+  },
+  "traffic_macro_f1": 1.0,
+  "traffic_weighted_f1": 1.0,
+  "flood_macro_f1": 1.0,
+  "flood_weighted_f1": 1.0,
+  "traffic_metrics": {
+    "CLEAR": {
+      "cls_name": "CLEAR",
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "tn": 3,
+      "support": 2
+    },
+    "MODERATE": {
+      "cls_name": "MODERATE",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 4,
+      "support": 1
+    },
+    "HEAVY": {
+      "cls_name": "HEAVY",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 4,
+      "support": 1
+    },
+    "CONGESTED": {
+      "cls_name": "CONGESTED",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 4,
+      "support": 1
+    }
+  },
+  "flood_metrics": {
+    "NONE": {
+      "cls_name": "NONE",
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "tn": 2,
+      "support": 3
+    },
+    "SHALLOW": {
+      "cls_name": "SHALLOW",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 4,
+      "support": 1
+    },
+    "DEEP": {
+      "cls_name": "DEEP",
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 4,
+      "support": 1
+    }
+  },
+  "weather_slices": {
+    "dry": {
+      "total_frames": 3,
+      "traffic_accuracy": 1.0,
+      "flood_accuracy": 1.0
+    },
+    "heavy_rain": {
+      "total_frames": 1,
+      "traffic_accuracy": 1.0,
+      "flood_accuracy": 1.0
+    },
+    "rain": {
+      "total_frames": 1,
+      "traffic_accuracy": 1.0,
+      "flood_accuracy": 1.0
+    }
+  },
+  "time_of_day_slices": {
+    "day": {
+      "total_frames": 4,
+      "traffic_accuracy": 1.0,
+      "flood_accuracy": 1.0
+    },
+    "night": {
+      "total_frames": 1,
+      "traffic_accuracy": 1.0,
+      "flood_accuracy": 1.0
+    }
+  }
+}
