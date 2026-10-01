@@ -55,7 +55,6 @@ services/go-server/server
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Routing engine spike scratch data
+# Spike & Temporary Sandbox Directories
+.tmp_*
 .tmp_spike_routing/
-
