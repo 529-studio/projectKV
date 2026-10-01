@@ -253,6 +253,38 @@ func TestHandler_UpstreamError_Returns502(t *testing.T) {
 	}
 }
 
+func TestHandler_UpstreamTransientError_RetriesAndSucceeds(t *testing.T) {
+	var attempts atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		att := attempts.Add(1)
+		if att == 1 {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("RECOVERED_JPEG"))
+	}))
+	defer upstream.Close()
+
+	cache := proxycache.NewCache(30 * time.Second)
+	h := proxycache.NewHandler(cache, upstream.URL, nil)
+	router := newTestRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/snapshot/camRetry", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK after retry, got %d", w.Code)
+	}
+	if attempts.Load() != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts.Load())
+	}
+	if w.Body.String() != "RECOVERED_JPEG" {
+		t.Errorf("expected RECOVERED_JPEG, got %q", w.Body.String())
+	}
+}
+
 func TestHandler_MissingID_Returns400(t *testing.T) {
 	cache := proxycache.NewCache(30 * time.Second)
 	h := proxycache.NewHandler(cache, "http://example.com", nil)
