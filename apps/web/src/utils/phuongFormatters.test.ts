@@ -248,6 +248,7 @@ describe('groupCamerasByCityCorridors & ARTERIAL_CORRIDORS', () => {
     assert.ok(ARTERIAL_CORRIDORS.includes('Cộng Hòa'));
     assert.ok(ARTERIAL_CORRIDORS.includes('Xa Lộ Hà Nội'));
     assert.ok(ARTERIAL_CORRIDORS.includes('Võ Văn Kiệt'));
+    assert.ok(ARTERIAL_CORRIDORS.includes('Võ Nguyên Giáp'));
   });
 
   test('groups cameras across wards by corridor name', () => {

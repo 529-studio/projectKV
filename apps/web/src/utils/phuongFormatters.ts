@@ -392,12 +392,18 @@ export const ARTERIAL_CORRIDORS = Object.freeze([
   'Cộng Hòa',
   'Xa Lộ Hà Nội',
   'Võ Văn Kiệt',
-  'Nguyễn Văn Linh',
   'Phạm Văn Đồng',
-  'Nam Kỳ Khởi Nghĩa',
+  'Nguyễn Văn Linh',
+  'Trường Chinh',
   'Cách Mạng Tháng Tám',
-  'Nguyễn Hữu Cảnh',
+  'Nam Kỳ Khởi Nghĩa',
   'Mai Chí Thọ',
+  'Quốc lộ 1',
+  'Nguyễn Thị Minh Khai',
+  'Ba Tháng Hai',
+  'Hoàng Văn Thụ',
+  'Huỳnh Tấn Phát',
+  'Võ Nguyên Giáp',
 ]);
 
 export interface TrafficVerdictLike {
