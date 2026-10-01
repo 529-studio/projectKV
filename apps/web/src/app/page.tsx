@@ -9,6 +9,7 @@ import CameraModal from '../components/CameraModal';
 import PinnedDock from '../components/PinnedDock';
 import MapLegend from '../components/MapLegend';
 import MobileCameraDrawer from '../components/MobileCameraDrawer';
+import TrafficSyncBanner from '../components/TrafficSyncBanner';
 import PhuongTreeFilter, {
   computeFilteredCameraIds,
   computeActiveFilterLabel,
@@ -181,12 +182,20 @@ export default function Home() {
           lang={lang}
         />
 
+        {/* FLOATING STATUS PILL — Non-blocking background AI sync notification */}
+        <TrafficSyncBanner
+          analysisEnabled={analysisEnabled}
+          verdictsCount={verdicts.size}
+          lang={lang}
+        />
+
         {/* MAP LEGEND — collapsible */}
         <MapLegend
           isOpen={legendOpen}
           onToggle={() => setLegendOpen(prev => !prev)}
           analysisEnabled={analysisEnabled}
           hexOverlayEnabled={hexOverlayEnabled}
+          verdictsCount={verdicts.size}
           lang={lang}
         />
 
@@ -227,6 +236,7 @@ export default function Home() {
         onTogglePin={() => selectedCamera && togglePin(selectedCamera.id)}
         lang={lang}
         appEnv={appEnv}
+        analysisEnabled={analysisEnabled}
       />
     </div>
   );
