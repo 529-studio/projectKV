@@ -41,6 +41,7 @@ export default function CameraModal({
     const interval = setInterval(() => {
       setElapsedSeconds(prev => {
         if (prev >= 15) {
+          setImgError(false);
           setFetchTimestamp(Date.now());
           return 0;
         }
@@ -66,6 +67,7 @@ export default function CameraModal({
   }, [camera?.id, fetchTimestamp, camera?.isOnline, camera?.isGhost]);
 
   const handleRefresh = () => {
+    setImgError(false);
     setFetchTimestamp(Date.now());
     setElapsedSeconds(0);
   };
@@ -131,7 +133,7 @@ export default function CameraModal({
                     : 'just now'
                   : `${elapsedSeconds}s ${lang === 'vi' ? 'trước' : 'ago'}`}
               </span>
-              {isActuallyAvailable && (
+              {(camera.isOnline && !camera.isGhost) && (
                 <button
                   onClick={handleRefresh}
                   className="text-zinc-400 hover:text-white underline text-[11px] ml-1"
@@ -243,14 +245,22 @@ export default function CameraModal({
               </div>
             </div>
           ) : imgError ? (
-            <div className="text-center p-6 space-y-2">
+            <div className="text-center p-6 space-y-3">
               <div className="text-red-400 font-bold text-sm">
                 {lang === 'vi' ? 'KHÔNG THỂ TẢI HÌNH ẢNH SNAPSHOT' : 'UNABLE TO LOAD SNAPSHOT IMAGE'}
               </div>
-              <div className="text-zinc-500 text-xs">
+              <div className="text-zinc-500 text-xs max-w-md">
                 {lang === 'vi'
-                  ? 'Máy chủ proxy báo lỗi 503 hoặc mất kết nối tới camera.'
-                  : 'Proxy server reported 503 error or connection timeout to camera.'}
+                  ? 'Máy chủ proxy báo lỗi 502/503 hoặc mất kết nối tạm thời tới camera.'
+                  : 'Proxy server reported 502/503 error or temporary connection timeout to camera.'}
+              </div>
+              <div>
+                <button
+                  onClick={handleRefresh}
+                  className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-500 rounded text-xs font-mono transition-colors"
+                >
+                  {lang === 'vi' ? '↻ THỬ LẠI KẾT NỐI' : '↻ RETRY CONNECTION'}
+                </button>
               </div>
             </div>
           ) : (

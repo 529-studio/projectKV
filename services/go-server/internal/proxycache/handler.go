@@ -108,7 +108,8 @@ func (h *Handler) GetSnapshot(c *gin.Context) {
 
 	// Fire-and-forget HotSet touch — does not block the response.
 	if h.onTouch != nil {
-		h.onTouch(id, "", "", "")
+		snapshotURL := fmt.Sprintf("%s?id=%s", h.upstreamURL, id)
+		h.onTouch(id, "", "", snapshotURL)
 	}
 
 	cacheStatus := "MISS"
@@ -158,38 +159,62 @@ func (h *Handler) GetSnapshotOSD(c *gin.Context) {
 }
 
 // fetchUpstream fetches the raw snapshot bytes from the upstream DOT portal.
+// It retries once on transient network or 5xx upstream errors with a short backoff.
 func (h *Handler) fetchUpstream(ctx context.Context, id string) ([]byte, string, error) {
-	url := fmt.Sprintf("%s?id=%s&t=%d", h.upstreamURL, id, time.Now().UnixMilli())
+	const maxAttempts = 2
+	var lastErr error
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, "", fmt.Errorf("build request: %w", err)
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CameraViewProxy/1.0)")
-	req.Header.Set("Referer", "https://giaothong.hochiminhcity.gov.vn/")
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if attempt > 1 {
+			select {
+			case <-ctx.Done():
+				return nil, "", ctx.Err()
+			case <-time.After(300 * time.Millisecond):
+			}
+		}
 
-	resp, err := h.httpClient.Do(req)
-	if err != nil {
-		return nil, "", fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck
+		url := fmt.Sprintf("%s?id=%s&t=%d", h.upstreamURL, id, time.Now().UnixMilli())
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("upstream returned %d", resp.StatusCode)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, "", fmt.Errorf("build request: %w", err)
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CameraViewProxy/1.0)")
+		req.Header.Set("Referer", "https://giaothong.hochiminhcity.gov.vn/")
+
+		resp, err := h.httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("do request: %w", err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close() //nolint:errcheck
+			lastErr = fmt.Errorf("upstream returned %d", resp.StatusCode)
+			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+				// Client-side errors from upstream (e.g. 404 Not Found) are non-transient; abort immediately.
+				return nil, "", lastErr
+			}
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close() //nolint:errcheck
+		if err != nil {
+			lastErr = fmt.Errorf("read body: %w", err)
+			continue
+		}
+
+		if IsGhostImage(body) {
+			return nil, "", ErrGhostCamera
+		}
+
+		ct := resp.Header.Get("Content-Type")
+		if ct == "" {
+			ct = "image/jpeg"
+		}
+		return body, ct, nil
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, "", fmt.Errorf("read body: %w", err)
-	}
-
-	if IsGhostImage(body) {
-		return nil, "", ErrGhostCamera
-	}
-
-	ct := resp.Header.Get("Content-Type")
-	if ct == "" {
-		ct = "image/jpeg"
-	}
-	return body, ct, nil
+	return nil, "", lastErr
 }
