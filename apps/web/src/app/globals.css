@@ -1101,6 +1101,11 @@ body, html {
   border-right-color: #3f3f46 !important;
 }
 
+/* H3 Hex Cell Smooth Fade Transitions */
+.hex-cell-polygon {
+  transition: fill-opacity 0.3s ease, stroke-opacity 0.3s ease, opacity 0.3s ease;
+}
+
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {

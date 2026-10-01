@@ -1,6 +1,7 @@
 'use client';
 import dynamic from 'next/dynamic';
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import type L from 'leaflet';
 import { useCameras, Camera } from '../hooks/useCameras';
 import { useTraffic } from '../hooks/useTraffic';
 import LandingOverlay from '../components/LandingOverlay';
@@ -14,11 +15,14 @@ import PhuongTreeFilter, {
 } from '../components/PhuongTreeFilter';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
+const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
 
 export default function Home() {
   const { cameras, loading, error } = useCameras();
-  const { verdicts, analysisEnabled, appEnv } = useTraffic();
+  const { verdicts, hexCells, analysisEnabled, appEnv } = useTraffic();
   
+  const [map, setMap] = useState<L.Map | null>(null);
+  const [hexOverlayEnabled, setHexOverlayEnabled] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pinnedCameraIds, setPinnedCameraIds] = useState<string[]>([]);
@@ -156,7 +160,16 @@ export default function Home() {
             activeFilterLabel={activeFilterLabel}
             lang={lang}
             appEnv={appEnv}
-          />
+            onMapReady={setMap}
+          >
+            <HexOverlay
+              map={map}
+              hexCells={hexCells}
+              enabled={hexOverlayEnabled}
+              onToggle={() => setHexOverlayEnabled(prev => !prev)}
+              lang={lang}
+            />
+          </MapComponent>
         </div>
         
         {/* BOTTOM DOCK */}
@@ -172,6 +185,7 @@ export default function Home() {
           isOpen={legendOpen}
           onToggle={() => setLegendOpen(prev => !prev)}
           analysisEnabled={analysisEnabled}
+          hexOverlayEnabled={hexOverlayEnabled}
           lang={lang}
         />
 
