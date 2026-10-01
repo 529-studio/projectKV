@@ -5,6 +5,17 @@ on:
     branches:
       - dev
       - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.agents/**'
+      - '.githooks/**'
+      - '.github/workflows/auto-request-reviewers.yml'
+      - '.github/workflows/branch-guard.yml'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/go-ci.yml'
+      - '.env.example'
+      - '.env.stg.example'
   workflow_dispatch:
     inputs:
       custom_tag:
