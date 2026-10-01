@@ -45,15 +45,13 @@ Follow this pattern for every new cross-module dependency. **No module should im
 
 ### Rule 2 — Allowed import graph
 ```
-cmd/api        → may import anything (composition root only — wiring, no business logic)
-httpserver     → camera, proxycache, hotset, cvclient, subscription, notify, ws (for route registration only)
+cmd/server     → may import anything (composition root only — wiring, no business logic)
+httpserver     → camera, proxycache, hotset, cvclient, ws (for route registration only)
 camera         → (leaf — no internal imports)
 proxycache     → camera
 hotset         → camera            (defines Analyzer interface itself; does NOT import store or cvclient)
 cvclient       → hotset, camera    (implements hotset.Analyzer)
-notify         → i18n              (defines SubscriptionStore interface itself; does NOT import store)
-subscription   → store, camera, notify
-store          → camera            (implements notify.SubscriptionStore + verdict repo interfaces defined by hotset/httpserver as needed)
+store          → camera            (implements verdict repo interfaces defined by hotset/httpserver as needed)
 ws             → hotset            (for verdict types only)
 live           → hotset, camera    (verdict types, SSE hub, H3 hex cell aggregation)
 i18n           → (leaf)

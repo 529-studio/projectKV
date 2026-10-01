@@ -15,14 +15,12 @@ in the consuming package** instead of importing the producing package directly
 producer, wiring only in `cmd/api/main.go`).
 
 ```
-cmd/api        → may import anything (composition root — wiring only, no business logic)
-httpserver     → camera, proxycache, hotset, cvclient, subscription, notify, ws
+cmd/server     → may import anything (composition root — wiring only, no business logic)
+httpserver     → camera, proxycache, hotset, cvclient, ws
 camera         → (leaf — no internal imports)
 proxycache     → camera
 hotset         → camera
 cvclient       → hotset, camera
-notify         → i18n
-subscription   → store, camera, notify
 store          → camera
 ws             → hotset
 live           → hotset, camera
@@ -41,7 +39,7 @@ archiver       → storage, hotset
 2. If the import is **not listed**, do **not** add it. Instead:
    - Define an `interface` in the package that needs the capability.
    - Implement that interface in the package that provides the capability.
-   - Wire the concrete type in `cmd/api/main.go`.
+   - Wire the concrete type in `cmd/server/main.go`.
 3. If the import **is listed**, proceed normally.
 4. Never create circular imports — the graph above is a DAG by design.
 

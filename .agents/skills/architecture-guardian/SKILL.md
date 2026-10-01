@@ -39,17 +39,18 @@ For every modified `.go` file under `internal/`:
 2. List all imports of sibling packages under `internal/`.
 3. Cross-reference each import against the allowed import graph:
    ```
-   cmd/api        → may import anything
-   httpserver     → camera, proxycache, hotset, cvclient, subscription, notify, ws
+   cmd/server     → may import anything
+   httpserver     → camera, proxycache, hotset, cvclient, ws
    camera         → (leaf)
    proxycache     → camera
    hotset         → camera
    cvclient       → hotset, camera
-   notify         → i18n
-   subscription   → store, camera, notify
    store          → camera
    ws             → hotset
    live           → hotset, camera
+   tilecache      → (leaf)
+   storage        → (leaf)
+   archiver       → storage, hotset
    i18n           → (leaf)
    config         → (leaf)
    platform       → (leaf)
@@ -58,7 +59,7 @@ For every modified `.go` file under `internal/`:
    - File path
    - The unauthorized import
    - Suggested fix: "Define an interface in package X and implement it in
-     package Y; wire in cmd/api/main.go"
+     package Y; wire in cmd/server/main.go"
 
 ### 2. Banned Dependency Check
 
