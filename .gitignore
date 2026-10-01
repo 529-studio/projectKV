@@ -56,3 +56,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Routing engine spike scratch data
+.tmp_spike_routing/
+
