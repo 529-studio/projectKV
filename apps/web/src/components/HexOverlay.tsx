@@ -1,10 +1,11 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import L from 'leaflet';
 import {
   HexCell,
   getHexColorAndOpacity,
   isHexVisibleAtZoom,
+  getHexInteractivityState,
   formatHexTooltip,
 } from '../utils/hexUtils';
 import { HEX_I18N } from '../config/constants';
@@ -33,6 +34,11 @@ export default function HexOverlay({
   useEffect(() => {
     if (!map) return;
 
+    if (!map.getPane('hexOverlayPane')) {
+      const hexPane = map.createPane('hexOverlayPane');
+      hexPane.style.zIndex = '350';
+    }
+
     if (!layerGroupRef.current) {
       layerGroupRef.current = L.layerGroup().addTo(map);
     }
@@ -40,11 +46,19 @@ export default function HexOverlay({
     layerGroup.clearLayers();
 
     if (!enabled || hexCells.size === 0) {
+      const pane = map.getPane('hexOverlayPane');
+      if (pane) pane.style.pointerEvents = 'none';
       return;
     }
 
     const currentZoom = map.getZoom();
-    const isVisible = isHexVisibleAtZoom(currentZoom);
+    const { isVisible, pointerEvents, className } = getHexInteractivityState(currentZoom);
+
+    // Sync pane pointer-events with current zoom visibility
+    const hexPane = map.getPane('hexOverlayPane');
+    if (hexPane) {
+      hexPane.style.pointerEvents = pointerEvents;
+    }
 
     hexCells.forEach((cell) => {
       if (!cell.polygon || cell.polygon.length < 3) return;
@@ -57,8 +71,9 @@ export default function HexOverlay({
         color: '#52525b',
         weight: 1,
         opacity: isVisible ? 0.8 : 0,
-        className: 'hex-cell-polygon',
+        className,
         interactive: isVisible,
+        pane: 'hexOverlayPane',
       }) as CustomPolygon;
 
       polygon._baseFillOpacity = fillOpacity;
@@ -90,13 +105,54 @@ export default function HexOverlay({
         });
       });
 
+      // Prevent browser focus ring on SVG polygon element
+      polygon.on('mousedown', (e) => {
+        if (e.originalEvent && typeof e.originalEvent.preventDefault === 'function') {
+          e.originalEvent.preventDefault();
+        }
+      });
+
+      polygon.on('click', (e) => {
+        if (!isHexVisibleAtZoom(map.getZoom())) return;
+        L.DomEvent.stopPropagation(e);
+        polygon.closeTooltip();
+
+        // Remove browser focus ring on SVG polygon element immediately
+        const target = e.originalEvent?.target as HTMLElement | SVGElement | undefined;
+        if (target && typeof target.blur === 'function') {
+          target.blur();
+        }
+        if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
+          (document.activeElement as HTMLElement).blur();
+        }
+
+        const bounds = polygon.getBounds();
+        map.fitBounds(bounds, {
+          padding: [30, 30],
+          maxZoom: 14,
+        });
+      });
+
       layerGroup.addLayer(polygon);
     });
+
+    const handleZoomStart = () => {
+      // Close open tooltips immediately when zoom starts
+      if (!layerGroupRef.current) return;
+      layerGroupRef.current.eachLayer((layer) => {
+        (layer as L.Polygon).closeTooltip();
+      });
+    };
 
     const handleZoomEnd = () => {
       if (!layerGroupRef.current) return;
       const zoom = map.getZoom();
-      const visible = isHexVisibleAtZoom(zoom);
+      const { isVisible: visible, pointerEvents } = getHexInteractivityState(zoom);
+
+      const pane = map.getPane('hexOverlayPane');
+      if (pane) {
+        pane.style.pointerEvents = pointerEvents;
+      }
 
       layerGroupRef.current.eachLayer((layer) => {
         const poly = layer as CustomPolygon;
@@ -105,15 +161,29 @@ export default function HexOverlay({
           fillOpacity: visible ? baseFill : 0,
           opacity: visible ? 0.8 : 0,
         });
+
+        const el = (poly.getElement?.() || (poly as unknown as { _path?: SVGElement })._path) as HTMLElement | SVGElement | undefined;
+        if (el) {
+          if (visible) {
+            el.classList.remove('hex-cell-hidden');
+            el.style.pointerEvents = 'auto';
+          } else {
+            el.classList.add('hex-cell-hidden');
+            el.style.pointerEvents = 'none';
+          }
+        }
+
         if (!visible) {
           poly.closeTooltip();
         }
       });
     };
 
+    map.on('zoomstart', handleZoomStart);
     map.on('zoomend', handleZoomEnd);
 
     return () => {
+      map.off('zoomstart', handleZoomStart);
       map.off('zoomend', handleZoomEnd);
       layerGroup.clearLayers();
     };
@@ -130,6 +200,26 @@ export default function HexOverlay({
     };
   }, []);
 
+  const congestedCount = useMemo(() => {
+    let count = 0;
+    hexCells.forEach((cell) => {
+      const s = cell.severity.toUpperCase().trim();
+      if (s === 'CONGESTED' || s === 'HEAVY' || s === 'FLOODED_DEEP' || s === 'FLOODED_SHALLOW') {
+        count++;
+      }
+    });
+    return count;
+  }, [hexCells]);
+
+  const buttonTitle = useMemo(() => {
+    if (congestedCount > 0) {
+      return lang === 'vi'
+        ? `Vùng tổng hợp (${congestedCount} vùng đang ùn tắc / ngập)`
+        : `Zone overview (${congestedCount} congested / flooded zones)`;
+    }
+    return lang === 'vi' ? 'Bật/tắt hiển thị vùng tổng hợp H3' : 'Toggle H3 zone overview';
+  }, [congestedCount, lang]);
+
   return (
     <button
       type="button"
@@ -141,7 +231,7 @@ export default function HexOverlay({
       }`}
       aria-pressed={enabled}
       aria-label={lang === 'vi' ? 'Bật/tắt vùng tổng hợp' : 'Toggle zone overview'}
-      title={lang === 'vi' ? 'Bật/tắt hiển thị vùng tổng hợp H3' : 'Toggle H3 zone overview'}
+      title={buttonTitle}
     >
       <svg
         className={`w-3.5 h-3.5 shrink-0 transition-colors ${
@@ -157,6 +247,19 @@ export default function HexOverlay({
         <polygon points="12 2.5 21 7.5 21 16.5 12 21.5 3 16.5 3 7.5" />
       </svg>
       <span>{HEX_I18N.TOGGLE[lang]}</span>
+      {congestedCount > 0 && (
+        <span
+          className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/40 inline-flex items-center gap-1"
+          aria-label={
+            lang === 'vi'
+              ? `${congestedCount} vùng đang ùn tắc`
+              : `${congestedCount} congested zones`
+          }
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+          <span>{congestedCount}</span>
+        </span>
+      )}
     </button>
   );
 }

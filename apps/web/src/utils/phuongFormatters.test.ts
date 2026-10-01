@@ -8,6 +8,8 @@ import {
   extractCorridor,
   removeVietnameseDiacritics,
   matchesVietnameseSearch,
+  ARTERIAL_CORRIDORS,
+  groupCamerasByCityCorridors,
 } from './phuongFormatters.ts';
 
 describe('formatPhuongName', () => {
@@ -237,6 +239,75 @@ describe('formatRoadName & I18N_NAMES', () => {
     assert.equal(formatRoadName('13', 'en', 'Quốc lộ'), 'National Route 13');
     assert.equal(formatRoadName('Hà Nội', 'vi', 'Xa lộ'), 'Xa lộ Hà Nội');
     assert.equal(formatRoadName('Hà Nội', 'en', 'Xa lộ'), 'Hà Nội Highway');
+  });
+});
+
+describe('groupCamerasByCityCorridors & ARTERIAL_CORRIDORS', () => {
+  test('ARTERIAL_CORRIDORS contains high-priority commuter routes', () => {
+    assert.ok(ARTERIAL_CORRIDORS.includes('Điện Biên Phủ'));
+    assert.ok(ARTERIAL_CORRIDORS.includes('Cộng Hòa'));
+    assert.ok(ARTERIAL_CORRIDORS.includes('Xa Lộ Hà Nội'));
+    assert.ok(ARTERIAL_CORRIDORS.includes('Võ Văn Kiệt'));
+    assert.ok(ARTERIAL_CORRIDORS.includes('Võ Nguyên Giáp'));
+  });
+
+  test('groups cameras across wards by corridor name', () => {
+    const cameras = [
+      { id: 'cam1', displayName: 'Điện Biên Phủ - Pasteur', phuong_name: 'Phường Võ Thị Sáu' },
+      { id: 'cam2', displayName: 'Điện Biên Phủ - Đinh Tiên Hoàng', phuong_name: 'Phường Đa Kao' },
+      { id: 'cam3', displayName: 'Cộng Hòa - Ấp Bắc', phuong_name: 'Phường 13' },
+    ];
+
+    const groups = groupCamerasByCityCorridors(cameras);
+    assert.equal(groups.length, 2);
+
+    const dbp = groups.find(g => g.name === 'Điện Biên Phủ');
+    assert.ok(dbp);
+    assert.equal(dbp.totalCameras, 2);
+    assert.equal(dbp.cameras.length, 2);
+
+    const ch = groups.find(g => g.name === 'Cộng Hòa');
+    assert.ok(ch);
+    assert.equal(ch.totalCameras, 1);
+  });
+
+  test('prioritizes corridors with active congestion to top', () => {
+    const cameras = [
+      { id: 'cam1', displayName: 'Cộng Hòa - Ấp Bắc' },
+      { id: 'cam2', displayName: 'Điện Biên Phủ - Pasteur' },
+      { id: 'cam3', displayName: 'Xa Lộ Hà Nội - Cầu Rạch Chiếc' },
+    ];
+
+    const verdicts = new Map([
+      ['cam1', { severity: 'CONGESTED', stale: false }],
+      ['cam2', { severity: 'CLEAR', stale: false }],
+      ['cam3', { severity: 'MODERATE', stale: false }],
+    ]);
+
+    const groups = groupCamerasByCityCorridors(cameras, verdicts);
+    assert.equal(groups[0].name, 'Cộng Hòa'); // Congested first
+    assert.equal(groups[0].congestedCount, 1);
+
+    assert.equal(groups[1].name, 'Xa Lộ Hà Nội'); // Moderate second
+    assert.equal(groups[1].moderateCount, 1);
+
+    assert.equal(groups[2].name, 'Điện Biên Phủ'); // Clear third
+    assert.equal(groups[2].congestedCount, 0);
+  });
+
+  test('filters corridors and cameras by search term', () => {
+    const cameras = [
+      { id: 'cam1', displayName: 'Cộng Hòa - Ấp Bắc' },
+      { id: 'cam2', displayName: 'Điện Biên Phủ - Pasteur' },
+    ];
+
+    const searchCorridor = groupCamerasByCityCorridors(cameras, undefined, 'Cong Hoa');
+    assert.equal(searchCorridor.length, 1);
+    assert.equal(searchCorridor[0].name, 'Cộng Hòa');
+
+    const searchCrossStreet = groupCamerasByCityCorridors(cameras, undefined, 'Pasteur');
+    assert.equal(searchCrossStreet.length, 1);
+    assert.equal(searchCrossStreet[0].name, 'Điện Biên Phủ');
   });
 });
 

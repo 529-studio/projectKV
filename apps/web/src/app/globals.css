@@ -1101,10 +1101,24 @@ body, html {
   border-right-color: #3f3f46 !important;
 }
 
-/* H3 Hex Cell Smooth Fade Transitions */
+/* H3 Hex Cell Smooth Fade Transitions & Interaction Isolation */
 .hex-cell-polygon {
+  cursor: pointer;
+  outline: none !important;
   transition: fill-opacity 0.3s ease, stroke-opacity 0.3s ease, opacity 0.3s ease;
 }
+
+.hex-cell-polygon:focus,
+.hex-cell-polygon:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.hex-cell-polygon.hex-cell-hidden {
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
 
 
 /* Custom Scrollbar */

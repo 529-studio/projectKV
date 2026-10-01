@@ -140,4 +140,15 @@ describe('calculateMarkerStyle (Dimmed vs Normal styling)', () => {
     const styleLowZoom = calculateMarkerStyle(false, baseRadius, 12);
     assert.equal(styleLowZoom.weight, 1.5);
   });
+
+  test('returns hexMacro dimmed styling with 0.25 fillOpacity and subtle stroke', () => {
+    const baseRadius = 8;
+    const style = calculateMarkerStyle(true, baseRadius, 12, 'hexMacro');
+
+    assert.equal(style.fillOpacity, 0.25);
+    assert.equal(style.opacity, 0.35);
+    assert.equal(style.weight, 1);
+    assert.equal(style.strokeColor, '#3f3f46');
+    assert.equal(style.radius, 6);
+  });
 });
