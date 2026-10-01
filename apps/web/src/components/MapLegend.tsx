@@ -8,6 +8,7 @@ interface MapLegendProps {
   onToggle: () => void;
   analysisEnabled?: boolean;
   hexOverlayEnabled?: boolean;
+  verdictsCount?: number;
   lang?: 'vi' | 'en';
 }
 
@@ -16,6 +17,7 @@ export default function MapLegend({
   onToggle,
   analysisEnabled = false,
   hexOverlayEnabled = false,
+  verdictsCount = 0,
   lang = 'vi',
 }: MapLegendProps) {
   return (
@@ -71,10 +73,18 @@ export default function MapLegend({
               {/* Category 2: Hot Set cameras with real-time AI verdict (Only rendered when analysisEnabled is true) */}
               {analysisEnabled && (
                 <>
-                  <div className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1.5 border-t border-zinc-800/80">
-                    {lang === 'vi'
-                      ? 'Giám sát AI (Điểm trọng yếu / Đang xem)'
-                      : 'AI Monitoring (Hotspots / Active)'}
+                  <div className="flex items-center justify-between text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1.5 border-t border-zinc-800/80">
+                    <span>
+                      {lang === 'vi'
+                        ? 'Giám sát AI (Điểm trọng yếu / Đang xem)'
+                        : 'AI Monitoring (Hotspots / Active)'}
+                    </span>
+                    {verdictsCount === 0 && (
+                      <span className="flex items-center gap-1 text-amber-400 font-normal lowercase tracking-normal">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        <span>{lang === 'vi' ? 'đang tải...' : 'syncing...'}</span>
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2.5">
                     <span
