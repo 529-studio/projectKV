@@ -22,6 +22,8 @@ interface MapComponentProps {
   activeFilterLabel?: string | null;
   lang?: 'vi' | 'en';
   appEnv?: string;
+  onMapReady?: (map: L.Map | null) => void;
+  children?: React.ReactNode;
 }
 
 export default function MapComponent({
@@ -35,6 +37,8 @@ export default function MapComponent({
   activeFilterLabel,
   lang = 'vi',
   appEnv = 'production',
+  onMapReady,
+  children,
 }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -87,6 +91,7 @@ export default function MapComponent({
 
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
+      onMapReady?.(map);
 
       // Dynamically scale marker sizes on zoomend
       map.on('zoomend', () => {
@@ -118,11 +123,12 @@ export default function MapComponent({
     return () => {
       resizeObserver.disconnect();
       if (mapRef.current) {
+        onMapReady?.(null);
         mapRef.current.remove();
         mapRef.current = null;
       }
     };
-  }, []);
+  }, [onMapReady]);
 
   // Smoothly fly to selected camera
   useEffect(() => {
@@ -266,30 +272,35 @@ export default function MapComponent({
     <div className="relative w-full h-full overflow-hidden">
       <div ref={containerRef} className="w-full h-full z-0 absolute inset-0 bg-[#09090b]" />
 
-      {/* On-map active filter chip (ADR-004 A3 - Issue #65) */}
-      {isFiltered && activeFilterLabel && (
-        <div
-          className="absolute top-20 left-3 sm:top-3.5 sm:left-14 z-[800] max-w-[calc(100vw-32px)] sm:max-w-md bg-zinc-950/95 border border-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded shadow-2xl backdrop-blur-md flex items-center gap-2 font-mono text-xs select-none transition-all"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="flex items-center gap-1.5 truncate min-w-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-            <span className="truncate font-semibold text-zinc-100">{activeFilterLabel}</span>
+      {/* Top controls: Toggle chips and active filter chips */}
+      <div className="absolute top-20 left-3 sm:top-3.5 sm:left-14 z-[800] flex flex-wrap items-center gap-2 max-w-[calc(100vw-32px)] sm:max-w-2xl pointer-events-none">
+        {children}
+
+        {/* On-map active filter chip (ADR-004 A3 - Issue #65) */}
+        {isFiltered && activeFilterLabel && (
+          <div
+            className="pointer-events-auto bg-zinc-950/95 border border-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded shadow-2xl backdrop-blur-md flex items-center gap-2 font-mono text-xs select-none transition-all"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-center gap-1.5 truncate min-w-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+              <span className="truncate font-semibold text-zinc-100">{activeFilterLabel}</span>
+            </div>
+            {onFilterClear && (
+              <button
+                type="button"
+                onClick={onFilterClear}
+                className="text-zinc-400 hover:text-white hover:bg-zinc-800 rounded p-0.5 ml-1 transition-colors shrink-0 focus:outline-none"
+                aria-label={lang === 'vi' ? 'Xóa bộ lọc' : 'Clear filter'}
+                title={lang === 'vi' ? 'Xóa bộ lọc (Esc)' : 'Clear filter (Esc)'}
+              >
+                <span className="text-sm font-bold leading-none block px-1">✕</span>
+              </button>
+            )}
           </div>
-          {onFilterClear && (
-            <button
-              type="button"
-              onClick={onFilterClear}
-              className="text-zinc-400 hover:text-white hover:bg-zinc-800 rounded p-0.5 ml-1 transition-colors shrink-0 focus:outline-none"
-              aria-label={lang === 'vi' ? 'Xóa bộ lọc' : 'Clear filter'}
-              title={lang === 'vi' ? 'Xóa bộ lọc (Esc)' : 'Clear filter (Esc)'}
-            >
-              <span className="text-sm font-bold leading-none block px-1">✕</span>
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

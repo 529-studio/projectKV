@@ -271,6 +271,10 @@ func main() {
 		allCameras = camCatalog.All()
 	}
 	hexAggregator := live.NewHexAggregator(allCameras, hexPolygons, cfg.HexResolution, cfg.HexMinCameras, liveHub, nil)
+	if cfg.AppEnv == "dev" && cfg.Analyzer == "mock" {
+		hexAggregator.SetAllowMock(true)
+		log.Println("[INIT] Hex cell aggregation enabled for mock analyzer in 'dev' environment.")
+	}
 
 	// 6d. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
 	if analysisEnabled && analyzer != nil {

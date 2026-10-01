@@ -118,3 +118,40 @@ export const VERDICT_I18N = Object.freeze({
     },
   },
 });
+
+export const HEX_CONFIG = Object.freeze({
+  MIN_ZOOM: 11,
+  MAX_ZOOM: 13,
+  FILL_OPACITY_CLEAR: 0.18,
+  FILL_OPACITY_MODERATE: 0.18,
+  FILL_OPACITY_CONGESTED: 0.22,
+  STROKE_COLOR: '#52525b',
+  STROKE_WEIGHT: 1,
+});
+
+export const HEX_I18N = Object.freeze({
+  TOGGLE: {
+    vi: 'Vùng tổng hợp',
+    en: 'Zone Overview',
+  },
+  CAMERAS_MONITORING: {
+    vi: (n: number) => `${n} camera đang giám sát`,
+    en: (n: number) => `${n} ${n === 1 ? 'camera' : 'cameras'} monitoring`,
+  },
+  WORST_CAMERA: {
+    vi: 'Tình trạng nặng nhất',
+    en: 'Worst status',
+  },
+  ZONE_CLEAR: {
+    vi: 'Thông thoáng (vùng)',
+    en: 'Clear (zone)',
+  },
+  ZONE_MODERATE: {
+    vi: 'Đông xe (vùng)',
+    en: 'Moderate (zone)',
+  },
+  ZONE_CONGESTED: {
+    vi: 'Ùn tắc (vùng)',
+    en: 'Congested (zone)',
+  },
+});
