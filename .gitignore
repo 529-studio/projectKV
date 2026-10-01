@@ -55,4 +55,5 @@ services/go-server/server
 __pycache__/
 *.py[cod]
 *$py.class
-
+# Spike & Temporary Sandbox Directories
+.tmp_*
