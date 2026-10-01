@@ -9,6 +9,9 @@ export const OTHER_WARDS_KEY = '__OTHER_WARDS__';
 export const OUTSIDE_HCMC_KEY = OTHER_WARDS_KEY;
 
 import { FLOOD_I18N } from '../utils/floodUtils';
+import { useCorridor } from '../hooks/useCorridor';
+import { formatObservationAge, getCorridorWorstVerdict } from '../utils/corridorUtils';
+import { CORRIDOR_I18N } from '../config/constants';
 
 export interface PhuongTreeFilterProps {
   cameras: Camera[];
@@ -77,6 +80,32 @@ export {
   type TrafficVerdictLike,
   type CityCorridorGroup,
 };
+
+function CorridorDetailHeader({ roadKey, lang }: { roadKey?: string | null; lang: 'vi' | 'en' }) {
+  const { status, loading } = useCorridor(roadKey || null);
+
+  if (!roadKey) return null;
+
+  return (
+    <div className="flex items-center justify-between px-2.5 py-1 bg-zinc-950/90 border-b border-zinc-800/60 font-mono text-[9.5px] text-zinc-400 select-none">
+      {loading ? (
+        <span className="text-zinc-500 animate-pulse">{lang === 'vi' ? 'Đang tải thông tin...' : 'Loading status...'}</span>
+      ) : status ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-zinc-300 font-semibold">{CORRIDOR_I18N.COVERAGE[lang](status.coverage_pct)}</span>
+          <span className="text-zinc-600">•</span>
+          <span>
+            {status.oldest_observation_age_s != null
+              ? CORRIDOR_I18N.OLDEST[lang](formatObservationAge(status.oldest_observation_age_s, lang) || '')
+              : CORRIDOR_I18N.UNKNOWN[lang]}
+          </span>
+        </div>
+      ) : (
+        <span>{CORRIDOR_I18N.UNKNOWN[lang]}</span>
+      )}
+    </div>
+  );
+}
 
 export default function PhuongTreeFilter({
   cameras,
@@ -746,6 +775,11 @@ export default function PhuongTreeFilter({
               const isSelected = selectedCorridor === corr.name && !selectedPhuong;
               const isExpanded = expandedCityCorridors.has(corr.name);
               const corrDisplay = formatCorridorDisplay(corr.name, lang);
+              const corrRoadKey = (corr.cameras as Camera[]).find(c => c.road_key)?.road_key || '';
+              const worstSev = getCorridorWorstVerdict(corr.cameras as Camera[], verdicts);
+              const corridorTooltip = worstSev
+                ? `${corr.name} • ${worstSev}`
+                : corr.name;
 
               return (
                 <div
@@ -759,6 +793,7 @@ export default function PhuongTreeFilter({
                         ? 'bg-zinc-800 text-white font-bold border-l-2 border-l-white'
                         : 'hover:bg-zinc-800/60 text-zinc-200'
                     }`}
+                    title={corridorTooltip}
                   >
                     <div className="flex items-center gap-2 truncate flex-1 min-w-0">
                       <button
@@ -769,6 +804,25 @@ export default function PhuongTreeFilter({
                       >
                         {isExpanded ? '▾' : '▸'}
                       </button>
+                      {/* Severity badge dot: only shown when corridor has real, non-stale verdict */}
+                      {worstSev === 'CONGESTED' && (
+                        <span
+                          className="w-2 h-2 rounded-full bg-rose-500 shrink-0 shadow-sm"
+                          title={lang === 'vi' ? 'Ùn tắc' : 'Congested'}
+                        />
+                      )}
+                      {worstSev === 'MODERATE' && (
+                        <span
+                          className="w-2 h-2 rounded-full bg-amber-400 shrink-0 shadow-sm"
+                          title={lang === 'vi' ? 'Đông xe' : 'Moderate'}
+                        />
+                      )}
+                      {worstSev === 'CLEAR' && (
+                        <span
+                          className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-sm"
+                          title={lang === 'vi' ? 'Thông thoáng' : 'Clear'}
+                        />
+                      )}
                       <span className="text-xs truncate font-semibold">
                         {lang === 'en' && corrDisplay.prefix === I18N_NAMES.en.road_type_duong ? (
                           <>
@@ -815,6 +869,7 @@ export default function PhuongTreeFilter({
                         transition={{ duration: 0.18, ease: 'easeInOut' }}
                         className="overflow-hidden bg-black/40 border-t border-zinc-800/60 ml-6 my-0.5 space-y-0.5"
                       >
+                        <CorridorDetailHeader roadKey={corrRoadKey} lang={lang} />
                         <div className="py-1 space-y-0.5">
                           {corr.cameras.map(cam => (
                             <div
@@ -911,6 +966,11 @@ export default function PhuongTreeFilter({
                             const isCorrSelected =
                               isPhuongSelected && selectedCorridor === corr.name;
                             const corrDisplay = formatCorridorDisplay(corr.name, lang);
+                            const wardCorrRoadKey = corr.cameras.find(c => c.road_key)?.road_key || '';
+                            const wardWorstSev = getCorridorWorstVerdict(corr.cameras, verdicts);
+                            const wardCorridorTooltip = wardWorstSev
+                              ? `${corr.name} • ${wardWorstSev}`
+                              : corr.name;
 
                             return (
                               <div key={corridorId} className="flex flex-col">
@@ -922,6 +982,7 @@ export default function PhuongTreeFilter({
                                       ? 'bg-zinc-800 text-white font-semibold'
                                       : 'hover:bg-zinc-900 text-zinc-300'
                                   }`}
+                                  title={wardCorridorTooltip}
                                 >
                                   <div className="flex items-center gap-1.5 truncate flex-1 min-w-0">
                                     <button
@@ -932,6 +993,25 @@ export default function PhuongTreeFilter({
                                     >
                                       {isCorrExpanded ? '▾' : '▸'}
                                     </button>
+                                    {/* Severity badge dot: only shown when corridor has real, non-stale verdict */}
+                                    {wardWorstSev === 'CONGESTED' && (
+                                      <span
+                                        className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
+                                        title={lang === 'vi' ? 'Ùn tắc' : 'Congested'}
+                                      />
+                                    )}
+                                    {wardWorstSev === 'MODERATE' && (
+                                      <span
+                                        className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
+                                        title={lang === 'vi' ? 'Đông xe' : 'Moderate'}
+                                      />
+                                    )}
+                                    {wardWorstSev === 'CLEAR' && (
+                                      <span
+                                        className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"
+                                        title={lang === 'vi' ? 'Thông thoáng' : 'Clear'}
+                                      />
+                                    )}
                                     <span className="truncate">
                                       {lang === 'en' && corrDisplay.prefix === I18N_NAMES.en.road_type_duong ? (
                                         <>
@@ -964,6 +1044,7 @@ export default function PhuongTreeFilter({
                                       transition={{ duration: 0.15, ease: 'easeInOut' }}
                                       className="overflow-hidden bg-black/40 border-l border-zinc-800/80 ml-8 my-0.5 space-y-0.5"
                                     >
+                                      <CorridorDetailHeader roadKey={wardCorrRoadKey} lang={lang} />
                                       {corr.cameras.map(cam => (
                                         <div
                                           key={cam.id}
