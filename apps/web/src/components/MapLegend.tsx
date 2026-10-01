@@ -168,7 +168,7 @@ export default function MapLegend({
   onToggle,
   analysisEnabled = false,
   hexOverlayEnabled = false,
-  hexOverlayMode = 'traffic',
+  hexOverlayMode = 'flood',
   verdictsCount = 0,
   lang = 'vi',
 }: MapLegendProps) {
