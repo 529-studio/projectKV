@@ -47,7 +47,7 @@ export default function HexOverlay({
   lang = 'vi',
 }: HexOverlayProps) {
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
-  const [internalMode, setInternalMode] = useState<HexOverlayMode>('traffic');
+  const [internalMode, setInternalMode] = useState<HexOverlayMode>('flood');
 
   const currentMode = mode ?? internalMode;
   const handleModeChange = (newMode: HexOverlayMode) => {
@@ -386,48 +386,6 @@ export default function HexOverlay({
         <>
           <span className="w-px h-4 bg-zinc-800 shrink-0 mx-0.5" />
 
-          {/* Traffic Mode Button */}
-          <button
-            type="button"
-            onClick={() => handleModeChange('traffic')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold transition-all focus:outline-none cursor-pointer ${
-              currentMode === 'traffic'
-                ? 'bg-white text-black font-bold shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-            title={lang === 'vi' ? 'Hiển thị mật độ giao thông H3' : 'Show traffic density H3'}
-          >
-            <svg
-              className={`w-3.5 h-3.5 shrink-0 transition-colors ${
-                currentMode === 'traffic' ? 'text-black' : 'text-zinc-400'
-              }`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3 3 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
-              <circle cx="7" cy="17" r="2" />
-              <path d="M9 17h6" />
-              <circle cx="17" cy="17" r="2" />
-            </svg>
-            <span className="hidden sm:inline">{FLOOD_I18N.LAYER_TRAFFIC[lang]}</span>
-            {congestedCount > 0 && (
-              <span
-                className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold ${
-                  currentMode === 'traffic'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-red-500/20 text-red-400 border border-red-500/40'
-                }`}
-              >
-                {congestedCount}
-              </span>
-            )}
-          </button>
-
           {/* Rain / Flood Mode Button */}
           <button
             type="button"
@@ -466,6 +424,48 @@ export default function HexOverlay({
                 }`}
               >
                 {floodedHexCount}
+              </span>
+            )}
+          </button>
+
+          {/* Traffic Mode Button */}
+          <button
+            type="button"
+            onClick={() => handleModeChange('traffic')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold transition-all focus:outline-none cursor-pointer ${
+              currentMode === 'traffic'
+                ? 'bg-white text-black font-bold shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+            title={lang === 'vi' ? 'Hiển thị mật độ giao thông H3' : 'Show traffic density H3'}
+          >
+            <svg
+              className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+                currentMode === 'traffic' ? 'text-black' : 'text-zinc-400'
+              }`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3 3 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+              <circle cx="7" cy="17" r="2" />
+              <path d="M9 17h6" />
+              <circle cx="17" cy="17" r="2" />
+            </svg>
+            <span className="hidden sm:inline">{FLOOD_I18N.LAYER_TRAFFIC[lang]}</span>
+            {congestedCount > 0 && (
+              <span
+                className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold ${
+                  currentMode === 'traffic'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-red-500/20 text-red-400 border border-red-500/40'
+                }`}
+              >
+                {congestedCount}
               </span>
             )}
           </button>

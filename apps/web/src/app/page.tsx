@@ -28,7 +28,7 @@ export default function Home() {
   
   const [map, setMap] = useState<L.Map | null>(null);
   const [hexOverlayEnabled, setHexOverlayEnabled] = useState(true);
-  const [hexOverlayMode, setHexOverlayMode] = useState<HexOverlayMode>('traffic');
+  const [hexOverlayMode, setHexOverlayMode] = useState<HexOverlayMode>('flood');
   const [isFloodFilterActive, setIsFloodFilterActive] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
