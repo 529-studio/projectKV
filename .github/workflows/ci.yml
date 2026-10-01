@@ -28,6 +28,10 @@ on:
       - '.env.example'
       - '.env.stg.example'
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   detect-changes:
     name: Detect Changed Components
