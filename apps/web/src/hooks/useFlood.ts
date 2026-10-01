@@ -68,6 +68,7 @@ export function useFlood(): UseFloodReturn {
     let isCancelled = false;
 
     async function fetchInitial() {
+      const startTime = Date.now();
       try {
         // 1. Fetch initial flood status
         const statusPromise = fetch(getApiUrl(API_ENDPOINTS.FLOOD_STATUS))
@@ -122,6 +123,11 @@ export function useFlood(): UseFloodReturn {
           setFloodHexCells(initialHex);
         }
       } finally {
+        const elapsed = Date.now() - startTime;
+        const minDelay = 700;
+        if (elapsed < minDelay) {
+          await new Promise((resolve) => setTimeout(resolve, minDelay - elapsed));
+        }
         if (!isCancelled) {
           setLoading(false);
         }

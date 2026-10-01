@@ -429,7 +429,7 @@ export default function HexOverlay({
                 title={lang === 'vi' ? 'Đang tải dự báo mưa H3...' : 'Loading H3 rain forecast...'}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-                <span className="hidden sm:inline text-[9px]">{lang === 'vi' ? 'đang tải...' : 'loading...'}</span>
+                <span className="inline text-[9px]">{lang === 'vi' ? 'đang tải...' : 'loading...'}</span>
               </span>
             ) : floodedHexCount > 0 ? (
               <span
