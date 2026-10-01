@@ -157,6 +157,10 @@ func (s *Scheduler) SetBudget(b *AnalysisBudget) {
 // Run blocks until ctx is cancelled. Intended to be started once from main
 // in its own goroutine: `go scheduler.Run(ctx)`.
 func (s *Scheduler) Run(ctx context.Context) {
+	// Execute first analysis cycle immediately upon startup so Hot Set and H3
+	// aggregators are populated right away without waiting for the first ticker interval.
+	s.runOnce(ctx)
+
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
