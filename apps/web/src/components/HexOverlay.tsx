@@ -5,6 +5,7 @@ import {
   HexCell,
   getHexColorAndOpacity,
   isHexVisibleAtZoom,
+  getHexInteractivityState,
   formatHexTooltip,
 } from '../utils/hexUtils';
 import { HEX_I18N } from '../config/constants';
@@ -33,6 +34,11 @@ export default function HexOverlay({
   useEffect(() => {
     if (!map) return;
 
+    if (!map.getPane('hexOverlayPane')) {
+      const hexPane = map.createPane('hexOverlayPane');
+      hexPane.style.zIndex = '350';
+    }
+
     if (!layerGroupRef.current) {
       layerGroupRef.current = L.layerGroup().addTo(map);
     }
@@ -40,11 +46,19 @@ export default function HexOverlay({
     layerGroup.clearLayers();
 
     if (!enabled || hexCells.size === 0) {
+      const pane = map.getPane('hexOverlayPane');
+      if (pane) pane.style.pointerEvents = 'none';
       return;
     }
 
     const currentZoom = map.getZoom();
-    const isVisible = isHexVisibleAtZoom(currentZoom);
+    const { isVisible, pointerEvents, className } = getHexInteractivityState(currentZoom);
+
+    // Sync pane pointer-events with current zoom visibility
+    const hexPane = map.getPane('hexOverlayPane');
+    if (hexPane) {
+      hexPane.style.pointerEvents = pointerEvents;
+    }
 
     hexCells.forEach((cell) => {
       if (!cell.polygon || cell.polygon.length < 3) return;
@@ -57,8 +71,9 @@ export default function HexOverlay({
         color: '#52525b',
         weight: 1,
         opacity: isVisible ? 0.8 : 0,
-        className: 'hex-cell-polygon',
+        className,
         interactive: isVisible,
+        pane: 'hexOverlayPane',
       }) as CustomPolygon;
 
       polygon._baseFillOpacity = fillOpacity;
@@ -90,9 +105,27 @@ export default function HexOverlay({
         });
       });
 
+      // Prevent browser focus ring on SVG polygon element
+      polygon.on('mousedown', (e) => {
+        if (e.originalEvent && typeof e.originalEvent.preventDefault === 'function') {
+          e.originalEvent.preventDefault();
+        }
+      });
+
       polygon.on('click', (e) => {
         if (!isHexVisibleAtZoom(map.getZoom())) return;
         L.DomEvent.stopPropagation(e);
+        polygon.closeTooltip();
+
+        // Remove browser focus ring on SVG polygon element immediately
+        const target = e.originalEvent?.target as HTMLElement | SVGElement | undefined;
+        if (target && typeof target.blur === 'function') {
+          target.blur();
+        }
+        if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
+          (document.activeElement as HTMLElement).blur();
+        }
+
         const bounds = polygon.getBounds();
         map.fitBounds(bounds, {
           padding: [30, 30],
@@ -103,10 +136,23 @@ export default function HexOverlay({
       layerGroup.addLayer(polygon);
     });
 
+    const handleZoomStart = () => {
+      // Close open tooltips immediately when zoom starts
+      if (!layerGroupRef.current) return;
+      layerGroupRef.current.eachLayer((layer) => {
+        (layer as L.Polygon).closeTooltip();
+      });
+    };
+
     const handleZoomEnd = () => {
       if (!layerGroupRef.current) return;
       const zoom = map.getZoom();
-      const visible = isHexVisibleAtZoom(zoom);
+      const { isVisible: visible, pointerEvents } = getHexInteractivityState(zoom);
+
+      const pane = map.getPane('hexOverlayPane');
+      if (pane) {
+        pane.style.pointerEvents = pointerEvents;
+      }
 
       layerGroupRef.current.eachLayer((layer) => {
         const poly = layer as CustomPolygon;
@@ -115,15 +161,29 @@ export default function HexOverlay({
           fillOpacity: visible ? baseFill : 0,
           opacity: visible ? 0.8 : 0,
         });
+
+        const el = (poly.getElement?.() || (poly as unknown as { _path?: SVGElement })._path) as HTMLElement | SVGElement | undefined;
+        if (el) {
+          if (visible) {
+            el.classList.remove('hex-cell-hidden');
+            el.style.pointerEvents = 'auto';
+          } else {
+            el.classList.add('hex-cell-hidden');
+            el.style.pointerEvents = 'none';
+          }
+        }
+
         if (!visible) {
           poly.closeTooltip();
         }
       });
     };
 
+    map.on('zoomstart', handleZoomStart);
     map.on('zoomend', handleZoomEnd);
 
     return () => {
+      map.off('zoomstart', handleZoomStart);
       map.off('zoomend', handleZoomEnd);
       layerGroup.clearLayers();
     };
