@@ -18,6 +18,13 @@ var mockSeverities = []string{
 	hotset.SeverityCongested,
 }
 
+var mockFloodSeverities = []string{
+	hotset.SeverityDry,
+	hotset.SeverityWet,
+	hotset.SeverityFloodedShallow,
+	hotset.SeverityFloodedDeep,
+}
+
 type MockAnalyzer struct {
 	counter atomic.Uint64
 }
@@ -26,5 +33,13 @@ func NewMockAnalyzer() *MockAnalyzer { return &MockAnalyzer{} }
 func (m *MockAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hotset.Verdict, error) {
 	idx := m.counter.Add(1) - 1
 	severity := mockSeverities[idx%uint64(len(mockSeverities))]
-	return hotset.Verdict{CameraID: cam.ID, Severity: severity, Confidence: 0.99, Source: "mock", Timestamp: time.Now()}, nil
+	floodSeverity := mockFloodSeverities[idx%uint64(len(mockFloodSeverities))]
+	return hotset.Verdict{
+		CameraID:      cam.ID,
+		Severity:      severity,
+		FloodSeverity: floodSeverity,
+		Confidence:    0.99,
+		Source:        "mock",
+		Timestamp:     time.Now(),
+	}, nil
 }

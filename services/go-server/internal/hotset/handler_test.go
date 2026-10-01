@@ -191,9 +191,81 @@ func TestGetFloodStatus_ReturnsEmptyArray(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	body := w.Body.String()
-	if body != "[]\n" && body != "[]" {
-		t.Errorf("expected empty JSON array [], got %q", body)
+	var resp hotset.FloodStatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal flood status: %v", err)
+	}
+	if len(resp.Verdicts) != 0 {
+		t.Errorf("expected empty verdicts, got %d", len(resp.Verdicts))
+	}
+}
+
+func TestGetFloodStatus_HonestyAndMockFiltering(t *testing.T) {
+	now := time.Now().UTC()
+	store := &mockStorer{
+		verdicts: []hotset.Verdict{
+			{
+				CameraID:      "flood_deep_cam",
+				Severity:      "CLEAR",
+				FloodSeverity: "FLOODED_DEEP",
+				Confidence:    0.9,
+				Source:        "vlm",
+				ObservedAt:    now,
+				Timestamp:     now,
+			},
+			{
+				CameraID:      "mock_flood_cam",
+				Severity:      "CLEAR",
+				FloodSeverity: "FLOODED_SHALLOW",
+				Confidence:    0.9,
+				Source:        "mock",
+				ObservedAt:    now,
+				Timestamp:     now,
+			},
+			{
+				CameraID:      "unverified_cam",
+				Severity:      "CLEAR",
+				FloodSeverity: "",
+				Confidence:    0.9,
+				Source:        "vlm",
+				ObservedAt:    now,
+				Timestamp:     now,
+			},
+		},
+	}
+
+	// 1. In production, mock verdicts are excluded and unverified are excluded (Honesty rule)
+	hProd := hotset.NewHandlerWithConfig(store, true, "production")
+	rProd := newTestRouter(hProd)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/flood-status", nil)
+	wProd := httptest.NewRecorder()
+	rProd.ServeHTTP(wProd, req)
+
+	var respProd hotset.FloodStatusResponse
+	if err := json.Unmarshal(wProd.Body.Bytes(), &respProd); err != nil {
+		t.Fatalf("unmarshal flood status: %v", err)
+	}
+	if len(respProd.Verdicts) != 1 {
+		t.Fatalf("expected 1 verdict in prod, got %d", len(respProd.Verdicts))
+	}
+	if respProd.Verdicts[0].CameraID != "flood_deep_cam" {
+		t.Errorf("expected flood_deep_cam, got %s", respProd.Verdicts[0].CameraID)
+	}
+
+	// 2. In dev, mock verdicts are allowed
+	hDev := hotset.NewHandlerWithConfig(store, true, "dev")
+	rDev := newTestRouter(hDev)
+
+	wDev := httptest.NewRecorder()
+	rDev.ServeHTTP(wDev, req)
+
+	var respDev hotset.FloodStatusResponse
+	if err := json.Unmarshal(wDev.Body.Bytes(), &respDev); err != nil {
+		t.Fatalf("unmarshal flood status in dev: %v", err)
+	}
+	if len(respDev.Verdicts) != 2 {
+		t.Fatalf("expected 2 verdicts in dev (mock allowed, unverified excluded), got %d", len(respDev.Verdicts))
 	}
 }
 

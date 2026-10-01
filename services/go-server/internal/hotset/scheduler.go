@@ -40,13 +40,14 @@ type Analyzer interface {
 // congestion analysis and flood detection — only the Analyzer implementation
 // and the meaning of Severity differ.
 type Verdict struct {
-	CameraID   string    `json:"camera_id"`
-	Severity   string    `json:"severity"` // e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED", or "DRY" | "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP"
-	Confidence float64   `json:"confidence"`
-	Source     string    `json:"source"` // "mock" | "vlm" | "onnx"
-	ObservedAt time.Time `json:"observed_at"`
-	Stale      bool      `json:"stale"`
-	Timestamp  time.Time `json:"timestamp"`
+	CameraID      string    `json:"camera_id"`
+	Severity      string    `json:"severity"`                 // Traffic severity: e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED"
+	FloodSeverity string    `json:"flood_severity,omitempty"` // Flood severity: "DRY" | "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP" | "UNKNOWN"
+	Confidence    float64   `json:"confidence"`
+	Source        string    `json:"source"` // "mock" | "vlm" | "onnx"
+	ObservedAt    time.Time `json:"observed_at"`
+	Stale         bool      `json:"stale"`
+	Timestamp     time.Time `json:"timestamp"`
 }
 
 // OnVerdict is called for every successful analysis result. The caller

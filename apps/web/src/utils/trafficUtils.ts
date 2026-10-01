@@ -1,6 +1,7 @@
 export interface TrafficVerdict {
   camera_id: string;
   severity: string;
+  flood_severity?: string;
   confidence: number;
   source?: string;
   observed_at?: string;
@@ -58,6 +59,7 @@ export function normalizeVerdict(raw: any, ttlMs: number = DEFAULT_VERDICT_TTL_M
   return {
     ...raw,
     camera_id: raw.camera_id || raw.cameraId,
+    flood_severity: raw.flood_severity || raw.floodSeverity,
     observed_at: raw.observed_at || raw.timestamp,
     stale: isStale,
   };

@@ -57,12 +57,13 @@ func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
 	out := make([]hotset.Verdict, len(verdicts))
 	for i, v := range verdicts {
 		out[i] = hotset.Verdict{
-			CameraID:   v.CameraID,
-			Severity:   v.Severity,
-			Confidence: v.Confidence,
-			Source:     v.Source,
-			ObservedAt: v.ObservedAt,
-			Timestamp:  v.Timestamp,
+			CameraID:      v.CameraID,
+			Severity:      v.Severity,
+			FloodSeverity: v.FloodSeverity,
+			Confidence:    v.Confidence,
+			Source:        v.Source,
+			ObservedAt:    v.ObservedAt,
+			Timestamp:     v.Timestamp,
 		}
 	}
 	return out
@@ -285,6 +286,13 @@ func main() {
 		log.Println("[INIT] Hex cell aggregation enabled for mock analyzer in 'dev' environment.")
 	}
 
+	floodHexAggregator := live.NewFloodHexAggregator(allCameras, hexPolygons, cfg.HexResolution, 1, liveHub, nil)
+	if cfg.AppEnv == "dev" && cfg.Analyzer == "mock" {
+		floodHexAggregator.SetAllowMock(true)
+		log.Println("[INIT] Flood hex cell aggregation enabled for mock analyzer in 'dev' environment.")
+	}
+	liveHub.SetFloodHexAggregator(floodHexAggregator)
+
 	// 6d. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
 	if analysisEnabled && analyzer != nil {
 		// Initialize object storage and snapshot archiver (Issue #62)
@@ -332,15 +340,21 @@ func main() {
 				hexAggregator.OnVerdict(v)
 			}
 
+			// Fan-out 1c: push flood hex cell update if safety floor (>= 1 camera) is met.
+			if floodHexAggregator != nil {
+				floodHexAggregator.OnVerdict(v)
+			}
+
 			// Fan-out 2: persist to SQLite for GET /api/traffic-status hydration.
 			if verdictRepo != nil {
 				sv := store.Verdict{
-					CameraID:   v.CameraID,
-					Severity:   v.Severity,
-					Confidence: v.Confidence,
-					Source:     v.Source,
-					ObservedAt: v.ObservedAt,
-					Timestamp:  v.Timestamp,
+					CameraID:      v.CameraID,
+					Severity:      v.Severity,
+					Confidence:    v.Confidence,
+					Source:        v.Source,
+					ObservedAt:    v.ObservedAt,
+					Timestamp:     v.Timestamp,
+					FloodSeverity: v.FloodSeverity,
 				}
 				if err := verdictRepo.Save(context.Background(), sv); err != nil {
 					log.Printf("[WARN] Failed to persist verdict for %s: %v", v.CameraID, err)
