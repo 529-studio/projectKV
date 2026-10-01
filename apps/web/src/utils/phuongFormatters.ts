@@ -353,9 +353,19 @@ export interface MarkerStyleOptions {
 export function calculateMarkerStyle(
   isDimmed: boolean,
   baseRadius: number,
-  zoom: number
+  zoom: number,
+  dimMode: 'filtered' | 'hexMacro' = 'filtered'
 ): MarkerStyleOptions {
   if (isDimmed) {
+    if (dimMode === 'hexMacro') {
+      return {
+        radius: Math.max(2.5, Math.round(baseRadius * 0.7)),
+        weight: 1,
+        opacity: 0.35,
+        fillOpacity: 0.25,
+        strokeColor: '#3f3f46',
+      };
+    }
     return {
       radius: Math.max(2.5, Math.round(baseRadius * 0.7)),
       weight: 1,
