@@ -137,7 +137,7 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     const viTooltip = formatFloodHexTooltip(cell, 'vi');
     assert.ok(viTooltip.includes('Ngập sâu (nguy hiểm)'));
     assert.ok(viTooltip.includes('2 camera giám sát'));
-    assert.ok(viTooltip.includes('Điểm ngập nặng nhất'));
+    assert.ok(viTooltip.includes('Điểm mưa/ngập nặng nhất'));
     assert.ok(viTooltip.includes('Đường Ung Văn Khiêm'));
     assert.ok(!viTooltip.includes('Phường'));
     assert.ok(!viTooltip.includes('Quận'));
@@ -145,7 +145,7 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     const enTooltip = formatFloodHexTooltip(cell, 'en');
     assert.ok(enTooltip.includes('Deep water (hazardous)'));
     assert.ok(enTooltip.includes('2 cameras monitoring'));
-    assert.ok(enTooltip.includes('Worst flood spot'));
+    assert.ok(enTooltip.includes('Worst rain/flood spot'));
   });
 
   test('honesty rule: never says "OK to go" or "safe" for unknown/unverified data', () => {
@@ -159,9 +159,9 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
 
   test('FLOOD_I18N contains all required bilingual keys with Vietnamese diacritics', () => {
     assert.equal(FLOOD_I18N.LAYER_TRAFFIC.vi, 'Giao thông');
-    assert.equal(FLOOD_I18N.LAYER_FLOOD.vi, 'Ngập nước');
-    assert.equal(FLOOD_I18N.TOOLTIP_TITLE.vi, 'Cảnh báo ngập');
-    assert.equal(FLOOD_I18N.FILTER_CHIP.vi(3), '🌧️ Điểm ngập (3)');
-    assert.equal(FLOOD_I18N.ACTIVE_ALERT_BADGE.vi(2), '🌧️ Vùng ngập • 2');
+    assert.equal(FLOOD_I18N.LAYER_FLOOD.vi, 'Khả năng có mưa');
+    assert.equal(FLOOD_I18N.TOOLTIP_TITLE.vi, 'Cảnh báo mưa & ngập');
+    assert.equal(FLOOD_I18N.FILTER_CHIP.vi(3), 'Khu vực có mưa (3)');
+    assert.equal(FLOOD_I18N.ACTIVE_ALERT_BADGE.vi(2), 'Vùng có mưa • 2');
   });
 });
