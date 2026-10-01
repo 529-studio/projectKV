@@ -34,6 +34,8 @@ export interface HexOverlayProps {
   mode?: HexOverlayMode;
   onModeChange?: (mode: HexOverlayMode) => void;
   lang?: 'vi' | 'en';
+  floodLoading?: boolean;
+  trafficLoading?: boolean;
 }
 
 export default function HexOverlay({
@@ -45,6 +47,8 @@ export default function HexOverlay({
   mode,
   onModeChange,
   lang = 'vi',
+  floodLoading = false,
+  trafficLoading = false,
 }: HexOverlayProps) {
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
   const [internalMode, setInternalMode] = useState<HexOverlayMode>('flood');
@@ -415,7 +419,19 @@ export default function HexOverlay({
               <path d="M12 16v6" />
             </svg>
             <span className="hidden sm:inline">{FLOOD_I18N.LAYER_FLOOD[lang]}</span>
-            {floodedHexCount > 0 && (
+            {floodLoading ? (
+              <span
+                className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold flex items-center gap-1 ${
+                  currentMode === 'flood'
+                    ? 'bg-zinc-950 text-sky-400'
+                    : 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                }`}
+                title={lang === 'vi' ? 'Đang tải dự báo mưa H3...' : 'Loading H3 rain forecast...'}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                <span className="hidden sm:inline text-[9px]">{lang === 'vi' ? 'đang tải...' : 'loading...'}</span>
+              </span>
+            ) : floodedHexCount > 0 ? (
               <span
                 className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold ${
                   currentMode === 'flood'
@@ -425,7 +441,7 @@ export default function HexOverlay({
               >
                 {floodedHexCount}
               </span>
-            )}
+            ) : null}
           </button>
 
           {/* Traffic Mode Button */}
@@ -457,7 +473,18 @@ export default function HexOverlay({
               <circle cx="17" cy="17" r="2" />
             </svg>
             <span className="hidden sm:inline">{FLOOD_I18N.LAYER_TRAFFIC[lang]}</span>
-            {congestedCount > 0 && (
+            {trafficLoading ? (
+              <span
+                className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold flex items-center gap-1 ${
+                  currentMode === 'traffic'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                }`}
+                title={lang === 'vi' ? 'Đang tải dữ liệu giao thông H3...' : 'Loading H3 traffic data...'}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
+              </span>
+            ) : congestedCount > 0 ? (
               <span
                 className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold ${
                   currentMode === 'traffic'
@@ -467,7 +494,7 @@ export default function HexOverlay({
               >
                 {congestedCount}
               </span>
-            )}
+            ) : null}
           </button>
         </>
       )}

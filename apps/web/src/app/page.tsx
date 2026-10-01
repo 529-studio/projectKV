@@ -1,6 +1,7 @@
 'use client';
 import dynamic from 'next/dynamic';
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type L from 'leaflet';
 import { useCameras, Camera } from '../hooks/useCameras';
 import { useTraffic } from '../hooks/useTraffic';
@@ -23,8 +24,8 @@ const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: fals
 
 export default function Home() {
   const { cameras, loading, error } = useCameras();
-  const { verdicts, hexCells, analysisEnabled, appEnv } = useTraffic();
-  const { floodVerdicts, floodHexCells, floodedCameraIds, floodedCameraCount } = useFlood();
+  const { verdicts, hexCells, analysisEnabled, appEnv, loading: trafficLoading } = useTraffic();
+  const { floodVerdicts, floodHexCells, floodedCameraIds, floodedCameraCount, loading: floodLoading } = useFlood();
   
   const [map, setMap] = useState<L.Map | null>(null);
   const [hexOverlayEnabled, setHexOverlayEnabled] = useState(true);
@@ -245,6 +246,8 @@ export default function Home() {
               mode={hexOverlayMode}
               onModeChange={handleHexModeChange}
               lang={lang}
+              floodLoading={floodLoading}
+              trafficLoading={trafficLoading}
             />
           </MapComponent>
         </div>
@@ -264,6 +267,29 @@ export default function Home() {
           lang={lang}
         />
 
+        {/* H3 Rain Forecast Loading Floating Chip */}
+        <AnimatePresence>
+          {hexOverlayEnabled && hexOverlayMode === 'flood' && floodLoading && (
+            <motion.div
+              initial={{ opacity: 0, y: -6, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="fixed bottom-20 left-1/2 -translate-x-1/2 md:bottom-auto md:top-14 md:left-1/2 md:-translate-x-1/2 z-[820] pointer-events-none flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-950/95 border border-sky-500/40 text-sky-300 font-mono text-[11px] shadow-2xl backdrop-blur-md select-none"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />
+              </span>
+              <span>
+                {lang === 'vi' ? 'Đang tải dự báo mưa & ngập nước H3...' : 'Loading H3 rain & flood forecast...'}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* MAP LEGEND — collapsible */}
         <MapLegend
           isOpen={legendOpen}
@@ -273,6 +299,8 @@ export default function Home() {
           hexOverlayMode={hexOverlayMode}
           verdictsCount={verdicts.size}
           lang={lang}
+          floodLoading={floodLoading}
+          trafficLoading={trafficLoading}
         />
 
         {/* MOBILE CAMERA LIST — trigger button (hidden on md+) */}

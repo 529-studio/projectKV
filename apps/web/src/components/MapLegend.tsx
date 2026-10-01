@@ -12,6 +12,8 @@ interface MapLegendProps {
   hexOverlayMode?: 'traffic' | 'flood';
   verdictsCount?: number;
   lang?: 'vi' | 'en';
+  floodLoading?: boolean;
+  trafficLoading?: boolean;
 }
 
 interface LegendContentProps {
@@ -20,6 +22,8 @@ interface LegendContentProps {
   hexOverlayEnabled: boolean;
   hexOverlayMode: 'traffic' | 'flood';
   verdictsCount: number;
+  floodLoading?: boolean;
+  trafficLoading?: boolean;
 }
 
 function LegendContent({
@@ -28,6 +32,8 @@ function LegendContent({
   hexOverlayEnabled,
   hexOverlayMode,
   verdictsCount,
+  floodLoading = false,
+  trafficLoading = false,
 }: LegendContentProps) {
   return (
     <>
@@ -103,10 +109,24 @@ function LegendContent({
       {/* Category 3: H3 Hex Overlay (Only rendered when hexOverlayEnabled is true) */}
       {hexOverlayEnabled && (
         <>
-          <div className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1.5 border-t border-zinc-800/80">
-            {hexOverlayMode === 'flood'
-              ? (lang === 'vi' ? 'Khả năng có mưa (H3)' : 'Rain Forecast (H3)')
-              : (lang === 'vi' ? 'Vùng tổng hợp (H3)' : 'Zone Overview (H3)')}
+          <div className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1.5 border-t border-zinc-800/80 flex items-center justify-between">
+            <span>
+              {hexOverlayMode === 'flood'
+                ? (lang === 'vi' ? 'Khả năng có mưa (H3)' : 'Rain Forecast (H3)')
+                : (lang === 'vi' ? 'Vùng tổng hợp (H3)' : 'Zone Overview (H3)')}
+            </span>
+            {hexOverlayMode === 'flood' && floodLoading && (
+              <span className="flex items-center gap-1 text-sky-400 font-normal lowercase tracking-normal">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                <span>{lang === 'vi' ? 'đang tải...' : 'syncing...'}</span>
+              </span>
+            )}
+            {hexOverlayMode === 'traffic' && trafficLoading && (
+              <span className="flex items-center gap-1 text-zinc-400 font-normal lowercase tracking-normal">
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
+                <span>{lang === 'vi' ? 'đang tải...' : 'syncing...'}</span>
+              </span>
+            )}
           </div>
           {hexOverlayMode === 'flood' ? (
             <>
@@ -171,6 +191,8 @@ export default function MapLegend({
   hexOverlayMode = 'flood',
   verdictsCount = 0,
   lang = 'vi',
+  floodLoading = false,
+  trafficLoading = false,
 }: MapLegendProps) {
   return (
     <>
@@ -209,6 +231,8 @@ export default function MapLegend({
                   hexOverlayEnabled={hexOverlayEnabled}
                   hexOverlayMode={hexOverlayMode}
                   verdictsCount={verdictsCount}
+                  floodLoading={floodLoading}
+                  trafficLoading={trafficLoading}
                 />
               </div>
             </motion.div>
@@ -287,6 +311,8 @@ export default function MapLegend({
                     hexOverlayEnabled={hexOverlayEnabled}
                     hexOverlayMode={hexOverlayMode}
                     verdictsCount={verdictsCount}
+                    floodLoading={floodLoading}
+                    trafficLoading={trafficLoading}
                   />
                 </div>
               </motion.div>
