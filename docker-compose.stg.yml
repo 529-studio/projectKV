@@ -1,22 +1,22 @@
 services:
   warded-stg:
-    image: ghcr.io/529-studio/projectkv:stg-latest
-    container_name: warded-stg
+    image: ${IMAGE_NAME:-ghcr.io/529-studio/projectkv}:${IMAGE_TAG:-stg-latest}
+    container_name: ${CONTAINER_NAME:-warded-stg}
     restart: unless-stopped
     pull_policy: always
     networks:
       - core-network
     environment:
-      - PORT=3000
-      - GIN_MODE=release
-      - CAMERAS_FILE_PATH=/app/cameras_enriched.json
-      - STATIC_WEB_DIR=/app/web
-      - SQLITE_PATH=/app/data/camera-view.db
-      - SNAPSHOT_UPSTREAM_BASE_URL=https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx
-      - SNAPSHOT_CACHE_TTL_SECONDS=10
-      - HOTSET_INTERVAL_SECONDS=30
-      - HOTSET_ACTIVE_TTL_SECONDS=120
-      - TZ=Asia/Ho_Chi_Minh
+      - PORT=${PORT:-3000}
+      - GIN_MODE=${GIN_MODE:-release}
+      - CAMERAS_FILE_PATH=${CAMERAS_FILE_PATH:-/app/cameras_enriched.json}
+      - STATIC_WEB_DIR=${STATIC_WEB_DIR:-/app/web}
+      - SQLITE_PATH=${SQLITE_PATH:-/app/data/camera-view.db}
+      - SNAPSHOT_UPSTREAM_BASE_URL=${SNAPSHOT_UPSTREAM_BASE_URL:-https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx}
+      - SNAPSHOT_CACHE_TTL_SECONDS=${SNAPSHOT_CACHE_TTL_SECONDS:-10}
+      - HOTSET_INTERVAL_SECONDS=${HOTSET_INTERVAL_SECONDS:-30}
+      - HOTSET_ACTIVE_TTL_SECONDS=${HOTSET_ACTIVE_TTL_SECONDS:-120}
+      - TZ=${TZ:-Asia/Ho_Chi_Minh}
       - ANALYZER=${ANALYZER:-vlm}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - CLOUD_VISION_API_KEY=${CLOUD_VISION_API_KEY:-}
@@ -26,19 +26,21 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.50"
-          memory: 256M
+          cpus: "${CPU_LIMIT:-0.50}"
+          memory: "${MEMORY_LIMIT:-256M}"
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=core-network"
-      - "traefik.http.routers.warded-stg.rule=Host(`warded-stg.529studio.site`)"
-      - "traefik.http.routers.warded-stg.entrypoints=websecure"
-      - "traefik.http.routers.warded-stg.tls.certresolver=cloudflare"
-      - "traefik.http.services.warded-stg.loadbalancer.server.port=3000"
+      - "traefik.docker.network=${DOCKER_NETWORK:-core-network}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}.rule=Host(`${DOMAIN_NAME:-warded-stg.529studio.site}`)"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cloudflare}"
+      - "traefik.http.services.${ROUTER_NAME:-warded-stg}.loadbalancer.server.port=${PORT:-3000}"
 
 volumes:
-  warded-stg-data: {}
+  warded-stg-data:
+    name: ${DATA_VOLUME_NAME:-warded-stg_warded-stg-data}
 
 networks:
   core-network:
+    name: ${DOCKER_NETWORK:-core-network}
     external: true
