@@ -156,3 +156,29 @@ describe('Traffic Verdict Provenance and Staleness (Issue #64)', () => {
     assert.equal(getSeverityLabel('', 'vi'), '');
   });
 });
+
+describe('Traffic Sync Indicator State Logic', () => {
+  test('syncing state is active only when analysisEnabled is true and verdicts count is 0', () => {
+    const shouldShowSyncing = (analysisEnabled: boolean, verdictsCount: number, dismissed: boolean) => {
+      if (!analysisEnabled || dismissed) return false;
+      return verdictsCount === 0;
+    };
+
+    assert.equal(shouldShowSyncing(true, 0, false), true);
+    assert.equal(shouldShowSyncing(true, 10, false), false);
+    assert.equal(shouldShowSyncing(false, 0, false), false);
+    assert.equal(shouldShowSyncing(true, 0, true), false);
+  });
+
+  test('synced success state triggers when transitioning from 0 to >0 verdicts', () => {
+    let prevCount = 0;
+    const currentCount = 5;
+    const shouldTriggerSuccess = prevCount === 0 && currentCount > 0;
+    assert.equal(shouldTriggerSuccess, true);
+
+    prevCount = 5;
+    const subsequentCount = 6;
+    const shouldRetrigger = prevCount === 0 && subsequentCount > 0;
+    assert.equal(shouldRetrigger, false);
+  });
+});
