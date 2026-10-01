@@ -143,7 +143,19 @@ export default function HexOverlay({
       aria-label={lang === 'vi' ? 'Bật/tắt vùng tổng hợp' : 'Toggle zone overview'}
       title={lang === 'vi' ? 'Bật/tắt hiển thị vùng tổng hợp H3' : 'Toggle H3 zone overview'}
     >
-      <span className="text-sm leading-none">🔷</span>
+      <svg
+        className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+          enabled ? 'text-zinc-100 fill-zinc-100/20' : 'text-zinc-400 fill-none'
+        }`}
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <polygon points="12 2.5 21 7.5 21 16.5 12 21.5 3 16.5 3 7.5" />
+      </svg>
       <span>{HEX_I18N.TOGGLE[lang]}</span>
     </button>
   );
