@@ -8,9 +8,14 @@ import { usePhuongs } from '../hooks/usePhuongs';
 export const OTHER_WARDS_KEY = '__OTHER_WARDS__';
 export const OUTSIDE_HCMC_KEY = OTHER_WARDS_KEY;
 
+import { FLOOD_I18N } from '../utils/floodUtils';
+
 export interface PhuongTreeFilterProps {
   cameras: Camera[];
   verdicts?: Map<string, TrafficVerdictLike>;
+  floodedCameraIds?: Set<string>;
+  isFloodFilterActive?: boolean;
+  onToggleFloodFilter?: () => void;
   loading?: boolean;
   error?: Error | null;
   selectedPhuong: string | null;
@@ -76,6 +81,9 @@ export {
 export default function PhuongTreeFilter({
   cameras,
   verdicts,
+  floodedCameraIds,
+  isFloodFilterActive = false,
+  onToggleFloodFilter,
   loading: camerasLoading = false,
   error = null,
   selectedPhuong,
@@ -100,10 +108,18 @@ export default function PhuongTreeFilter({
   const [expandedPhuongs, setExpandedPhuongs] = useState<Set<string>>(new Set());
   const [expandedCorridors, setExpandedCorridors] = useState<Set<string>>(new Set());
 
+  // Active cameras taking flood filter into account
+  const activeCameras = useMemo(() => {
+    if (isFloodFilterActive && floodedCameraIds) {
+      return cameras.filter(c => floodedCameraIds.has(c.id));
+    }
+    return cameras;
+  }, [cameras, isFloodFilterActive, floodedCameraIds]);
+
   // City-wide corridor grouping with traffic prioritization
   const cityCorridors = useMemo(() => {
-    return groupCamerasByCityCorridors(cameras, verdicts, searchTerm);
-  }, [cameras, verdicts, searchTerm]);
+    return groupCamerasByCityCorridors(activeCameras, verdicts, searchTerm);
+  }, [activeCameras, verdicts, searchTerm]);
 
   // Arterial corridors state & horizontal scroll controller
   const [isArterialsExpanded, setIsArterialsExpanded] = useState(false);
@@ -171,7 +187,7 @@ export default function PhuongTreeFilter({
       const name = p.name.trim();
       pTypeMap.set(name, p.type);
     });
-    cameras.forEach(c => {
+    activeCameras.forEach(c => {
       if (c.phuong_name) {
         const name = c.phuong_name.trim();
         if (c.phuong_type && !pTypeMap.has(name)) {
@@ -183,7 +199,7 @@ export default function PhuongTreeFilter({
     // Map: phuongKey -> Map: corridorName -> Camera[]
     const phuongMap = new Map<string, Map<string, Camera[]>>();
 
-    cameras.forEach(cam => {
+    activeCameras.forEach(cam => {
       const phuongKey = cam.phuong_name ? cam.phuong_name.trim() : OTHER_WARDS_KEY;
       const corridor = cam.road_name ? cam.road_name.trim() : extractCorridor(cam.displayName, cam.title);
       const roadType = cam.road_type || null;
@@ -216,7 +232,7 @@ export default function PhuongTreeFilter({
     // Build ordered list of Phườngs starting with official apiPhuongs
     const allPhuongKeys = new Set<string>();
     apiPhuongs.forEach(p => allPhuongKeys.add(p.name.trim()));
-    cameras.forEach(c => {
+    activeCameras.forEach(c => {
       if (c.phuong_name) allPhuongKeys.add(c.phuong_name.trim());
     });
 
@@ -282,7 +298,7 @@ export default function PhuongTreeFilter({
     }
 
     return { treeData: groups, phuongTypeMap: pTypeMap };
-  }, [cameras, apiPhuongs, searchTerm, t.otherWards, lang]);
+  }, [activeCameras, apiPhuongs, searchTerm, t.otherWards, lang]);
 
   // When searching, auto-expand matching phuongs and corridors for easy exploration
   useEffect(() => {
@@ -527,6 +543,34 @@ export default function PhuongTreeFilter({
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Quick Flood Filter Chip */}
+      {floodedCameraIds && floodedCameraIds.size > 0 && (
+        <div className="px-2.5 pb-2 pt-1 bg-zinc-950/70 border-b border-zinc-800/80 flex items-center justify-between shrink-0">
+          <button
+            type="button"
+            onClick={onToggleFloodFilter}
+            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all border flex items-center gap-1.5 cursor-pointer ${
+              isFloodFilterActive
+                ? 'bg-sky-500/20 text-sky-300 border-sky-400 font-bold shadow-sm'
+                : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:text-sky-300 hover:border-sky-500/50'
+            }`}
+            title={lang === 'vi' ? 'Lọc danh sách chỉ hiển thị camera tại điểm ngập' : 'Filter camera list to flooded spots'}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0" />
+            <span>{FLOOD_I18N.FILTER_CHIP[lang](floodedCameraIds.size)}</span>
+          </button>
+          {isFloodFilterActive && (
+            <button
+              type="button"
+              onClick={onToggleFloodFilter}
+              className="text-[10.5px] text-zinc-400 hover:text-zinc-200 transition-colors font-mono cursor-pointer"
+            >
+              {lang === 'vi' ? 'Xóa lọc' : 'Clear'}
+            </button>
+          )}
         </div>
       )}
 

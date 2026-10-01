@@ -39,6 +39,7 @@ type Hub struct {
 	buf       int // per-client channel capacity
 	heartbeat time.Duration
 	log       *slog.Logger
+	floodAgg  *FloodHexAggregator
 }
 
 // NewHub constructs a Hub with default settings.
@@ -67,10 +68,41 @@ func NewHubWithConfig(bufSize int, heartbeat time.Duration, log *slog.Logger) *H
 	}
 }
 
-// RegisterRoutes mounts the SSE stream endpoint onto the given Gin router.
-// Expects rg to already be scoped to the API prefix; registers GET /api/live/stream.
+// SetFloodHexAggregator attaches a FloodHexAggregator for GET /api/flood-hex snapshot queries.
+func (h *Hub) SetFloodHexAggregator(agg *FloodHexAggregator) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.floodAgg = agg
+}
+
+// RegisterRoutes mounts the SSE stream endpoint and flood hex snapshot onto the given Gin router.
+// Registers GET /api/live/stream and GET /api/flood-hex.
 func (h *Hub) RegisterRoutes(r gin.IRouter) {
 	r.GET(RouteStream, h.HandleSSE)
+	r.GET("/api/flood-hex", h.HandleFloodHex)
+}
+
+// HandleFloodHex godoc
+// @Summary Snapshot of all active flood hex cells
+// @Description Returns the snapshot of all currently active H3 hexagonal cells with qualifying flood observations for immediate client hydration on startup.
+// @Tags Flood
+// @Produce json
+// @Success 200 {array} live.FloodHexCell
+// @Router /api/flood-hex [get]
+func (h *Hub) HandleFloodHex(c *gin.Context) {
+	h.mu.RLock()
+	agg := h.floodAgg
+	h.mu.RUnlock()
+
+	if agg == nil {
+		c.JSON(http.StatusOK, []FloodHexCell{})
+		return
+	}
+	cells := agg.GetAllCells()
+	if cells == nil {
+		cells = []FloodHexCell{}
+	}
+	c.JSON(http.StatusOK, cells)
 }
 
 // HandleSSE godoc
@@ -185,6 +217,30 @@ func (h *Hub) BroadcastHex(cell HexCell) {
 	}
 
 	frame := fmt.Sprintf("event: %s\ndata: %s\n\n", EventHexUpdate, data)
+	frameBytes := []byte(frame)
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for cl := range h.clients {
+		select {
+		case cl.send <- frameBytes:
+		default:
+			// Buffer full — drop this frame for this slow client.
+		}
+	}
+}
+
+// BroadcastFloodHex serialises cell as a named SSE event (flood_hex_update) and delivers it
+// to all connected clients.
+func (h *Hub) BroadcastFloodHex(cell FloodHexCell) {
+	data, err := json.Marshal(cell)
+	if err != nil {
+		h.log.Error("live: failed to marshal flood hex cell", "error", err)
+		return
+	}
+
+	frame := fmt.Sprintf("event: %s\ndata: %s\n\n", EventFloodHexUpdate, data)
 	frameBytes := []byte(frame)
 
 	h.mu.RLock()
