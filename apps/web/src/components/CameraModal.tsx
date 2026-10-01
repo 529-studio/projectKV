@@ -11,9 +11,19 @@ interface CameraModalProps {
   onTogglePin: () => void;
   lang?: 'vi' | 'en';
   appEnv?: string;
+  analysisEnabled?: boolean;
 }
 
-export default function CameraModal({ camera, verdict, onClose, isPinned, onTogglePin, lang = 'vi', appEnv = 'production' }: CameraModalProps) {
+export default function CameraModal({
+  camera,
+  verdict,
+  onClose,
+  isPinned,
+  onTogglePin,
+  lang = 'vi',
+  appEnv = 'production',
+  analysisEnabled = false,
+}: CameraModalProps) {
   const [imgError, setImgError] = useState(false);
   const [fetchTimestamp, setFetchTimestamp] = useState<number>(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -183,6 +193,19 @@ export default function CameraModal({ camera, verdict, onClose, isPinned, onTogg
                     </span>
                   )}
                 </>
+              )}
+
+              {isActuallyAvailable && !hasRealVerdict && analysisEnabled && (
+                <span
+                  className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-900/90 text-zinc-400 text-xs font-mono"
+                  title={
+                    lang === 'vi'
+                      ? 'Camera hoạt động bình thường, đang chờ kết quả phân tích AI'
+                      : 'Camera is online, awaiting AI traffic analysis'
+                  }
+                >
+                  [{lang === 'vi' ? 'Chờ phân tích AI' : 'Awaiting AI analysis'}]
+                </span>
               )}
             </div>
           </div>

@@ -19,6 +19,8 @@ export function useTraffic() {
   const [hexCells, setHexCells] = useState<Map<string, HexCell>>(new Map());
   const [analysisEnabled, setAnalysisEnabled] = useState(false);
   const [appEnv, setAppEnv] = useState<string>('production');
+  const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateVerdict = useCallback((raw: any) => {
@@ -80,6 +82,10 @@ export function useTraffic() {
         setVerdicts(initialMap);
       } catch (err) {
         console.warn('Failed to fetch initial traffic status:', err);
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
@@ -91,7 +97,12 @@ export function useTraffic() {
       try {
         es = new EventSource(getApiUrl(API_ENDPOINTS.SSE_LIVE));
 
+        es.onopen = () => {
+          setConnected(true);
+        };
+
         es.addEventListener('camera_update', (event: MessageEvent) => {
+          setConnected(true);
           try {
             const payload = JSON.parse(event.data);
             if (Array.isArray(payload)) {
@@ -108,6 +119,7 @@ export function useTraffic() {
         });
 
         es.addEventListener('hex_update', (event: MessageEvent) => {
+          setConnected(true);
           try {
             const payload = JSON.parse(event.data);
             if (Array.isArray(payload)) {
@@ -124,6 +136,7 @@ export function useTraffic() {
         });
 
         es.onerror = (err) => {
+          setConnected(false);
           // EventSource automatically attempts to reconnect on transient errors per the SSE spec.
           if (es?.readyState === EventSource.CLOSED) {
             console.warn('SSE connection closed:', err);
@@ -172,5 +185,5 @@ export function useTraffic() {
     };
   }, [updateVerdict, updateHexCell, appEnv]);
 
-  return { verdicts, hexCells, analysisEnabled, appEnv };
+  return { verdicts, hexCells, analysisEnabled, appEnv, loading, connected };
 }
