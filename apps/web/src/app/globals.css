@@ -1103,6 +1103,7 @@ body, html {
 
 /* H3 Hex Cell Smooth Fade Transitions */
 .hex-cell-polygon {
+  cursor: pointer;
   transition: fill-opacity 0.3s ease, stroke-opacity 0.3s ease, opacity 0.3s ease;
 }
 

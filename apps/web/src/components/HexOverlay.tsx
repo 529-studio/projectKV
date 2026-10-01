@@ -90,6 +90,16 @@ export default function HexOverlay({
         });
       });
 
+      polygon.on('click', (e) => {
+        if (!isHexVisibleAtZoom(map.getZoom())) return;
+        L.DomEvent.stopPropagation(e);
+        const bounds = polygon.getBounds();
+        map.fitBounds(bounds, {
+          padding: [30, 30],
+          maxZoom: 14,
+        });
+      });
+
       layerGroup.addLayer(polygon);
     });
 
