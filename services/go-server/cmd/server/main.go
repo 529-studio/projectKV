@@ -20,6 +20,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/cache"
 	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
+	"github.com/529-studio/projectKV/services/go-server/internal/corridor"
 	"github.com/529-studio/projectKV/services/go-server/internal/cvclient"
 	"github.com/529-studio/projectKV/services/go-server/internal/handlers"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
@@ -257,6 +258,17 @@ func main() {
 	hotsetHandler := hotset.NewHandlerWithConfig(&verdictStoreAdapter{repo: verdictRepo}, analysisEnabled, cfg.AppEnv)
 	hotsetHandler.SetStaleTTL(time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second)
 
+	var corridorHandler *corridor.Handler
+	if camCatalog != nil {
+		corridorService := corridor.NewService(
+			camCatalog,
+			&verdictStoreAdapter{repo: verdictRepo},
+			cfg.AppEnv,
+			time.Duration(cfg.VerdictStaleTTLSeconds)*time.Second,
+		)
+		corridorHandler = corridor.NewHandler(corridorService)
+	}
+
 	// 6. Initialize WebSocket Hub for real-time verdict streaming (Issue #9).
 	// Kept in place — will be retired after D1 (EventSource migration) is verified.
 	wsHub := ws.NewHub()
@@ -451,6 +463,10 @@ func main() {
 		proxyHandler.RegisterRoutes(api)
 		// Traffic and flood congestion status endpoints (Issue #8)
 		hotsetHandler.RegisterRoutes(api)
+		// Traffic corridor status endpoints (ADR-004 §D1 / Issue #75)
+		if corridorHandler != nil {
+			corridorHandler.RegisterRoutes(api)
+		}
 		// Map tile proxy and local disk cache
 		tileHandler.RegisterRoutes(api)
 		// Legacy alias kept for backward compat with existing FE constants.js

@@ -16,6 +16,8 @@ export interface Camera {
   phuong_name?: string | null;
   road_type?: string | null;
   road_name?: string | null;
+  road_key?: string | null;
+  road_keys?: string[];
 }
 
 export function useCameras() {
@@ -43,6 +45,8 @@ export function useCameras() {
           phuong_name: c.phuong_name ?? null,
           road_type: c.road_type ?? null,
           road_name: c.road_name ?? null,
+          road_key: c.road_key ?? null,
+          road_keys: Array.isArray(c.road_keys) ? c.road_keys : [],
         }));
         setCameras(parsed);
       } catch (err) {
