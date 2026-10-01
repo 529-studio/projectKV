@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import L from 'leaflet';
 import {
   HexCell,
@@ -200,6 +200,26 @@ export default function HexOverlay({
     };
   }, []);
 
+  const congestedCount = useMemo(() => {
+    let count = 0;
+    hexCells.forEach((cell) => {
+      const s = cell.severity.toUpperCase().trim();
+      if (s === 'CONGESTED' || s === 'HEAVY' || s === 'FLOODED_DEEP' || s === 'FLOODED_SHALLOW') {
+        count++;
+      }
+    });
+    return count;
+  }, [hexCells]);
+
+  const buttonTitle = useMemo(() => {
+    if (congestedCount > 0) {
+      return lang === 'vi'
+        ? `Vùng tổng hợp (${congestedCount} vùng đang ùn tắc / ngập)`
+        : `Zone overview (${congestedCount} congested / flooded zones)`;
+    }
+    return lang === 'vi' ? 'Bật/tắt hiển thị vùng tổng hợp H3' : 'Toggle H3 zone overview';
+  }, [congestedCount, lang]);
+
   return (
     <button
       type="button"
@@ -211,7 +231,7 @@ export default function HexOverlay({
       }`}
       aria-pressed={enabled}
       aria-label={lang === 'vi' ? 'Bật/tắt vùng tổng hợp' : 'Toggle zone overview'}
-      title={lang === 'vi' ? 'Bật/tắt hiển thị vùng tổng hợp H3' : 'Toggle H3 zone overview'}
+      title={buttonTitle}
     >
       <svg
         className={`w-3.5 h-3.5 shrink-0 transition-colors ${
@@ -227,6 +247,19 @@ export default function HexOverlay({
         <polygon points="12 2.5 21 7.5 21 16.5 12 21.5 3 16.5 3 7.5" />
       </svg>
       <span>{HEX_I18N.TOGGLE[lang]}</span>
+      {congestedCount > 0 && (
+        <span
+          className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/40 inline-flex items-center gap-1"
+          aria-label={
+            lang === 'vi'
+              ? `${congestedCount} vùng đang ùn tắc`
+              : `${congestedCount} congested zones`
+          }
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+          <span>{congestedCount}</span>
+        </span>
+      )}
     </button>
   );
 }
