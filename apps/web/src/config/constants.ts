@@ -23,6 +23,8 @@ export const API_ENDPOINTS = Object.freeze({
   CAMERA_DETAIL: (id: string) => `/api/cameras/${encodeURIComponent(id)}`,
   SNAPSHOT: (id: string) => `/api/snapshot/${encodeURIComponent(id)}`,
   TRAFFIC_STATUS: '/api/traffic-status',
+  FLOOD_STATUS: '/api/flood-status',
+  FLOOD_HEX: '/api/flood-hex',
   ZONES: '/api/zones',
   PHUONG: '/api/phuong',
   SSE_LIVE: '/api/live/stream',
@@ -50,6 +52,13 @@ export const TRAFFIC_SEVERITY = Object.freeze({
   MODERATE: 'MODERATE',
   HEAVY: 'HEAVY',
   CONGESTED: 'CONGESTED',
+});
+
+export const FLOOD_SEVERITY = Object.freeze({
+  DRY: 'DRY',
+  WET: 'WET',
+  FLOODED_SHALLOW: 'FLOODED_SHALLOW',
+  FLOODED_DEEP: 'FLOODED_DEEP',
 });
 
 export const HOTSET_CONFIG = Object.freeze({

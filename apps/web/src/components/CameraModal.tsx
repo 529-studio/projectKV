@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
 import { API_ENDPOINTS, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
+import { getFloodSeverityLabel } from '../utils/floodUtils';
 
 interface CameraModalProps {
   camera: Camera | null;
@@ -190,6 +191,14 @@ export default function CameraModal({
                       title={lang === 'vi' ? 'Dữ liệu giả lập chạy trong môi trường dev' : 'Simulated verdict in dev mode'}
                     >
                       [{lang === 'vi' ? VERDICT_I18N.DEMO_BADGE.vi : VERDICT_I18N.DEMO_BADGE.en}]
+                    </span>
+                  )}
+                  {verdict?.flood_severity && verdict.flood_severity !== 'DRY' && verdict.flood_severity !== 'UNKNOWN' && (
+                    <span
+                      className="px-2 py-0.5 rounded border border-sky-500/80 bg-sky-500/20 text-sky-300 text-xs font-bold"
+                      title={lang === 'vi' ? 'Tình trạng ngập nước thực địa' : 'Local flood status'}
+                    >
+                      🌧️ {getFloodSeverityLabel(verdict.flood_severity, lang)}
                     </span>
                   )}
                 </>

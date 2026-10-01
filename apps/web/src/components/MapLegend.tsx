@@ -2,12 +2,14 @@
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { FUNCTIONAL_COLORS, VERDICT_I18N, HEX_I18N } from '../config/constants';
+import { FLOOD_I18N } from '../utils/floodUtils';
 
 interface MapLegendProps {
   isOpen: boolean;
   onToggle: () => void;
   analysisEnabled?: boolean;
   hexOverlayEnabled?: boolean;
+  hexOverlayMode?: 'traffic' | 'flood';
   verdictsCount?: number;
   lang?: 'vi' | 'en';
 }
@@ -17,6 +19,7 @@ export default function MapLegend({
   onToggle,
   analysisEnabled = false,
   hexOverlayEnabled = false,
+  hexOverlayMode = 'traffic',
   verdictsCount = 0,
   lang = 'vi',
 }: MapLegendProps) {
@@ -122,29 +125,59 @@ export default function MapLegend({
               {hexOverlayEnabled && (
                 <>
                   <div className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1.5 border-t border-zinc-800/80">
-                    {lang === 'vi' ? 'Vùng tổng hợp (H3)' : 'Zone Overview (H3)'}
+                    {hexOverlayMode === 'flood'
+                      ? (lang === 'vi' ? 'Vùng ngập nước (H3)' : 'Flood Zones (H3)')
+                      : (lang === 'vi' ? 'Vùng tổng hợp (H3)' : 'Zone Overview (H3)')}
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="w-3.5 h-3.5 rounded-sm border border-emerald-500/60 shrink-0"
-                      style={{ backgroundColor: 'rgba(34, 197, 94, 0.35)' }}
-                    />
-                    <span className="text-zinc-300">{HEX_I18N.ZONE_CLEAR[lang]}</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="w-3.5 h-3.5 rounded-sm border border-amber-500/60 shrink-0"
-                      style={{ backgroundColor: 'rgba(234, 179, 8, 0.35)' }}
-                    />
-                    <span className="text-zinc-300">{HEX_I18N.ZONE_MODERATE[lang]}</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="w-3.5 h-3.5 rounded-sm border border-rose-500/60 shrink-0"
-                      style={{ backgroundColor: 'rgba(239, 68, 68, 0.4)' }}
-                    />
-                    <span className="text-zinc-300">{HEX_I18N.ZONE_CONGESTED[lang]}</span>
-                  </div>
+                  {hexOverlayMode === 'flood' ? (
+                    <>
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="w-3.5 h-3.5 rounded-sm border border-blue-600/80 shrink-0"
+                          style={{ backgroundColor: 'rgba(29, 78, 216, 0.45)' }}
+                        />
+                        <span className="text-zinc-300">{FLOOD_I18N.DEEP_WATER[lang]}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="w-3.5 h-3.5 rounded-sm border border-sky-500/80 shrink-0"
+                          style={{ backgroundColor: 'rgba(2, 132, 199, 0.4)' }}
+                        />
+                        <span className="text-zinc-300">{FLOOD_I18N.SHALLOW_WATER[lang]}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="w-3.5 h-3.5 rounded-sm border border-slate-500/80 shrink-0"
+                          style={{ backgroundColor: 'rgba(100, 116, 139, 0.3)' }}
+                        />
+                        <span className="text-zinc-300">{FLOOD_I18N.WET_ROAD[lang]}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="w-3.5 h-3.5 rounded-sm border border-emerald-500/60 shrink-0"
+                          style={{ backgroundColor: 'rgba(34, 197, 94, 0.35)' }}
+                        />
+                        <span className="text-zinc-300">{HEX_I18N.ZONE_CLEAR[lang]}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="w-3.5 h-3.5 rounded-sm border border-amber-500/60 shrink-0"
+                          style={{ backgroundColor: 'rgba(234, 179, 8, 0.35)' }}
+                        />
+                        <span className="text-zinc-300">{HEX_I18N.ZONE_MODERATE[lang]}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="w-3.5 h-3.5 rounded-sm border border-rose-500/60 shrink-0"
+                          style={{ backgroundColor: 'rgba(239, 68, 68, 0.4)' }}
+                        />
+                        <span className="text-zinc-300">{HEX_I18N.ZONE_CONGESTED[lang]}</span>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>

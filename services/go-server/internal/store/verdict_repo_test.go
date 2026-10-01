@@ -23,12 +23,13 @@ func openTestDB(t *testing.T) *sql.DB {
 	}
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS camera_verdicts (
-			camera_id   TEXT PRIMARY KEY,
-			severity    TEXT NOT NULL,
-			confidence  REAL NOT NULL,
-			source      TEXT NOT NULL DEFAULT '',
-			observed_at TIMESTAMP,
-			updated_at  TIMESTAMP NOT NULL
+			camera_id      TEXT PRIMARY KEY,
+			severity       TEXT NOT NULL,
+			flood_severity TEXT NOT NULL DEFAULT '',
+			confidence     REAL NOT NULL,
+			source         TEXT NOT NULL DEFAULT '',
+			observed_at    TIMESTAMP,
+			updated_at     TIMESTAMP NOT NULL
 		);
 	`)
 	if err != nil {
@@ -47,12 +48,13 @@ func TestVerdictRepo_Save_InsertsRow(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Second)
 	v := store.Verdict{
-		CameraID:   "cam1",
-		Severity:   "HEAVY",
-		Confidence: 0.91,
-		Source:     "vlm",
-		ObservedAt: now,
-		Timestamp:  now,
+		CameraID:      "cam1",
+		Severity:      "HEAVY",
+		FloodSeverity: "FLOODED_SHALLOW",
+		Confidence:    0.91,
+		Source:        "vlm",
+		ObservedAt:    now,
+		Timestamp:     now,
 	}
 	if err := repo.Save(ctx, v); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -71,6 +73,9 @@ func TestVerdictRepo_Save_InsertsRow(t *testing.T) {
 	}
 	if got.Severity != v.Severity {
 		t.Errorf("Severity mismatch: want %q, got %q", v.Severity, got.Severity)
+	}
+	if got.FloodSeverity != v.FloodSeverity {
+		t.Errorf("FloodSeverity mismatch: want %q, got %q", v.FloodSeverity, got.FloodSeverity)
 	}
 	if got.Confidence != v.Confidence {
 		t.Errorf("Confidence mismatch: want %f, got %f", v.Confidence, got.Confidence)
