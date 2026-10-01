@@ -28,12 +28,12 @@ export const FLOOD_I18N = Object.freeze({
     en: 'Traffic',
   },
   LAYER_FLOOD: {
-    vi: 'Ngập nước',
-    en: 'Flooding',
+    vi: 'Khả năng có mưa',
+    en: 'Rain chance',
   },
   TOOLTIP_TITLE: {
-    vi: 'Cảnh báo ngập',
-    en: 'Flood Alert',
+    vi: 'Cảnh báo mưa & ngập',
+    en: 'Rain & Flood Alert',
   },
   DEEP_WATER: {
     vi: 'Ngập sâu (nguy hiểm)',
@@ -60,16 +60,16 @@ export const FLOOD_I18N = Object.freeze({
     en: (n: number) => `${n} ${n === 1 ? 'camera' : 'cameras'} monitoring`,
   },
   WORST_FLOOD_CAMERA: {
-    vi: 'Điểm ngập nặng nhất',
-    en: 'Worst flood spot',
+    vi: 'Điểm mưa/ngập nặng nhất',
+    en: 'Worst rain/flood spot',
   },
   FILTER_CHIP: {
-    vi: (n: number) => `🌧️ Điểm ngập (${n})`,
-    en: (n: number) => `🌧️ Flooded (${n})`,
+    vi: (n: number) => `Khu vực có mưa (${n})`,
+    en: (n: number) => `Rain areas (${n})`,
   },
   ACTIVE_ALERT_BADGE: {
-    vi: (n: number) => `🌧️ Vùng ngập • ${n}`,
-    en: (n: number) => `🌧️ Flooded • ${n}`,
+    vi: (n: number) => `Vùng có mưa • ${n}`,
+    en: (n: number) => `Rain zones • ${n}`,
   },
 });
 

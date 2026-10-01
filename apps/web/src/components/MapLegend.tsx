@@ -126,7 +126,7 @@ export default function MapLegend({
                 <>
                   <div className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1.5 border-t border-zinc-800/80">
                     {hexOverlayMode === 'flood'
-                      ? (lang === 'vi' ? 'Vùng ngập nước (H3)' : 'Flood Zones (H3)')
+                      ? (lang === 'vi' ? 'Khả năng có mưa (H3)' : 'Rain Forecast (H3)')
                       : (lang === 'vi' ? 'Vùng tổng hợp (H3)' : 'Zone Overview (H3)')}
                   </div>
                   {hexOverlayMode === 'flood' ? (

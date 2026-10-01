@@ -557,9 +557,14 @@ export default function PhuongTreeFilter({
                 ? 'bg-sky-500/20 text-sky-300 border-sky-400 font-bold shadow-sm'
                 : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:text-sky-300 hover:border-sky-500/50'
             }`}
-            title={lang === 'vi' ? 'Lọc danh sách chỉ hiển thị camera tại điểm ngập' : 'Filter camera list to flooded spots'}
+            title={lang === 'vi' ? 'Lọc danh sách chỉ hiển thị camera tại khu vực có mưa' : 'Filter camera list to rain areas'}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0" />
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+              <path d="M16 14v6" />
+              <path d="M8 14v6" />
+              <path d="M12 16v6" />
+            </svg>
             <span>{FLOOD_I18N.FILTER_CHIP[lang](floodedCameraIds.size)}</span>
           </button>
           {isFloodFilterActive && (
