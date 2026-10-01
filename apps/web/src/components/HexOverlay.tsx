@@ -377,7 +377,8 @@ export default function HexOverlay({
         >
           <polygon points="12 2.5 21 7.5 21 16.5 12 21.5 3 16.5 3 7.5" />
         </svg>
-        <span>{HEX_I18N.TOGGLE[lang]}</span>
+        <span className="hidden sm:inline">{HEX_I18N.TOGGLE[lang]}</span>
+        <span className="sm:hidden">{lang === 'vi' ? 'Vùng' : 'Zone'}</span>
       </button>
 
       {/* Mode Switcher Segmented Control (Visible when enabled) */}
