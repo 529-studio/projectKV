@@ -10,6 +10,7 @@ export const OUTSIDE_HCMC_KEY = OTHER_WARDS_KEY;
 
 export interface PhuongTreeFilterProps {
   cameras: Camera[];
+  verdicts?: Map<string, TrafficVerdictLike>;
   loading?: boolean;
   error?: Error | null;
   selectedPhuong: string | null;
@@ -47,7 +48,11 @@ import {
   computeFilteredCameraIds,
   computeActiveFilterLabel,
   calculateMarkerStyle,
+  ARTERIAL_CORRIDORS,
+  groupCamerasByCityCorridors,
   type CorridorDisplay,
+  type TrafficVerdictLike,
+  type CityCorridorGroup,
 } from '../utils/phuongFormatters';
 
 export {
@@ -61,11 +66,16 @@ export {
   computeFilteredCameraIds,
   computeActiveFilterLabel,
   calculateMarkerStyle,
+  ARTERIAL_CORRIDORS,
+  groupCamerasByCityCorridors,
   type CorridorDisplay,
+  type TrafficVerdictLike,
+  type CityCorridorGroup,
 };
 
 export default function PhuongTreeFilter({
   cameras,
+  verdicts,
   loading: camerasLoading = false,
   error = null,
   selectedPhuong,
@@ -85,22 +95,35 @@ export default function PhuongTreeFilter({
 
   const { phuongs: apiPhuongs, loading: phuongsLoading } = usePhuongs();
 
+  const [explorerTab, setExplorerTab] = useState<'corridors' | 'phuongs'>('corridors');
+  const [expandedCityCorridors, setExpandedCityCorridors] = useState<Set<string>>(new Set());
   const [expandedPhuongs, setExpandedPhuongs] = useState<Set<string>>(new Set());
   const [expandedCorridors, setExpandedCorridors] = useState<Set<string>>(new Set());
+
+  // City-wide corridor grouping with traffic prioritization
+  const cityCorridors = useMemo(() => {
+    return groupCamerasByCityCorridors(cameras, verdicts, searchTerm);
+  }, [cameras, verdicts, searchTerm]);
 
   // i18n text resources
   const t = useMemo(() => {
     return {
-      title: lang === 'vi' ? 'Lọc theo Phường' : 'Filter by Ward',
+      title: lang === 'vi' ? 'Khám phá Camera' : 'Camera Explorer',
+      tabCorridors: lang === 'vi' ? 'Tuyến đường' : 'Corridors',
+      tabPhuongs: lang === 'vi' ? 'Phường / Xã' : 'Wards',
       street: lang === 'vi' ? 'Đường' : 'Street',
+      quickArterials: lang === 'vi' ? 'Trục chính:' : 'Arterials:',
       otherWards: lang === 'vi' ? 'Các Phường khác (cập nhật sau)' : 'Other Wards (to be updated)',
       outsideHcm: lang === 'vi' ? 'Các Phường khác (cập nhật sau)' : 'Other Wards (to be updated)',
       noCameras: lang === 'vi' ? 'Không có camera' : 'No cameras',
+      noCorridors: lang === 'vi' ? 'Không tìm thấy tuyến đường' : 'No corridors found',
       allCameras: lang === 'vi' ? 'Tất cả camera' : 'All cameras',
-      searchPlaceholder: lang === 'vi' ? 'Tìm kiếm camera, đường, phường...' : 'Search camera, street, ward...',
+      searchPlaceholder: lang === 'vi' ? 'Tìm camera, tuyến đường, phường...' : 'Search camera, corridor, ward...',
       activeFilter: lang === 'vi' ? 'Đang lọc:' : 'Filter:',
       clearFilter: lang === 'vi' ? 'Xóa lọc' : 'Clear',
       cameraCount: (n: number) => (lang === 'vi' ? `${n} camera` : `${n} ${n === 1 ? 'camera' : 'cameras'}`),
+      congestedTag: lang === 'vi' ? 'kẹt' : 'jam',
+      moderateTag: lang === 'vi' ? 'đông' : 'slow',
     };
   }, [lang]);
 
@@ -274,6 +297,41 @@ export default function PhuongTreeFilter({
     });
   };
 
+  // City corridor handlers
+  useEffect(() => {
+    if (searchTerm.trim() && explorerTab === 'corridors') {
+      const newCity = new Set<string>();
+      cityCorridors.forEach(c => newCity.add(c.name));
+      setExpandedCityCorridors(newCity);
+    }
+  }, [searchTerm, explorerTab, cityCorridors]);
+
+  useEffect(() => {
+    if (selectedCorridor) {
+      setExpandedCityCorridors(prev => new Set(prev).add(selectedCorridor));
+    }
+  }, [selectedCorridor]);
+
+  const handleSelectCityCorridor = (corrName: string) => {
+    if (selectedCorridor === corrName && !selectedPhuong) {
+      onSelectCorridor(null);
+    } else {
+      onSelectPhuong(null);
+      onSelectCorridor(corrName);
+      setExpandedCityCorridors(prev => new Set(prev).add(corrName));
+    }
+  };
+
+  const toggleCityCorridorExpand = (corrName: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setExpandedCityCorridors(prev => {
+      const next = new Set(prev);
+      if (next.has(corrName)) next.delete(corrName);
+      else next.add(corrName);
+      return next;
+    });
+  };
+
   const handleSelectPhuong = (key: string) => {
     if (selectedPhuong === key) {
       // Toggle off
@@ -342,6 +400,45 @@ export default function PhuongTreeFilter({
         </div>
       </div>
 
+      {/* Explorer Tab Switch: [Theo tuyến đường] vs [Theo phường] */}
+      <div className="grid grid-cols-2 border-b border-zinc-800 bg-zinc-950 text-xs font-mono shrink-0">
+        <button
+          type="button"
+          onClick={() => setExplorerTab('corridors')}
+          className={`py-2 text-center font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${
+            explorerTab === 'corridors'
+              ? 'text-white border-b-white bg-zinc-900/60'
+              : 'text-zinc-500 border-b-transparent hover:text-zinc-300 hover:bg-zinc-900/20'
+          }`}
+          aria-pressed={explorerTab === 'corridors'}
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="4" y1="21" x2="4" y2="3" />
+            <line x1="20" y1="21" x2="20" y2="3" />
+            <line x1="12" y1="5" x2="12" y2="7" />
+            <line x1="12" y1="11" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12" y2="19" />
+          </svg>
+          <span>{t.tabCorridors}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setExplorerTab('phuongs')}
+          className={`py-2 text-center font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${
+            explorerTab === 'phuongs'
+              ? 'text-white border-b-white bg-zinc-900/60'
+              : 'text-zinc-500 border-b-transparent hover:text-zinc-300 hover:bg-zinc-900/20'
+          }`}
+          aria-pressed={explorerTab === 'phuongs'}
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+            <circle cx="12" cy="10" r="3" />
+          </svg>
+          <span>{t.tabPhuongs}</span>
+        </button>
+      </div>
+
       {/* Prominent Search Bar with SVG Search Icon & Reset Button */}
       {onSearchChange && (
         <div className="p-2.5 border-b border-zinc-800 bg-zinc-950/70 shrink-0">
@@ -399,6 +496,32 @@ export default function PhuongTreeFilter({
         </div>
       )}
 
+      {/* Quick Arterial Corridors Chips (Horizontal Scrollable) */}
+      <div className="px-2.5 py-1.5 border-b border-zinc-800/80 bg-zinc-950 shrink-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5" style={{ scrollbarWidth: 'none' }}>
+          <span className="text-[10px] text-zinc-500 font-bold uppercase shrink-0 mr-0.5">
+            {t.quickArterials}
+          </span>
+          {ARTERIAL_CORRIDORS.map(corrName => {
+            const isSelected = selectedCorridor === corrName && !selectedPhuong;
+            return (
+              <button
+                key={corrName}
+                type="button"
+                onClick={() => handleSelectCityCorridor(corrName)}
+                className={`px-2 py-0.5 rounded text-[10.5px] font-semibold whitespace-nowrap transition-colors border shrink-0 ${
+                  isSelected
+                    ? 'bg-white text-black border-white font-bold'
+                    : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
+                }`}
+              >
+                {corrName}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Active Filter Bar (if a Phường or Corridor is selected) */}
       {activeFilterLabel && (
         <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 text-[11px] text-zinc-300 shrink-0">
@@ -426,6 +549,119 @@ export default function PhuongTreeFilter({
           <p className="text-xs text-yellow-500 p-3 font-mono">
             {lang === 'vi' ? 'Đang tải dữ liệu...' : 'Loading data...'}
           </p>
+        ) : explorerTab === 'corridors' ? (
+          cityCorridors.length === 0 ? (
+            <p className="text-xs text-zinc-500 p-3 text-center">{t.noCorridors}</p>
+          ) : (
+            cityCorridors.map(corr => {
+              const isSelected = selectedCorridor === corr.name && !selectedPhuong;
+              const isExpanded = expandedCityCorridors.has(corr.name);
+              const corrDisplay = formatCorridorDisplay(corr.name, lang);
+
+              return (
+                <div
+                  key={`city-corr-${corr.name}`}
+                  className="border border-zinc-800/80 rounded bg-zinc-900/30 overflow-hidden transition-colors"
+                >
+                  <div
+                    onClick={() => handleSelectCityCorridor(corr.name)}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-zinc-800 text-white font-bold border-l-2 border-l-white'
+                        : 'hover:bg-zinc-800/60 text-zinc-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                      <button
+                        type="button"
+                        onClick={e => toggleCityCorridorExpand(corr.name, e)}
+                        className="text-zinc-400 hover:text-white text-xs w-4 h-4 flex items-center justify-center shrink-0 focus:outline-none"
+                        aria-label={lang === 'vi' ? 'Đóng/mở' : 'Toggle corridor'}
+                      >
+                        {isExpanded ? '▾' : '▸'}
+                      </button>
+                      <span className="text-xs truncate font-semibold">
+                        {lang === 'en' && corrDisplay.prefix === I18N_NAMES.en.road_type_duong ? (
+                          <>
+                            <span>{corrDisplay.name}</span>
+                            <span className="text-zinc-500 ml-1">{corrDisplay.prefix}</span>
+                          </>
+                        ) : (
+                          <>
+                            {corrDisplay.prefix && (
+                              <span className="text-zinc-500 mr-1">{corrDisplay.prefix}</span>
+                            )}
+                            <span>{corrDisplay.name}</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      {corr.congestedCount > 0 && (
+                        <span className="text-[9.5px] font-bold text-red-400 bg-red-950/50 border border-red-800/60 px-1.5 py-0.5 rounded flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                          <span>{corr.congestedCount} {t.congestedTag}</span>
+                        </span>
+                      )}
+                      {corr.congestedCount === 0 && corr.moderateCount > 0 && (
+                        <span className="text-[9.5px] font-bold text-yellow-400 bg-yellow-950/50 border border-yellow-800/60 px-1.5 py-0.5 rounded">
+                          {corr.moderateCount} {t.moderateTag}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800">
+                        {corr.totalCameras}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Expanded Cameras */}
+                  <AnimatePresence initial={false}>
+                    {isExpanded && (
+                      <motion.div
+                        key={`city-corr-cams-${corr.name}`}
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.18, ease: 'easeInOut' }}
+                        className="overflow-hidden bg-black/40 border-t border-zinc-800/60 ml-6 my-0.5 space-y-0.5"
+                      >
+                        <div className="py-1 space-y-0.5">
+                          {corr.cameras.map(cam => (
+                            <div
+                              key={cam.id}
+                              onClick={e => {
+                                e.stopPropagation();
+                                onCameraClick(cam as Camera);
+                              }}
+                              className="flex items-center justify-between px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800/70 active:bg-zinc-700 cursor-pointer rounded transition-colors group"
+                              title={cam.displayName || cam.title}
+                            >
+                              <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                    (cam as Camera).isOnline ? 'bg-white' : 'bg-zinc-600'
+                                  }`}
+                                />
+                                <span className="truncate">
+                                  {cam.displayName || cam.title}
+                                </span>
+                              </div>
+                              {(cam as Camera).isGhost && (
+                                <span className="text-[9px] text-amber-500 shrink-0 ml-1 font-bold">
+                                  [GHOST]
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })
+          )
         ) : treeData.length === 0 ? (
           <p className="text-xs text-zinc-500 p-3 text-center">{t.noCameras}</p>
         ) : (

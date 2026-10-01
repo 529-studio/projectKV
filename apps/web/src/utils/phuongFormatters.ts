@@ -383,3 +383,118 @@ export function calculateMarkerStyle(
     strokeColor: '#000000',
   };
 }
+
+/**
+ * Key arterial traffic corridors in Ho Chi Minh City for instant 1-tap filtering.
+ */
+export const ARTERIAL_CORRIDORS = Object.freeze([
+  'Điện Biên Phủ',
+  'Cộng Hòa',
+  'Xa Lộ Hà Nội',
+  'Võ Văn Kiệt',
+  'Nguyễn Văn Linh',
+  'Phạm Văn Đồng',
+  'Nam Kỳ Khởi Nghĩa',
+  'Cách Mạng Tháng Tám',
+  'Nguyễn Hữu Cảnh',
+  'Mai Chí Thọ',
+]);
+
+export interface TrafficVerdictLike {
+  severity?: string;
+  stale?: boolean;
+}
+
+export interface CityCorridorGroup {
+  name: string;
+  cameras: FilterableCamera[];
+  totalCameras: number;
+  congestedCount: number;
+  moderateCount: number;
+}
+
+/**
+ * Groups cameras city-wide by corridor name, with live traffic severity prioritization.
+ * Corridors with active congestion appear first, followed by moderate, then by total camera density.
+ */
+export function groupCamerasByCityCorridors(
+  cameras: FilterableCamera[],
+  verdicts?: Map<string, TrafficVerdictLike>,
+  searchTerm?: string
+): CityCorridorGroup[] {
+  const map = new Map<string, FilterableCamera[]>();
+
+  cameras.forEach(cam => {
+    const corridor = extractCorridor(cam.displayName, cam.title);
+    if (!corridor || corridor === 'Khác') return;
+
+    if (!map.has(corridor)) {
+      map.set(corridor, []);
+    }
+    map.get(corridor)!.push(cam);
+  });
+
+  const query = searchTerm ? searchTerm.trim() : '';
+  const result: CityCorridorGroup[] = [];
+
+  map.forEach((cams, corridorName) => {
+    // Search filtering
+    let matchingCams = cams;
+    if (query) {
+      const matchCorridor = matchesVietnameseSearch(corridorName, query);
+      if (!matchCorridor) {
+        matchingCams = cams.filter(c =>
+          matchesVietnameseSearch(c.displayName || c.title || '', query)
+        );
+      }
+    }
+
+    if (matchingCams.length === 0) return;
+
+    // Traffic congestion calculation
+    let congestedCount = 0;
+    let moderateCount = 0;
+
+    if (verdicts) {
+      matchingCams.forEach(c => {
+        const v = verdicts.get(c.id);
+        if (v && !v.stale && v.severity) {
+          const sev = v.severity.toUpperCase().trim();
+          if (sev === 'CONGESTED' || sev === 'HEAVY' || sev === 'FLOODED_DEEP' || sev === 'FLOODED_SHALLOW') {
+            congestedCount++;
+          } else if (sev === 'MODERATE' || sev === 'WET') {
+            moderateCount++;
+          }
+        }
+      });
+    }
+
+    matchingCams.sort((a, b) =>
+      (a.displayName || a.title || '').localeCompare(b.displayName || b.title || '', 'vi')
+    );
+
+    result.push({
+      name: corridorName,
+      cameras: matchingCams,
+      totalCameras: matchingCams.length,
+      congestedCount,
+      moderateCount,
+    });
+  });
+
+  // Sort: Congested first, then moderate, then total cameras desc, then alphabetically
+  result.sort((a, b) => {
+    if (a.congestedCount !== b.congestedCount) {
+      return b.congestedCount - a.congestedCount;
+    }
+    if (a.moderateCount !== b.moderateCount) {
+      return b.moderateCount - a.moderateCount;
+    }
+    if (a.totalCameras !== b.totalCameras) {
+      return b.totalCameras - a.totalCameras;
+    }
+    return a.name.localeCompare(b.name, 'vi');
+  });
+
+  return result;
+}
