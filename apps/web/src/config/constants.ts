@@ -27,6 +27,8 @@ export const API_ENDPOINTS = Object.freeze({
   FLOOD_HEX: '/api/flood-hex',
   ZONES: '/api/zones',
   PHUONG: '/api/phuong',
+  ROADS: '/api/roads',
+  ROAD_STATUS: (roadKey: string) => `/api/roads/${encodeURIComponent(roadKey)}/status`,
   SSE_LIVE: '/api/live/stream',
   WS_LIVE: '/ws/live',
 });
@@ -164,3 +166,19 @@ export const HEX_I18N = Object.freeze({
     en: 'Congested (zone)',
   },
 });
+
+export const CORRIDOR_I18N = Object.freeze({
+  COVERAGE: {
+    vi: (pct: number) => `Phủ sóng: ${pct}%`,
+    en: (pct: number) => `Coverage: ${pct}%`,
+  },
+  OLDEST: {
+    vi: (age: string) => `Quan sát cũ nhất: ${age}`,
+    en: (age: string) => `Oldest observation: ${age}`,
+  },
+  UNKNOWN: {
+    vi: 'Chưa có dữ liệu',
+    en: 'No data',
+  },
+});
+

@@ -52,6 +52,62 @@ definitions:
       type:
         type: string
     type: object
+  corridor.CameraVerdict:
+    properties:
+      camera_id:
+        type: string
+      confidence:
+        type: number
+      flood_severity:
+        type: string
+      name:
+        type: string
+      observed_at:
+        type: string
+      severity:
+        description: '"CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED" | "UNKNOWN"'
+        type: string
+      source:
+        type: string
+      stale:
+        type: boolean
+    type: object
+  corridor.CorridorStatus:
+    properties:
+      cameras:
+        items:
+          $ref: '#/definitions/corridor.CameraVerdict'
+        type: array
+      coverage_pct:
+        type: number
+      oldest_observation_age_s:
+        type: integer
+      road_key:
+        type: string
+      total_cameras:
+        type: integer
+      verified_cameras:
+        type: integer
+      worst_severity:
+        description: '"CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED" | "UNKNOWN"'
+        type: string
+    type: object
+  corridor.RoadSummary:
+    properties:
+      camera_count:
+        type: integer
+      road_key:
+        type: string
+    type: object
+  corridor.RoadsResponse:
+    properties:
+      roads:
+        items:
+          $ref: '#/definitions/corridor.RoadSummary'
+        type: array
+      total:
+        type: integer
+    type: object
   hotset.FloodStatusResponse:
     properties:
       analysis_enabled:
@@ -300,6 +356,47 @@ paths:
       summary: List camera wards (Phường)
       tags:
       - Camera
+  /api/roads:
+    get:
+      description: Returns list of all known road keys with associated camera counts,
+        sorted by camera density descending.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/corridor.RoadsResponse'
+      summary: List all known road keys
+      tags:
+      - Corridor
+  /api/roads/{road_key}/status:
+    get:
+      description: Returns the aggregated traffic status for a named road corridor
+        identified by road_key, including worst severity, coverage percentage, oldest
+        observation age, and per-camera verdicts. Enforces ADR-004 §D4 honesty rules.
+      parameters:
+      - description: Road Key identifier (e.g. vo_van_kiet, quoc_lo_1)
+        in: path
+        name: road_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/corridor.CorridorStatus'
+        "404":
+          description: Corridor not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get corridor traffic status
+      tags:
+      - Corridor
   /api/snapshot/{id}:
     get:
       description: Proxy and cache a real-time traffic camera snapshot from the upstream
