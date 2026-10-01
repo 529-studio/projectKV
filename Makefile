@@ -34,9 +34,6 @@ setup-hooks:
 dev-go:
 	cd services/go-server && go run ./cmd/server
 
-dev-api:
-	cd services/go-server && go run ./cmd/api
-
 build-go:
 	cd services/go-server && go build -o bin/server ./cmd/server && go build ./...
 
