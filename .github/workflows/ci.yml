@@ -3,11 +3,108 @@ name: CI - Code Verification
 on:
   pull_request:
     branches: [main, dev]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.agents/**'
+      - '.githooks/**'
+      - '.github/workflows/auto-request-reviewers.yml'
+      - '.github/workflows/branch-guard.yml'
+      - '.github/workflows/docker-publish.yml'
+      - '.github/workflows/go-ci.yml'
+      - '.env.example'
+      - '.env.stg.example'
   push:
     branches: [main, dev]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.agents/**'
+      - '.githooks/**'
+      - '.github/workflows/auto-request-reviewers.yml'
+      - '.github/workflows/branch-guard.yml'
+      - '.github/workflows/docker-publish.yml'
+      - '.github/workflows/go-ci.yml'
+      - '.env.example'
+      - '.env.stg.example'
 
 jobs:
-  verify:
+  detect-changes:
+    name: Detect Changed Components
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      tools_dataset: ${{ steps.filter.outputs.tools_dataset }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Filter Changed Paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'services/go-server/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'apps/web/**'
+              - '.github/workflows/ci.yml'
+            tools_dataset:
+              - 'tools/**'
+              - 'cameras_all.json'
+              - 'cameras_enriched.json'
+              - 'h3_hex_polygons.json'
+              - '.github/workflows/ci.yml'
+
+  verify-backend:
+    name: Verify Go Backend
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'services/go-server/go.mod'
+
+      - name: Verify and Test Go Backend
+        run: |
+          cd services/go-server
+          go vet ./...
+          go test -v ./...
+          go build -v -o bin/server ./cmd/server
+
+  verify-frontend:
+    name: Verify Web Frontend
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'apps/web/package-lock.json'
+
+      - name: Verify Web Frontend (Next.js)
+        run: |
+          cd apps/web
+          npm ci || npm install
+          npm run build
+
+  verify-tools-dataset:
+    name: Verify Tools & Dataset Integrity
+    needs: detect-changes
+    if: needs.detect-changes.outputs.tools_dataset == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -18,24 +115,6 @@ jobs:
         with:
           node-version: 20
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: Verify and Test Go Backend
-        run: |
-          cd services/go-server
-          go vet ./...
-          go test -v ./...
-          go build -v -o bin/server ./cmd/server
-
-      - name: Verify Web Frontend (Next.js)
-        run: |
-          cd apps/web
-          npm install
-          npm run build
-      
       - name: Verify Tools Syntax
         run: |
           node --check tools/crawler/get_all_cameras.js
@@ -48,3 +127,27 @@ jobs:
             console.log('Total valid cameras count:', data.length);
             if (!Array.isArray(data) || data.length === 0) process.exit(1);
           "
+
+  ci-gate:
+    name: CI Gate
+    needs: [detect-changes, verify-backend, verify-frontend, verify-tools-dataset]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate All CI Job Results
+        run: |
+          echo "Backend check result: ${{ needs.verify-backend.result }}"
+          echo "Frontend check result: ${{ needs.verify-frontend.result }}"
+          echo "Tools & Dataset check result: ${{ needs.verify-tools-dataset.result }}"
+
+          if [ "${{ needs.verify-backend.result }}" = "failure" ] || \
+             [ "${{ needs.verify-backend.result }}" = "cancelled" ] || \
+             [ "${{ needs.verify-frontend.result }}" = "failure" ] || \
+             [ "${{ needs.verify-frontend.result }}" = "cancelled" ] || \
+             [ "${{ needs.verify-tools-dataset.result }}" = "failure" ] || \
+             [ "${{ needs.verify-tools-dataset.result }}" = "cancelled" ]; then
+            echo "❌ CI Verification failed on one or more active components."
+            exit 1
+          fi
+
+          echo "✅ All active CI checks passed or were safely skipped."
