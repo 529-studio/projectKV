@@ -197,6 +197,15 @@ func main() {
 	}
 	proxyCache := proxycache.NewCache(cfg.CacheTTL)
 	proxyHandler := proxycache.NewHandler(proxyCache, upstreamBase, func(id, name, zone, snapshotURL string) {
+		if camCatalog != nil {
+			if cam, ok := camCatalog.ByID(id); ok {
+				hotsetRegistry.Touch(cameraToHotSet(*cam))
+				return
+			}
+		}
+		if snapshotURL == "" {
+			snapshotURL = fmt.Sprintf("%s?id=%s", upstreamBase, id)
+		}
 		hotsetRegistry.Touch(hotset.Camera{ID: id, Name: name, Zone: zone, SnapshotURL: snapshotURL})
 	})
 
