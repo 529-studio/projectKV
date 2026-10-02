@@ -1,0 +1,1002 @@
+#!/usr/bin/env python3
+"""
+benchmark.py — Evaluation harness for ProjectKV traffic camera analysis.
+
+ADR-004 §D6 Accuracy Gate:
+"Build an evaluation set: ≥300 labeled frames, including ≥60 rain/flood-positive
+and night frames. Report precision/recall per class. Flood false negatives are
+the metric that matters."
+
+Usage:
+    python3 tools/eval/benchmark.py --analyzer mock
+    python3 tools/eval/benchmark.py --analyzer vlm --api-key <KEY>
+    python3 tools/eval/benchmark.py --analyzer predictions --predictions-file preds.json
+"""
+
+import argparse
+import base64
+import json
+import math
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field, asdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple, Any
+
+
+# ---------------------------------------------------------------------------
+# Data Models & Schemas
+# ---------------------------------------------------------------------------
+
+DEFAULT_SCHEMA = {
+    "traffic": ["CLEAR", "MODERATE", "HEAVY", "CONGESTED"],
+    "flood": ["NONE", "SHALLOW", "DEEP"],
+    "time_of_day": ["day", "night", "dawn_dusk"],
+    "weather": ["dry", "rain", "heavy_rain"],
+}
+
+# Target frame counts from ADR-004 §D6 / Issue #71
+TARGET_COMPOSITION = [
+    {"category": "Clear/dry/day", "target": 100, "filter": lambda f: f.traffic == "CLEAR" and f.weather == "dry" and f.time_of_day == "day"},
+    {"category": "Moderate traffic", "target": 50, "filter": lambda f: f.traffic == "MODERATE"},
+    {"category": "Heavy/congested", "target": 50, "filter": lambda f: f.traffic in ("HEAVY", "CONGESTED")},
+    {"category": "Rain (any traffic)", "target": 40, "filter": lambda f: f.weather in ("rain", "heavy_rain")},
+    {"category": "Flood shallow", "target": 20, "filter": lambda f: f.flood == "SHALLOW"},
+    {"category": "Flood deep", "target": 10, "filter": lambda f: f.flood == "DEEP"},
+    {"category": "Night", "target": 30, "filter": lambda f: f.time_of_day == "night"},
+]
+
+
+@dataclass
+class LabeledFrame:
+    frame_id: str
+    camera_id: str
+    image_path: Path
+    traffic: str
+    flood: str
+    time_of_day: str
+    weather: str
+    annotator: Optional[str] = None
+    annotated_at: Optional[str] = None
+    notes: Optional[str] = None
+    raw_data: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class Prediction:
+    frame_id: str
+    traffic: str
+    flood: str
+    confidence: float
+    description: str = ""
+    raw_response: Optional[Dict[str, Any]] = None
+    latency_ms: float = 0.0
+
+
+@dataclass
+class ClassMetric:
+    cls_name: str
+    tp: int = 0
+    fp: int = 0
+    fn: int = 0
+    tn: int = 0
+    support: int = 0
+
+    @property
+    def precision(self) -> float:
+        denom = self.tp + self.fp
+        return (self.tp / denom) if denom > 0 else 0.0
+
+    @property
+    def recall(self) -> float:
+        denom = self.tp + self.fn
+        return (self.tp / denom) if denom > 0 else 0.0
+
+    @property
+    def f1(self) -> float:
+        p, r = self.precision, self.recall
+        return (2 * p * r / (p + r)) if (p + r) > 0 else 0.0
+
+
+@dataclass
+class ConfusionMatrix:
+    classes: List[str]
+    matrix: Dict[str, Dict[str, int]]  # actual -> predicted -> count
+
+    def get(self, actual: str, predicted: str) -> int:
+        return self.matrix.get(actual, {}).get(predicted, 0)
+
+
+@dataclass
+class FloodGateResult:
+    actual_positives: int
+    detected_positives: int
+    false_negatives: int
+    false_positives: int
+    true_negatives: int
+    false_negative_rate: float
+    max_fnr_threshold: float
+    passed: bool
+    status_label: str
+    missed_frames: List[Dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
+class BenchmarkResult:
+    timestamp: str
+    analyzer_name: str
+    model_name: str
+    total_frames: int
+    labels_dir: str
+    traffic_classes: List[str]
+    traffic_metrics: Dict[str, ClassMetric]
+    traffic_macro_f1: float
+    traffic_weighted_f1: float
+    traffic_cm: ConfusionMatrix
+    flood_classes: List[str]
+    flood_metrics: Dict[str, ClassMetric]
+    flood_macro_f1: float
+    flood_weighted_f1: float
+    flood_cm: ConfusionMatrix
+    flood_gate: FloodGateResult
+    weather_slices: Dict[str, Dict[str, Any]]
+    time_of_day_slices: Dict[str, Dict[str, Any]]
+    composition_progress: List[Dict[str, Any]]
+    predictions: List[Dict[str, Any]] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Schema Validation & Dataset Loading
+# ---------------------------------------------------------------------------
+
+def load_schema(schema_path: Optional[Path]) -> Dict[str, List[str]]:
+    """Loads and returns label schema definition."""
+    if schema_path and schema_path.is_file():
+        try:
+            with open(schema_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    # Direct category map
+                    if "traffic" in data and "flood" in data:
+                        return data
+                    # Nested in "categories" property
+                    if "categories" in data and isinstance(data["categories"], dict):
+                        return data["categories"]
+        except Exception as e:
+            print(f"[WARN] Failed to parse schema file {schema_path}: {e}. Falling back to default schema.", file=sys.stderr)
+    return DEFAULT_SCHEMA
+
+
+def parse_label_file(file_path: Path, schema: Dict[str, List[str]], repo_root: Optional[Path] = None) -> LabeledFrame:
+    """Parses a single label JSON file supporting both flat and nested schemas."""
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    if not isinstance(data, dict):
+        raise ValueError(f"{file_path}: Label JSON must be an object")
+
+    # Extract labels (check nested labels object or top-level keys)
+    labels = data.get("labels", {})
+    traffic = (labels.get("traffic") or data.get("traffic") or "").strip().upper()
+    flood = (labels.get("flood") or data.get("flood") or "").strip().upper()
+    time_of_day = (labels.get("time_of_day") or data.get("time_of_day") or "").strip().lower()
+    weather = (labels.get("weather") or data.get("weather") or "").strip().lower()
+
+    # Validate against schema
+    if traffic not in schema["traffic"]:
+        raise ValueError(f"{file_path}: Invalid traffic value '{traffic}'. Allowed: {schema['traffic']}")
+    if flood not in schema["flood"]:
+        raise ValueError(f"{file_path}: Invalid flood value '{flood}'. Allowed: {schema['flood']}")
+    if time_of_day not in schema["time_of_day"]:
+        raise ValueError(f"{file_path}: Invalid time_of_day value '{time_of_day}'. Allowed: {schema['time_of_day']}")
+    if weather not in schema["weather"]:
+        raise ValueError(f"{file_path}: Invalid weather value '{weather}'. Allowed: {schema['weather']}")
+
+    frame_id = str(data.get("frame_id") or file_path.stem)
+    camera_id = str(data.get("camera_id") or "")
+    image_path_raw = str(data.get("image_path") or "")
+
+    # Resolve image path relative to repo_root or label file directory
+    image_path = Path(image_path_raw)
+    if repo_root and not image_path.is_absolute():
+        candidate_repo = repo_root / image_path
+        candidate_local = file_path.parent / image_path
+        if candidate_repo.exists():
+            image_path = candidate_repo
+        elif candidate_local.exists():
+            image_path = candidate_local
+        else:
+            image_path = candidate_repo
+
+    return LabeledFrame(
+        frame_id=frame_id,
+        camera_id=camera_id,
+        image_path=image_path,
+        traffic=traffic,
+        flood=flood,
+        time_of_day=time_of_day,
+        weather=weather,
+        annotator=data.get("annotator"),
+        annotated_at=data.get("annotated_at"),
+        notes=data.get("notes"),
+        raw_data=data,
+    )
+
+
+def load_dataset(labels_dir: Path, schema: Dict[str, List[str]], repo_root: Optional[Path] = None) -> List[LabeledFrame]:
+    """Loads all label JSON files from directory recursively."""
+    if not labels_dir.is_dir():
+        raise FileNotFoundError(f"Labels directory not found: {labels_dir}")
+
+    frames: List[LabeledFrame] = []
+    errors: List[str] = []
+
+    for path in sorted(labels_dir.glob("**/*.json")):
+        # Skip schema or metadata files
+        if path.name in ("label_schema.json", "schema.json", "package.json"):
+            continue
+        try:
+            frame = parse_label_file(path, schema, repo_root)
+            frames.append(frame)
+        except Exception as e:
+            errors.append(f"{path.name}: {e}")
+
+    if errors:
+        print(f"[WARN] Encountered {len(errors)} invalid label files:", file=sys.stderr)
+        for err in errors[:5]:
+            print(f"  - {err}", file=sys.stderr)
+        if len(errors) > 5:
+            print(f"  ... and {len(errors) - 5} more", file=sys.stderr)
+
+    return frames
+
+
+# ---------------------------------------------------------------------------
+# Analyzers
+# ---------------------------------------------------------------------------
+
+class BaseAnalyzer:
+    """Abstract interface for camera frame analyzers."""
+    name: str = "base"
+    model: str = "none"
+
+    def analyze(self, frame: LabeledFrame) -> Prediction:
+        raise NotImplementedError
+
+
+class MockAnalyzer(BaseAnalyzer):
+    """
+    Deterministic mock analyzer for local verification and unit testing.
+    Can operate in exact ground-truth simulation or controlled accuracy mode.
+    """
+    name: str = "mock"
+    model: str = "mock-dev-engine"
+
+    def __init__(self, accuracy: float = 1.0, simulate_flood_miss: bool = False):
+        self.accuracy = accuracy
+        self.simulate_flood_miss = simulate_flood_miss
+
+    def analyze(self, frame: LabeledFrame) -> Prediction:
+        t0 = time.time()
+        # Default: matches ground truth for deterministic tests
+        pred_traffic = frame.traffic
+        pred_flood = frame.flood
+
+        if self.simulate_flood_miss and frame.flood in ("SHALLOW", "DEEP"):
+            pred_flood = "NONE"
+
+        latency = (time.time() - t0) * 1000.0
+        return Prediction(
+            frame_id=frame.frame_id,
+            traffic=pred_traffic,
+            flood=pred_flood,
+            confidence=0.95,
+            description="Mock analyzer deterministic prediction",
+            latency_ms=latency,
+        )
+
+
+class PrecomputedPredictionsAnalyzer(BaseAnalyzer):
+    """Loads predictions from a pre-recorded JSON file."""
+    name: str = "predictions"
+
+    def __init__(self, filepath: Path):
+        self.model = filepath.name
+        with open(filepath, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        self.lookup: Dict[str, Dict[str, Any]] = {}
+        if isinstance(raw, list):
+            for item in raw:
+                fid = str(item.get("frame_id") or "")
+                if fid:
+                    self.lookup[fid] = item
+        elif isinstance(raw, dict):
+            # Check if map of frame_id -> dict
+            for k, v in raw.items():
+                if isinstance(v, dict):
+                    self.lookup[k] = v
+
+    def analyze(self, frame: LabeledFrame) -> Prediction:
+        item = self.lookup.get(frame.frame_id)
+        if not item:
+            # Fallback to UNKNOWN
+            return Prediction(
+                frame_id=frame.frame_id,
+                traffic="UNKNOWN",
+                flood="UNKNOWN",
+                confidence=0.0,
+                description="Frame not found in precomputed predictions file",
+            )
+
+        traffic = str(item.get("traffic") or item.get("traffic_severity") or "UNKNOWN").upper()
+        flood_raw = str(item.get("flood") or item.get("flood_severity") or "UNKNOWN").upper()
+        flood = normalize_vlm_flood_severity(flood_raw)
+        confidence = float(item.get("confidence", 0.9))
+
+        return Prediction(
+            frame_id=frame.frame_id,
+            traffic=traffic,
+            flood=flood,
+            confidence=confidence,
+            description=str(item.get("description", "")),
+            raw_response=item,
+        )
+
+
+def normalize_vlm_flood_severity(raw: str) -> str:
+    """Maps VLM flood_severity (DRY, WET, FLOODED_SHALLOW, FLOODED_DEEP) to evaluation schema (NONE, SHALLOW, DEEP)."""
+    s = raw.strip().upper()
+    if s in ("DRY", "WET", "NONE"):
+        return "NONE"
+    if s in ("FLOODED_SHALLOW", "SHALLOW"):
+        return "SHALLOW"
+    if s in ("FLOODED_DEEP", "DEEP"):
+        return "DEEP"
+    return "UNKNOWN"
+
+
+def normalize_vlm_traffic_severity(raw: str) -> str:
+    """Normalizes traffic severity from VLM output."""
+    s = raw.strip().upper()
+    if s in ("CLEAR", "MODERATE", "HEAVY", "CONGESTED"):
+        return s
+    return "UNKNOWN"
+
+
+class VLMAnalyzer(BaseAnalyzer):
+    """
+    Calls Google Gemini Multimodal Vision API (Issue #71 / ADR-004 §D6 & §B3).
+    Encodes JPEG image frame as base64 and parses structured JSON output.
+    """
+    name: str = "vlm"
+
+    TRAFFIC_PROMPT = """You are a traffic analyst AI. Analyze the traffic camera image and return a JSON object ONLY — no markdown, no explanation.
+
+JSON schema (all fields required):
+{
+  "traffic_severity": "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED" | "UNKNOWN",
+  "flood_severity": "DRY" | "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP" | "UNKNOWN",
+  "confidence": <float 0.0–1.0>,
+  "description": "<one sentence in English>"
+}
+
+Rules:
+- traffic_severity = CLEAR: free-flowing traffic, no congestion.
+- traffic_severity = MODERATE: some slowdowns, vehicles moving.
+- traffic_severity = HEAVY: significant slowdown, queues forming.
+- traffic_severity = CONGESTED: gridlock or near-standstill.
+- flood_severity = DRY: no visible water on road surface.
+- flood_severity = WET: wet road, rain, shallow puddles only.
+- flood_severity = FLOODED_SHALLOW: ankle-deep to wheel-height water on road.
+- flood_severity = FLOODED_DEEP: waist-high or deeper water, impassable.
+- If the image is too dark, blurry, obscured, or otherwise unanalyzable, set confidence < 0.5 and use UNKNOWN for both severity fields.
+- confidence must reflect how certain you are about BOTH severity fields combined.
+- Return ONLY the JSON object. No other text."""
+
+    def __init__(self, api_key: str, model: str = "gemini-3.5-flash-lite", request_delay: float = 0.5):
+        self.api_key = api_key
+        self.model = model
+        self.request_delay = request_delay
+
+    def analyze(self, frame: LabeledFrame) -> Prediction:
+        if not frame.image_path.is_file():
+            raise FileNotFoundError(f"Image not found for frame {frame.frame_id}: {frame.image_path}")
+
+        image_bytes = frame.image_path.read_bytes()
+        b64_image = base64.b64encode(image_bytes).decode("ascii")
+
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": self.TRAFFIC_PROMPT},
+                        {
+                            "inline_data": {
+                                "mime_type": "image/jpeg",
+                                "data": b64_image,
+                            }
+                        },
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.1,
+                "responseMimeType": "application/json",
+            },
+        }
+
+        body = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            endpoint,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        t0 = time.time()
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                resp_bytes = resp.read()
+            latency = (time.time() - t0) * 1000.0
+        except urllib.error.HTTPError as e:
+            err_msg = e.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Gemini API HTTP Error {e.code}: {err_msg}") from e
+        except Exception as e:
+            raise RuntimeError(f"Gemini API request failed: {e}") from e
+
+        if self.request_delay > 0:
+            time.sleep(self.request_delay)
+
+        resp_data = json.loads(resp_bytes.decode("utf-8"))
+        try:
+            text_part = resp_data["candidates"][0]["content"]["parts"][0]["text"]
+            clean_text = text_part.strip()
+            if clean_text.startswith("```"):
+                lines = clean_text.splitlines()
+                clean_text = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
+            verdict = json.loads(clean_text)
+        except Exception as e:
+            return Prediction(
+                frame_id=frame.frame_id,
+                traffic="UNKNOWN",
+                flood="UNKNOWN",
+                confidence=0.0,
+                description=f"Failed to parse Gemini output: {e}",
+                raw_response=resp_data,
+                latency_ms=latency,
+            )
+
+        traffic_raw = str(verdict.get("traffic_severity") or "UNKNOWN")
+        flood_raw = str(verdict.get("flood_severity") or "UNKNOWN")
+        confidence = float(verdict.get("confidence", 0.0))
+        description = str(verdict.get("description", ""))
+
+        return Prediction(
+            frame_id=frame.frame_id,
+            traffic=normalize_vlm_traffic_severity(traffic_raw),
+            flood=normalize_vlm_flood_severity(flood_raw),
+            confidence=confidence,
+            description=description,
+            raw_response=verdict,
+            latency_ms=latency,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Metrics Computation
+# ---------------------------------------------------------------------------
+
+def compute_confusion_matrix(
+    y_true: List[str], y_pred: List[str], class_labels: List[str]
+) -> ConfusionMatrix:
+    """Builds an actual -> predicted -> count confusion matrix."""
+    all_classes = list(class_labels)
+    # Include UNKNOWN in columns/rows if present in predictions or ground truth
+    extra_classes = set(y_true).union(set(y_pred)) - set(all_classes)
+    for extra in sorted(extra_classes):
+        all_classes.append(extra)
+
+    matrix: Dict[str, Dict[str, int]] = {
+        act: {pred: 0 for pred in all_classes} for act in all_classes
+    }
+
+    for act, pred in zip(y_true, y_pred):
+        if act not in matrix:
+            matrix[act] = {p: 0 for p in all_classes}
+        if pred not in matrix[act]:
+            for r in matrix.values():
+                r[pred] = 0
+        matrix[act][pred] += 1
+
+    return ConfusionMatrix(classes=all_classes, matrix=matrix)
+
+
+def compute_class_metrics(
+    cm: ConfusionMatrix, eval_classes: List[str]
+) -> Dict[str, ClassMetric]:
+    """Computes TP, FP, FN, TN, precision, recall, f1 for each class."""
+    metrics: Dict[str, ClassMetric] = {}
+    total_samples = sum(
+        sum(preds.values()) for preds in cm.matrix.values()
+    )
+
+    for c in eval_classes:
+        tp = cm.get(c, c)
+        actual_total = sum(cm.matrix.get(c, {}).values())
+        fn = actual_total - tp
+
+        predicted_total = sum(
+            row.get(c, 0) for row in cm.matrix.values()
+        )
+        fp = predicted_total - tp
+        tn = total_samples - (tp + fp + fn)
+
+        metrics[c] = ClassMetric(
+            cls_name=c,
+            tp=tp,
+            fp=fp,
+            fn=fn,
+            tn=tn,
+            support=actual_total,
+        )
+
+    return metrics
+
+
+def compute_summary_f1(metrics: Dict[str, ClassMetric]) -> Tuple[float, float]:
+    """Calculates macro-average F1 and weighted-average F1."""
+    classes_with_support = [m for m in metrics.values() if m.support > 0]
+    if not classes_with_support:
+        return 0.0, 0.0
+
+    macro_f1 = sum(m.f1 for m in classes_with_support) / len(classes_with_support)
+    total_support = sum(m.support for m in classes_with_support)
+    weighted_f1 = (
+        sum(m.f1 * m.support for m in classes_with_support) / total_support
+        if total_support > 0
+        else 0.0
+    )
+    return macro_f1, weighted_f1
+
+
+def evaluate_flood_safety_gate(
+    frames: List[LabeledFrame],
+    predictions: List[Prediction],
+    max_fnr: float = 0.05,
+) -> FloodGateResult:
+    """
+    Computes flood safety accuracy gate metric: False-Negative Rate.
+    Safety rule: Actual flood (SHALLOW or DEEP) must NEVER be missed (classified as NONE/UNKNOWN).
+    """
+    actual_positives = 0
+    detected_positives = 0
+    false_negatives = 0
+    false_positives = 0
+    true_negatives = 0
+    missed_frames = []
+
+    pred_map = {p.frame_id: p for p in predictions}
+
+    for f in frames:
+        p = pred_map.get(f.frame_id)
+        is_actual_flood = f.flood in ("SHALLOW", "DEEP")
+        pred_flood = p.flood if p else "UNKNOWN"
+        is_pred_flood = pred_flood in ("SHALLOW", "DEEP")
+
+        if is_actual_flood:
+            actual_positives += 1
+            if is_pred_flood:
+                detected_positives += 1
+            else:
+                false_negatives += 1
+                missed_frames.append({
+                    "frame_id": f.frame_id,
+                    "camera_id": f.camera_id,
+                    "actual_flood": f.flood,
+                    "predicted_flood": pred_flood,
+                    "confidence": p.confidence if p else 0.0,
+                    "weather": f.weather,
+                    "time_of_day": f.time_of_day,
+                    "notes": f.notes or "",
+                })
+        else:
+            if is_pred_flood:
+                false_positives += 1
+            else:
+                true_negatives += 1
+
+    fnr = (false_negatives / actual_positives) if actual_positives > 0 else 0.0
+    passed = fnr <= max_fnr
+
+    if actual_positives == 0:
+        status_label = "INCOMPLETE (0 flood positive frames evaluated)"
+    elif passed:
+        status_label = f"PASS ✅ ({fnr * 100:.1f}% FNR ≤ {max_fnr * 100:.1f}%)"
+    else:
+        status_label = f"FAIL ❌ ({fnr * 100:.1f}% FNR > {max_fnr * 100:.1f}%)"
+
+    return FloodGateResult(
+        actual_positives=actual_positives,
+        detected_positives=detected_positives,
+        false_negatives=false_negatives,
+        false_positives=false_positives,
+        true_negatives=true_negatives,
+        false_negative_rate=fnr,
+        max_fnr_threshold=max_fnr,
+        passed=passed,
+        status_label=status_label,
+        missed_frames=missed_frames,
+    )
+
+
+def compute_slices(
+    frames: List[LabeledFrame],
+    predictions: List[Prediction],
+    key: str,
+) -> Dict[str, Dict[str, Any]]:
+    """Evaluates accuracy broken down by environmental slice (weather or time_of_day)."""
+    pred_map = {p.frame_id: p for p in predictions}
+    groups: Dict[str, List[Tuple[LabeledFrame, Optional[Prediction]]]] = {}
+
+    for f in frames:
+        val = getattr(f, key, "unknown")
+        groups.setdefault(val, []).append((f, pred_map.get(f.frame_id)))
+
+    results = {}
+    for slice_val, pairs in sorted(groups.items()):
+        total = len(pairs)
+        traffic_correct = sum(1 for f, p in pairs if p and p.traffic == f.traffic)
+        flood_correct = sum(1 for f, p in pairs if p and p.flood == f.flood)
+        results[slice_val] = {
+            "total_frames": total,
+            "traffic_accuracy": traffic_correct / total if total > 0 else 0.0,
+            "flood_accuracy": flood_correct / total if total > 0 else 0.0,
+        }
+    return results
+
+
+def evaluate_composition_progress(frames: List[LabeledFrame]) -> List[Dict[str, Any]]:
+    """Evaluates dataset composition against ADR-004 §D6 target counts."""
+    results = []
+    for item in TARGET_COMPOSITION:
+        cat = item["category"]
+        tgt = item["target"]
+        fn = item["filter"]
+        count = sum(1 for f in frames if fn(f))
+        pct = (count / tgt) * 100.0 if tgt > 0 else 0.0
+        status = "✅ Complete" if count >= tgt else f"⏳ {count}/{tgt} ({pct:.0f}%)"
+        results.append({
+            "category": cat,
+            "current": count,
+            "target": tgt,
+            "percentage": pct,
+            "status": status,
+        })
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Runner & Report Generation
+# ---------------------------------------------------------------------------
+
+def run_benchmark(
+    frames: List[LabeledFrame],
+    analyzer: BaseAnalyzer,
+    schema: Dict[str, List[str]],
+    labels_dir_str: str,
+    max_flood_fnr: float = 0.05,
+) -> BenchmarkResult:
+    """Runs analyzer on frames and produces a full BenchmarkResult."""
+    predictions: List[Prediction] = []
+
+    for idx, frame in enumerate(frames, start=1):
+        pred = analyzer.analyze(frame)
+        predictions.append(pred)
+
+    y_traffic_true = [f.traffic for f in frames]
+    y_traffic_pred = [p.traffic for p in predictions]
+    traffic_classes = schema["traffic"]
+    traffic_cm = compute_confusion_matrix(y_traffic_true, y_traffic_pred, traffic_classes)
+    traffic_metrics = compute_class_metrics(traffic_cm, traffic_classes)
+    traffic_macro_f1, traffic_weighted_f1 = compute_summary_f1(traffic_metrics)
+
+    y_flood_true = [f.flood for f in frames]
+    y_flood_pred = [p.flood for p in predictions]
+    flood_classes = schema["flood"]
+    flood_cm = compute_confusion_matrix(y_flood_true, y_flood_pred, flood_classes)
+    flood_metrics = compute_class_metrics(flood_cm, flood_classes)
+    flood_macro_f1, flood_weighted_f1 = compute_summary_f1(flood_metrics)
+
+    flood_gate = evaluate_flood_safety_gate(frames, predictions, max_fnr=max_flood_fnr)
+    weather_slices = compute_slices(frames, predictions, "weather")
+    tod_slices = compute_slices(frames, predictions, "time_of_day")
+    comp_progress = evaluate_composition_progress(frames)
+
+    pred_records = [
+        {
+            "frame_id": p.frame_id,
+            "traffic": p.traffic,
+            "flood": p.flood,
+            "confidence": p.confidence,
+            "description": p.description,
+            "latency_ms": p.latency_ms,
+        }
+        for p in predictions
+    ]
+
+    return BenchmarkResult(
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        analyzer_name=analyzer.name,
+        model_name=analyzer.model,
+        total_frames=len(frames),
+        labels_dir=labels_dir_str,
+        traffic_classes=traffic_classes,
+        traffic_metrics=traffic_metrics,
+        traffic_macro_f1=traffic_macro_f1,
+        traffic_weighted_f1=traffic_weighted_f1,
+        traffic_cm=traffic_cm,
+        flood_classes=flood_classes,
+        flood_metrics=flood_metrics,
+        flood_macro_f1=flood_macro_f1,
+        flood_weighted_f1=flood_weighted_f1,
+        flood_cm=flood_cm,
+        flood_gate=flood_gate,
+        weather_slices=weather_slices,
+        time_of_day_slices=tod_slices,
+        composition_progress=comp_progress,
+        predictions=pred_records,
+    )
+
+
+def generate_markdown_report(res: BenchmarkResult) -> str:
+    """Generates a complete, publication-ready Markdown report."""
+    lines = []
+    lines.append(f"# AI Analyzer Evaluation Report (ADR-004 §D6 Accuracy Gate)")
+    lines.append("")
+    lines.append(f"- **Generated At**: `{res.timestamp}`")
+    lines.append(f"- **Analyzer**: `{res.analyzer_name}` (`{res.model_name}`)")
+    lines.append(f"- **Evaluation Dataset**: `{res.total_frames}` labeled frames from `{res.labels_dir}`")
+    lines.append("")
+
+    # Executive Summary & Gate Status
+    lines.append("## 1. Executive Summary & Accuracy Gate")
+    lines.append("")
+    gate_badge = "✅ **PASS**" if res.flood_gate.passed else "❌ **FAIL (SAFETY GATE BREACH)**"
+    lines.append(f"| Gate Metric | Target | Actual Value | Verdict |")
+    lines.append(f"|---|---|---|---|")
+    lines.append(f"| **Flood False-Negative Rate (FNR)** | ≤ {res.flood_gate.max_fnr_threshold * 100:.1f}% | **{res.flood_gate.false_negative_rate * 100:.1f}%** ({res.flood_gate.false_negatives}/{res.flood_gate.actual_positives} missed) | {gate_badge} |")
+    lines.append(f"| Traffic Macro F1 | ≥ 0.70 | **{res.traffic_macro_f1:.3f}** | {'✅' if res.traffic_macro_f1 >= 0.7 else '⚠️'} |")
+    lines.append(f"| Flood Macro F1 | ≥ 0.80 | **{res.flood_macro_f1:.3f}** | {'✅' if res.flood_macro_f1 >= 0.8 else '⚠️'} |")
+    lines.append("")
+    lines.append(f"> **Safety Gate Rule (ADR-004 §D6)**: A flood false-negative (failing to detect standing water or deep floods) directs drivers into hazardous corridors. Until the flood FNR is rigorously ≤ {res.flood_gate.max_fnr_threshold * 100:.1f}% across ≥60 rain/flood frames, route verdicts cannot show an unrestricted 'clear' state.")
+    lines.append("")
+
+    # Target Dataset Progress
+    lines.append("## 2. Dataset Composition Progress (Target: ≥300 Frames)")
+    lines.append("")
+    lines.append("| Category | Target | Current Count | Progress | Status |")
+    lines.append("|---|---|---|---|---|")
+    for cp in res.composition_progress:
+        bar_len = min(10, int(cp["percentage"] / 10))
+        bar = "█" * bar_len + "░" * (10 - bar_len)
+        lines.append(f"| {cp['category']} | {cp['target']} | {cp['current']} | `{bar}` {cp['percentage']:.0f}% | {cp['status']} |")
+    lines.append("")
+
+    # Traffic Classification
+    lines.append("## 3. Traffic Classification Performance")
+    lines.append("")
+    lines.append("| Class | Precision | Recall | F1-Score | Support |")
+    lines.append("|---|---|---|---|---|")
+    for c in res.traffic_classes:
+        m = res.traffic_metrics.get(c)
+        if m:
+            lines.append(f"| **{c}** | {m.precision:.3f} | {m.recall:.3f} | {m.f1:.3f} | {m.support} |")
+    lines.append(f"| *Macro Avg* | - | - | **{res.traffic_macro_f1:.3f}** | {res.total_frames} |")
+    lines.append(f"| *Weighted Avg* | - | - | **{res.traffic_weighted_f1:.3f}** | {res.total_frames} |")
+    lines.append("")
+
+    # Traffic Confusion Matrix
+    lines.append("### Traffic Confusion Matrix")
+    lines.append("")
+    header = "| Actual \\ Predicted | " + " | ".join(res.traffic_cm.classes) + " | Total |"
+    sep = "|---|" + "|".join(["---"] * len(res.traffic_cm.classes)) + "|---|"
+    lines.append(header)
+    lines.append(sep)
+    for act in res.traffic_cm.classes:
+        counts = [str(res.traffic_cm.get(act, pred)) for pred in res.traffic_cm.classes]
+        row_tot = sum(res.traffic_cm.get(act, pred) for pred in res.traffic_cm.classes)
+        lines.append(f"| **{act}** | " + " | ".join(counts) + f" | **{row_tot}** |")
+    lines.append("")
+
+    # Flood Classification
+    lines.append("## 4. Flood Classification Performance")
+    lines.append("")
+    lines.append("| Class | Precision | Recall | F1-Score | Support |")
+    lines.append("|---|---|---|---|---|")
+    for c in res.flood_classes:
+        m = res.flood_metrics.get(c)
+        if m:
+            lines.append(f"| **{c}** | {m.precision:.3f} | {m.recall:.3f} | {m.f1:.3f} | {m.support} |")
+    lines.append(f"| *Macro Avg* | - | - | **{res.flood_macro_f1:.3f}** | {res.total_frames} |")
+    lines.append(f"| *Weighted Avg* | - | - | **{res.flood_weighted_f1:.3f}** | {res.total_frames} |")
+    lines.append("")
+
+    # Flood Confusion Matrix
+    lines.append("### Flood Confusion Matrix")
+    lines.append("")
+    header = "| Actual \\ Predicted | " + " | ".join(res.flood_cm.classes) + " | Total |"
+    sep = "|---|" + "|".join(["---"] * len(res.flood_cm.classes)) + "|---|"
+    lines.append(header)
+    lines.append(sep)
+    for act in res.flood_cm.classes:
+        counts = [str(res.flood_cm.get(act, pred)) for pred in res.flood_cm.classes]
+        row_tot = sum(res.flood_cm.get(act, pred) for pred in res.flood_cm.classes)
+        lines.append(f"| **{act}** | " + " | ".join(counts) + f" | **{row_tot}** |")
+    lines.append("")
+
+    # Flood False-Negative Diagnostic
+    lines.append("## 5. Flood False-Negative Diagnostic (Missed Floods)")
+    lines.append("")
+    if res.flood_gate.missed_frames:
+        lines.append(f"⚠️ **{len(res.flood_gate.missed_frames)} flood instances were missed by the analyzer!**")
+        lines.append("")
+        lines.append("| Frame ID | Camera ID | Actual Flood | Predicted | Confidence | Weather | Time of Day | Notes |")
+        lines.append("|---|---|---|---|---|---|---|---|")
+        for mf in res.flood_gate.missed_frames:
+            lines.append(f"| `{mf['frame_id']}` | `{mf['camera_id']}` | **{mf['actual_flood']}** | `{mf['predicted_flood']}` | {mf['confidence']:.2f} | {mf['weather']} | {mf['time_of_day']} | {mf['notes']} |")
+    else:
+        lines.append("🎉 **Zero false-negative flood events detected!** All flooded conditions were recognized as hazardous.")
+    lines.append("")
+
+    # Environmental Slices
+    lines.append("## 6. Sliced Analysis (Weather & Lighting)")
+    lines.append("")
+    lines.append("### Weather Slice")
+    lines.append("")
+    lines.append("| Weather Condition | Frames | Traffic Accuracy | Flood Accuracy |")
+    lines.append("|---|---|---|---|")
+    for w, data in res.weather_slices.items():
+        lines.append(f"| **{w}** | {data['total_frames']} | {data['traffic_accuracy'] * 100:.1f}% | {data['flood_accuracy'] * 100:.1f}% |")
+    lines.append("")
+
+    lines.append("### Time of Day Slice")
+    lines.append("")
+    lines.append("| Lighting / Time | Frames | Traffic Accuracy | Flood Accuracy |")
+    lines.append("|---|---|---|---|")
+    for tod, data in res.time_of_day_slices.items():
+        lines.append(f"| **{tod}** | {data['total_frames']} | {data['traffic_accuracy'] * 100:.1f}% | {data['flood_accuracy'] * 100:.1f}% |")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def print_cli_summary(res: BenchmarkResult):
+    """Prints a clean ASCII summary to console."""
+    sep = "=" * 64
+    print(sep)
+    print(" PROJECTKV AI ANALYZER BENCHMARK SUMMARY")
+    print(sep)
+    print(f" Timestamp:      {res.timestamp}")
+    print(f" Analyzer:       {res.analyzer_name} ({res.model_name})")
+    print(f" Dataset:        {res.total_frames} frames from {res.labels_dir}")
+    print(f" Safety Gate:    {res.flood_gate.status_label}")
+    print(f" Flood FNR:      {res.flood_gate.false_negative_rate * 100:.2f}% (Threshold: ≤ {res.flood_gate.max_fnr_threshold * 100:.1f}%)")
+    print(f" Traffic F1:     Macro={res.traffic_macro_f1:.3f} | Weighted={res.traffic_weighted_f1:.3f}")
+    print(f" Flood F1:       Macro={res.flood_macro_f1:.3f} | Weighted={res.flood_weighted_f1:.3f}")
+    print(sep)
+
+
+# ---------------------------------------------------------------------------
+# CLI Entry Point
+# ---------------------------------------------------------------------------
+
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate traffic & flood AI analyzer on labeled camera frames.")
+    parser.add_argument("--labels-dir", default="tools/eval/labels", help="Directory with label JSON files")
+    parser.add_argument("--fixtures-dir", default=None, help="Optional fixture directory with frames and labels")
+    parser.add_argument("--schema", default="tools/eval/label_schema.json", help="Path to label schema JSON")
+    parser.add_argument("--analyzer", choices=["mock", "vlm", "predictions"], default="mock", help="Analyzer backend to benchmark")
+    parser.add_argument("--model", default="gemini-3.5-flash-lite", help="Gemini VLM model name (for --analyzer vlm)")
+    parser.add_argument("--api-key", default=None, help="Gemini API key (or set CLOUD_VISION_API_KEY env var)")
+    parser.add_argument("--predictions-file", default=None, help="JSON file with predictions (for --analyzer predictions)")
+    parser.add_argument("--output-report", default=None, help="File path to write markdown report")
+    parser.add_argument("--output-json", default=None, help="File path to write JSON metrics")
+    parser.add_argument("--gate-max-fnr", type=float, default=0.05, help="Maximum allowed flood false-negative rate (default 0.05 = 5%%)")
+    parser.add_argument("--strict", action="store_true", help="Exit with code 1 if accuracy gate fails")
+    parser.add_argument("--simulate-flood-miss", action="store_true", help="Simulate flood detection miss in mock mode (for gate testing)")
+    args = parser.parse_args()
+
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    schema_path = Path(args.schema) if Path(args.schema).is_absolute() else repo_root / args.schema
+    schema = load_schema(schema_path if schema_path.exists() else None)
+
+    # Determine labels directory
+    if args.fixtures_dir:
+        labels_dir = Path(args.fixtures_dir)
+        if (labels_dir / "labels").is_dir():
+            labels_dir = labels_dir / "labels"
+    else:
+        labels_dir = Path(args.labels_dir) if Path(args.labels_dir).is_absolute() else repo_root / args.labels_dir
+
+    print(f"[INFO] Loading dataset from: {labels_dir}")
+    frames = load_dataset(labels_dir, schema, repo_root)
+    if not frames:
+        print(f"[ERROR] No valid labeled frames found in {labels_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"[INFO] Loaded {len(frames)} labeled frames")
+
+    # Instantiate analyzer
+    if args.analyzer == "mock":
+        analyzer = MockAnalyzer(simulate_flood_miss=args.simulate_flood_miss)
+    elif args.analyzer == "predictions":
+        if not args.predictions_file:
+            print("[ERROR] --predictions-file is required when --analyzer=predictions", file=sys.stderr)
+            sys.exit(1)
+        preds_path = Path(args.predictions_file) if Path(args.predictions_file).is_absolute() else repo_root / args.predictions_file
+        analyzer = PrecomputedPredictionsAnalyzer(preds_path)
+    elif args.analyzer == "vlm":
+        api_key = args.api_key or os.environ.get("CLOUD_VISION_API_KEY") or os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            print("[ERROR] Gemini API key required for VLM analyzer (pass --api-key or set CLOUD_VISION_API_KEY)", file=sys.stderr)
+            sys.exit(1)
+        analyzer = VLMAnalyzer(api_key=api_key, model=args.model)
+    else:
+        print(f"[ERROR] Unsupported analyzer: {args.analyzer}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"[INFO] Running benchmark using analyzer: {analyzer.name} ({analyzer.model})...")
+    result = run_benchmark(
+        frames=frames,
+        analyzer=analyzer,
+        schema=schema,
+        labels_dir_str=str(labels_dir),
+        max_flood_fnr=args.gate_max_fnr,
+    )
+
+    print_cli_summary(result)
+
+    # Write report if requested
+    report_md = generate_markdown_report(result)
+    if args.output_report:
+        report_path = Path(args.output_report) if Path(args.output_report).is_absolute() else repo_root / args.output_report
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(report_md, encoding="utf-8")
+        print(f"[INFO] Wrote report to: {report_path}")
+
+    # Write JSON metrics if requested
+    if args.output_json:
+        json_path = Path(args.output_json) if Path(args.output_json).is_absolute() else repo_root / args.output_json
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Serialize result cleanly
+        export_data = {
+            "timestamp": result.timestamp,
+            "analyzer": result.analyzer_name,
+            "model": result.model_name,
+            "total_frames": result.total_frames,
+            "flood_gate": asdict(result.flood_gate),
+            "traffic_macro_f1": result.traffic_macro_f1,
+            "traffic_weighted_f1": result.traffic_weighted_f1,
+            "flood_macro_f1": result.flood_macro_f1,
+            "flood_weighted_f1": result.flood_weighted_f1,
+            "traffic_metrics": {k: asdict(v) for k, v in result.traffic_metrics.items()},
+            "flood_metrics": {k: asdict(v) for k, v in result.flood_metrics.items()},
+            "weather_slices": result.weather_slices,
+            "time_of_day_slices": result.time_of_day_slices,
+        }
+        json_path.write_text(json.dumps(export_data, indent=2) + "\n", encoding="utf-8")
+        print(f"[INFO] Wrote JSON metrics to: {json_path}")
+
+    if args.strict and not result.flood_gate.passed:
+        print("[FAIL] Accuracy gate breached. Exiting with code 1.", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

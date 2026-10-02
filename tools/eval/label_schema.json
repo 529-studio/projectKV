@@ -1,0 +1,6 @@
+{
+  "traffic": ["CLEAR", "MODERATE", "HEAVY", "CONGESTED"],
+  "flood": ["NONE", "SHALLOW", "DEEP"],
+  "time_of_day": ["day", "night", "dawn_dusk"],
+  "weather": ["dry", "rain", "heavy_rain"]
+}

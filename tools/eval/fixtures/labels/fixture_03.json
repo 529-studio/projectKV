@@ -1,0 +1,14 @@
+{
+  "frame_id": "fixture_03",
+  "camera_id": "5d8cd7fb766c880017188954",
+  "image_path": "tools/eval/fixtures/frames/fixture_03_congested_dry_day.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "human_reviewer_02",
+  "annotated_at": "2026-10-01T12:10:00Z",
+  "notes": "Full intersection gridlock, vehicles stopped bumper-to-bumper."
+}
