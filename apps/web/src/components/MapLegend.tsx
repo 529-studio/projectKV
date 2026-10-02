@@ -246,14 +246,29 @@ export default function MapLegend({
         <div className="absolute top-16 right-3 z-[800] pointer-events-auto select-none">
           <button
             onClick={onToggle}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-zinc-700 bg-zinc-950/95 text-zinc-200 shadow-2xl backdrop-blur-md font-mono text-xs font-semibold focus:outline-none active:bg-zinc-900 cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-zinc-700 bg-zinc-950/95 text-zinc-200 shadow-2xl backdrop-blur-md font-mono text-xs font-semibold focus:outline-none active:bg-zinc-900 cursor-pointer"
             aria-expanded={isOpen}
             aria-label={lang === 'vi' ? 'Đóng/mở chú giải bản đồ' : 'Toggle map legend'}
+            title={lang === 'vi' ? 'Chú giải bản đồ' : 'Map legend'}
           >
-            <span className="font-bold text-white tracking-wider text-xs uppercase">
-              {lang === 'vi' ? 'CHÚ GIẢI BẢN ĐỒ' : 'MAP LEGEND'}
+            <svg
+              className="w-3.5 h-3.5 text-zinc-400 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+            <span className="font-bold text-white tracking-wider text-[11px] uppercase">
+              {lang === 'vi' ? 'Chú giải' : 'Legend'}
             </span>
-            <span className="text-zinc-400 text-xs ml-1 shrink-0">
+            <span className="text-zinc-400 text-xs ml-0.5 shrink-0">
               {isOpen ? '▾' : '▸'}
             </span>
           </button>
