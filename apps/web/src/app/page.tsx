@@ -278,6 +278,7 @@ export default function Home() {
           pinnedCameras={pinnedCameras} 
           onUnpin={togglePin} 
           onClear={() => setPinnedCameraIds([])} 
+          onCameraClick={setSelectedCamera}
           lang={lang}
         />
 
