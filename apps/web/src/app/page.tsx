@@ -345,25 +345,45 @@ export default function Home() {
           )}
         </AnimatePresence>
 
-        {/* MAP LEGEND — collapsible */}
-        <MapLegend
-          isOpen={legendOpen}
-          onToggle={() => setLegendOpen(prev => !prev)}
-          analysisEnabled={analysisEnabled}
-          hexOverlayEnabled={hexOverlayEnabled}
-          hexOverlayMode={hexOverlayMode}
-          verdictsCount={verdicts.size}
-          lang={lang}
-          floodLoading={floodLoading}
-          trafficLoading={trafficLoading}
-        />
-
-        {/* LIVE METEOROLOGICAL WEATHER & RADAR WIDGET (Issue #120) */}
-        <div className="absolute top-16 right-3 md:top-3 md:right-[260px] z-[810] pointer-events-auto">
+        {/* TOP-RIGHT CONTROLS: Weather Widget & Map Legend (Desktop md+) */}
+        <div className="hidden md:flex items-start gap-2.5 absolute top-3 right-3 z-[810] pointer-events-auto">
           <WeatherWidget
             weather={weather}
             loading={weatherLoading}
             lang={lang}
+          />
+          <MapLegend
+            isOpen={legendOpen}
+            onToggle={() => setLegendOpen(prev => !prev)}
+            analysisEnabled={analysisEnabled}
+            hexOverlayEnabled={hexOverlayEnabled}
+            hexOverlayMode={hexOverlayMode}
+            verdictsCount={verdicts.size}
+            lang={lang}
+            floodLoading={floodLoading}
+            trafficLoading={trafficLoading}
+          />
+        </div>
+
+        {/* MOBILE CONTROLS (<md) */}
+        <div className="md:hidden">
+          <div className="absolute top-16 right-14 z-[810] pointer-events-auto">
+            <WeatherWidget
+              weather={weather}
+              loading={weatherLoading}
+              lang={lang}
+            />
+          </div>
+          <MapLegend
+            isOpen={legendOpen}
+            onToggle={() => setLegendOpen(prev => !prev)}
+            analysisEnabled={analysisEnabled}
+            hexOverlayEnabled={hexOverlayEnabled}
+            hexOverlayMode={hexOverlayMode}
+            verdictsCount={verdicts.size}
+            lang={lang}
+            floodLoading={floodLoading}
+            trafficLoading={trafficLoading}
           />
         </div>
 

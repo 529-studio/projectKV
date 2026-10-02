@@ -206,8 +206,8 @@ export default function MapLegend({
 }: MapLegendProps) {
   return (
     <>
-      {/* DESKTOP VIEW (md+): Collapsible card at top-3 right-3 */}
-      <div className="hidden md:block absolute top-3 right-3 z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[230px]">
+      {/* DESKTOP VIEW (md+): Collapsible card */}
+      <div className="hidden md:block z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[230px]">
         {/* Header row — always visible */}
         <button
           onClick={onToggle}
