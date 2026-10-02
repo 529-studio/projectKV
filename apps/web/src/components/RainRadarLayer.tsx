@@ -50,6 +50,8 @@ export default function RainRadarLayer({
         opacity,
         tileSize: 256,
         maxZoom: 18,
+        maxNativeZoom: 7,
+        minNativeZoom: 0,
         updateWhenIdle: true,
         updateWhenZooming: false,
       });
