@@ -8,6 +8,7 @@ import { useTraffic } from '../hooks/useTraffic';
 import { useFlood } from '../hooks/useFlood';
 import { type HexOverlayMode } from '../components/HexOverlay';
 import { FLOOD_I18N } from '../utils/floodUtils';
+import { MOBILE_SEARCH_I18N } from '../config/constants';
 import LandingOverlay from '../components/LandingOverlay';
 import CameraModal from '../components/CameraModal';
 import PinnedDock from '../components/PinnedDock';
@@ -36,6 +37,7 @@ export default function Home() {
   const [pinnedCameraIds, setPinnedCameraIds] = useState<string[]>([]);
   const [legendOpen, setLegendOpen] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [shouldFocusSearch, setShouldFocusSearch] = useState(false);
 
   // Hierarchical Filter State (D3 - Issue #41)
   const [selectedPhuong, setSelectedPhuong] = useState<string | null>(null);
@@ -276,6 +278,7 @@ export default function Home() {
           pinnedCameras={pinnedCameras} 
           onUnpin={togglePin} 
           onClear={() => setPinnedCameraIds([])} 
+          onCameraClick={setSelectedCamera}
           lang={lang}
         />
 
@@ -346,13 +349,66 @@ export default function Home() {
           trafficLoading={trafficLoading}
         />
 
-        {/* MOBILE CAMERA LIST — trigger button (hidden on md+) */}
+        {/* MOBILE FLOATING QUICK SEARCH BAR (hidden on md+) */}
+        <div className="md:hidden absolute top-3 left-3 right-3 z-[810] pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => {
+              setShouldFocusSearch(true);
+              setMobileDrawerOpen(true);
+            }}
+            className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2.5 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-500 rounded-lg text-left shadow-2xl backdrop-blur-md transition-all cursor-pointer group active:scale-[0.99]"
+            aria-label={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <svg
+                className="w-4 h-4 text-zinc-400 group-hover:text-white shrink-0 transition-colors"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <span className="text-xs font-mono text-zinc-400 group-hover:text-zinc-200 truncate">
+                {searchTerm ? searchTerm : MOBILE_SEARCH_I18N.PLACEHOLDER[lang]}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[10px] font-mono font-medium text-zinc-400 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded">
+                {MOBILE_SEARCH_I18N.BADGE[lang]}
+              </span>
+            </div>
+          </button>
+        </div>
+
+        {/* MOBILE CAMERA LIST & SEARCH — FAB trigger button (hidden on md+) */}
         <button
-          onClick={() => setMobileDrawerOpen(true)}
-          className="md:hidden absolute bottom-20 right-3 z-[800] w-11 h-11 bg-zinc-950 border border-zinc-700 hover:border-zinc-400 text-white rounded flex items-center justify-center shadow-2xl transition-colors"
-          aria-label={lang === 'vi' ? 'Danh sách camera' : 'Camera list'}
+          onClick={() => {
+            setShouldFocusSearch(true);
+            setMobileDrawerOpen(true);
+          }}
+          className="md:hidden absolute bottom-20 right-3 z-[830] w-11 h-11 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+          aria-label={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
+          title={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
         >
-          <span className="text-base leading-none">☰</span>
+          <svg
+            className="w-4 h-4 text-zinc-200"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
         </button>
 
         {/* MOBILE CAMERA DRAWER */}
@@ -365,7 +421,10 @@ export default function Home() {
           loading={loading}
           error={error}
           isOpen={mobileDrawerOpen}
-          onClose={() => setMobileDrawerOpen(false)}
+          onClose={() => {
+            setMobileDrawerOpen(false);
+            setShouldFocusSearch(false);
+          }}
           onCameraClick={setSelectedCamera}
           selectedPhuong={selectedPhuong}
           selectedCorridor={selectedCorridor}
@@ -375,6 +434,7 @@ export default function Home() {
           onSearchChange={setSearchTerm}
           lang={lang}
           onLangChange={setLang}
+          autoFocusSearch={shouldFocusSearch}
         />
       </main>
 

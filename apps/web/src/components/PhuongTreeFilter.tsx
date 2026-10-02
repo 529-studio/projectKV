@@ -31,6 +31,7 @@ export interface PhuongTreeFilterProps {
   lang?: 'vi' | 'en';
   onLangChange?: (lang: 'vi' | 'en') => void;
   className?: string;
+  autoFocusSearch?: boolean;
 }
 
 interface CorridorGroup {
@@ -125,10 +126,22 @@ export default function PhuongTreeFilter({
   lang: controlledLang,
   onLangChange,
   className = '',
+  autoFocusSearch = false,
 }: PhuongTreeFilterProps) {
   const [internalLang, setInternalLang] = useState<'vi' | 'en'>('vi');
   const lang = controlledLang ?? internalLang;
   const setLang = onLangChange ?? setInternalLang;
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocusSearch) {
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocusSearch]);
 
   const { phuongs: apiPhuongs, loading: phuongsLoading } = usePhuongs();
 
@@ -539,6 +552,7 @@ export default function PhuongTreeFilter({
 
             {/* Search Input */}
             <input
+              ref={searchInputRef}
               type="text"
               placeholder={t.searchPlaceholder}
               value={searchTerm}

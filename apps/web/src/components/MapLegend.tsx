@@ -240,22 +240,31 @@ export default function MapLegend({
         </AnimatePresence>
       </div>
 
-      {/* MOBILE VIEW (<md): Trigger button at top-3 right-3 + Bottom sheet modal */}
+      {/* MOBILE VIEW (<md): Trigger button at top-16 right-3 + Bottom sheet modal */}
       <div className="md:hidden">
         {/* Trigger Button */}
-        <div className="absolute top-3 right-3 z-[800] pointer-events-auto select-none">
+        <div className="absolute top-16 right-3 z-[800] pointer-events-auto select-none">
           <button
             onClick={onToggle}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-zinc-700 bg-zinc-950/95 text-zinc-200 shadow-2xl backdrop-blur-md font-mono text-xs font-semibold focus:outline-none active:bg-zinc-900 cursor-pointer"
+            className="w-[34px] h-[34px] flex items-center justify-center rounded border border-zinc-700 bg-zinc-950/95 text-zinc-300 hover:text-white shadow-2xl backdrop-blur-md focus:outline-none active:bg-zinc-900 cursor-pointer transition-colors"
             aria-expanded={isOpen}
-            aria-label={lang === 'vi' ? 'Đóng/mở chú giải bản đồ' : 'Toggle map legend'}
+            aria-label={lang === 'vi' ? 'Chú giải bản đồ' : 'Map legend'}
+            title={lang === 'vi' ? 'Chú giải bản đồ' : 'Map legend'}
           >
-            <span className="font-bold text-white tracking-wider text-xs uppercase">
-              {lang === 'vi' ? 'CHÚ GIẢI BẢN ĐỒ' : 'MAP LEGEND'}
-            </span>
-            <span className="text-zinc-400 text-xs ml-1 shrink-0">
-              {isOpen ? '▾' : '▸'}
-            </span>
+            <svg
+              className="w-4 h-4 text-zinc-300"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <path d="M12 17h.01" />
+            </svg>
           </button>
         </div>
 
