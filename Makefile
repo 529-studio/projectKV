@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-api build-go test-go lint-go swagger geo-enrich test-enrich normalize-roads hex-polygons
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-api build-go test-go lint-go swagger geo-enrich test-enrich normalize-roads hex-polygons test-eval benchmark-mock
 
 help:
 	@echo "========================================================"
@@ -21,6 +21,8 @@ help:
 	@echo "  make normalize-roads - Run road name normalization (road_key)"
 	@echo "  make hex-polygons    - Precompute H3 hex polygon boundaries"
 	@echo "  make test-enrich     - Run unit tests for geo-enrich tool"
+	@echo "  make test-eval       - Run unit tests for eval benchmark harness"
+	@echo "  make benchmark-mock  - Run AI benchmark harness in mock mode"
 
 install:
 	cd services/go-server && go mod download
@@ -72,6 +74,12 @@ hex-polygons:
 
 test-enrich:
 	python3 -m unittest discover -s tools/geo-enrich -p "test_*.py"
+
+test-eval:
+	python3 -m unittest discover -s tools/eval -p "*_test.py"
+
+benchmark-mock:
+	python3 tools/eval/benchmark.py --analyzer mock
 
 docker-build:
 	docker build -t warded-stg:latest .
