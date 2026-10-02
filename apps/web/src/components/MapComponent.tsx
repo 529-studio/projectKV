@@ -327,7 +327,7 @@ export default function MapComponent({
       <div ref={containerRef} className="w-full h-full z-0 absolute inset-0 bg-[#09090b]" />
 
       {/* Top controls: Toggle chips and active filter chips */}
-      <div className="absolute top-20 left-3 sm:top-3.5 sm:left-14 z-[800] flex flex-wrap items-center gap-2 max-w-[calc(100vw-32px)] sm:max-w-2xl pointer-events-none">
+      <div className="absolute top-16 left-3 sm:top-3.5 sm:left-14 z-[800] flex flex-wrap items-center gap-2 max-w-[calc(100vw-32px)] sm:max-w-2xl pointer-events-none">
         {children}
 
         {/* On-map active filter chip (ADR-004 A3 - Issue #65) */}

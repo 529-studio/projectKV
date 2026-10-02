@@ -2,6 +2,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera } from '../hooks/useCameras';
 import PhuongTreeFilter, { type TrafficVerdictLike } from './PhuongTreeFilter';
+import { MOBILE_SEARCH_I18N } from '../config/constants';
 
 interface MobileCameraDrawerProps {
   cameras: Camera[];
@@ -22,6 +23,7 @@ interface MobileCameraDrawerProps {
   onSearchChange: (term: string) => void;
   lang: 'vi' | 'en';
   onLangChange: (lang: 'vi' | 'en') => void;
+  autoFocusSearch?: boolean;
 }
 
 export default function MobileCameraDrawer({
@@ -43,6 +45,7 @@ export default function MobileCameraDrawer({
   onSearchChange,
   lang,
   onLangChange,
+  autoFocusSearch = false,
 }: MobileCameraDrawerProps) {
   const handleCameraClick = (cam: Camera) => {
     onCameraClick(cam);
@@ -75,13 +78,18 @@ export default function MobileCameraDrawer({
           >
             {/* Drag handle and close header */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 shrink-0">
-              <div className="w-6" />
+              <span className="text-xs font-mono font-bold text-white tracking-wider uppercase">
+                {MOBILE_SEARCH_I18N.DRAWER_TITLE[lang]}
+              </span>
               <div className="w-10 h-1 rounded-full bg-zinc-600" />
               <button
                 onClick={onClose}
-                className="text-zinc-400 hover:text-white font-bold text-lg leading-none p-1 transition-colors"
-                aria-label="Đóng danh sách camera"
+                className="text-zinc-400 hover:text-white font-bold text-base leading-none p-1 transition-colors flex items-center gap-1 cursor-pointer"
+                aria-label={lang === 'vi' ? 'Đóng và xem bản đồ' : 'Close and view map'}
               >
+                <span className="text-[11px] font-mono font-normal text-zinc-400 hover:text-white mr-0.5">
+                  {MOBILE_SEARCH_I18N.CLOSE_LABEL[lang]}
+                </span>
                 ✕
               </button>
             </div>
@@ -105,6 +113,7 @@ export default function MobileCameraDrawer({
                 onSearchChange={onSearchChange}
                 lang={lang}
                 onLangChange={onLangChange}
+                autoFocusSearch={autoFocusSearch}
               />
             </div>
           </motion.div>
