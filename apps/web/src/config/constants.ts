@@ -182,3 +182,27 @@ export const CORRIDOR_I18N = Object.freeze({
   },
 });
 
+export const MOBILE_SEARCH_I18N = Object.freeze({
+  PLACEHOLDER: {
+    vi: 'Tìm camera, tuyến đường, phường...',
+    en: 'Search cameras, roads, wards...',
+  },
+  BADGE: {
+    vi: 'Đường / Phường',
+    en: 'Street / Ward',
+  },
+  DRAWER_TITLE: {
+    vi: 'Tìm & lọc camera',
+    en: 'Search & filter',
+  },
+  CLOSE_LABEL: {
+    vi: 'Bản đồ',
+    en: 'Map',
+  },
+  TRIGGER_LABEL: {
+    vi: 'Tìm camera theo đường, phường',
+    en: 'Search cameras by street, ward',
+  },
+});
+
+

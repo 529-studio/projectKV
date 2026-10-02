@@ -240,10 +240,10 @@ export default function MapLegend({
         </AnimatePresence>
       </div>
 
-      {/* MOBILE VIEW (<md): Trigger button at top-3 right-3 + Bottom sheet modal */}
+      {/* MOBILE VIEW (<md): Trigger button at top-16 right-3 + Bottom sheet modal */}
       <div className="md:hidden">
         {/* Trigger Button */}
-        <div className="absolute top-3 right-3 z-[800] pointer-events-auto select-none">
+        <div className="absolute top-16 right-3 z-[800] pointer-events-auto select-none">
           <button
             onClick={onToggle}
             className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-zinc-700 bg-zinc-950/95 text-zinc-200 shadow-2xl backdrop-blur-md font-mono text-xs font-semibold focus:outline-none active:bg-zinc-900 cursor-pointer"
