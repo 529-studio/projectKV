@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { WeatherData, RadarMetadata } from '../utils/weatherUtils';
+import { API_ENDPOINTS, getApiUrl } from '../config/constants';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -25,10 +26,10 @@ export function useWeather(): UseWeatherReturn {
       setLoading(true);
       setError(null);
 
-      // Concurrent fetch of weather forecast and radar metadata
+      // Concurrent fetch of weather forecast and radar metadata via configured backend API URL
       const [weatherRes, radarRes] = await Promise.allSettled([
-        fetch('/api/weather'),
-        fetch('/api/weather/radar'),
+        fetch(getApiUrl(API_ENDPOINTS.WEATHER)),
+        fetch(getApiUrl(API_ENDPOINTS.WEATHER_RADAR)),
       ]);
 
       if (weatherRes.status === 'fulfilled' && weatherRes.value.ok) {

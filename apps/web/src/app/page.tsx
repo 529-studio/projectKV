@@ -359,7 +359,7 @@ export default function Home() {
         />
 
         {/* LIVE METEOROLOGICAL WEATHER & RADAR WIDGET (Issue #120) */}
-        <div className="absolute top-16 right-3 md:top-3 md:right-3 z-[810] pointer-events-auto">
+        <div className="absolute top-16 right-3 md:top-3 md:right-[260px] z-[810] pointer-events-auto">
           <WeatherWidget
             weather={weather}
             loading={weatherLoading}
