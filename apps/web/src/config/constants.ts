@@ -29,6 +29,8 @@ export const API_ENDPOINTS = Object.freeze({
   PHUONG: '/api/phuong',
   ROADS: '/api/roads',
   ROAD_STATUS: (roadKey: string) => `/api/roads/${encodeURIComponent(roadKey)}/status`,
+  WEATHER: '/api/weather',
+  WEATHER_RADAR: '/api/weather/radar',
   SSE_LIVE: '/api/live/stream',
   WS_LIVE: '/ws/live',
 });
