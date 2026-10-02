@@ -1,16 +1,16 @@
 services:
-  warded-stg:
-    image: ${IMAGE_NAME:-ghcr.io/529-studio/projectkv}:${IMAGE_TAG:-stg-latest}
-    container_name: ${CONTAINER_NAME:-warded-stg}
+  warded-backend:
+    image: ${BE_IMAGE_NAME:-ghcr.io/529-studio/projectkv-backend}:${BE_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
+    container_name: ${BE_CONTAINER_NAME:-warded-backend}
     restart: unless-stopped
     pull_policy: always
     networks:
       - core-network
     environment:
-      - PORT=${PORT:-3000}
+      - PORT=${BE_PORT:-3000}
       - GIN_MODE=${GIN_MODE:-release}
       - CAMERAS_FILE_PATH=${CAMERAS_FILE_PATH:-/app/cameras_enriched.json}
-      - STATIC_WEB_DIR=${STATIC_WEB_DIR:-/app/web}
+      - HEX_POLYGON_FILE_PATH=${HEX_POLYGON_FILE_PATH:-/app/h3_hex_polygons.json}
       - SQLITE_PATH=${SQLITE_PATH:-/app/data/camera-view.db}
       - SNAPSHOT_UPSTREAM_BASE_URL=${SNAPSHOT_UPSTREAM_BASE_URL:-https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx}
       - SNAPSHOT_CACHE_TTL_SECONDS=${SNAPSHOT_CACHE_TTL_SECONDS:-10}
@@ -21,20 +21,61 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - CLOUD_VISION_API_KEY=${CLOUD_VISION_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      - CV_ENGINE_URL=${CV_ENGINE_URL:-http://warded-model:8000}
     volumes:
       - warded-stg-data:/app/data
     deploy:
       resources:
         limits:
-          cpus: "${CPU_LIMIT:-0.50}"
-          memory: "${MEMORY_LIMIT:-256M}"
+          cpus: "${BE_CPU_LIMIT:-0.50}"
+          memory: "${BE_MEMORY_LIMIT:-256M}"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=${DOCKER_NETWORK:-core-network}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}.rule=Host(`${DOMAIN_NAME:-warded-stg.529studio.site}`)"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cloudflare}"
-      - "traefik.http.services.${ROUTER_NAME:-warded-stg}.loadbalancer.server.port=${PORT:-3000}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.rule=Host(`${DOMAIN_NAME:-warded-stg.529studio.site}`) && (PathPrefix(`/api`) || PathPrefix(`/ws`) || PathPrefix(`/health`) || PathPrefix(`/swagger`))"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cloudflare}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.priority=100"
+      - "traefik.http.services.${ROUTER_NAME:-warded-stg}-be.loadbalancer.server.port=${BE_PORT:-3000}"
+
+  warded-frontend:
+    image: ${FE_IMAGE_NAME:-ghcr.io/529-studio/projectkv-frontend}:${FE_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
+    container_name: ${FE_CONTAINER_NAME:-warded-frontend}
+    restart: unless-stopped
+    pull_policy: always
+    networks:
+      - core-network
+    deploy:
+      resources:
+        limits:
+          cpus: "${FE_CPU_LIMIT:-0.25}"
+          memory: "${FE_MEMORY_LIMIT:-64M}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${DOCKER_NETWORK:-core-network}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.rule=Host(`${DOMAIN_NAME:-warded-stg.529studio.site}`)"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cloudflare}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.priority=1"
+      - "traefik.http.services.${ROUTER_NAME:-warded-stg}-fe.loadbalancer.server.port=80"
+
+  warded-model:
+    image: ${MODEL_IMAGE_NAME:-ghcr.io/529-studio/projectkv-model}:${MODEL_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
+    container_name: ${MODEL_CONTAINER_NAME:-warded-model}
+    restart: unless-stopped
+    pull_policy: always
+    networks:
+      - core-network
+    environment:
+      - PORT=8000
+      - MODEL_DIR=/app/models/yolov8n_openvino_320
+    deploy:
+      resources:
+        limits:
+          cpus: "${MODEL_CPU_LIMIT:-1.00}"
+          memory: "${MODEL_MEMORY_LIMIT:-512M}"
+    labels:
+      - "traefik.enable=false"
 
 volumes:
   warded-stg-data:

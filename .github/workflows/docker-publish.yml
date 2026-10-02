@@ -30,14 +30,55 @@ concurrency:
 permissions:
   contents: read
   packages: write
+  pull-requests: read
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
-    name: Build & Push Docker Image
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 0: Detect Changed Components
+  # ────────────────────────────────────────────────────────────────────────────
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      model: ${{ steps.filter.outputs.model }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Filter Changed Paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'services/go-server/**'
+              - 'cameras_all.json'
+              - 'cameras_enriched.json'
+              - 'h3_hex_polygons.json'
+              - 'docker-compose.stg.yml'
+              - '.github/workflows/docker-publish.yml'
+            frontend:
+              - 'apps/web/**'
+              - 'docker-compose.stg.yml'
+              - '.github/workflows/docker-publish.yml'
+            model:
+              - 'services/cv-engine/**'
+              - 'docker-compose.stg.yml'
+              - '.github/workflows/docker-publish.yml'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1A: Build & Push Go Backend Service
+  # ────────────────────────────────────────────────────────────────────────────
+  build-backend:
+    name: Build & Push Backend Image
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -57,7 +98,59 @@ jobs:
       - name: Determine Docker Image Tags
         id: meta
         run: |
-          IMAGE_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend" | tr '[:upper:]' '[:lower:]')
+          LEGACY_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          TAGS="${IMAGE_LOWER}:${{ github.sha }},${LEGACY_LOWER}:${{ github.sha }}"
+
+          if [ "${{ github.ref_name }}" = "dev" ]; then
+            TAGS="${TAGS},${IMAGE_LOWER}:dev,${IMAGE_LOWER}:stg-latest,${IMAGE_LOWER}:latest,${LEGACY_LOWER}:dev,${LEGACY_LOWER}:stg-latest,${LEGACY_LOWER}:latest"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            TAGS="${TAGS},${IMAGE_LOWER}:latest,${LEGACY_LOWER}:latest"
+          fi
+
+          if [ -n "${{ inputs.custom_tag }}" ]; then
+            TAGS="${TAGS},${IMAGE_LOWER}:${{ inputs.custom_tag }},${LEGACY_LOWER}:${{ inputs.custom_tag }}"
+          fi
+
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and Push Backend Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/go-server/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1B: Build & Push Web Frontend Service (Nginx)
+  # ────────────────────────────────────────────────────────────────────────────
+  build-frontend:
+    name: Build & Push Frontend Image
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine Docker Image Tags
+        id: meta
+        run: |
+          IMAGE_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend" | tr '[:upper:]' '[:lower:]')
           TAGS="${IMAGE_LOWER}:${{ github.sha }}"
 
           if [ "${{ github.ref_name }}" = "dev" ]; then
@@ -72,21 +165,81 @@ jobs:
 
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and Push Docker Image
+      - name: Build and Push Frontend Docker Image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ./apps/web/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
 
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1C: Build & Push Model Service (OpenVINO CV Engine)
+  # ────────────────────────────────────────────────────────────────────────────
+  build-model:
+    name: Build & Push Model Image
+    needs: detect-changes
+    if: needs.detect-changes.outputs.model == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine Docker Image Tags
+        id: meta
+        run: |
+          IMAGE_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-model" | tr '[:upper:]' '[:lower:]')
+          TAGS="${IMAGE_LOWER}:${{ github.sha }}"
+
+          if [ "${{ github.ref_name }}" = "dev" ]; then
+            TAGS="${TAGS},${IMAGE_LOWER}:dev,${IMAGE_LOWER}:stg-latest,${IMAGE_LOWER}:latest"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            TAGS="${TAGS},${IMAGE_LOWER}:latest"
+          fi
+
+          if [ -n "${{ inputs.custom_tag }}" ]; then
+            TAGS="${TAGS},${IMAGE_LOWER}:${{ inputs.custom_tag }}"
+          fi
+
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and Push Model Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/cv-engine/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=model
+          cache-to: type=gha,mode=max,scope=model
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Deploy via Portainer
+  # ────────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy via Portainer
     runs-on: ubuntu-latest
-    needs: [build-and-push]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs: [detect-changes, build-backend, build-frontend, build-model]
+    if: |
+      always() &&
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch') &&
+      needs.build-backend.result != 'failure' && needs.build-backend.result != 'cancelled' &&
+      needs.build-frontend.result != 'failure' && needs.build-frontend.result != 'cancelled' &&
+      needs.build-model.result != 'failure' && needs.build-model.result != 'cancelled' &&
+      (needs.build-backend.result == 'success' || needs.build-frontend.result == 'success' || needs.build-model.result == 'success')
 
     steps:
       - name: Checkout Code
@@ -131,7 +284,7 @@ jobs:
   notify-status:
     name: Notify Alert Gateway
     runs-on: ubuntu-latest
-    needs: [build-and-push, deploy]
+    needs: [build-backend, build-frontend, build-model, deploy]
     if: always()
 
     steps:
@@ -141,10 +294,12 @@ jobs:
           ALERT_KEY: ${{ secrets.ALERT_GATEWAY_KEY || 'REDACTED_ALERT_GATEWAY_KEY' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_MSG: ${{ github.event.head_commit.message || github.sha }}
-          BP_RES: ${{ needs.build-and-push.result }}
+          BE_RES: ${{ needs.build-backend.result }}
+          FE_RES: ${{ needs.build-frontend.result }}
+          MODEL_RES: ${{ needs.build-model.result }}
           DP_RES: ${{ needs.deploy.result }}
         run: |
-          if [ "$BP_RES" = "failure" ] || [ "$DP_RES" = "failure" ]; then
+          if [ "$BE_RES" = "failure" ] || [ "$FE_RES" = "failure" ] || [ "$MODEL_RES" = "failure" ] || [ "$DP_RES" = "failure" ]; then
             SEVERITY="CRITICAL"
             TITLE="CI/CD Failed: ${{ github.repository }}"
             MESSAGE="Pipeline thất bại tại commit: $COMMIT_MSG (Branch: ${{ github.ref_name }} by @${{ github.actor }})"
