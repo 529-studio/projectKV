@@ -6,6 +6,7 @@ import type L from 'leaflet';
 import { useCameras, Camera } from '../hooks/useCameras';
 import { useTraffic } from '../hooks/useTraffic';
 import { useFlood } from '../hooks/useFlood';
+import { useWeather } from '../hooks/useWeather';
 import { type HexOverlayMode } from '../components/HexOverlay';
 import { FLOOD_I18N } from '../utils/floodUtils';
 import { MOBILE_SEARCH_I18N } from '../config/constants';
@@ -15,6 +16,7 @@ import PinnedDock from '../components/PinnedDock';
 import MapLegend from '../components/MapLegend';
 import MobileCameraDrawer from '../components/MobileCameraDrawer';
 import TrafficSyncBanner from '../components/TrafficSyncBanner';
+import WeatherWidget from '../components/WeatherWidget';
 import PhuongTreeFilter, {
   computeFilteredCameraIds,
   computeActiveFilterLabel,
@@ -22,11 +24,13 @@ import PhuongTreeFilter, {
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
+const RainRadarLayer = dynamic(() => import('../components/RainRadarLayer'), { ssr: false });
 
 export default function Home() {
   const { cameras, loading, error } = useCameras();
   const { verdicts, hexCells, analysisEnabled, appEnv, loading: trafficLoading } = useTraffic();
   const { floodVerdicts, floodHexCells, floodedCameraIds, floodedCameraCount, loading: floodLoading } = useFlood();
+  const { weather, radar, loading: weatherLoading } = useWeather();
   
   const [map, setMap] = useState<L.Map | null>(null);
   const [hexOverlayEnabled, setHexOverlayEnabled] = useState(true);
@@ -258,6 +262,11 @@ export default function Home() {
             onMapReady={setMap}
             hexOverlayEnabled={hexOverlayEnabled}
           >
+            <RainRadarLayer
+              map={map}
+              radar={radar}
+              enabled={hexOverlayEnabled && hexOverlayMode === 'flood'}
+            />
             <HexOverlay
               map={map}
               hexCells={hexCells}
@@ -348,6 +357,15 @@ export default function Home() {
           floodLoading={floodLoading}
           trafficLoading={trafficLoading}
         />
+
+        {/* LIVE METEOROLOGICAL WEATHER & RADAR WIDGET (Issue #120) */}
+        <div className="absolute top-16 right-3 md:top-3 md:right-3 z-[810] pointer-events-auto">
+          <WeatherWidget
+            weather={weather}
+            loading={weatherLoading}
+            lang={lang}
+          />
+        </div>
 
         {/* MOBILE FLOATING QUICK SEARCH BAR (hidden on md+) */}
         <div className="md:hidden absolute top-3 left-3 right-3 z-[810] pointer-events-auto">

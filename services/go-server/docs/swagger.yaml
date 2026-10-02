@@ -180,6 +180,82 @@ definitions:
         description: display name
         type: string
     type: object
+  weather.HourlyForecast:
+    properties:
+      precipitation_probability_percent:
+        type: integer
+      rain_mm:
+        type: number
+      time:
+        type: string
+      weather_code:
+        type: integer
+      weather_desc_en:
+        type: string
+      weather_desc_vi:
+        type: string
+    type: object
+  weather.RadarFrame:
+    properties:
+      path:
+        type: string
+      time:
+        type: integer
+    type: object
+  weather.RadarMetadata:
+    properties:
+      generated:
+        type: integer
+      host:
+        type: string
+      latest_tile_template:
+        type: string
+      nowcast_frames:
+        items:
+          $ref: '#/definitions/weather.RadarFrame'
+        type: array
+      past_frames:
+        items:
+          $ref: '#/definitions/weather.RadarFrame'
+        type: array
+      source:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  weather.WeatherData:
+    properties:
+      apparent_temperature_c:
+        type: number
+      hourly_forecast:
+        items:
+          $ref: '#/definitions/weather.HourlyForecast'
+        type: array
+      humidity_percent:
+        type: integer
+      latitude:
+        type: number
+      location:
+        type: string
+      longitude:
+        type: number
+      precipitation_probability_percent:
+        type: integer
+      rain_mm:
+        type: number
+      source:
+        type: string
+      temperature_c:
+        type: number
+      updated_at:
+        type: string
+      weather_code:
+        type: integer
+      weather_desc_en:
+        type: string
+      weather_desc_vi:
+        type: string
+    type: object
 info:
   contact: {}
   description: Ho Chi Minh City Traffic Camera & Flood Alert API
@@ -498,6 +574,47 @@ paths:
       summary: Get latest traffic congestion verdicts
       tags:
       - Traffic
+  /api/weather:
+    get:
+      description: Returns current temperature, humidity, WMO weather condition code,
+        hourly rain probability, and precipitation volume from Open-Meteo with in-memory
+        caching.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/weather.WeatherData'
+        "500":
+          description: Internal server error fetching weather data
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get live meteorological weather & rain forecast for Ho Chi Minh City
+      tags:
+      - Weather
+  /api/weather/radar:
+    get:
+      description: Returns the latest radar frame timestamps, host, and tile URL template
+        for rendering live precipitation radar layers in Leaflet.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/weather.RadarMetadata'
+        "500":
+          description: Internal server error fetching radar metadata
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get live RainViewer Doppler radar tile metadata
+      tags:
+      - Weather
   /api/zones:
     get:
       description: Retrieve sorted list of valid camera zone identifiers

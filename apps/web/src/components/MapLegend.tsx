@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { FUNCTIONAL_COLORS, VERDICT_I18N, HEX_I18N } from '../config/constants';
 import { FLOOD_I18N } from '../utils/floodUtils';
+import { WEATHER_I18N } from '../utils/weatherUtils';
 
 interface MapLegendProps {
   isOpen: boolean;
@@ -150,6 +151,15 @@ function LegendContent({
                   style={{ backgroundColor: 'rgba(100, 116, 139, 0.3)' }}
                 />
                 <span className="text-zinc-300">{FLOOD_I18N.WET_ROAD[lang]}</span>
+              </div>
+              <div className="flex items-center gap-2.5 pt-1.5 mt-0.5 border-t border-zinc-800/80">
+                <span
+                  className="w-3.5 h-3.5 rounded-sm border border-sky-400/80 bg-sky-500/25 shrink-0"
+                />
+                <span className="text-zinc-300">{WEATHER_I18N.RADAR_LAYER[lang]}</span>
+              </div>
+              <div className="text-[9.5px] text-zinc-500 pt-0.5">
+                {WEATHER_I18N.ATTRIBUTION[lang]}
               </div>
             </>
           ) : (

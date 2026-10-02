@@ -32,6 +32,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/storage"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
 	"github.com/529-studio/projectKV/services/go-server/internal/tilecache"
+	"github.com/529-studio/projectKV/services/go-server/internal/weather"
 	"github.com/529-studio/projectKV/services/go-server/internal/ws"
 
 	"github.com/gin-gonic/gin"
@@ -269,6 +270,10 @@ func main() {
 		corridorHandler = corridor.NewHandler(corridorService)
 	}
 
+	// 5c. Initialize live weather forecast and RainViewer radar metadata service (Issue #120).
+	weatherService := weather.NewService()
+	weatherHandler := weather.NewHandler(weatherService)
+
 	// 6. Initialize WebSocket Hub for real-time verdict streaming (Issue #9).
 	// Kept in place — will be retired after D1 (EventSource migration) is verified.
 	wsHub := ws.NewHub()
@@ -502,6 +507,8 @@ func main() {
 		if corridorHandler != nil {
 			corridorHandler.RegisterRoutes(api)
 		}
+		// Live weather forecast & radar metadata endpoints (Issue #120)
+		weatherHandler.RegisterRoutes(api)
 		// Map tile proxy and local disk cache
 		tileHandler.RegisterRoutes(api)
 		// Legacy alias kept for backward compat with existing FE constants.js
