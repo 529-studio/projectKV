@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { FUNCTIONAL_COLORS, VERDICT_I18N, HEX_I18N } from '../config/constants';
 import { FLOOD_I18N } from '../utils/floodUtils';
+import { WEATHER_I18N } from '../utils/weatherUtils';
 
 interface MapLegendProps {
   isOpen: boolean;
@@ -151,6 +152,15 @@ function LegendContent({
                 />
                 <span className="text-zinc-300">{FLOOD_I18N.WET_ROAD[lang]}</span>
               </div>
+              <div className="flex items-center gap-2.5 pt-1.5 mt-0.5 border-t border-zinc-800/80">
+                <span
+                  className="w-3.5 h-3.5 rounded-sm border border-sky-400/80 bg-sky-500/25 shrink-0"
+                />
+                <span className="text-zinc-300">{WEATHER_I18N.RADAR_LAYER[lang]}</span>
+              </div>
+              <div className="text-[9.5px] text-zinc-500 pt-0.5">
+                {WEATHER_I18N.ATTRIBUTION[lang]}
+              </div>
             </>
           ) : (
             <>
@@ -196,8 +206,8 @@ export default function MapLegend({
 }: MapLegendProps) {
   return (
     <>
-      {/* DESKTOP VIEW (md+): Collapsible card at top-3 right-3 */}
-      <div className="hidden md:block absolute top-3 right-3 z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[230px]">
+      {/* DESKTOP VIEW (md+): Collapsible card */}
+      <div className="hidden md:block z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[230px]">
         {/* Header row — always visible */}
         <button
           onClick={onToggle}
@@ -240,10 +250,10 @@ export default function MapLegend({
         </AnimatePresence>
       </div>
 
-      {/* MOBILE VIEW (<md): Trigger button at top-16 right-3 + Bottom sheet modal */}
+      {/* MOBILE VIEW (<md): Trigger button + Bottom sheet modal */}
       <div className="md:hidden">
         {/* Trigger Button */}
-        <div className="absolute top-16 right-3 z-[800] pointer-events-auto select-none">
+        <div className="z-[800] pointer-events-auto select-none">
           <button
             onClick={onToggle}
             className="w-[34px] h-[34px] flex items-center justify-center rounded border border-zinc-700 bg-zinc-950/95 text-zinc-300 hover:text-white shadow-2xl backdrop-blur-md focus:outline-none active:bg-zinc-900 cursor-pointer transition-colors"

@@ -336,6 +336,10 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
   - Added dedicated frontend layer [`FloodHexOverlay.tsx`](file:///Users/thanhdatvu/repos/projectKV/apps/web/src/components/FloodHexOverlay.tsx) visualizing urban rain forecast with high-contrast cyan/blue tints (`rgba(56,189,248,0.22)`).
   - Dual map layer control allowing users to toggle between "Khả năng có mưa" (Rain forecast) and "Vùng tổng hợp" (Traffic overview).
   - Unit tests in [`floodUtils.test.ts`](file:///Users/thanhdatvu/repos/projectKV/apps/web/src/utils/floodUtils.test.ts).
+  - **Data Source & Honesty Fact-Check**:
+    - In **local development** (`APP_ENV=dev`), `ANALYZER=mock` rotates through `DRY` $\rightarrow$ `WET` $\rightarrow$ `FLOODED_SHALLOW` $\rightarrow$ `FLOODED_DEEP` in `internal/cvclient/mock.go` (`source: "mock"`) to facilitate UI/UX testing.
+    - In **staging/production**, the ADR-004 H0 Honesty Rule strictly filters out any verdict with `source: "mock"`; H3 cells remain honest/transparent unless real Gemini multimodal vision analysis confirms wet or flooded roadway conditions.
+    - **Scope Clarification**: In Sprint 2, "Khả năng có mưa" represents camera-derived spatial aggregation (ground-truth surface wetness detected by CCTV), not external meteorological Doppler radar or satellite forecast APIs (which were subsequently introduced in Issue #120 via Open-Meteo & RainViewer).
 
 #### Issue #115 — `[web] mobile quick search bar & mobile pinned camera dock drawer`
 - **Module:** `apps/web`
