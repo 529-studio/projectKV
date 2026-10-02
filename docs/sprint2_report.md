@@ -1,7 +1,7 @@
 # Sprint 2 Completion & Technical Verification Report
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
-**Document Version:** 1.0.0  
+**Document Version:** 1.1.0 (Audited & Backlog Reconciled)  
 **Date:** 2026-10-02  
 **Target Audience:** Technical Leads, System Architects, AI Evaluation Agents (Claude / Antigravity)  
 **Primary References & Ground Truth:**
@@ -11,7 +11,7 @@
 - [`docs/spike-routing-engine.md`](file:///Users/thanhdatvu/repos/projectKV/docs/spike-routing-engine.md)
 - [`docs/spike-cv-runtime.md`](file:///Users/thanhdatvu/repos/projectKV/docs/spike-cv-runtime.md)
 - [`tools/eval/README.md`](file:///Users/thanhdatvu/repos/projectKV/tools/eval/README.md)
-- Git log: commits on `origin/dev` from `feat/a1-full-ward-polygons` (#81) through `feat/mobile-quick-search` (#115).
+- Git log: commits on `origin/dev` from `feat/a1-full-ward-polygons` (#81) through `feat/decouple-docker-architecture` (#118).
 
 ---
 
@@ -21,22 +21,28 @@ Sprint 2 transitioned ProjectKV from a raw exploratory prototype into a producti
 
 Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major outcomes:
 1. **Safety & Honesty First**: Completely eliminated ungrounded mock verdicts from staging, established strict provenance tracking (`source`, `observed_at`, `stale`), and implemented the "Honesty Rule" (never say "OK to go" or render false green states; unmonitored or unverified segments are explicitly transparent or marked "unknown").
-2. **Robust Backend Infrastructure & Tooling**: Built a clean Go storage interface with an event-driven snapshot archiver, rate limiters, budget circuit breakers, H3 spatial grid offline enrichment, structured multilingual administrative/road catalogs, real multimodal Vision LLM analysis (Gemini 2.5 Flash-Lite), and high-performance corridor status APIs.
+2. **Robust Backend Infrastructure & Tooling**: Built a clean Go storage interface with an event-driven snapshot archiver, rate limiters, budget circuit breakers, H3 spatial grid offline enrichment, structured multilingual administrative/road catalogs, real multimodal Vision LLM analysis (`gemini-3.5-flash-lite`, configurable via `GEMINI_MODEL`), and high-performance corridor status APIs.
 3. **Macro-Micro Spatial UX**: Delivered responsive Uber H3 hexagonal aggregation for both traffic density and urban rainfall/flooding, corridor-first road exploration, dimmed focus filters, and an ergonomic mobile drawer experience.
 
-### Quantitative Scorecard
+### Quantitative Scorecard & Audit Reconciliation
 
-| Metric | Planned | Delivered | Status |
+| Metric | Planned in ADR-004 §3 | Delivered in Sprint 2 | Status |
 |---|:---:|:---:|:---:|
-| **Core Sprint 2 Issues** | 15 | 15 | **100% Completed** |
+| **Core Sprint 2 Backlog** | 16 items | 15 items | **93.75% Completed (1 Deferred)** |
+| **Completed Issues** | 15 | 15 | H0, A1, A2, A3, A5, A6, B1, B3, B4, B5, B6, B7, C2, C3, C4 |
+| **Deferred Issues** | 1 | 0 | **A4 (Dock Rework)** — rolled over to Sprint 3 |
 | **Parent Epics (#76, #77, #78, #79)** | 4 | 4 | **100% Completed & Closed** |
-| **Supplementary Spikes & Features (#104, #106, #115)** | 0 | 3 | **100% Completed & Merged** |
+| **Supplementary Spikes & Features (#104, #106, #115, #117)** | 0 | 4 | **100% Completed & Merged** |
 | **Open Pull Requests** | 0 | 0 | **0 Open PRs** (Clean) |
 | **Open Issues** | 0 | 0 | **0 Open Issues** (Clean) |
 | **Go Test Suites** | 21 packages | 21 packages | **100% Passing** |
 | **Web Client Unit Tests** | 0 (Sprint 1) | 71 unit tests | **100% Passing (0 failures)** |
 | **ESLint & TypeScript Validity** | 0 errors | 0 errors | **Clean** |
 | **Next.js Production Build** | Passing | Passing | **Exported cleanly (5/5 static routes)** |
+
+> [!IMPORTANT]
+> **Audit Note on Item A4 (Dock Rework)**:  
+> In the original [ADR-004 §3](file:///Users/thanhdatvu/repos/projectKV/docs/ADR-004-route-check-and-snapshot-archive.md#L108), the Sprint 2 backlog included **16 items** (H0, A1–A6, B1, B3–B7, C2–C4). When `sprint2_execution_guide.md` was authored, A4 was omitted from the 4-Wave execution matrix. PR #115 partially introduced mobile responsive dock UX (collapsed pill and slide-up drawer), but core A4 requirements (*drag-to-reorder via Pointer Events, 3 tile size presets S/M/L, pin cap 12, image age, and per-card severity badges*) were not completed. A4 is formally tracked as **Deferred** and rolled over to the Sprint 3 Backlog.
 
 ---
 
@@ -47,7 +53,7 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
 | Decision | Mandate | Implementation in Codebase |
 |---|---|---|
 | **D1: Route-Check Split** | Decompose into 2a Corridor status, 2b Route check, 2c Alternatives | Shipped 2a (`services/go-server/internal/corridor/`, `GET /api/roads/{road_key}/status`); 2b/2c deferred to post-gate. |
-| **D2: Routing Engine Spike** | Evaluate Valhalla vs OSRM vs Hosted; require motorcycle profile + polygon avoidance | Completed in `docs/spike-routing-engine.md`. **Valhalla** selected (P50 7–35ms, 151MB RAM in 256MB container, native scooter costing, `exclude_polygons` support). |
+| **D2: Routing Engine Spike** | Evaluate Valhalla vs OSRM vs Hosted; require motorcycle profile + polygon avoidance | Completed in `docs/spike-routing-engine.md`. **Valhalla** selected (built-in `motor_scooter` costing, arbitrary polygon avoidance `exclude_polygons`, 151.6 MiB RAM inside 256MB container). Latency P50 was 7–35ms across typical corridors, while longest cross-city route `long_q12_d1` observed P99 of 122.2ms. OSRM eliminated due to lack of arbitrary polygon avoidance; OSRM OOM measured in direct memory mode without testing `osrm-datastore` mmap. |
 | **D4: Verdict Semantics & Honesty** | Two orthogonal dimensions (`traffic` & `flood`); never blend; never say "OK to go"; frozen-frame detector; debounce | Implemented in `internal/models/verdict.go`, `internal/proxycache/`, and frontend `hexUtils.ts` / `floodUtils.ts`. |
 | **D6: Accuracy Gate** | Build labeled evaluation set (≥300 frames); benchmark precision/recall; Flood False-Negative Rate is primary safety metric | Implemented in `tools/eval/` (`benchmark.py`, `label_schema.json`, `labels/`, `README.md`). |
 | **D7: Snapshot Storage** | Build `internal/storage` interface + local driver; event-driven (state change) + sampled (5m) policy; retention job | Implemented in `internal/storage/` and `internal/archiver/` writing to `data/proofs/`. SeaweedFS deferred. |
@@ -205,7 +211,7 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
 - **Module:** `services/go-server/internal/cvclient`
 - **Merged PRs:** [#92](https://github.com/529-studio/projectKV/pull/92), [#93](https://github.com/529-studio/projectKV/pull/93), [#96](https://github.com/529-studio/projectKV/pull/96)
 - **Technical Implementation:**
-  - Implemented [`CloudVisionAnalyzer`](file:///Users/thanhdatvu/repos/projectKV/services/go-server/internal/cvclient/cloudvision.go) integrating Google Gemini Multimodal Vision API (`gemini-2.5-flash-lite`).
+  - Implemented [`CloudVisionAnalyzer`](file:///Users/thanhdatvu/repos/projectKV/services/go-server/internal/cvclient/cloudvision.go) integrating Google Gemini Multimodal Vision API (default `gemini-3.5-flash-lite`, configurable at runtime via `GEMINI_MODEL`).
   - Strict prompt engineering producing validated JSON payload: `traffic_severity`, `flood_severity`, `confidence`, `description`.
   - Error paths and low confidence ($<0.50$) strictly return `unknown` (Honesty Rule).
   - Implemented token-bucket throttling and 429 backoff handling to operate reliably within free-tier quotas.
@@ -214,6 +220,7 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
   - [x] Real multimodal API integrated and tested with mock HTTP fixtures.
   - [x] Low confidence maps to `unknown`, never guesses.
   - [x] Active when `ANALYZER=vlm` and `CLOUD_VISION_API_KEY` is supplied.
+  - [x] Runtime model override verified via `GEMINI_MODEL`.
 
 #### Issue #73 — `[go-server] live: hex cell aggregation and hex_update SSE event (C3)`
 - **Module:** `services/go-server/internal/live`
@@ -233,7 +240,7 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
 
 ---
 
-### Wave 3 — UI Hex Overlay, Corridor Status & Spikes
+### Wave 3 — UI Hex Overlay, Corridor Status, Spikes & Deferred Item
 
 #### Issue #74 — `[web] hex overlay: H3 cell visualization on Leaflet map (C4)`
 - **Module:** `apps/web`
@@ -286,19 +293,32 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
 - **Merged PR:** [#100](https://github.com/529-studio/projectKV/pull/100) | **Commit:** `83e169b`
 - **Technical Implementation:**
   - Benchmarked Valhalla 3.6.0 vs OSRM MLD on an extracted 36 MB HCMC OSM extract (`106.35,10.15` $\rightarrow$ `107.45,11.35`).
-  - Key Findings:
-    - **Container RAM constraint (256 MB)**: Valhalla operated smoothly at **151.6 MiB peak RSS**; OSRM crashed with OOM.
+  - **Key Empirical Findings**:
+    - **Container RAM constraint (256 MB)**: Valhalla operated at **151.6 MiB peak RSS**; OSRM crashed with OOM under default in-memory mapping (`osrm-routed`). (Note: OSRM's `osrm-datastore` mmap shared-memory mode was not evaluated).
     - **Motorcycle Profile**: Valhalla provides built-in `motor_scooter` costing tailored for Vietnamese traffic; OSRM requires custom Lua authoring.
     - **Dynamic Rerouting / Avoid Areas**: Valhalla natively supports arbitrary `exclude_polygons` (essential for avoiding flooded corridors in 2c); OSRM only supports road-class exclusions.
-    - **Latency**: Valhalla P50 is 7–35 ms (well within acceptable interactive thresholds).
+    - **Latency**: Valhalla P50 is 7–35 ms across typical arterial corridors. The longest cross-city route (`long_q12_d1`) reached P99 of 122.2 ms, exceeding the 100ms threshold and indicating that caching will be necessary for 2b.
   - Check-in document: [`docs/spike-routing-engine.md`](file:///Users/thanhdatvu/repos/projectKV/docs/spike-routing-engine.md).
 - **DoD Verification:**
   - [x] Empirical evaluation performed on real HCMC road geometry.
   - [x] Clear architectural decision recorded: **Adopt Valhalla**.
 
+#### [DEFERRED] Issue A4 — `[web] dock rework: drag-to-reorder, size presets, and card severity`
+- **Status:** **Deferred / Rolled over to Sprint 3 Backlog**
+- **Original ADR-004 Scope**:
+  - Drag-to-reorder pinned cameras using Pointer Events (no library) with touch fallback (◀ ▶ buttons) and keyboard support.
+  - 3 tile size presets (S/M/L) and full-width grid view.
+  - Pin cap (start 12) with localStorage persistence.
+  - Each tile shows image age, online/stale status, and fresh severity badge.
+- **Current State in Codebase**:
+  - PR #115 partially introduced mobile responsive dock (collapsed pill `[ 📌 Đang theo dõi: X cam ▴ ]` and slide-up drawer).
+  - Desktop view remains a basic horizontal carousel in [`PinnedDock.tsx`](file:///Users/thanhdatvu/repos/projectKV/apps/web/src/components/PinnedDock.tsx).
+  - Drag-to-reorder, size presets, pin cap 12, and per-card severity badges were not implemented.
+- **Action Plan**: Formally tracked as item #1 on Sprint 3 Backlog.
+
 ---
 
-### Supplementary Spikes & Polish
+### Supplementary Spikes & Infrastructure Deliverables
 
 #### Issue #104 — `[spike] CV runtime evaluation on non-AVX hardware (Intel Celeron N2930)`
 - **Module:** `docs`
@@ -325,6 +345,17 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
   - Compacted mobile map legend into a 34x34px SVG question-mark (`?`) icon to eliminate overlap with H3 controls.
   - Responsive pinned camera dock: on mobile, collapses into an unobtrusive pill `[ 📌 Đang theo dõi: X cam ▴ ]` at `bottom-4` that expands on tap into a slide-up bottom sheet drawer with thumbnail cards and full modal inspection.
   - Unit tests in [`mobileSearch.test.ts`](file:///Users/thanhdatvu/repos/projectKV/apps/web/src/utils/mobileSearch.test.ts) and [`pinnedDock.test.ts`](file:///Users/thanhdatvu/repos/projectKV/apps/web/src/utils/pinnedDock.test.ts).
+
+#### Issue #117 — `[infra] Decouple Docker Architecture into Modular Services (/BE, /FE, /model)`
+- **Module:** `services/go-server`, `apps/web`, `services/cv-engine`, `docker-compose.stg.yml`, `.github/workflows/`
+- **Merged PR:** [#118](https://github.com/529-studio/projectKV/pull/118)
+- **Technical Implementation:**
+  - Decoupled single monolithic container into 3 isolated microservices:
+    1. `warded-backend`: Pure Go server (~28MB) on port 3000.
+    2. `warded-frontend`: Nginx Alpine (~22MB) on port 80 serving compiled Next.js export with caching & gzip.
+    3. `warded-model`: Intel OpenVINO Python 3.11 inference container on port 8000 (cgroups 512MB RAM, 1.0 CPU).
+  - Configured Traefik path-based ingress routing on `core-network`.
+  - Parallelized GitHub Actions CI builds via `dorny/paths-filter@v3` (reducing single-component build time from 2.5m down to 25s–40s).
 
 ---
 
@@ -376,7 +407,7 @@ Command: `npm test` in `apps/web/`
 ### 4.3 Web Client Linter & Production Build
 Commands: `npm run lint` && `npm run build` in `apps/web/`
 ```text
-✓ Compiled successfully in 2.3s
+✓ Compiled successfully in 1693ms
 ✓ Linting and checking validity of types
 ✓ Collecting page data
 ✓ Generating static pages (5/5)
@@ -399,9 +430,9 @@ Per **ADR-004 §4 ("Gate to Start 2b")**, four specific prerequisites must be me
 | Gate Requirement | Condition Defined in ADR-004 §4 | Actual Status in Sprint 2 | Gate Result |
 |---|---|---|:---:|
 | **1. B4 Evaluation Harness** | Benchmark harness in place reporting precision/recall; Flood False-Negative Rate isolated as gate metric | Fully delivered in `tools/eval/` (PR #114) with schema and benchmark runner. | **PASSED ✅** |
-| **2. B5 Routing Decision** | Routing engine evaluated on HCMC extract; clear decision recorded | Fully delivered in `docs/spike-routing-engine.md` (PR #100). **Valhalla adopted** (scooter costing, polygon avoidance, 151MB RAM). | **PASSED ✅** |
+| **2. B5 Routing Decision** | Routing engine evaluated on HCMC extract; clear decision recorded | Fully delivered in `docs/spike-routing-engine.md` (PR #100). **Valhalla adopted** (scooter costing, polygon avoidance, 151.6MB RAM). | **PASSED ✅** |
 | **3. B6 Corridor Status** | `GET /api/roads/{road_key}/status` shipped and integrated into UI | Fully delivered in backend `internal/corridor/` and frontend tree (PR #112). | **PASSED ✅** |
 | **4. B7 Abuse Guards** | Rate limiter, per-request cap, and budget circuit breaker active | Fully delivered in `internal/middleware/ratelimit.go` and `internal/hotset/budget.go` (PR #87). | **PASSED ✅** |
 
 ### Evaluation Verdict
-**Sprint 2 is 100% complete, fully verified, and the Gate to Sprint 2b is officially PASSED.** The codebase is ready to proceed to Sprint 2b implementation.
+**Sprint 2 core architecture, backend pipelines, and safety gates are officially PASSED.** All 4 gate criteria for Route-Check (2b) are satisfied. Item **A4 (Dock Rework)** is formally carried over into Sprint 3 as a priority frontend item alongside the Sprint 3 self-hosted CV integration.
