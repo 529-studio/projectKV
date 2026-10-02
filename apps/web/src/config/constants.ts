@@ -182,3 +182,55 @@ export const CORRIDOR_I18N = Object.freeze({
   },
 });
 
+export const MOBILE_SEARCH_I18N = Object.freeze({
+  PLACEHOLDER: {
+    vi: 'Tìm camera, tuyến đường, phường...',
+    en: 'Search cameras, roads, wards...',
+  },
+  BADGE: {
+    vi: 'Đường / Phường',
+    en: 'Street / Ward',
+  },
+  DRAWER_TITLE: {
+    vi: 'Tìm & lọc camera',
+    en: 'Search & filter',
+  },
+  CLOSE_LABEL: {
+    vi: 'Bản đồ',
+    en: 'Map',
+  },
+  TRIGGER_LABEL: {
+    vi: 'Tìm camera theo đường, phường',
+    en: 'Search cameras by street, ward',
+  },
+});
+
+export const PINNED_DOCK_I18N = Object.freeze({
+  TITLE: {
+    vi: 'DOCK THEO DÕI',
+    en: 'MONITORING DOCK',
+  },
+  COLLAPSED_PILL: {
+    vi: (count: number) => `📌 Đang theo dõi: ${count} cam`,
+    en: (count: number) => `📌 Monitoring: ${count} ${count === 1 ? 'cam' : 'cams'}`,
+  },
+  CLEAR_ALL: {
+    vi: '[XÓA HẾT]',
+    en: '[CLEAR ALL]',
+  },
+  COLLAPSE: {
+    vi: 'Thu gọn',
+    en: 'Collapse',
+  },
+  EXPAND: {
+    vi: 'Mở rộng',
+    en: 'Expand',
+  },
+  UNPIN: {
+    vi: 'Bỏ ghim',
+    en: 'Unpin',
+  },
+});
+
+
+
