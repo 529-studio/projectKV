@@ -1,7 +1,7 @@
 # Sprint 2 Completion & Technical Verification Report
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
-**Document Version:** 1.1.0 (Audited & Backlog Reconciled)  
+**Document Version:** 1.2.0 (Audited & Fully Reconciled with `dev` Branch)  
 **Date:** 2026-10-02  
 **Target Audience:** Technical Leads, System Architects, AI Evaluation Agents (Claude / Antigravity)  
 **Primary References & Ground Truth:**
@@ -11,7 +11,7 @@
 - [`docs/spike-routing-engine.md`](file:///Users/thanhdatvu/repos/projectKV/docs/spike-routing-engine.md)
 - [`docs/spike-cv-runtime.md`](file:///Users/thanhdatvu/repos/projectKV/docs/spike-cv-runtime.md)
 - [`tools/eval/README.md`](file:///Users/thanhdatvu/repos/projectKV/tools/eval/README.md)
-- Git log: commits on `origin/dev` from `feat/a1-full-ward-polygons` (#81) through `feat/decouple-docker-architecture` (#118).
+- Git log: commits on `origin/dev` from `feat/a1-full-ward-polygons` (#81) through `feat/weather-radar-integration` (#122).
 
 ---
 
@@ -19,24 +19,26 @@
 
 Sprint 2 transitioned ProjectKV from a raw exploratory prototype into a production-grade, architecturally sound, and trustworthy urban traffic and flood intelligence system. 
 
-Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major outcomes:
+Following the strategic mandates of **ADR-004**, Sprint 2 achieved four major pillars:
 1. **Safety & Honesty First**: Completely eliminated ungrounded mock verdicts from staging, established strict provenance tracking (`source`, `observed_at`, `stale`), and implemented the "Honesty Rule" (never say "OK to go" or render false green states; unmonitored or unverified segments are explicitly transparent or marked "unknown").
 2. **Robust Backend Infrastructure & Tooling**: Built a clean Go storage interface with an event-driven snapshot archiver, rate limiters, budget circuit breakers, H3 spatial grid offline enrichment, structured multilingual administrative/road catalogs, real multimodal Vision LLM analysis (`gemini-3.5-flash-lite`, configurable via `GEMINI_MODEL`), and high-performance corridor status APIs.
 3. **Macro-Micro Spatial UX**: Delivered responsive Uber H3 hexagonal aggregation for both traffic density and urban rainfall/flooding, corridor-first road exploration, dimmed focus filters, and an ergonomic mobile drawer experience.
+4. **Meteorological Weather & Live Doppler Radar**: Integrated zero-key open APIs (Open-Meteo and RainViewer) into the Go backend and Next.js frontend, providing real-time HCMC weather metrics, a 6-hour rain forecast popup, and smooth street-level Doppler radar map overlays.
 
 ### Quantitative Scorecard & Audit Reconciliation
 
 | Metric | Planned in ADR-004 §3 | Delivered in Sprint 2 | Status |
 |---|:---:|:---:|:---:|
 | **Core Sprint 2 Backlog** | 16 items | 15 items | **93.75% Completed (1 Deferred)** |
-| **Completed Issues** | 15 | 15 | H0, A1, A2, A3, A5, A6, B1, B3, B4, B5, B6, B7, C2, C3, C4 |
+| **Completed Core Issues** | 15 | 15 | H0, A1, A2, A3, A5, A6, B1, B3, B4, B5, B6, B7, C2, C3, C4 |
 | **Deferred Issues** | 1 | 0 | **A4 (Dock Rework)** — rolled over to Sprint 3 |
 | **Parent Epics (#76, #77, #78, #79)** | 4 | 4 | **100% Completed & Closed** |
-| **Supplementary Spikes & Features (#104, #106, #115, #117)** | 0 | 4 | **100% Completed & Merged** |
-| **Open Pull Requests** | 0 | 0 | **0 Open PRs** (Clean) |
-| **Open Issues** | 0 | 0 | **0 Open Issues** (Clean) |
-| **Go Test Suites** | 21 packages | 21 packages | **100% Passing** |
-| **Web Client Unit Tests** | 0 (Sprint 1) | 71 unit tests | **100% Passing (0 failures)** |
+| **Supplementary Spikes, Features & Fixes (#104, #106, #115, #117, #120, #121)** | 0 | 6 | **100% Completed & Merged** |
+| **Open Pull Requests on Sprint 2** | 0 | 0 | **0 Open PRs** (Clean) |
+| **Open Issues on Sprint 2** | 0 | 0 | **0 Open Issues** (Clean) |
+| **Go Test Suites** | 21 packages | 22 packages (17 active suites) | **100% Passing** |
+| **Web Client Unit Tests** | 0 (Sprint 1) | 76 unit tests (14 suites) | **100% Passing (0 failures)** |
+| **Python Tooling Unit Tests** | 0 (Sprint 1) | 36 unit tests (2 suites) | **100% Passing (0 failures)** |
 | **ESLint & TypeScript Validity** | 0 errors | 0 errors | **Clean** |
 | **Next.js Production Build** | Passing | Passing | **Exported cleanly (5/5 static routes)** |
 
@@ -55,17 +57,22 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
 | **D1: Route-Check Split** | Decompose into 2a Corridor status, 2b Route check, 2c Alternatives | Shipped 2a (`services/go-server/internal/corridor/`, `GET /api/roads/{road_key}/status`); 2b/2c deferred to post-gate. |
 | **D2: Routing Engine Spike** | Evaluate Valhalla vs OSRM vs Hosted; require motorcycle profile + polygon avoidance | Completed in `docs/spike-routing-engine.md`. **Valhalla** selected (built-in `motor_scooter` costing, arbitrary polygon avoidance `exclude_polygons`, 151.6 MiB RAM inside 256MB container). Latency P50 was 7–35ms across typical corridors, while longest cross-city route `long_q12_d1` observed P99 of 122.2ms. OSRM eliminated due to lack of arbitrary polygon avoidance; OSRM OOM measured in direct memory mode without testing `osrm-datastore` mmap. |
 | **D4: Verdict Semantics & Honesty** | Two orthogonal dimensions (`traffic` & `flood`); never blend; never say "OK to go"; frozen-frame detector; debounce | Implemented in `internal/models/verdict.go`, `internal/proxycache/`, and frontend `hexUtils.ts` / `floodUtils.ts`. |
-| **D6: Accuracy Gate** | Build labeled evaluation set (≥300 frames); benchmark precision/recall; Flood False-Negative Rate is primary safety metric | Implemented in `tools/eval/` (`benchmark.py`, `label_schema.json`, `labels/`, `README.md`). |
+| **D6: Accuracy Gate** | Build labeled evaluation set (≥300 frames); benchmark precision/recall; Flood False-Negative Rate is primary safety metric | Implemented in `tools/eval/` (`benchmark.py`, `benchmark_test.py`, `label_schema.json`, `labels/`, `README.md`). |
 | **D7: Snapshot Storage** | Build `internal/storage` interface + local driver; event-driven (state change) + sampled (5m) policy; retention job | Implemented in `internal/storage/` and `internal/archiver/` writing to `data/proofs/`. SeaweedFS deferred. |
 | **D9: Abuse & Cost Guards** | Token-bucket rate limiter per IP, daily VLM budget circuit breaker degrading to `unknown` | Implemented in `internal/middleware/ratelimit.go` and `internal/hotset/budget.go`. |
 | **D10: Mandatory Provenance** | Every verdict carries `source` (`mock\|vlm\|onnx`), `observed_at`, `stale`; mock outside dev forbidden; DEMO badge in dev | Implemented in Go `models.Verdict` & DB schema `0003_add_observed_at.sql`, and Next.js `CameraModal.tsx` & `MapComponent.tsx`. |
 | **D11: H3 Hexagonal Grid** | Option B: offline H3 enrichment; zero cgo in Go; zero `h3-js` in client; worst-of aggregation; ≥3 camera floor | Implemented in `tools/geo-enrich/enrich.py`, `internal/live/hex.go`, `internal/live/flood_hex.go`, and web `HexOverlay.tsx`. |
 
-### 2.2 Architectural Guardrails (`AGENTS.md`)
-- **Modulith Leaf Architecture**: `internal/storage` is a strict leaf package with zero internal dependencies and zero cgo.
+### 2.2 Supplementary Architecture & Infrastructure Standards
+
+- **Decoupled Microservice Architecture (Issue #117 / PR #118)**:  
+  Staging architecture transitioned from a single monolithic container into 3 isolated services (`warded-backend`, `warded-frontend`, `warded-model`) connected via Traefik ingress on `core-network`. Build times reduced from ~2.5m down to 25s–40s via GitHub Actions `dorny/paths-filter@v3`.
+- **Weather & Doppler Radar Architecture (Issue #120 / PR #122)**:  
+  Implemented `internal/weather` in Go backend to fetch live meteorological data from Open-Meteo and live radar metadata from RainViewer. In-memory caching with `singleflight` prevents external rate-limiting. Frontend utilizes Leaflet `maxNativeZoom: 7` to upscale radar tiles cleanly up to zoom level 18 without requesting unsupported tiles.
+- **Modulith Leaf Architecture**: `internal/storage` and `internal/weather` are strict leaf packages with zero circular dependencies.
 - **Zero-cgo & Pure Go**: Go server compiles with `CGO_ENABLED=0` across all architectures. No H3 C-bindings or GDAL in Go; all spatial indexing is precomputed in Python tooling.
 - **Client Bundle Protection**: Web client does NOT bundle `h3-js` (~40KB eliminated) or Lucide icons (~30KB eliminated). All icons are native SVGs; all polygon geometries are transmitted as lightweight JSON arrays.
-- **Monochromatic High-Contrast UI**: Strict dark theme (`#000000`, `#121212`, `#1e1e1e`, `#ffffff`, `#888888`), functional accents strictly reserved for status: Red (`congested`/`deep`), Yellow (`slow`/`shallow`), Green (`clear`), Blue (`rain`/`flood`), and Gray (`stale`/`unknown`).
+- **Monochromatic High-Contrast UI**: Strict dark theme (`#000000`, `#121212`, `#1e1e1e`, `#ffffff`, `#888888`), functional accents strictly reserved for status: Red (`congested`/`deep`), Yellow (`slow`/`shallow`), Green (`clear`), Blue/Cyan (`rain`/`flood`), and Gray (`stale`/`unknown`).
 - **Bilingual i18n & Vietnamese Diacritics**: 100% proper diacritics across all user-facing labels (`vi` primary, `en` secondary). Raw database catalog stores prefix-less names (`Bến Nghé`, `Nguyễn Huệ`) with dynamic prefix formatting.
 
 ---
@@ -280,7 +287,7 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
   - Defined [`label_schema.json`](file:///Users/thanhdatvu/repos/projectKV/tools/eval/label_schema.json) for 4 dimensions: `traffic` (`CLEAR`, `MODERATE`, `HEAVY`, `CONGESTED`), `flood` (`NONE`, `SHALLOW`, `DEEP`), `time_of_day` (`day`, `night`, `dawn_dusk`), and `weather` (`dry`, `rain`, `heavy_rain`).
   - Created [`benchmark.py`](file:///Users/thanhdatvu/repos/projectKV/tools/eval/benchmark.py): Evaluates candidate analyzers against ground-truth frames.
   - Computes precision, recall, F1-score, confusion matrices, and specifically isolates **Flood False-Negative Rate (FNR)** as the gating metric.
-  - Checked in initial fixtures and test suite in [`test_benchmark.py`](file:///Users/thanhdatvu/repos/projectKV/tools/eval/test_benchmark.py) (7/7 tests passing).
+  - Checked in initial fixtures and test suite in [`benchmark_test.py`](file:///Users/thanhdatvu/repos/projectKV/tools/eval/benchmark_test.py) (10/10 tests passing).
   - Comprehensive documentation in [`tools/eval/README.md`](file:///Users/thanhdatvu/repos/projectKV/tools/eval/README.md).
 - **DoD Verification:**
   - [x] Schema validates all 4 evaluation dimensions.
@@ -318,7 +325,7 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
 
 ---
 
-### Supplementary Spikes & Infrastructure Deliverables
+### Supplementary Spikes, Features & Production Hardenings
 
 #### Issue #104 — `[spike] CV runtime evaluation on non-AVX hardware (Intel Celeron N2930)`
 - **Module:** `docs`
@@ -339,7 +346,7 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
   - **Data Source & Honesty Fact-Check**:
     - In **local development** (`APP_ENV=dev`), `ANALYZER=mock` rotates through `DRY` $\rightarrow$ `WET` $\rightarrow$ `FLOODED_SHALLOW` $\rightarrow$ `FLOODED_DEEP` in `internal/cvclient/mock.go` (`source: "mock"`) to facilitate UI/UX testing.
     - In **staging/production**, the ADR-004 H0 Honesty Rule strictly filters out any verdict with `source: "mock"`; H3 cells remain honest/transparent unless real Gemini multimodal vision analysis confirms wet or flooded roadway conditions.
-    - **Scope Clarification**: In Sprint 2, "Khả năng có mưa" represents camera-derived spatial aggregation (ground-truth surface wetness detected by CCTV), not external meteorological Doppler radar or satellite forecast APIs (which were subsequently introduced in Issue #120 via Open-Meteo & RainViewer).
+    - **Scope Clarification**: In Issue #106, "Khả năng có mưa" originally referred to CCTV camera-derived surface wetness aggregation. This laid the UX foundation for the true meteorological radar overlay introduced in Issue #120.
 
 #### Issue #115 — `[web] mobile quick search bar & mobile pinned camera dock drawer`
 - **Module:** `apps/web`
@@ -361,68 +368,190 @@ Following the strategic mandates of **ADR-004**, Sprint 2 achieved three major o
   - Configured Traefik path-based ingress routing on `core-network`.
   - Parallelized GitHub Actions CI builds via `dorny/paths-filter@v3` (reducing single-component build time from 2.5m down to 25s–40s).
 
+#### Issue #120 — `[weather] Open-Meteo rain forecast and RainViewer live radar integration`
+- **Module:** `services/go-server/internal/weather`, `apps/web`
+- **Merged PR:** [#122](https://github.com/529-studio/projectKV/pull/122) | **Commits:** `8b655a4`, `e114d5d`, `5e4364a`, `46af14f`
+- **Technical Implementation:**
+  - **Backend (`services/go-server/internal/weather/`)**:
+    - Created `WeatherService` querying **Open-Meteo Free Forecast API** (`api.open-meteo.com/v1/forecast`) for Ho Chi Minh City coordinates (`lat=10.7769, lon=106.7009`). Delivers current temperature, apparent temperature, relative humidity, precipitation probability, WMO weather codes, and hourly 6-hour precipitation forecasts. In-memory TTL cache: 10 minutes.
+    - Created RainViewer Doppler radar client querying `api.rainviewer.com/public/weather-maps.json` for live radar timestamps and tile host URLs. In-memory TTL cache: 5 minutes.
+    - Implemented concurrent `singleflight` request suppression to prevent duplicate upstream calls.
+    - Exposed REST endpoints `GET /api/weather/current` and `GET /api/weather/radar` with full Swagger annotations and unit tests in [`weather_test.go`](file:///Users/thanhdatvu/repos/projectKV/services/go-server/internal/weather/weather_test.go).
+    - Requires **zero external API keys** and zero commercial tokens.
+  - **Frontend (`apps/web/`)**:
+    - Created [`WeatherWidget.tsx`](file:///Users/thanhdatvu/repos/projectKV/apps/web/src/components/WeatherWidget.tsx): Monochromatic status pill with WMO category SVGs (`sun`, `cloud`, `rain`, `storm`), temperature, and rain probability badge. Expands on click into a 6-hour hourly precipitation & temperature popover.
+    - Created [`RainRadarLayer.tsx`](file:///Users/thanhdatvu/repos/projectKV/apps/web/src/components/RainRadarLayer.tsx): Automatically overlays live RainViewer Doppler radar tiles onto Leaflet when "Khả năng có mưa" mode is enabled.
+    - **Radar Zoom Upscaling Fix**: Configured `maxNativeZoom: 7` and `minNativeZoom: 0` on `L.tileLayer`, allowing Leaflet to smoothly upscale RainViewer's zoom-7 radar tiles up to street levels (8–18) without encountering "Zoom Level Not Supported" watermark errors.
+    - **Responsive Layout & Mobile Conflict Elimination**:
+      - On desktop (`md+`): Flex-aligned beside `MapLegend` in a single container (`gap-2.5 absolute top-3 right-3`).
+      - On mobile (`<md`): Arranged in a vertical flex column (`md:hidden absolute top-16 right-3 flex flex-col items-end gap-2`) with `MapLegend` `[?]` button on top and `WeatherWidget` below. This provides >160px clearance for the H3 Zone control bar (`[⬡ Vùng | 🌧 25 | 🚗]`), completely resolving mobile touch and visual overlap.
+      - Added `touchstart` event support for smooth outside-click closing on mobile touchscreens.
+    - Unit tests in [`weatherUtils.test.ts`](file:///Users/thanhdatvu/repos/projectKV/apps/web/src/utils/weatherUtils.test.ts) (5/5 tests passing).
+
+#### Issue #121 — `[fix] Dockerfile Go builder upgrade to golang:1.26-alpine`
+- **Module:** `services/go-server/Dockerfile`
+- **Merged PR:** [#121](https://github.com/529-studio/projectKV/pull/121) | **Commit:** `eb9704d`
+- **Technical Implementation:**
+  - Upgraded Go builder base image from `golang:1.24-alpine` to `golang:1.26-alpine` in `services/go-server/Dockerfile` to maintain full toolchain compatibility with `go.mod` (Go 1.26 toolchain requirements).
+
 ---
 
 ## 4. Verification & Testing Evidence
 
 ### 4.1 Go Backend Verification
-Command: `go test ./...` in `services/go-server/`
+Command: `cd services/go-server && go test ./...`
 ```text
-ok   github.com/529-studio/projectKV/services/go-server/cmd/server
-ok   github.com/529-studio/projectKV/services/go-server/internal/archiver
-ok   github.com/529-studio/projectKV/services/go-server/internal/cache
-ok   github.com/529-studio/projectKV/services/go-server/internal/camera
-ok   github.com/529-studio/projectKV/services/go-server/internal/config
-ok   github.com/529-studio/projectKV/services/go-server/internal/corridor
-ok   github.com/529-studio/projectKV/services/go-server/internal/cvclient
-ok   github.com/529-studio/projectKV/services/go-server/internal/hotset
-ok   github.com/529-studio/projectKV/services/go-server/internal/httpserver
-ok   github.com/529-studio/projectKV/services/go-server/internal/live
-ok   github.com/529-studio/projectKV/services/go-server/internal/middleware
-ok   github.com/529-studio/projectKV/services/go-server/internal/proxycache
-ok   github.com/529-studio/projectKV/services/go-server/internal/storage
-ok   github.com/529-studio/projectKV/services/go-server/internal/store
-ok   github.com/529-studio/projectKV/services/go-server/internal/tilecache
-ok   github.com/529-studio/projectKV/services/go-server/internal/ws
-ALL PASS (0 failures)
+ok   github.com/529-studio/projectKV/services/go-server/cmd/server       17.333s
+?    github.com/529-studio/projectKV/services/go-server/docs             [no test files]
+ok   github.com/529-studio/projectKV/services/go-server/internal/archiver (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/cache    (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/camera   (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/config   0.891s
+ok   github.com/529-studio/projectKV/services/go-server/internal/corridor (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/cvclient (cached)
+?    github.com/529-studio/projectKV/services/go-server/internal/handlers [no test files]
+ok   github.com/529-studio/projectKV/services/go-server/internal/hotset   (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/httpserver (cached)
+?    github.com/529-studio/projectKV/services/go-server/internal/i18n     [no test files]
+ok   github.com/529-studio/projectKV/services/go-server/internal/live     (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/middleware (cached)
+?    github.com/529-studio/projectKV/services/go-server/internal/models   [no test files]
+?    github.com/529-studio/projectKV/services/go-server/internal/platform [no test files]
+ok   github.com/529-studio/projectKV/services/go-server/internal/proxycache (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/storage  (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/store    (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/tilecache (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/weather  (cached)
+ok   github.com/529-studio/projectKV/services/go-server/internal/ws       (cached)
+
+ALL 17 TEST SUITES PASS (0 failures, 5 utility packages without tests)
 ```
 
 ### 4.2 Web Client Unit Tests
-Command: `npm test` in `apps/web/`
+Command: `npm --prefix apps/web test`
 ```text
-✔ computeFilteredCameraIds (Issue #65 ADR-004 A3)
-✔ computeActiveFilterLabel (On-map filter chip)
-✔ calculateMarkerStyle (Dimmed vs Normal styling)
+▶ Flood Hex Overlay Utilities (Issue #106)
+  ✔ normalizeFloodHexCell accepts valid flood hex cell payloads
+  ✔ normalizeFloodHexCell supports camelCase property aliases
+  ✔ normalizeFloodHexCell rejects invalid or malformed payloads
+  ✔ getFloodHexColorAndOpacity applies functional blue/cyan palette
+  ✔ isFloodVisibleAtZoom enables macro zoom (11-13) and hides micro zoom (14+)
+  ✔ getFloodInteractivityState controls visibility, pointerEvents, and CSS classes
+  ✔ getFloodSeverityLabel provides correct Vietnamese diacritics and English labels
+  ✔ formatFloodHexTooltip shows severity, camera count, and worst camera
+  ✔ honesty rule: never says "OK to go" or "safe" for unknown/unverified data
+  ✔ FLOOD_I18N contains all required bilingual keys with Vietnamese diacritics
 ✔ Flood Hex Overlay Utilities (Issue #106)
+
+▶ Hex Overlay Utilities (Issue #74)
+  ✔ normalizeHexCell accepts valid hex cell payloads
+  ✔ normalizeHexCell supports camelCase property aliases
+  ✔ normalizeHexCell rejects invalid or malformed payloads
+  ✔ getHexColorAndOpacity applies approved low-opacity tints per ADR-004 §D11
+  ✔ isHexVisibleAtZoom enables macro zoom (11-13) and hides micro zoom (14+)
+  ✔ getHexInteractivityState controls visibility, pointerEvents, and CSS classes
+  ✔ formatHexTooltip shows camera count and worst camera, never a ward name
+  ✔ HEX_I18N contains all required strings with proper Vietnamese diacritics
 ✔ Hex Overlay Utilities (Issue #74)
+
 ✔ MOBILE_SEARCH_I18N contains all required strings with proper Vietnamese diacritics
-✔ formatPhuongName (named, numbered, communes, towns)
-✔ formatCorridorDisplay (bridges, overpasses, junctions, expressways)
-✔ search & diacritics (diacritic-insensitive search)
-✔ extractCorridor & road grouping
+
+▶ formatPhuongName
+  ✔ returns original string in Vietnamese (vi) locale
+  ✔ formats named Phường into <Name> Ward in English (en) locale
+  ✔ formats numbered Phường into Ward <N> in English (en) locale
+  ✔ formats Communes (Xã) into <Name> Commune in English (en) locale
+  ✔ formats Towns (Thị trấn) into <Name> Town in English (en) locale
+  ✔ formats prefix-less names with explicit types in vi and en
+  ✔ handles empty or non-matching inputs gracefully
+✔ formatPhuongName
+
+▶ formatCorridorDisplay
+  ✔ handles bridges, overpasses, junctions, roundabouts, expressways, national routes, tunnels, numbered streets
+✔ formatCorridorDisplay
+
+▶ search & diacritics
+  ✔ strips Vietnamese diacritics correctly
+  ✔ matches search queries with diacritics, unaccented, and English tokens
+✔ search & diacritics
+
+▶ extractCorridor
+  ✔ extracts primary street name by splitting delimiters
+  ✔ falls back to title or Khác when displayName is absent
+✔ extractCorridor
+
+▶ formatRoadName & I18N_NAMES
+  ✔ contains all 6 required i18n keys for vi and en
+  ✔ formats full road names with localization
+✔ formatRoadName & I18N_NAMES
+
+▶ groupCamerasByCityCorridors & ARTERIAL_CORRIDORS
+  ✔ ARTERIAL_CORRIDORS contains high-priority commuter routes
+  ✔ groups cameras across wards by corridor name
+  ✔ prioritizes corridors with active congestion to top
+  ✔ filters corridors and cameras by search term
+✔ groupCamerasByCityCorridors & ARTERIAL_CORRIDORS
+
 ✔ PINNED_DOCK_I18N contains all required keys and correct Vietnamese diacritics
 
-ℹ tests 71
-ℹ suites 13
-ℹ pass 71
+▶ Weather Utilities (Issue #120)
+  ✔ WEATHER_I18N contains all bilingual keys with valid Vietnamese diacritics
+  ✔ getWeatherCategory correctly maps WMO codes
+  ✔ formatTemperature handles valid numbers and edge cases
+  ✔ formatRainProbability formats percentages
+  ✔ formatHour parses time correctly
+✔ Weather Utilities (Issue #120)
+
+ℹ tests 76
+ℹ suites 14
+ℹ pass 76
 ℹ fail 0
 ```
 
-### 4.3 Web Client Linter & Production Build
-Commands: `npm run lint` && `npm run build` in `apps/web/`
+### 4.3 Python Tooling Unit Tests
+1. **`tools/geo-enrich`**:  
+   Command: `python3 -m unittest discover -s tools/geo-enrich`
+   ```text
+   ..........................
+   ----------------------------------------------------------------------
+   Ran 26 tests in 0.058s
+   OK
+   ```
+2. **`tools/eval`**:  
+   Command: `python3 tools/eval/benchmark_test.py`
+   ```text
+   ..........
+   ----------------------------------------------------------------------
+   Ran 10 tests in 0.065s
+   OK
+   ```
+
+### 4.4 Web Client Linter & Production Build
+Command: `npm --prefix apps/web run build`
 ```text
-✓ Compiled successfully in 1693ms
+▲ Next.js 15.5.24
+- Environments: .env.local
+
+Creating an optimized production build ...
+✓ Compiled successfully in 1235ms
 ✓ Linting and checking validity of types
 ✓ Collecting page data
 ✓ Generating static pages (5/5)
+✓ Collecting build traces
 ✓ Exporting (2/2)
 ✓ Finalizing page optimization
 
 Route (app)                                 Size  First Load JS
-┌ ○ /                                    67.1 kB         170 kB
+┌ ○ /                                      69 kB         172 kB
 ├ ○ /_not-found                            995 B         104 kB
 └ ○ /icon.png                                0 B            0 B
 + First Load JS shared by all             103 kB
+  ├ chunks/255-cf15ac3efcf391d6.js       46.5 kB
+  ├ chunks/4bd1b696-c023c6e3521b1417.js  54.2 kB
+  └ other shared chunks (total)          2.52 kB
+
+○  (Static)  prerendered as static content
+0 errors, clean build.
 ```
 
 ---
@@ -433,10 +562,10 @@ Per **ADR-004 §4 ("Gate to Start 2b")**, four specific prerequisites must be me
 
 | Gate Requirement | Condition Defined in ADR-004 §4 | Actual Status in Sprint 2 | Gate Result |
 |---|---|---|:---:|
-| **1. B4 Evaluation Harness** | Benchmark harness in place reporting precision/recall; Flood False-Negative Rate isolated as gate metric | Fully delivered in `tools/eval/` (PR #114) with schema and benchmark runner. | **PASSED ✅** |
+| **1. B4 Evaluation Harness** | Benchmark harness in place reporting precision/recall; Flood False-Negative Rate isolated as gate metric | Fully delivered in `tools/eval/` (PR #114) with schema and `benchmark.py` (10/10 tests in `benchmark_test.py`). | **PASSED ✅** |
 | **2. B5 Routing Decision** | Routing engine evaluated on HCMC extract; clear decision recorded | Fully delivered in `docs/spike-routing-engine.md` (PR #100). **Valhalla adopted** (scooter costing, polygon avoidance, 151.6MB RAM). | **PASSED ✅** |
 | **3. B6 Corridor Status** | `GET /api/roads/{road_key}/status` shipped and integrated into UI | Fully delivered in backend `internal/corridor/` and frontend tree (PR #112). | **PASSED ✅** |
 | **4. B7 Abuse Guards** | Rate limiter, per-request cap, and budget circuit breaker active | Fully delivered in `internal/middleware/ratelimit.go` and `internal/hotset/budget.go` (PR #87). | **PASSED ✅** |
 
 ### Evaluation Verdict
-**Sprint 2 core architecture, backend pipelines, and safety gates are officially PASSED.** All 4 gate criteria for Route-Check (2b) are satisfied. Item **A4 (Dock Rework)** is formally carried over into Sprint 3 as a priority frontend item alongside the Sprint 3 self-hosted CV integration.
+**Sprint 2 core architecture, backend pipelines, meteorological layers, and safety gates are officially PASSED.** All 4 gate criteria for Route-Check (2b) are satisfied. Item **A4 (Dock Rework)** is formally carried over into Sprint 3 as a priority frontend item alongside the Sprint 3 self-hosted CV integration.
