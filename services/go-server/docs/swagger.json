@@ -456,6 +456,64 @@
                 }
             }
         },
+        "/api/weather": {
+            "get": {
+                "description": "Returns current temperature, humidity, WMO weather condition code, hourly rain probability, and precipitation volume from Open-Meteo with in-memory caching.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Weather"
+                ],
+                "summary": "Get live meteorological weather \u0026 rain forecast for Ho Chi Minh City",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/weather.WeatherData"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error fetching weather data",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/weather/radar": {
+            "get": {
+                "description": "Returns the latest radar frame timestamps, host, and tile URL template for rendering live precipitation radar layers in Leaflet.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Weather"
+                ],
+                "summary": "Get live RainViewer Doppler radar tile metadata",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/weather.RadarMetadata"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error fetching radar metadata",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/zones": {
             "get": {
                 "description": "Retrieve sorted list of valid camera zone identifiers",
@@ -768,6 +826,122 @@
                 },
                 "worst_camera_name": {
                     "description": "display name",
+                    "type": "string"
+                }
+            }
+        },
+        "weather.HourlyForecast": {
+            "type": "object",
+            "properties": {
+                "precipitation_probability_percent": {
+                    "type": "integer"
+                },
+                "rain_mm": {
+                    "type": "number"
+                },
+                "time": {
+                    "type": "string"
+                },
+                "weather_code": {
+                    "type": "integer"
+                },
+                "weather_desc_en": {
+                    "type": "string"
+                },
+                "weather_desc_vi": {
+                    "type": "string"
+                }
+            }
+        },
+        "weather.RadarFrame": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "integer"
+                }
+            }
+        },
+        "weather.RadarMetadata": {
+            "type": "object",
+            "properties": {
+                "generated": {
+                    "type": "integer"
+                },
+                "host": {
+                    "type": "string"
+                },
+                "latest_tile_template": {
+                    "type": "string"
+                },
+                "nowcast_frames": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/weather.RadarFrame"
+                    }
+                },
+                "past_frames": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/weather.RadarFrame"
+                    }
+                },
+                "source": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "weather.WeatherData": {
+            "type": "object",
+            "properties": {
+                "apparent_temperature_c": {
+                    "type": "number"
+                },
+                "hourly_forecast": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/weather.HourlyForecast"
+                    }
+                },
+                "humidity_percent": {
+                    "type": "integer"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "precipitation_probability_percent": {
+                    "type": "integer"
+                },
+                "rain_mm": {
+                    "type": "number"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "temperature_c": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "weather_code": {
+                    "type": "integer"
+                },
+                "weather_desc_en": {
+                    "type": "string"
+                },
+                "weather_desc_vi": {
                     "type": "string"
                 }
             }

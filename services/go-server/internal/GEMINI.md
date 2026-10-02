@@ -31,6 +31,7 @@ tilecache      → (leaf)
 storage        → (leaf)
 archiver       → storage, hotset
 corridor       → camera, hotset
+weather        → (leaf)
 ```
 
 ### How to apply this rule
