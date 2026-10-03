@@ -76,10 +76,14 @@ services:
           memory: "${MODEL_MEMORY_LIMIT:-512M}"
     labels:
       - "traefik.enable=false"
+    volumes:
+      - warded-model-weights:/app/models
 
 volumes:
   warded-stg-data:
     name: ${DATA_VOLUME_NAME:-warded-stg_warded-stg-data}
+  warded-model-weights:
+    name: ${MODEL_VOLUME_NAME:-warded-stg_warded-model-weights}
 
 networks:
   core-network:
