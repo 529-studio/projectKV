@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flood Frame Labeler — ProjectKV</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #000;
+      --surface: #121212;
+      --border: #2a2a2a;
+      --text: #fff;
+      --muted: #888;
+      --accent-none: #4ade80;    /* green */
+      --accent-shallow: #facc15; /* yellow */
+      --accent-deep: #f87171;    /* red */
+      --accent-active: #fff;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 13px;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── Top bar ─────────────────────────────────────────── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #topbar h1 { font-size: 13px; font-weight: 600; letter-spacing: .04em; }
+    #progress { color: var(--muted); font-size: 12px; }
+    #open-btn, #export-btn {
+      margin-left: auto;
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+    }
+    #open-btn:hover, #export-btn:hover { background: #2a2a2a; }
+    #export-btn { margin-left: 6px; }
+
+    /* ── Main area ───────────────────────────────────────── */
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ── Image pane ──────────────────────────────────────── */
+    #img-pane {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #080808;
+      overflow: hidden;
+      position: relative;
+    }
+    #frame-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    #frame-name {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,.7);
+      padding: 3px 10px;
+      border-radius: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+      max-width: 90%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+    }
+    #placeholder svg { opacity: .2; }
+
+    /* ── Sidebar ─────────────────────────────────────────── */
+    #sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 14px;
+      gap: 18px;
+    }
+
+    .label-group { display: flex; flex-direction: column; gap: 6px; }
+    .label-group h2 {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .key-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 7px;
+      border-radius: 3px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background .1s;
+    }
+    .key-row:hover { background: #1a1a1a; }
+    .key-row.active {
+      border-color: #555;
+      background: #1e1e1e;
+    }
+    .key-row.active .key-badge { background: var(--accent-active); color: #000; }
+
+    /* flood-specific active colors */
+    .key-row[data-val="NONE"].active   { border-color: var(--accent-none); }
+    .key-row[data-val="NONE"].active   .key-badge { background: var(--accent-none); color: #000; }
+    .key-row[data-val="SHALLOW"].active { border-color: var(--accent-shallow); }
+    .key-row[data-val="SHALLOW"].active .key-badge { background: var(--accent-shallow); color: #000; }
+    .key-row[data-val="DEEP"].active   { border-color: var(--accent-deep); }
+    .key-row[data-val="DEEP"].active   .key-badge { background: var(--accent-deep); color: #000; }
+
+    .key-badge {
+      min-width: 22px;
+      height: 22px;
+      background: #2a2a2a;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .key-label { font-size: 12px; color: #ccc; }
+    .key-desc  { font-size: 10px; color: var(--muted); margin-left: auto; }
+
+    /* ── Nav + save row ──────────────────────────────────── */
+    #bottombar {
+      border-top: 1px solid var(--border);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      color: #fff;
+      padding: 5px 14px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+    }
+    .nav-btn:hover { background: #2a2a2a; }
+    .nav-btn:disabled { opacity: .3; cursor: default; }
+    #save-status { font-size: 12px; color: var(--muted); }
+    #hotkey-hint { margin-left: auto; font-size: 11px; color: #444; }
+
+    /* ── Toast ───────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 48px;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      padding: 6px 16px;
+      border-radius: 3px;
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s, transform .2s;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Notes textarea ──────────────────────────────────── */
+    #notes {
+      width: 100%;
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+      color: #ccc;
+      padding: 6px 8px;
+      border-radius: 3px;
+      resize: vertical;
+      font-family: inherit;
+      font-size: 11px;
+      min-height: 52px;
+    }
+    #notes:focus { outline: 1px solid #444; }
+
+    /* ── Annotator input ─────────────────────────────────── */
+    #annotator-input {
+      width: 100%;
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+      color: #ccc;
+      padding: 5px 8px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 11px;
+    }
+    #annotator-input:focus { outline: 1px solid #444; }
+
+    /* ── Labeled badge in list ───────────────────────────── */
+    .thumb-list { display: flex; flex-direction: column; gap: 3px; max-height: 140px; overflow-y: auto; }
+    .thumb-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 5px;
+      border-radius: 2px;
+      cursor: pointer;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .thumb-item:hover { background: #1a1a1a; }
+    .thumb-item.current { color: #fff; background: #1e1e1e; }
+    .thumb-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #333;
+    }
+    .thumb-dot.labeled { background: #4ade80; }
+    .thumb-dot.flood-shallow { background: #facc15; }
+    .thumb-dot.flood-deep    { background: #f87171; }
+    .thumb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <h1>Flood Frame Labeler</h1>
+  <span id="progress">No frames loaded</span>
+  <button id="open-btn" onclick="openFolder()">Open Folder</button>
+  <button id="export-btn" onclick="exportAll()" style="display:none">Export All JSON</button>
+</div>
+
+<!-- Main area -->
+<div id="main">
+
+  <!-- Image pane -->
+  <div id="img-pane">
+    <div id="placeholder">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+        <path d="m21 15-5-5L5 21"/>
+      </svg>
+      <span>Open a folder containing JPEG frames</span>
+      <span style="font-size:11px;color:#555">data/proofs/  or  tools/eval/fixtures/frames/</span>
+    </div>
+    <img id="frame-img" style="display:none" alt="frame" />
+    <div id="frame-name"></div>
+  </div>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+
+    <!-- Flood -->
+    <div class="label-group">
+      <h2>Flood ★ (primary)</h2>
+      <div class="key-row" data-group="flood" data-val="NONE"    onclick="setLabel('flood','NONE')"   >
+        <span class="key-badge">1</span><span class="key-label">NONE</span><span class="key-desc">Dry / spray</span>
+      </div>
+      <div class="key-row" data-group="flood" data-val="SHALLOW" onclick="setLabel('flood','SHALLOW')">
+        <span class="key-badge">2</span><span class="key-label">SHALLOW</span><span class="key-desc">Pooling / ankle</span>
+      </div>
+      <div class="key-row" data-group="flood" data-val="DEEP"    onclick="setLabel('flood','DEEP')"   >
+        <span class="key-badge">3</span><span class="key-label">DEEP</span><span class="key-desc">Wheel-height+</span>
+      </div>
+    </div>
+
+    <!-- Traffic -->
+    <div class="label-group">
+      <h2>Traffic</h2>
+      <div class="key-row" data-group="traffic" data-val="CLEAR"     onclick="setLabel('traffic','CLEAR')"    >
+        <span class="key-badge">Q</span><span class="key-label">CLEAR</span>
+      </div>
+      <div class="key-row" data-group="traffic" data-val="MODERATE"  onclick="setLabel('traffic','MODERATE')" >
+        <span class="key-badge">W</span><span class="key-label">MODERATE</span>
+      </div>
+      <div class="key-row" data-group="traffic" data-val="HEAVY"     onclick="setLabel('traffic','HEAVY')"    >
+        <span class="key-badge">E</span><span class="key-label">HEAVY</span>
+      </div>
+      <div class="key-row" data-group="traffic" data-val="CONGESTED" onclick="setLabel('traffic','CONGESTED')">
+        <span class="key-badge">R</span><span class="key-label">CONGESTED</span>
+      </div>
+    </div>
+
+    <!-- Weather -->
+    <div class="label-group">
+      <h2>Weather</h2>
+      <div class="key-row" data-group="weather" data-val="dry"        onclick="setLabel('weather','dry')"       >
+        <span class="key-badge">A</span><span class="key-label">dry</span>
+      </div>
+      <div class="key-row" data-group="weather" data-val="rain"       onclick="setLabel('weather','rain')"      >
+        <span class="key-badge">S</span><span class="key-label">rain</span>
+      </div>
+      <div class="key-row" data-group="weather" data-val="heavy_rain" onclick="setLabel('weather','heavy_rain')">
+        <span class="key-badge">D</span><span class="key-label">heavy_rain</span>
+      </div>
+    </div>
+
+    <!-- Time of day -->
+    <div class="label-group">
+      <h2>Time of Day</h2>
+      <div class="key-row" data-group="time_of_day" data-val="day"       onclick="setLabel('time_of_day','day')"      >
+        <span class="key-badge">Z</span><span class="key-label">day</span>
+      </div>
+      <div class="key-row" data-group="time_of_day" data-val="night"     onclick="setLabel('time_of_day','night')"    >
+        <span class="key-badge">X</span><span class="key-label">night</span>
+      </div>
+      <div class="key-row" data-group="time_of_day" data-val="dawn_dusk" onclick="setLabel('time_of_day','dawn_dusk')">
+        <span class="key-badge">C</span><span class="key-label">dawn_dusk</span>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="label-group">
+      <h2>Notes</h2>
+      <textarea id="notes" placeholder="Optional: glare, occlusion, landmark…" rows="3"></textarea>
+    </div>
+
+    <!-- Annotator -->
+    <div class="label-group">
+      <h2>Annotator</h2>
+      <input id="annotator-input" type="text" placeholder="your_name" value="" />
+    </div>
+
+    <!-- Save / Skip -->
+    <div style="display:flex;gap:6px;">
+      <button class="nav-btn" style="flex:1" onclick="saveAndNext()">Save &amp; Next  [Enter]</button>
+      <button class="nav-btn" onclick="skipFrame()" title="Skip without saving [Tab]">Skip</button>
+    </div>
+
+    <!-- Frame list -->
+    <div class="label-group">
+      <h2>Frames</h2>
+      <div class="thumb-list" id="thumb-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Bottom bar -->
+<div id="bottombar">
+  <button class="nav-btn" id="prev-btn" onclick="navigate(-1)" disabled>← Prev</button>
+  <button class="nav-btn" id="next-btn" onclick="navigate(1)"  disabled>Next →</button>
+  <span id="save-status"></span>
+  <span id="hotkey-hint">1/2/3 = flood · Q-R = traffic · A-D = weather · Z-C = time · Enter = save</span>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+const state = {
+  frames: [],       // { name, file, handle? }
+  index: -1,
+  labels: {},       // frameIndex → label object
+  dirHandle: null,  // FileSystemDirectoryHandle for writing
+};
+
+const HOTKEYS = {
+  '1': ['flood', 'NONE'],
+  '2': ['flood', 'SHALLOW'],
+  '3': ['flood', 'DEEP'],
+  'q': ['traffic', 'CLEAR'],
+  'w': ['traffic', 'MODERATE'],
+  'e': ['traffic', 'HEAVY'],
+  'r': ['traffic', 'CONGESTED'],
+  'a': ['weather', 'dry'],
+  's': ['weather', 'rain'],
+  'd': ['weather', 'heavy_rain'],
+  'z': ['time_of_day', 'day'],
+  'x': ['time_of_day', 'night'],
+  'c': ['time_of_day', 'dawn_dusk'],
+};
+
+// ── Open folder ───────────────────────────────────────────────────────────────
+async function openFolder() {
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    state.dirHandle = handle;
+    const files = [];
+    for await (const [name, fh] of handle.entries()) {
+      if (fh.kind === 'file' && /\.(jpe?g|png|webp)$/i.test(name)) {
+        files.push({ name, handle: fh });
+      }
+    }
+    // Recurse one level (date sub-folders in data/proofs/YYYY-MM-DD/)
+    if (files.length === 0) {
+      for await (const [, subHandle] of handle.entries()) {
+        if (subHandle.kind !== 'directory') continue;
+        for await (const [name, fh] of subHandle.entries()) {
+          if (fh.kind === 'file' && /\.(jpe?g|png|webp)$/i.test(name)) {
+            files.push({ name, handle: fh, parent: subHandle });
+          }
+        }
+      }
+    }
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    state.frames = files;
+    state.index = -1;
+    state.labels = {};
+    renderThumbList();
+    document.getElementById('export-btn').style.display = '';
+    navigate(1);
+    toast(`Loaded ${files.length} frames from "${handle.name}"`);
+  } catch (err) {
+    if (err.name !== 'AbortError') toast('Error: ' + err.message);
+  }
+}
+
+// ── Navigate ──────────────────────────────────────────────────────────────────
+function navigate(delta) {
+  const next = state.index + delta;
+  if (next < 0 || next >= state.frames.length) return;
+  state.index = next;
+  loadFrame(next);
+}
+
+async function loadFrame(idx) {
+  const frame = state.frames[idx];
+  if (!frame) return;
+
+  const file = await frame.handle.getFile();
+  const url  = URL.createObjectURL(file);
+
+  const img = document.getElementById('frame-img');
+  img.onload = () => URL.revokeObjectURL(url);
+  img.src = url;
+  img.style.display = 'block';
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('frame-name').textContent = frame.name;
+
+  // Restore saved labels for this frame
+  const saved = state.labels[idx] || {};
+  updateSidebarHighlights(saved);
+
+  document.getElementById('notes').value = saved.notes || '';
+  document.getElementById('prev-btn').disabled = idx <= 0;
+  document.getElementById('next-btn').disabled = idx >= state.frames.length - 1;
+  document.getElementById('progress').textContent =
+    `${idx + 1} / ${state.frames.length}  (${Object.keys(state.labels).length} labeled)`;
+  document.getElementById('save-status').textContent = '';
+  renderThumbList();
+}
+
+// ── Label ─────────────────────────────────────────────────────────────────────
+function setLabel(group, val) {
+  if (state.index < 0) return;
+  if (!state.labels[state.index]) state.labels[state.index] = {};
+  state.labels[state.index][group] = val;
+  updateSidebarHighlights(state.labels[state.index]);
+}
+
+function updateSidebarHighlights(saved) {
+  document.querySelectorAll('.key-row').forEach(row => {
+    const g = row.dataset.group;
+    const v = row.dataset.val;
+    row.classList.toggle('active', saved[g] === v);
+  });
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+async function saveAndNext() {
+  if (state.index < 0 || state.frames.length === 0) return;
+
+  const frame  = state.frames[state.index];
+  const labels = state.labels[state.index] || {};
+
+  const flood = labels.flood;
+  if (!flood) { toast('⚠ Set flood level first (1/2/3)'); return; }
+
+  const annotator = document.getElementById('annotator-input').value.trim() || 'labeler';
+  const notes     = document.getElementById('notes').value.trim();
+
+  // Derive frame_id from file name (strip extension)
+  const frameId = frame.name.replace(/\.[^.]+$/, '');
+  const ts = new Date().toISOString();
+
+  const labelObj = {
+    frame_id:     frameId,
+    image_path:   frame.name,
+    labels: {
+      traffic:     labels.traffic     || '',
+      flood:       labels.flood       || '',
+      time_of_day: labels.time_of_day || '',
+      weather:     labels.weather     || '',
+    },
+    annotator,
+    annotated_at: ts,
+    notes:        notes || undefined,
+  };
+  // Remove undefined keys
+  if (!labelObj.notes) delete labelObj.notes;
+
+  const json = JSON.stringify(labelObj, null, 2) + '\n';
+
+  // Write to directory if available
+  if (state.dirHandle) {
+    try {
+      // Try to create/open a "labels" sub-folder next to the opened folder
+      let outHandle;
+      try {
+        outHandle = await state.dirHandle.getDirectoryHandle('labels', { create: true });
+      } catch {
+        outHandle = state.dirHandle;
+      }
+      const fileHandle = await outHandle.getFileHandle(frameId + '.json', { create: true });
+      const writable   = await fileHandle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      document.getElementById('save-status').textContent = `✓ saved ${frameId}.json`;
+    } catch (err) {
+      downloadJson(json, frameId + '.json');
+    }
+  } else {
+    downloadJson(json, frameId + '.json');
+  }
+
+  // Persist in memory too
+  state.labels[state.index] = { ...labels, annotator, notes };
+  renderThumbList();
+  navigate(1);
+}
+
+function skipFrame() {
+  navigate(1);
+}
+
+// ── Export All ────────────────────────────────────────────────────────────────
+function exportAll() {
+  const all = Object.entries(state.labels).map(([idxStr, labels]) => {
+    const idx   = parseInt(idxStr);
+    const frame = state.frames[idx];
+    if (!frame) return null;
+    const frameId = frame.name.replace(/\.[^.]+$/, '');
+    return {
+      frame_id:     frameId,
+      image_path:   frame.name,
+      labels: {
+        traffic:     labels.traffic     || '',
+        flood:       labels.flood       || '',
+        time_of_day: labels.time_of_day || '',
+        weather:     labels.weather     || '',
+      },
+      annotator:    labels.annotator || 'labeler',
+      annotated_at: new Date().toISOString(),
+      ...(labels.notes ? { notes: labels.notes } : {}),
+    };
+  }).filter(Boolean);
+
+  downloadJson(JSON.stringify(all, null, 2) + '\n', 'labels_export.json');
+  toast(`Exported ${all.length} labels`);
+}
+
+// ── Thumb list ────────────────────────────────────────────────────────────────
+function renderThumbList() {
+  const list = document.getElementById('thumb-list');
+  list.innerHTML = '';
+  state.frames.forEach((f, i) => {
+    const div  = document.createElement('div');
+    div.className = 'thumb-item' + (i === state.index ? ' current' : '');
+    const dot  = document.createElement('span');
+    dot.className = 'thumb-dot';
+    const lbl  = state.labels[i];
+    if (lbl?.flood === 'SHALLOW') dot.classList.add('labeled', 'flood-shallow');
+    else if (lbl?.flood === 'DEEP') dot.classList.add('labeled', 'flood-deep');
+    else if (lbl?.flood)           dot.classList.add('labeled');
+    const name = document.createElement('span');
+    name.className = 'thumb-name';
+    name.textContent = f.name;
+    div.append(dot, name);
+    div.onclick = () => { state.index = i; loadFrame(i); };
+    list.append(div);
+  });
+  // Scroll current into view
+  const cur = list.querySelector('.current');
+  if (cur) cur.scrollIntoView({ block: 'nearest' });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function downloadJson(json, filename) {
+  const a   = document.createElement('a');
+  a.href    = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ── Keyboard ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  // Don't intercept when typing in inputs
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+
+  const key = e.key.toLowerCase();
+
+  if (e.key === 'Enter') { e.preventDefault(); saveAndNext(); return; }
+  if (e.key === 'Tab')   { e.preventDefault(); skipFrame();   return; }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { navigate(1);  return; }
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { navigate(-1); return; }
+
+  const binding = HOTKEYS[key];
+  if (binding) {
+    e.preventDefault();
+    setLabel(binding[0], binding[1]);
+  }
+});
+
+// ── Annotator persistence ─────────────────────────────────────────────────────
+const stored = localStorage.getItem('kv_labeler_annotator');
+if (stored) document.getElementById('annotator-input').value = stored;
+document.getElementById('annotator-input').addEventListener('change', (e) => {
+  localStorage.setItem('kv_labeler_annotator', e.target.value);
+});
+</script>
+</body>
+</html>
