@@ -12,11 +12,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// HealthProbe is a callback returning component names and their operational status ("ok" or "degraded:...").
+type HealthProbe func() map[string]string
+
 // CameraHandler handles HTTP requests relating to traffic cameras and snapshots.
 type CameraHandler struct {
 	store      *models.CameraStore
 	cache      *cache.SnapshotCache
 	httpClient *http.Client
+	probe      HealthProbe
 }
 
 // NewCameraHandler creates an instance of CameraHandler.
@@ -28,6 +32,11 @@ func NewCameraHandler(store *models.CameraStore, snapCache *cache.SnapshotCache)
 			Timeout: 10 * time.Second,
 		},
 	}
+}
+
+// SetHealthProbe wires a component health probe to the handler.
+func (h *CameraHandler) SetHealthProbe(probe HealthProbe) {
+	h.probe = probe
 }
 
 // GetCameras handles GET /api/cameras.
@@ -106,11 +115,32 @@ func (h *CameraHandler) GetSnapshot(c *gin.Context) {
 	c.Data(http.StatusOK, contentType, buf)
 }
 
-// HealthCheck handles GET /health.
+// HealthCheck godoc
+// @Summary System health and readiness probe
+// @Description Returns overall service availability and component statuses (catalog, database, analyzer)
+// @Tags System
+// @Produce json
+// @Success 200 {object} map[string]any
+// @Router /health [get]
 func (h *CameraHandler) HealthCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"status":         "ok",
+	status := "ok"
+	resp := gin.H{
+		"status":         status,
 		"cameras_loaded": h.store.Total,
 		"online_cameras": h.store.OnlineCount,
-	})
+	}
+
+	if h.probe != nil {
+		components := h.probe()
+		for _, compStatus := range components {
+			if compStatus != "ok" {
+				status = "degraded"
+				break
+			}
+		}
+		resp["status"] = status
+		resp["components"] = components
+	}
+
+	c.JSON(http.StatusOK, resp)
 }

@@ -346,6 +346,7 @@ func main() {
 	}
 
 	// 6d. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
+	var hotsetScheduler *hotset.Scheduler
 	if analysisEnabled && analyzer != nil {
 		// Initialize object storage and snapshot archiver (Issue #62)
 		var arch *archiver.Archiver
@@ -431,7 +432,7 @@ func main() {
 			}
 		}
 
-		hotsetScheduler := hotset.NewScheduler(
+		hotsetScheduler = hotset.NewScheduler(
 			hotsetRegistry,
 			analyzer,
 			time.Duration(cfg.HotsetIntervalSeconds)*time.Second,
@@ -452,6 +453,36 @@ func main() {
 	}
 
 	cameraHandler := handlers.NewCameraHandler(camStore, snapCache)
+	cameraHandler.SetHealthProbe(func() map[string]string {
+		components := make(map[string]string)
+		if camStore != nil && camStore.Total > 0 {
+			components["catalog"] = "ok"
+		} else {
+			components["catalog"] = "degraded: no cameras loaded"
+		}
+
+		if verdictRepo != nil {
+			components["database"] = "ok"
+		} else {
+			components["database"] = "degraded: uninitialized"
+		}
+
+		if hotsetScheduler != nil {
+			if breaker := hotsetScheduler.Breaker(); breaker != nil {
+				if breaker.State() == hotset.StateOpen {
+					components["analyzer"] = fmt.Sprintf("degraded: circuit breaker open (%v)", breaker.LastError())
+				} else {
+					components["analyzer"] = "ok"
+				}
+			} else {
+				components["analyzer"] = "ok"
+			}
+		} else {
+			components["analyzer"] = "disabled"
+		}
+
+		return components
+	})
 
 	// 8. Setup Gin Engine
 	router := gin.Default()
