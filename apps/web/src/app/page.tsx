@@ -1,7 +1,6 @@
 'use client';
 import dynamic from 'next/dynamic';
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type L from 'leaflet';
 import { useCameras, Camera } from '../hooks/useCameras';
 import { useTraffic } from '../hooks/useTraffic';
@@ -22,6 +21,7 @@ import PhuongTreeFilter, {
   computeActiveFilterLabel,
 } from '../components/PhuongTreeFilter';
 import { getCameraSequence } from '../utils/cameraSequence';
+import type { ActiveLensMode } from '../components/HexOverlay';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
@@ -34,11 +34,8 @@ export default function Home() {
   const { rainRadarHexCells, loading: rainRadarLoading } = useRainHexRadar(radar, weather, cameras);
 
   const [map, setMap] = useState<L.Map | null>(null);
-  const [hexOverlayEnabled, setHexOverlayEnabled] = useState(true);
-  // S9 (Issue #144): Separate camera-verified flood from weather radar forecast
-  const [showRadar, setShowRadar] = useState(true);
-  const [showFlood, setShowFlood] = useState(true);
-  const [showTraffic, setShowTraffic] = useState(false);
+  // S9 (Issue #144): Independent 1-lens switcher ('flood' | 'radar' | 'traffic' | 'off')
+  const [activeLens, setActiveLens] = useState<ActiveLensMode>('flood');
   const [isFloodFilterActive, setIsFloodFilterActive] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,13 +49,6 @@ export default function Home() {
   const [selectedPhuong, setSelectedPhuong] = useState<string | null>(null);
   const [selectedCorridor, setSelectedCorridor] = useState<string | null>(null);
   const [lang, setLang] = useState<'vi' | 'en'>('vi');
-
-  // Open map legend by default on desktop view (>= 768px)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
-      setLegendOpen(true);
-    }
-  }, []);
 
   // Pinned camera list & order persistence (ADR-004 §A4/S5)
   useEffect(() => {
@@ -76,98 +66,29 @@ export default function Home() {
     }
   }, []);
 
-  // Zone Overview default & persistence (ADR-004 §D11 / S9 Issue #144)
+  // Active Lens default & persistence (ADR-004 §D11 / S9 Issue #144)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const saved = localStorage.getItem('warded_hex_overlay_enabled');
-    if (saved === 'false') {
-      setHexOverlayEnabled(false);
-    }
-    const savedRadar = localStorage.getItem('warded_show_radar');
-    if (savedRadar !== null) {
-      setShowRadar(savedRadar === 'true');
-    }
-    const savedFlood = localStorage.getItem('warded_show_flood');
-    if (savedFlood !== null) {
-      setShowFlood(savedFlood === 'true');
-    }
-    const savedTraffic = localStorage.getItem('warded_show_traffic');
-    if (savedTraffic !== null) {
-      setShowTraffic(savedTraffic === 'true');
+    const savedLens = localStorage.getItem('warded_active_lens');
+    if (savedLens === 'flood' || savedLens === 'radar' || savedLens === 'traffic' || savedLens === 'off') {
+      setActiveLens(savedLens as ActiveLensMode);
+      return;
     }
     // Backward compatibility for legacy 'warded_hex_mode'
     const savedMode = localStorage.getItem('warded_hex_mode');
-    if (savedRadar === null && savedFlood === null && savedTraffic === null && savedMode) {
-      if (savedMode === 'traffic') {
-        setShowTraffic(true);
-        setShowFlood(false);
-        setShowRadar(false);
-      } else if (savedMode === 'flood') {
-        setShowFlood(true);
-        setShowRadar(true);
-        setShowTraffic(false);
-      }
+    if (savedMode === 'traffic') {
+      setActiveLens('traffic');
+    } else if (savedMode === 'flood') {
+      setActiveLens('flood');
     }
   }, []);
 
-  const handleToggleHexOverlay = useCallback(() => {
-    setHexOverlayEnabled(prev => {
-      const next = !prev;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('warded_hex_overlay_enabled', String(next));
-      }
-      return next;
-    });
-  }, []);
-
-  const handleToggleRadar = useCallback(() => {
-    setShowRadar(prev => {
-      const next = !prev;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('warded_show_radar', String(next));
-      }
-      return next;
-    });
-  }, []);
-
-  const handleToggleFlood = useCallback(() => {
-    setShowFlood(prev => {
-      const next = !prev;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('warded_show_flood', String(next));
-      }
-      return next;
-    });
-  }, []);
-
-  const handleToggleTraffic = useCallback(() => {
-    setShowTraffic(prev => {
-      const next = !prev;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('warded_show_traffic', String(next));
-      }
-      return next;
-    });
-  }, []);
-
-  const [floodSyncNoticeDismissed, setFloodSyncNoticeDismissed] = useState(false);
-  const [showFloodSyncedSuccess, setShowFloodSyncedSuccess] = useState(false);
-  const prevRadarLoadingRef = useRef(rainRadarLoading);
-
-  useEffect(() => {
-    if (prevRadarLoadingRef.current && !rainRadarLoading) {
-      if (rainRadarHexCells.size > 0 && !floodSyncNoticeDismissed) {
-        setShowFloodSyncedSuccess(true);
-        const timer = setTimeout(() => {
-          setFloodSyncNoticeDismissed(true);
-        }, 2800);
-        return () => clearTimeout(timer);
-      } else {
-        setFloodSyncNoticeDismissed(true);
-      }
+  const handleModeChange = useCallback((newMode: ActiveLensMode) => {
+    setActiveLens(newMode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('warded_active_lens', newMode);
     }
-    prevRadarLoadingRef.current = rainRadarLoading;
-  }, [rainRadarLoading, rainRadarHexCells.size, floodSyncNoticeDismissed]);
+  }, []);
 
   // URL sync for active filter (ADR-004 stretch goal)
   useEffect(() => {
@@ -365,21 +286,35 @@ export default function Home() {
             lang={lang}
             appEnv={appEnv}
             onMapReady={setMap}
-            hexOverlayEnabled={hexOverlayEnabled}
+            hexOverlayEnabled={activeLens !== 'off'}
+            topRightControls={
+              <>
+                <WeatherWidget
+                  weather={weather}
+                  loading={weatherLoading}
+                  lang={lang}
+                />
+                <MapLegend
+                  isOpen={legendOpen}
+                  onToggle={() => setLegendOpen(prev => !prev)}
+                  analysisEnabled={analysisEnabled}
+                  lensMode={activeLens}
+                  verdictsCount={verdicts.size}
+                  lang={lang}
+                  floodLoading={floodLoading}
+                  radarLoading={rainRadarLoading}
+                  trafficLoading={trafficLoading}
+                />
+              </>
+            }
           >
             <HexOverlay
               map={map}
               hexCells={hexCells}
               floodHexCells={floodHexCells}
               radarHexCells={rainRadarHexCells}
-              enabled={hexOverlayEnabled}
-              onToggle={handleToggleHexOverlay}
-              showRadar={showRadar}
-              onToggleRadar={handleToggleRadar}
-              showFlood={showFlood}
-              onToggleFlood={handleToggleFlood}
-              showTraffic={showTraffic}
-              onToggleTraffic={handleToggleTraffic}
+              mode={activeLens}
+              onModeChange={handleModeChange}
               lang={lang}
               floodLoading={floodLoading}
               radarLoading={rainRadarLoading}
@@ -406,101 +341,6 @@ export default function Home() {
           verdictsCount={verdicts.size}
           lang={lang}
         />
-
-        {/* H3 Rain Radar Forecast Loading Floating Chip */}
-        <AnimatePresence>
-          {hexOverlayEnabled && showRadar && !floodSyncNoticeDismissed && (
-            <motion.div
-              initial={{ opacity: 0, y: -6, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.95 }}
-              transition={{ duration: 0.25 }}
-              className="fixed bottom-20 left-1/2 -translate-x-1/2 md:bottom-auto md:top-14 md:left-1/2 md:-translate-x-1/2 z-[820] pointer-events-auto flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-950/95 border border-sky-500/40 text-sky-300 font-mono text-[11px] shadow-2xl backdrop-blur-md select-none"
-              role="status"
-              aria-live="polite"
-            >
-              {showFloodSyncedSuccess ? (
-                <>
-                  <span className="relative flex h-2 w-2">
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-                  </span>
-                  <span className="text-zinc-200 font-semibold">
-                    {lang === 'vi'
-                      ? `✓ Đã sẵn sàng dữ liệu dự báo radar (${rainRadarHexCells.size} vùng)`
-                      : `✓ H3 radar forecast ready (${rainRadarHexCells.size} zones)`}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />
-                  </span>
-                  <span>
-                    {lang === 'vi' ? 'Đang tải dự báo radar thời tiết H3...' : 'Loading H3 weather radar forecast...'}
-                  </span>
-                </>
-              )}
-              <button
-                type="button"
-                onClick={() => setFloodSyncNoticeDismissed(true)}
-                className="text-zinc-500 hover:text-zinc-200 transition-colors ml-1 p-0.5 rounded focus:outline-none cursor-pointer"
-                aria-label={lang === 'vi' ? 'Đóng thông báo' : 'Dismiss notice'}
-                title={lang === 'vi' ? 'Đóng thông báo' : 'Dismiss notice'}
-              >
-                <span className="text-xs font-bold leading-none block">✕</span>
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* TOP-RIGHT CONTROLS: Weather Widget & Map Legend (Desktop md+) */}
-        <div className="hidden md:flex items-start gap-2.5 absolute top-3 right-3 z-[810] pointer-events-auto">
-          <WeatherWidget
-            weather={weather}
-            loading={weatherLoading}
-            lang={lang}
-          />
-          <MapLegend
-            isOpen={legendOpen}
-            onToggle={() => setLegendOpen(prev => !prev)}
-            analysisEnabled={analysisEnabled}
-            hexOverlayEnabled={hexOverlayEnabled}
-            showRadar={showRadar}
-            showFlood={showFlood}
-            showTraffic={showTraffic}
-            verdictsCount={verdicts.size}
-            lang={lang}
-            floodLoading={floodLoading}
-            radarLoading={rainRadarLoading}
-            trafficLoading={trafficLoading}
-          />
-        </div>
-
-        {/* MOBILE CONTROLS (<md) */}
-        <div className="md:hidden absolute top-16 right-3 z-[810] flex flex-col items-end gap-2 pointer-events-none">
-          <MapLegend
-            isOpen={legendOpen}
-            onToggle={() => setLegendOpen(prev => !prev)}
-            analysisEnabled={analysisEnabled}
-            hexOverlayEnabled={hexOverlayEnabled}
-            showRadar={showRadar}
-            showFlood={showFlood}
-            showTraffic={showTraffic}
-            verdictsCount={verdicts.size}
-            lang={lang}
-            floodLoading={floodLoading}
-            radarLoading={rainRadarLoading}
-            trafficLoading={trafficLoading}
-          />
-          <div className="pointer-events-auto">
-            <WeatherWidget
-              weather={weather}
-              loading={weatherLoading}
-              lang={lang}
-            />
-          </div>
-        </div>
 
         {/* MOBILE FLOATING QUICK SEARCH BAR (hidden on md+) */}
         <div className="md:hidden absolute top-3 left-3 right-3 z-[810] pointer-events-auto">

@@ -200,7 +200,8 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     assert.equal(FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE.vi, 'Xác nhận bởi camera giám sát');
     assert.equal(FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE.en, 'Verified by surveillance cameras');
     assert.equal(FLOOD_I18N.TOOLTIP_TITLE.vi, 'Thời tiết khu vực');
-    assert.equal(FLOOD_I18N.FILTER_CHIP.vi(3), 'Khu vực có mưa (3)');
+    assert.equal(FLOOD_I18N.FILTER_CHIP.vi(3), 'Điểm ngập camera (3)');
+    assert.equal(FLOOD_I18N.FILTER_CHIP.en(3), 'Camera flood spots (3)');
     assert.equal(FLOOD_I18N.ACTIVE_ALERT_BADGE.vi(2), 'Vùng có mưa • 2');
   });
 });
