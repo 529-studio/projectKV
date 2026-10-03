@@ -51,7 +51,7 @@ export default function HexOverlay({
   trafficLoading = false,
 }: HexOverlayProps) {
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
-  const [internalMode, setInternalMode] = useState<ActiveLensMode>('flood');
+  const [internalMode, setInternalMode] = useState<ActiveLensMode>('radar');
 
   const currentMode = mode ?? internalMode;
 
@@ -398,7 +398,53 @@ export default function HexOverlay({
 
   return (
     <div className="pointer-events-auto flex items-center rounded-lg border border-zinc-800 bg-zinc-950/95 shadow-2xl backdrop-blur-md p-1 gap-1 font-mono text-xs select-none">
-      {/* 1. LENS 1: Camera Verified Flood (Primary Default) */}
+      {/* 1. LENS 1: Weather Radar Forecast (Live API Radar) */}
+      <button
+        type="button"
+        onClick={() => handleSelectMode('radar')}
+        aria-pressed={currentMode === 'radar'}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all focus:outline-none cursor-pointer border ${
+          currentMode === 'radar'
+            ? 'bg-sky-500 text-zinc-950 border-sky-400 shadow-sm font-bold'
+            : 'text-zinc-400 hover:text-sky-300 hover:bg-zinc-900 border-transparent'
+        }`}
+        title={`${FLOOD_I18N.LAYER_RADAR[lang]} — ${FLOOD_I18N.LAYER_RADAR_SUBTITLE[lang]}`}
+      >
+        <svg
+          className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+            currentMode === 'radar' ? 'text-zinc-950' : 'text-sky-400'
+          }`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+          <path d="M16 14v6" />
+          <path d="M8 14v6" />
+          <path d="M12 16v6" />
+        </svg>
+        <span className="hidden sm:inline">{FLOOD_I18N.LAYER_RADAR[lang]}</span>
+        <span className="sm:hidden">{FLOOD_I18N.LAYER_RADAR_SHORT[lang]}</span>
+        {radarLoading ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-300 animate-pulse ml-0.5" />
+        ) : radarRainActive ? (
+          <span
+            className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[9.5px] font-bold ${
+              currentMode === 'radar'
+                ? 'bg-zinc-950 text-sky-400'
+                : 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+            }`}
+          >
+            {lang === 'vi' ? 'Mưa' : 'Rain'}
+          </span>
+        ) : null}
+      </button>
+
+      {/* 2. LENS 2: Camera Verified Flood (AI Vision Hotspots) */}
       <button
         type="button"
         onClick={() => handleSelectMode('flood')}
@@ -441,52 +487,6 @@ export default function HexOverlay({
             }`}
           >
             {floodedCameraHexCount}
-          </span>
-        ) : null}
-      </button>
-
-      {/* 2. LENS 2: Weather Radar Forecast */}
-      <button
-        type="button"
-        onClick={() => handleSelectMode('radar')}
-        aria-pressed={currentMode === 'radar'}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all focus:outline-none cursor-pointer border ${
-          currentMode === 'radar'
-            ? 'bg-sky-500 text-zinc-950 border-sky-400 shadow-sm font-bold'
-            : 'text-zinc-400 hover:text-sky-300 hover:bg-zinc-900 border-transparent'
-        }`}
-        title={`${FLOOD_I18N.LAYER_RADAR[lang]} — ${FLOOD_I18N.LAYER_RADAR_SUBTITLE[lang]}`}
-      >
-        <svg
-          className={`w-3.5 h-3.5 shrink-0 transition-colors ${
-            currentMode === 'radar' ? 'text-zinc-950' : 'text-sky-400'
-          }`}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
-          <path d="M16 14v6" />
-          <path d="M8 14v6" />
-          <path d="M12 16v6" />
-        </svg>
-        <span className="hidden sm:inline">{FLOOD_I18N.LAYER_RADAR[lang]}</span>
-        <span className="sm:hidden">{FLOOD_I18N.LAYER_RADAR_SHORT[lang]}</span>
-        {radarLoading ? (
-          <span className="w-1.5 h-1.5 rounded-full bg-sky-300 animate-pulse ml-0.5" />
-        ) : radarRainActive ? (
-          <span
-            className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[9.5px] font-bold ${
-              currentMode === 'radar'
-                ? 'bg-zinc-950 text-sky-400'
-                : 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
-            }`}
-          >
-            {lang === 'vi' ? 'Mưa' : 'Rain'}
           </span>
         ) : null}
       </button>

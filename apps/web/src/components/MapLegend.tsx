@@ -16,7 +16,7 @@ interface MapLegendProps {
   showRadar?: boolean;
   showFlood?: boolean;
   showTraffic?: boolean;
-  hexOverlayMode?: 'traffic' | 'flood';
+  hexOverlayMode?: 'traffic' | 'flood' | 'radar';
   verdictsCount?: number;
   lang?: 'vi' | 'en';
   floodLoading?: boolean;
@@ -117,48 +117,7 @@ function LegendContent({
       {/* Category 3: Active Map Lens Overlay */}
       {effectiveMode !== 'off' && (
         <>
-          {/* LENS 1: Camera-Verified Flood */}
-          {effectiveMode === 'flood' && (
-            <div className="flex flex-col gap-1.5 pt-1.5 border-t border-zinc-800/80">
-              <div className="flex items-center justify-between text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
-                <div className="flex flex-col">
-                  <span className="text-blue-400">{FLOOD_I18N.LAYER_FLOOD_VERIFIED[lang]}</span>
-                  <span className="text-[9px] text-emerald-400/90 font-normal lowercase tracking-normal">
-                    ✓ {FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE[lang]}
-                  </span>
-                </div>
-                {floodLoading && (
-                  <span className="flex items-center gap-1 text-sky-400 font-normal lowercase tracking-normal">
-                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-                    <span>{lang === 'vi' ? 'đang tải...' : 'syncing...'}</span>
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span
-                  className="w-3.5 h-3.5 rounded-sm border-2 border-blue-600 shrink-0"
-                  style={{ backgroundColor: 'rgba(29, 78, 216, 0.45)' }}
-                />
-                <span className="text-zinc-300">{FLOOD_I18N.DEEP_WATER[lang]}</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span
-                  className="w-3.5 h-3.5 rounded-sm border-2 border-sky-500 shrink-0"
-                  style={{ backgroundColor: 'rgba(2, 132, 199, 0.35)' }}
-                />
-                <span className="text-zinc-300">{FLOOD_I18N.SHALLOW_WATER[lang]}</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span
-                  className="w-3.5 h-3.5 rounded-sm border-2 border-sky-400 shrink-0"
-                  style={{ backgroundColor: 'rgba(56, 189, 248, 0.25)' }}
-                />
-                <span className="text-zinc-300">{FLOOD_I18N.WET_ROAD[lang]}</span>
-              </div>
-            </div>
-          )}
-
-          {/* LENS 2: Weather Radar Forecast */}
+          {/* LENS 1: Weather Radar Forecast */}
           {effectiveMode === 'radar' && (
             <div className="flex flex-col gap-1.5 pt-1.5 border-t border-zinc-800/80">
               <div className="flex items-center justify-between text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
@@ -198,6 +157,47 @@ function LegendContent({
               </div>
               <div className="text-[9.5px] text-zinc-500 pt-0.5">
                 {WEATHER_I18N.ATTRIBUTION[lang]}
+              </div>
+            </div>
+          )}
+
+          {/* LENS 2: Camera-Verified Flood */}
+          {effectiveMode === 'flood' && (
+            <div className="flex flex-col gap-1.5 pt-1.5 border-t border-zinc-800/80">
+              <div className="flex items-center justify-between text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
+                <div className="flex flex-col">
+                  <span className="text-blue-400">{FLOOD_I18N.LAYER_FLOOD_VERIFIED[lang]}</span>
+                  <span className="text-[9px] text-emerald-400/90 font-normal lowercase tracking-normal">
+                    ✓ {FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE[lang]}
+                  </span>
+                </div>
+                {floodLoading && (
+                  <span className="flex items-center gap-1 text-sky-400 font-normal lowercase tracking-normal">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                    <span>{lang === 'vi' ? 'đang tải...' : 'syncing...'}</span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="w-3.5 h-3.5 rounded-sm border-2 border-blue-600 shrink-0"
+                  style={{ backgroundColor: 'rgba(29, 78, 216, 0.45)' }}
+                />
+                <span className="text-zinc-300">{FLOOD_I18N.DEEP_WATER[lang]}</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="w-3.5 h-3.5 rounded-sm border-2 border-sky-500 shrink-0"
+                  style={{ backgroundColor: 'rgba(2, 132, 199, 0.35)' }}
+                />
+                <span className="text-zinc-300">{FLOOD_I18N.SHALLOW_WATER[lang]}</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="w-3.5 h-3.5 rounded-sm border-2 border-sky-400 shrink-0"
+                  style={{ backgroundColor: 'rgba(56, 189, 248, 0.25)' }}
+                />
+                <span className="text-zinc-300">{FLOOD_I18N.WET_ROAD[lang]}</span>
               </div>
             </div>
           )}
@@ -252,7 +252,7 @@ export default function MapLegend({
   showRadar,
   showFlood,
   showTraffic,
-  hexOverlayMode = 'flood',
+  hexOverlayMode = 'radar',
   verdictsCount = 0,
   lang = 'vi',
   floodLoading = false,
@@ -264,10 +264,10 @@ export default function MapLegend({
     ? lensMode
     : !hexOverlayEnabled
       ? 'off'
-      : showFlood
-        ? 'flood'
-        : showRadar
-          ? 'radar'
+      : showRadar
+        ? 'radar'
+        : showFlood
+          ? 'flood'
           : showTraffic
             ? 'traffic'
             : hexOverlayMode;

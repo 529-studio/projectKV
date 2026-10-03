@@ -35,7 +35,8 @@ export default function Home() {
 
   const [map, setMap] = useState<L.Map | null>(null);
   // S9 (Issue #144): Independent 1-lens switcher ('flood' | 'radar' | 'traffic' | 'off')
-  const [activeLens, setActiveLens] = useState<ActiveLensMode>('flood');
+  // Default to 'radar' as it is driven by real-time rain radar API
+  const [activeLens, setActiveLens] = useState<ActiveLensMode>('radar');
   const [isFloodFilterActive, setIsFloodFilterActive] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
