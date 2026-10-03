@@ -100,6 +100,8 @@ export default function HexOverlay({
     if (currentMode === 'traffic') {
       hexCells.forEach((cell) => {
         if (!cell.polygon || cell.polygon.length < 3) return;
+        // Suppress Resolution 9 sub-hexagons to avoid cluttering inside macro hexagons
+        if (cell.h3_id && cell.h3_id.startsWith('89')) return;
 
         const { fillColor, fillOpacity } = getHexColorAndOpacity(cell.severity);
 
@@ -175,6 +177,8 @@ export default function HexOverlay({
       // Flood mode: render flood hex cells
       floodHexCells.forEach((cell) => {
         if (!cell.polygon || cell.polygon.length < 3) return;
+        // Suppress Resolution 9 sub-hexagons to avoid cluttering inside macro hexagons
+        if (cell.h3_id && cell.h3_id.startsWith('89')) return;
 
         const { fillColor, fillOpacity, strokeColor, strokeWeight } = getFloodHexColorAndOpacity(cell.flood_severity);
 
