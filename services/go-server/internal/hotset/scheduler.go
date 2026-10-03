@@ -130,6 +130,7 @@ type Scheduler struct {
 	maxParallel int
 	onVerdict   OnVerdict
 	budget      *AnalysisBudget
+	breaker     *CircuitBreaker
 	log         *slog.Logger
 }
 
@@ -143,8 +144,19 @@ func NewScheduler(registry *Registry, analyzer Analyzer, interval time.Duration,
 		interval:    interval,
 		maxParallel: maxParallel,
 		onVerdict:   onVerdict,
+		breaker:     NewCircuitBreaker(3, 15*time.Second),
 		log:         log,
 	}
+}
+
+// SetCircuitBreaker attaches a custom CircuitBreaker to the scheduler.
+func (s *Scheduler) SetCircuitBreaker(cb *CircuitBreaker) {
+	s.breaker = cb
+}
+
+// Breaker returns the current CircuitBreaker attached to the scheduler.
+func (s *Scheduler) Breaker() *CircuitBreaker {
+	return s.breaker
 }
 
 // SetBudget wires an optional daily analyzer budget. When the budget is
@@ -201,13 +213,31 @@ func (s *Scheduler) runOnce(ctx context.Context) {
 				if s.onVerdict != nil {
 					now := time.Now()
 					s.onVerdict(Verdict{
-						CameraID:   cam.ID,
-						Severity:   SeverityUnknown,
-						Confidence: 0,
-						Source:     "",
-						ObservedAt: now,
-						Stale:      false,
-						Timestamp:  now,
+						CameraID:      cam.ID,
+						Severity:      SeverityUnknown,
+						FloodSeverity: SeverityUnknown,
+						Confidence:    0,
+						Source:        "budget_breaker",
+						ObservedAt:    now,
+						Stale:         true,
+						Timestamp:     now,
+					})
+				}
+				return
+			}
+
+			if s.breaker != nil && !s.breaker.Allow() {
+				if s.onVerdict != nil {
+					now := time.Now()
+					s.onVerdict(Verdict{
+						CameraID:      cam.ID,
+						Severity:      SeverityUnknown,
+						FloodSeverity: SeverityUnknown,
+						Confidence:    0,
+						Source:        "circuit_breaker",
+						ObservedAt:    now,
+						Stale:         true,
+						Timestamp:     now,
 					})
 				}
 				return
@@ -215,9 +245,30 @@ func (s *Scheduler) runOnce(ctx context.Context) {
 
 			verdict, err := s.analyzer.Analyze(callCtx, cam)
 			if err != nil {
-				s.log.Warn("analysis failed", "camera", cam.ID, "error", err)
+				if s.breaker != nil {
+					s.breaker.RecordFailure(err)
+				}
+				s.log.Warn("analysis failed, degrading to unknown", "camera", cam.ID, "error", err)
+				if s.onVerdict != nil {
+					now := time.Now()
+					s.onVerdict(Verdict{
+						CameraID:      cam.ID,
+						Severity:      SeverityUnknown,
+						FloodSeverity: SeverityUnknown,
+						Confidence:    0,
+						Source:        "fallback",
+						ObservedAt:    now,
+						Stale:         true,
+						Timestamp:     now,
+					})
+				}
 				return
 			}
+
+			if s.breaker != nil {
+				s.breaker.RecordSuccess()
+			}
+
 			if verdict.ObservedAt.IsZero() {
 				verdict.ObservedAt = time.Now()
 			}
