@@ -67,8 +67,8 @@ services:
     networks:
       - core-network
     environment:
-      - PORT=8000
-      - MODEL_DIR=/app/models/yolov8n_openvino_320
+      - PORT=${MODEL_PORT:-8000}
+      - MODEL_DIR=${MODEL_DIR:-/app/models/yolov8n_openvino_320}
     deploy:
       resources:
         limits:

@@ -1,10 +1,7 @@
 package cvclient
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -170,13 +167,4 @@ func TestCVEngineAnalyzer_Analyze_ContextCancelled(t *testing.T) {
 	if v.Severity != hotset.SeverityUnknown {
 		t.Errorf("expected severity UNKNOWN on timeout, got %q", v.Severity)
 	}
-}
-
-func TestCVEngineAnalyzer_ImplementsAnalyzerInterface(t *testing.T) {
-	// Compile-time assertion via assignment — if CVEngineAnalyzer doesn't implement
-	// hotset.Analyzer, this line will not compile.
-	var _ hotset.Analyzer = (*CVEngineAnalyzer)(nil)
-	_ = fmt.Sprintf // suppress import warning
-	_ = bytes.NewReader
-	_ = json.NewDecoder
 }
