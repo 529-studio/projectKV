@@ -289,6 +289,12 @@ export default function PinnedDock({
         onPointerMove={handlePointerMove}
         onPointerUp={(e) => handlePointerUp(e, cam)}
         onPointerCancel={handlePointerCancel}
+        onClick={() => {
+          if (!isDraggingRef.current && onCameraClick) {
+            onCameraClick(cam);
+            setIsMobileExpanded(false);
+          }
+        }}
         role="button"
         aria-label={`${cam.displayName || cam.title}. ${PINNED_DOCK_I18N.DRAG_TO_REORDER[lang]}`}
         className={`relative ${presetStyle.tileClass} bg-black border rounded-sm select-none cursor-grab active:cursor-grabbing overflow-hidden transition-all outline-none focus:ring-1 focus:ring-zinc-400 group ${
