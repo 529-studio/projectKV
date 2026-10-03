@@ -61,10 +61,10 @@ export function latLonToTilePixel(lat: number, lon: number, zoom = 7): TilePixel
 /**
  * Maps RainViewer radar reflectivity pixel (RGBA) to ProjectKV Flood/Rain Severity.
  * Precedence:
- * - a < 20: No echo (null)
- * - a >= 130: Heavy rain / deep water risk ('FLOODED_DEEP')
- * - a >= 60: Moderate rain / shallow water risk ('FLOODED_SHALLOW')
- * - a >= 20: Light rain / wet road ('WET')
+ * - a < 75: Atmospheric moisture / thin cloud clutter suppressed (null)
+ * - a >= 200: Heavy rain / storm risk ('FLOODED_DEEP')
+ * - a >= 140: Moderate rain / water accumulation risk ('FLOODED_SHALLOW')
+ * - a >= 75: Light rain / wet road ('WET')
  */
 export function mapRadarPixelToSeverity(
   _r: number,
@@ -72,9 +72,9 @@ export function mapRadarPixelToSeverity(
   _b: number,
   a: number
 ): 'FLOODED_DEEP' | 'FLOODED_SHALLOW' | 'WET' | null {
-  if (a < 20) return null;
-  if (a >= 130) return 'FLOODED_DEEP';
-  if (a >= 60) return 'FLOODED_SHALLOW';
+  if (a < 75) return null;
+  if (a >= 200) return 'FLOODED_DEEP';
+  if (a >= 140) return 'FLOODED_SHALLOW';
   return 'WET';
 }
 
@@ -113,7 +113,7 @@ export function mergeFloodHexCells<T extends FloodHexCellLike>(
 
 /**
  * Fallback mapping from Open-Meteo city rainfall when radar tiles are offline or empty.
- * If Open-Meteo reports active precipitation (rain_mm > 0 or rain/storm WMO code),
+ * If Open-Meteo reports active precipitation (rain_mm >= 1.0 or active rain WMO code >= 61),
  * marks active monitored camera cells as WET / FLOODED_SHALLOW.
  */
 export function generateOpenMeteoFallbackHexCells<T extends FloodHexCellLike = FloodHexCellLike>(
@@ -122,7 +122,7 @@ export function generateOpenMeteoFallbackHexCells<T extends FloodHexCellLike = F
   monitoredCellIds: Set<string>
 ): Map<string, T> {
   const result = new Map<string, T>();
-  const isRaining = weather.rain_mm > 0 || isWmoRain(weather.weather_code);
+  const isRaining = weather.rain_mm >= 1.0 || (weather.weather_code >= 61 && isWmoRain(weather.weather_code));
 
   if (!isRaining) return result;
 

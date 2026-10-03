@@ -38,20 +38,23 @@ describe('Rain Hex Utils (Issue #106 / #120 Restoration)', () => {
   });
 
   test('mapRadarPixelToSeverity maps reflectivity alpha to flood/rain severity', () => {
-    // Below threshold (clear / no echo)
+    // Below threshold (clear / cloud noise suppressed)
     assert.equal(mapRadarPixelToSeverity(0, 0, 0, 0), null);
-    assert.equal(mapRadarPixelToSeverity(100, 100, 100, 15), null);
+    assert.equal(mapRadarPixelToSeverity(100, 100, 100, 20), null);
+    assert.equal(mapRadarPixelToSeverity(100, 100, 100, 50), null);
+    assert.equal(mapRadarPixelToSeverity(120, 110, 100, 74), null);
 
     // Light rain (wet)
-    assert.equal(mapRadarPixelToSeverity(100, 100, 100, 25), 'WET');
-    assert.equal(mapRadarPixelToSeverity(120, 110, 100, 55), 'WET');
+    assert.equal(mapRadarPixelToSeverity(100, 100, 100, 75), 'WET');
+    assert.equal(mapRadarPixelToSeverity(120, 110, 100, 100), 'WET');
+    assert.equal(mapRadarPixelToSeverity(120, 110, 100, 139), 'WET');
 
-    // Moderate rain (shallow flood)
-    assert.equal(mapRadarPixelToSeverity(140, 130, 110, 60), 'FLOODED_SHALLOW');
-    assert.equal(mapRadarPixelToSeverity(160, 140, 110, 120), 'FLOODED_SHALLOW');
+    // Moderate rain (shallow flood risk)
+    assert.equal(mapRadarPixelToSeverity(140, 130, 110, 140), 'FLOODED_SHALLOW');
+    assert.equal(mapRadarPixelToSeverity(160, 140, 110, 199), 'FLOODED_SHALLOW');
 
-    // Heavy rain (deep flood)
-    assert.equal(mapRadarPixelToSeverity(200, 180, 120, 130), 'FLOODED_DEEP');
+    // Heavy rain (deep flood risk)
+    assert.equal(mapRadarPixelToSeverity(200, 180, 120, 200), 'FLOODED_DEEP');
     assert.equal(mapRadarPixelToSeverity(255, 200, 150, 240), 'FLOODED_DEEP');
   });
 
@@ -147,5 +150,14 @@ describe('Rain Hex Utils (Issue #106 / #120 Restoration)', () => {
     };
     const dryResult = generateOpenMeteoFallbackHexCells(weatherDry, polygons, monitoredCells);
     assert.equal(dryResult.size, 0);
+
+    // When minor trace rain / cloud moisture below threshold (rain_mm < 1.0 and cloudy weather code)
+    const weatherTrace: WeatherData = {
+      ...weatherRain,
+      weather_code: 2, // partly cloudy
+      rain_mm: 0.3,
+    };
+    const traceResult = generateOpenMeteoFallbackHexCells(weatherTrace, polygons, monitoredCells);
+    assert.equal(traceResult.size, 0);
   });
 });
