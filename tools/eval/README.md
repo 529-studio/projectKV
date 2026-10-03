@@ -156,9 +156,84 @@ python3 -m unittest discover -s tools/eval -p "*_test.py"
 
 ---
 
-## 7. Adding New Labeled Frames
+## 7. Hotkey Labeler (`labeler.html`)
+
+A zero-dependency browser-based labeling tool for rapidly annotating JPEG frames pulled from `data/proofs/`.
+
+### 7.1 Quick Start
+
+```bash
+# Open directly in any modern browser — no server required
+open tools/eval/labeler.html          # macOS
+xdg-open tools/eval/labeler.html     # Linux
+start tools/eval/labeler.html        # Windows
+```
+
+Then click **"Open Folder"** and select a directory containing JPEG frames (e.g. `data/proofs/2026-10-01/` or `tools/eval/fixtures/frames/`).
+
+### 7.2 Hotkey Reference
+
+| Key | Action |
+|---|---|
+| **1** | Flood → `NONE` (dry / surface spray) |
+| **2** | Flood → `SHALLOW` (pooling / ankle-deep) |
+| **3** | Flood → `DEEP` (wheel-height or higher) |
+| **Q** | Traffic → `CLEAR` |
+| **W** | Traffic → `MODERATE` |
+| **E** | Traffic → `HEAVY` |
+| **R** | Traffic → `CONGESTED` |
+| **A** | Weather → `dry` |
+| **S** | Weather → `rain` |
+| **D** | Weather → `heavy_rain` |
+| **Z** | Time of day → `day` |
+| **X** | Time of day → `night` |
+| **C** | Time of day → `dawn_dusk` |
+| **Enter** | **Save label and advance to next frame** |
+| **Tab** | Skip frame (no label saved) |
+| **← / →** | Navigate without saving |
+
+> **Flood is the only required field before saving** (1/2/3). Traffic, weather, and time-of-day are optional but strongly recommended for the accuracy gate (ADR-004 §D6).
+
+### 7.3 Output
+
+Each saved frame writes a JSON file matching the existing label schema:
+
+```json
+{
+  "frame_id": "cam_5a825b7d_1790858415",
+  "image_path": "cam_5a825b7d_1790858415.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "your_name",
+  "annotated_at": "2026-10-03T10:00:00.000Z"
+}
+```
+
+The tool writes output in a `labels/` sub-folder inside the opened directory (created automatically). When write permission is denied by the browser, it falls back to downloading individual `.json` files.
+
+Use **"Export All JSON"** to download a single array file (`labels_export.json`) containing all in-session annotations.
+
+### 7.4 Workflow
+
+1. Click **Open Folder** → select `data/proofs/<date>/` or any frame directory.
+2. Press **1** / **2** / **3** to classify flood level.
+3. Press **Q–R**, **A–D**, **Z–C** to set traffic / weather / time.
+4. Press **Enter** to save and advance automatically.
+5. At session end, copy the `labels/` output into `tools/eval/labels/`.
+6. Run `python3 tools/eval/benchmark.py` to regenerate the benchmark report.
+
+> The annotator name is persisted in `localStorage` so you only type it once per browser profile.
+
+---
+
+## 8. Adding New Labeled Frames
 
 1. Save or copy snapshot JPEG frames from `data/proofs/` into your archive directory.
-2. Create a JSON label file in `tools/eval/labels/<frame_id>.json` referencing the image path.
+2. Use the [labeler](./labeler.html) (§7) or create a JSON label file manually in `tools/eval/labels/<frame_id>.json`.
 3. Verify labels against the schema using `python3 tools/eval/benchmark_test.py`.
 4. Run `python3 tools/eval/benchmark.py` to regenerate the baseline report in `tools/eval/reports/`.
+
