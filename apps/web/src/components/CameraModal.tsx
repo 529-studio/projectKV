@@ -13,6 +13,12 @@ interface CameraModalProps {
   lang?: 'vi' | 'en';
   appEnv?: string;
   analysisEnabled?: boolean;
+  pinCapReached?: boolean;
+  onPrevCamera?: () => void;
+  onNextCamera?: () => void;
+  hasPrevCamera?: boolean;
+  hasNextCamera?: boolean;
+  sequenceLabel?: string;
 }
 
 export default function CameraModal({
@@ -24,6 +30,12 @@ export default function CameraModal({
   lang = 'vi',
   appEnv = 'production',
   analysisEnabled = false,
+  pinCapReached = false,
+  onPrevCamera,
+  onNextCamera,
+  hasPrevCamera = false,
+  hasNextCamera = false,
+  sequenceLabel,
 }: CameraModalProps) {
   const [imgError, setImgError] = useState(false);
   const [fetchTimestamp, setFetchTimestamp] = useState<number>(Date.now());
@@ -35,7 +47,29 @@ export default function CameraModal({
     setFetchTimestamp(Date.now());
     setElapsedSeconds(0);
     setOsdTime(null);
+    if (typeof window !== 'undefined') {
+      window.getSelection()?.removeAllRanges();
+    }
   }, [camera?.id]);
+
+  // Arrow key navigation for previous / next camera in sequence
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        if (hasPrevCamera && onPrevCamera) {
+          e.preventDefault();
+          onPrevCamera();
+        }
+      } else if (e.key === 'ArrowRight') {
+        if (hasNextCamera && onNextCamera) {
+          e.preventDefault();
+          onNextCamera();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasPrevCamera, hasNextCamera, onPrevCamera, onNextCamera]);
 
   useEffect(() => {
     if (!camera?.isOnline || camera?.isGhost) return;
@@ -92,18 +126,28 @@ export default function CameraModal({
 
   return (
     <div 
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 select-none"
       onClick={onClose}
     >
       <div 
-        className="bg-zinc-950 border border-zinc-700 shadow-2xl rounded-lg w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col font-mono text-zinc-300"
+        className="bg-zinc-950 border border-zinc-700 shadow-2xl rounded-lg w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col font-mono text-zinc-300 select-none"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* HEADER */}
-        <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 flex justify-between items-start">
-          <div>
-            <h2 className="text-white font-bold text-lg">{camera.displayName || camera.title}</h2>
+        <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 flex justify-between items-start select-none">
+          <div className="flex-1 min-w-0 mr-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-white font-bold text-lg truncate">{camera.displayName || camera.title}</h2>
+              {sequenceLabel && (
+                <span
+                  className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold tracking-wide shrink-0"
+                  title={lang === 'vi' ? 'Vị trí trong danh sách camera' : 'Camera sequence position'}
+                >
+                  [{sequenceLabel}]
+                </span>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-zinc-400">
               {osdTime ? (
                 <>
@@ -237,6 +281,52 @@ export default function CameraModal({
 
         {/* IMAGE WRAPPER */}
         <div className="relative w-full aspect-video bg-black flex items-center justify-center">
+          {/* Overlay Navigation Buttons (< and >) */}
+          {(hasPrevCamera || hasNextCamera) && (
+            <>
+              {/* Previous camera button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPrevCamera?.();
+                }}
+                disabled={!hasPrevCamera}
+                className={`absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-950/80 hover:bg-zinc-900 border border-zinc-700/80 text-white flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-90 ${
+                  !hasPrevCamera
+                    ? 'opacity-20 pointer-events-none'
+                    : 'opacity-85 hover:opacity-100 hover:border-zinc-400 cursor-pointer'
+                }`}
+                aria-label={lang === 'vi' ? 'Camera trước (Mũi tên trái)' : 'Previous camera (Left arrow)'}
+                title={lang === 'vi' ? 'Camera trước (Mũi tên trái)' : 'Previous camera (Left arrow)'}
+              >
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              {/* Next camera button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNextCamera?.();
+                }}
+                disabled={!hasNextCamera}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-950/80 hover:bg-zinc-900 border border-zinc-700/80 text-white flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-90 ${
+                  !hasNextCamera
+                    ? 'opacity-20 pointer-events-none'
+                    : 'opacity-85 hover:opacity-100 hover:border-zinc-400 cursor-pointer'
+                }`}
+                aria-label={lang === 'vi' ? 'Camera kế tiếp (Mũi tên phải)' : 'Next camera (Right arrow)'}
+                title={lang === 'vi' ? 'Camera kế tiếp (Mũi tên phải)' : 'Next camera (Right arrow)'}
+              >
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </>
+          )}
           {camera.isGhost ? (
             <div className="text-center p-6 space-y-2">
               <div className="text-amber-400 font-bold text-sm">
@@ -303,12 +393,23 @@ export default function CameraModal({
           </div>
           <button 
             onClick={onTogglePin}
-            className={`px-3 py-1.5 border rounded transition ${isPinned ? 'bg-zinc-200 text-black border-white hover:bg-white' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-600 text-white'}`}
+            title={!isPinned && pinCapReached ? (lang === 'vi' ? 'Đã đạt giới hạn ghim (tối đa 12 camera)' : 'Pin limit reached (maximum 12 cameras)') : undefined}
+            className={`px-3 py-1.5 border rounded transition ${
+              isPinned
+                ? 'bg-zinc-200 text-black border-white hover:bg-white'
+                : pinCapReached
+                ? 'bg-amber-950/80 hover:bg-amber-900 border-amber-700 text-amber-200 cursor-not-allowed'
+                : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-600 text-white'
+            }`}
           >
             {isPinned
               ? lang === 'vi'
                 ? '[- BỎ GHIM]'
                 : '[- UNPIN]'
+              : pinCapReached
+              ? lang === 'vi'
+                ? '[12/12 ĐẦY]'
+                : '[12/12 FULL]'
               : lang === 'vi'
               ? '[+ GHIM THEO DÕI]'
               : '[+ PIN TO DOCK]'}

@@ -11,7 +11,7 @@ import { useRainHexRadar } from '../hooks/useRainHexRadar';
 import { mergeFloodHexCells } from '../utils/rainHexUtils';
 import { type HexOverlayMode } from '../components/HexOverlay';
 import { FLOOD_I18N } from '../utils/floodUtils';
-import { MOBILE_SEARCH_I18N } from '../config/constants';
+import { MOBILE_SEARCH_I18N, PINNED_DOCK_CAP, PINNED_DOCK_I18N } from '../config/constants';
 import LandingOverlay from '../components/LandingOverlay';
 import CameraModal from '../components/CameraModal';
 import PinnedDock from '../components/PinnedDock';
@@ -23,6 +23,7 @@ import PhuongTreeFilter, {
   computeFilteredCameraIds,
   computeActiveFilterLabel,
 } from '../components/PhuongTreeFilter';
+import { getCameraSequence } from '../utils/cameraSequence';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
@@ -48,6 +49,7 @@ export default function Home() {
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pinnedCameraIds, setPinnedCameraIds] = useState<string[]>([]);
+  const [pinNotice, setPinNotice] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [shouldFocusSearch, setShouldFocusSearch] = useState(false);
@@ -61,6 +63,22 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
       setLegendOpen(true);
+    }
+  }, []);
+
+  // Pinned camera list & order persistence (ADR-004 §A4/S5)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = localStorage.getItem('warded_pinned_camera_ids');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setPinnedCameraIds(parsed.slice(0, PINNED_DOCK_CAP));
+        }
+      } catch {
+        // ignore malformed storage
+      }
     }
   }, []);
 
@@ -193,11 +211,41 @@ export default function Home() {
     return pinnedCameraIds.map(id => cameras.find(c => c.id === id)).filter(Boolean) as Camera[];
   }, [pinnedCameraIds, cameras]);
 
-  const togglePin = (camId: string) => {
-    setPinnedCameraIds(prev => 
-      prev.includes(camId) ? prev.filter(id => id !== camId) : [...prev, camId]
-    );
-  };
+  const togglePin = useCallback((camId: string) => {
+    setPinnedCameraIds(prev => {
+      if (prev.includes(camId)) {
+        const next = prev.filter(id => id !== camId);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('warded_pinned_camera_ids', JSON.stringify(next));
+        }
+        return next;
+      }
+      if (prev.length >= PINNED_DOCK_CAP) {
+        setPinNotice(PINNED_DOCK_I18N.PIN_CAP_REACHED[lang]);
+        setTimeout(() => setPinNotice(null), 3500);
+        return prev;
+      }
+      const next = [...prev, camId];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('warded_pinned_camera_ids', JSON.stringify(next));
+      }
+      return next;
+    });
+  }, [lang]);
+
+  const handleClearPins = useCallback(() => {
+    setPinnedCameraIds([]);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('warded_pinned_camera_ids');
+    }
+  }, []);
+
+  const handleReorderPins = useCallback((newOrder: string[]) => {
+    setPinnedCameraIds(newOrder);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('warded_pinned_camera_ids', JSON.stringify(newOrder));
+    }
+  }, []);
 
   const selectedCameraVerdict = useMemo(() => {
     if (!selectedCamera) return undefined;
@@ -214,6 +262,16 @@ export default function Home() {
       timestamp: fv?.timestamp || tv?.timestamp || new Date().toISOString(),
     };
   }, [selectedCamera, verdicts, floodVerdicts]);
+
+  const cameraSequence = useMemo(() => {
+    return getCameraSequence({
+      currentCamera: selectedCamera,
+      allCameras: cameras,
+      pinnedCameras,
+      selectedCorridor,
+      lang,
+    });
+  }, [selectedCamera, cameras, pinnedCameras, selectedCorridor, lang]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-300">
@@ -290,9 +348,12 @@ export default function Home() {
         <PinnedDock 
           pinnedCameras={pinnedCameras} 
           onUnpin={togglePin} 
-          onClear={() => setPinnedCameraIds([])} 
+          onClear={handleClearPins}
+          onReorder={handleReorderPins}
           onCameraClick={setSelectedCamera}
           lang={lang}
+          verdicts={verdicts}
+          pinNotice={pinNotice}
         />
 
         {/* FLOATING STATUS PILL — Non-blocking background AI sync notification */}
@@ -490,6 +551,12 @@ export default function Home() {
         lang={lang}
         appEnv={appEnv}
         analysisEnabled={analysisEnabled}
+        pinCapReached={pinnedCameraIds.length >= PINNED_DOCK_CAP}
+        onPrevCamera={() => cameraSequence.prevCamera && setSelectedCamera(cameraSequence.prevCamera as Camera)}
+        onNextCamera={() => cameraSequence.nextCamera && setSelectedCamera(cameraSequence.nextCamera as Camera)}
+        hasPrevCamera={Boolean(cameraSequence.prevCamera)}
+        hasNextCamera={Boolean(cameraSequence.nextCamera)}
+        sequenceLabel={cameraSequence.contextLabel}
       />
     </div>
   );

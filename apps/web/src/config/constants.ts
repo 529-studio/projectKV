@@ -207,6 +207,8 @@ export const MOBILE_SEARCH_I18N = Object.freeze({
   },
 });
 
+export const PINNED_DOCK_CAP = 12;
+
 export const PINNED_DOCK_I18N = Object.freeze({
   TITLE: {
     vi: 'DOCK THEO DÕI',
@@ -231,6 +233,63 @@ export const PINNED_DOCK_I18N = Object.freeze({
   UNPIN: {
     vi: 'Bỏ ghim',
     en: 'Unpin',
+  },
+  SIZE_PRESETS: {
+    S: { vi: 'Nhỏ', en: 'Small' },
+    M: { vi: 'Vừa', en: 'Medium' },
+    L: { vi: 'Lớn', en: 'Large' },
+  },
+  VIEW_MODE: {
+    STRIP: { vi: 'Dải', en: 'Strip' },
+    GRID: { vi: 'Lưới', en: 'Grid' },
+  },
+  FULL_WIDTH_GRID: {
+    vi: 'Lưới toàn chiều rộng',
+    en: 'Full-width grid',
+  },
+  PIN_CAP_REACHED: {
+    vi: 'Đã đạt giới hạn ghim (tối đa 12 camera)',
+    en: 'Pin limit reached (maximum 12 cameras)',
+  },
+  PIN_LIMIT_BADGE: {
+    vi: 'ĐÃ ĐẠT GIỚI HẠN',
+    en: 'PIN CAP REACHED',
+  },
+  NO_ANALYSIS: {
+    vi: 'Chưa phân tích',
+    en: 'No analysis',
+  },
+  ONLINE: {
+    vi: 'Trực tuyến',
+    en: 'Online',
+  },
+  OFFLINE: {
+    vi: 'Mất kết nối',
+    en: 'Offline',
+  },
+  STALE: {
+    vi: 'Cũ',
+    en: 'Stale',
+  },
+  JUST_NOW: {
+    vi: 'Vừa xong',
+    en: 'Just now',
+  },
+  SECONDS_AGO: {
+    vi: (s: number) => `${s}s trước`,
+    en: (s: number) => `${s}s ago`,
+  },
+  MOVE_LEFT: {
+    vi: 'Di chuyển sang trái',
+    en: 'Move left',
+  },
+  MOVE_RIGHT: {
+    vi: 'Di chuyển sang phải',
+    en: 'Move right',
+  },
+  DRAG_TO_REORDER: {
+    vi: 'Kéo để sắp xếp lại',
+    en: 'Drag to reorder',
   },
 });
 
