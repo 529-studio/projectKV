@@ -1,0 +1,122 @@
+{
+  "timestamp": "2026-10-03T10:45:49Z",
+  "host_hardware": {
+    "chassis": "ZOTAC ZBOX-CI320NANO (Fanless, 7.5W TDP)",
+    "cpu": "Intel Celeron N2930 (4C/4T @ 1.83GHz)",
+    "ram": "8GB DDR3L",
+    "storage": "250GB 5400RPM HDD (SATA 3Gb/s / 2.5\")",
+    "os": "Debian 13 (Docker Engine)"
+  },
+  "scenarios": {
+    "baseline": {
+      "mode": "baseline",
+      "duration_sec": 6.03,
+      "workers": {
+        "archiver": {
+          "operations": 3,
+          "errors": 0,
+          "throughput_mb_s": 0.03,
+          "iops": 0.5,
+          "latency_p50_ms": 1.41,
+          "latency_p90_ms": 2.08,
+          "latency_p95_ms": 2.08,
+          "latency_p99_ms": 2.08,
+          "latency_max_ms": 2.08
+        },
+        "sqlite": {
+          "operations": 5,
+          "errors": 0,
+          "throughput_mb_s": 0.0,
+          "iops": 0.8,
+          "latency_p50_ms": 0.23,
+          "latency_p90_ms": 0.4,
+          "latency_p95_ms": 0.4,
+          "latency_p99_ms": 0.4,
+          "latency_max_ms": 0.4
+        },
+        "valhalla": {
+          "operations": 4,
+          "errors": 0,
+          "throughput_mb_s": 0.04,
+          "iops": 0.7,
+          "latency_p50_ms": 0.16,
+          "latency_p90_ms": 0.23,
+          "latency_p95_ms": 0.23,
+          "latency_p99_ms": 0.23,
+          "latency_max_ms": 0.23
+        },
+        "cv_worker": {
+          "operations": 3,
+          "errors": 0,
+          "throughput_mb_s": 0.04,
+          "iops": 0.5,
+          "latency_p50_ms": 0.22,
+          "latency_p90_ms": 0.33,
+          "latency_p95_ms": 0.33,
+          "latency_p99_ms": 0.33,
+          "latency_max_ms": 0.33
+        }
+      },
+      "aggregate": {
+        "total_operations": 15,
+        "total_throughput_mb_s": 0.11,
+        "total_iops": 2.5
+      }
+    },
+    "storm-burst": {
+      "mode": "storm-burst",
+      "duration_sec": 5.1,
+      "workers": {
+        "archiver": {
+          "operations": 174,
+          "errors": 0,
+          "throughput_mb_s": 2.67,
+          "iops": 34.2,
+          "latency_p50_ms": 1.19,
+          "latency_p90_ms": 2.2,
+          "latency_p95_ms": 2.51,
+          "latency_p99_ms": 3.05,
+          "latency_max_ms": 3.24
+        },
+        "sqlite": {
+          "operations": 362,
+          "errors": 0,
+          "throughput_mb_s": 0.03,
+          "iops": 71.0,
+          "latency_p50_ms": 0.28,
+          "latency_p90_ms": 0.4,
+          "latency_p95_ms": 1.59,
+          "latency_p99_ms": 2.12,
+          "latency_max_ms": 2.48
+        },
+        "valhalla": {
+          "operations": 270,
+          "errors": 0,
+          "throughput_mb_s": 3.31,
+          "iops": 53.0,
+          "latency_p50_ms": 0.12,
+          "latency_p90_ms": 0.17,
+          "latency_p95_ms": 0.2,
+          "latency_p99_ms": 0.24,
+          "latency_max_ms": 0.31
+        },
+        "cv_worker": {
+          "operations": 47,
+          "errors": 0,
+          "throughput_mb_s": 0.68,
+          "iops": 9.2,
+          "latency_p50_ms": 0.27,
+          "latency_p90_ms": 0.33,
+          "latency_p95_ms": 0.34,
+          "latency_p99_ms": 0.38,
+          "latency_max_ms": 0.38
+        }
+      },
+      "aggregate": {
+        "total_operations": 853,
+        "total_throughput_mb_s": 6.69,
+        "total_iops": 167.4
+      }
+    }
+  }
+}
