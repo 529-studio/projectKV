@@ -321,16 +321,16 @@ export default function MapLegend({
       {/* MOBILE VIEW (<md): Trigger button + Bottom sheet modal */}
       <div className="md:hidden">
         {/* Trigger Button */}
-        <div className="z-[800] pointer-events-auto select-none">
+        <div className="pointer-events-auto select-none">
           <button
             onClick={onToggle}
-            className="w-[32px] h-[32px] flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/95 text-zinc-400 hover:text-white shadow-2xl backdrop-blur-md focus:outline-none active:bg-zinc-900 cursor-pointer transition-colors"
+            className="w-11 h-11 flex items-center justify-center rounded-lg border border-zinc-700 hover:border-zinc-400 bg-zinc-950/95 text-zinc-200 hover:text-white shadow-2xl backdrop-blur-md focus:outline-none active:scale-95 cursor-pointer transition-all"
             aria-expanded={isOpen}
             aria-label={lang === 'vi' ? 'Chú giải bản đồ' : 'Map legend'}
             title={lang === 'vi' ? 'Chú giải bản đồ' : 'Map legend'}
           >
             <svg
-              className="w-3.5 h-3.5"
+              className="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
