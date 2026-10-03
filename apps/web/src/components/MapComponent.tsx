@@ -406,9 +406,9 @@ export default function MapComponent({
             {legendControl}
           </div>
 
-          {/* Mobile view (<md): Legend at top-16 (opposite lens switcher), Weather at top-28 (below legend, opposite filter chip) */}
+          {/* Mobile view (<md): Legend trigger at bottom-20 left-3 (bottom left corner, opposite to search FAB), Weather at top-28 right-3 */}
           {legendControl && (
-            <div className="md:hidden absolute top-16 right-3 z-[800] pointer-events-auto">
+            <div className="md:hidden absolute bottom-20 left-3 z-[830] pointer-events-auto">
               {legendControl}
             </div>
           )}
