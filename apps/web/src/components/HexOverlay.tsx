@@ -11,10 +11,12 @@ import {
 } from '../utils/hexUtils';
 import {
   FloodHexCell,
-  getFloodHexColorAndOpacity,
+  getRadarHexColorAndOpacity,
+  getVerifiedFloodHexColorAndOpacity,
   isFloodVisibleAtZoom,
   getFloodInteractivityState,
   formatFloodHexTooltip,
+  formatRadarHexTooltip,
   FLOOD_I18N,
 } from '../utils/floodUtils';
 import { HEX_I18N } from '../config/constants';
@@ -29,12 +31,22 @@ export interface HexOverlayProps {
   map: L.Map | null;
   hexCells: Map<string, HexCell>;
   floodHexCells?: Map<string, FloodHexCell>;
+  radarHexCells?: Map<string, FloodHexCell>;
   enabled: boolean;
   onToggle: () => void;
+  // Independent layer controls (S9 - Issue #144)
+  showRadar?: boolean;
+  onToggleRadar?: () => void;
+  showFlood?: boolean;
+  onToggleFlood?: () => void;
+  showTraffic?: boolean;
+  onToggleTraffic?: () => void;
+  // Backwards compatibility for existing mode/onModeChange
   mode?: HexOverlayMode;
   onModeChange?: (mode: HexOverlayMode) => void;
   lang?: 'vi' | 'en';
   floodLoading?: boolean;
+  radarLoading?: boolean;
   trafficLoading?: boolean;
 }
 
@@ -42,34 +54,96 @@ export default function HexOverlay({
   map,
   hexCells,
   floodHexCells = new Map(),
+  radarHexCells = new Map(),
   enabled,
   onToggle,
+  showRadar,
+  onToggleRadar,
+  showFlood,
+  onToggleFlood,
+  showTraffic,
+  onToggleTraffic,
   mode,
   onModeChange,
   lang = 'vi',
   floodLoading = false,
+  radarLoading = false,
   trafficLoading = false,
 }: HexOverlayProps) {
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
-  const [internalMode, setInternalMode] = useState<HexOverlayMode>('flood');
 
-  const currentMode = mode ?? internalMode;
-  const handleModeChange = (newMode: HexOverlayMode) => {
-    if (onModeChange) {
-      onModeChange(newMode);
+  // Fallback internal state if independent toggles not supplied
+  const [internalShowRadar, setInternalShowRadar] = useState(true);
+  const [internalShowFlood, setInternalShowFlood] = useState(true);
+  const [internalShowTraffic, setInternalShowTraffic] = useState(false);
+
+  // Determine active state for each layer
+  const isRadarActive = showRadar !== undefined
+    ? showRadar
+    : (mode !== undefined ? mode === 'flood' : internalShowRadar);
+
+  const isFloodActive = showFlood !== undefined
+    ? showFlood
+    : (mode !== undefined ? mode === 'flood' : internalShowFlood);
+
+  const isTrafficActive = showTraffic !== undefined
+    ? showTraffic
+    : (mode !== undefined ? mode === 'traffic' : internalShowTraffic);
+
+  const handleToggleRadar = () => {
+    if (onToggleRadar) {
+      onToggleRadar();
     } else {
-      setInternalMode(newMode);
+      setInternalShowRadar((prev) => !prev);
+      if (mode !== undefined && onModeChange && !isRadarActive) {
+        onModeChange('flood');
+      }
     }
   };
 
-  const activeCellsCount = currentMode === 'traffic' ? hexCells.size : floodHexCells.size;
+  const handleToggleFlood = () => {
+    if (onToggleFlood) {
+      onToggleFlood();
+    } else {
+      setInternalShowFlood((prev) => !prev);
+      if (mode !== undefined && onModeChange && !isFloodActive) {
+        onModeChange('flood');
+      }
+    }
+  };
+
+  const handleToggleTraffic = () => {
+    if (onToggleTraffic) {
+      onToggleTraffic();
+    } else {
+      setInternalShowTraffic((prev) => !prev);
+      if (mode !== undefined && onModeChange) {
+        onModeChange(isTrafficActive ? 'flood' : 'traffic');
+      }
+    }
+  };
+
+  const activeCellsCount =
+    (isTrafficActive ? hexCells.size : 0) +
+    (isFloodActive ? floodHexCells.size : 0) +
+    (isRadarActive ? radarHexCells.size : 0);
 
   useEffect(() => {
     if (!map) return;
 
-    if (!map.getPane('hexOverlayPane')) {
-      const hexPane = map.createPane('hexOverlayPane');
-      hexPane.style.zIndex = '350';
+    // Create separate z-indexed panes to guarantee camera-verified flood hexes
+    // are physically drawn ON TOP of radar forecast hexes and never obscured.
+    if (!map.getPane('radarHexPane')) {
+      const radarPane = map.createPane('radarHexPane');
+      radarPane.style.zIndex = '340';
+    }
+    if (!map.getPane('trafficHexPane')) {
+      const trafficPane = map.createPane('trafficHexPane');
+      trafficPane.style.zIndex = '350';
+    }
+    if (!map.getPane('floodHexPane')) {
+      const floodPane = map.createPane('floodHexPane');
+      floodPane.style.zIndex = '360';
     }
 
     if (!layerGroupRef.current) {
@@ -79,28 +153,116 @@ export default function HexOverlay({
     layerGroup.clearLayers();
 
     if (!enabled || activeCellsCount === 0) {
-      const pane = map.getPane('hexOverlayPane');
-      if (pane) pane.style.pointerEvents = 'none';
+      const pRadar = map.getPane('radarHexPane');
+      if (pRadar) pRadar.style.pointerEvents = 'none';
+      const pTraffic = map.getPane('trafficHexPane');
+      if (pTraffic) pTraffic.style.pointerEvents = 'none';
+      const pFlood = map.getPane('floodHexPane');
+      if (pFlood) pFlood.style.pointerEvents = 'none';
       return;
     }
 
     const currentZoom = map.getZoom();
-    const interactivity = currentMode === 'traffic'
-      ? getHexInteractivityState(currentZoom)
-      : getFloodInteractivityState(currentZoom);
-
+    const interactivity = getFloodInteractivityState(currentZoom);
     const { isVisible, pointerEvents, className } = interactivity;
 
     // Sync pane pointer-events with current zoom visibility
-    const hexPane = map.getPane('hexOverlayPane');
-    if (hexPane) {
-      hexPane.style.pointerEvents = pointerEvents;
+    const pRadar = map.getPane('radarHexPane');
+    if (pRadar) pRadar.style.pointerEvents = pointerEvents;
+    const pTraffic = map.getPane('trafficHexPane');
+    if (pTraffic) pTraffic.style.pointerEvents = pointerEvents;
+    const pFlood = map.getPane('floodHexPane');
+    if (pFlood) pFlood.style.pointerEvents = pointerEvents;
+
+    // Helper for polygon zoom-to-bounds click
+    const attachCommonEvents = (polygon: CustomPolygon, baseFill: number) => {
+      polygon.on('mousedown', (e) => {
+        if (e.originalEvent && typeof e.originalEvent.preventDefault === 'function') {
+          e.originalEvent.preventDefault();
+        }
+      });
+
+      polygon.on('click', (e) => {
+        if (!isFloodVisibleAtZoom(map.getZoom())) return;
+        L.DomEvent.stopPropagation(e);
+        polygon.closeTooltip();
+
+        const target = e.originalEvent?.target as HTMLElement | SVGElement | undefined;
+        if (target && typeof target.blur === 'function') {
+          target.blur();
+        }
+        if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
+          (document.activeElement as HTMLElement).blur();
+        }
+
+        const bounds = polygon.getBounds();
+        map.fitBounds(bounds, {
+          padding: [30, 30],
+          maxZoom: 14,
+        });
+      });
+    };
+
+    // 1. RENDER RADAR FORECAST LAYER (Pane: radarHexPane, zIndex: 340)
+    // Uses dashed border and subtle opacity to visually represent forecast prediction
+    if (isRadarActive) {
+      radarHexCells.forEach((cell) => {
+        if (!cell.polygon || cell.polygon.length < 3) return;
+        if (cell.h3_id && cell.h3_id.startsWith('89')) return;
+
+        const { fillColor, fillOpacity, strokeColor, strokeWeight, dashArray } =
+          getRadarHexColorAndOpacity(cell.flood_severity);
+
+        const polygon = L.polygon(cell.polygon as L.LatLngTuple[], {
+          fillColor,
+          fillOpacity: isVisible ? fillOpacity : 0,
+          color: strokeColor,
+          weight: strokeWeight,
+          dashArray,
+          opacity: isVisible ? 0.6 : 0,
+          className: `${className} hex-cell-radar`,
+          interactive: isVisible,
+          pane: 'radarHexPane',
+        }) as CustomPolygon;
+
+        polygon._baseFillOpacity = fillOpacity;
+
+        const tooltipContent = formatRadarHexTooltip(cell, lang);
+        polygon.bindTooltip(tooltipContent, {
+          sticky: true,
+          direction: 'top',
+          offset: [0, -10],
+          opacity: 0.95,
+        });
+
+        polygon.on('mouseover', () => {
+          if (!isFloodVisibleAtZoom(map.getZoom())) return;
+          polygon.setStyle({
+            weight: strokeWeight + 1,
+            color: '#38bdf8',
+            fillOpacity: Math.min(0.35, fillOpacity + 0.1),
+          });
+        });
+
+        polygon.on('mouseout', () => {
+          polygon.closeTooltip();
+          if (!isFloodVisibleAtZoom(map.getZoom())) return;
+          polygon.setStyle({
+            weight: strokeWeight,
+            color: strokeColor,
+            fillOpacity,
+          });
+        });
+
+        attachCommonEvents(polygon, fillOpacity);
+        layerGroup.addLayer(polygon);
+      });
     }
 
-    if (currentMode === 'traffic') {
+    // 2. RENDER TRAFFIC DENSITY LAYER (Pane: trafficHexPane, zIndex: 350)
+    if (isTrafficActive) {
       hexCells.forEach((cell) => {
         if (!cell.polygon || cell.polygon.length < 3) return;
-        // Suppress Resolution 9 sub-hexagons to avoid cluttering inside macro hexagons
         if (cell.h3_id && cell.h3_id.startsWith('89')) return;
 
         const { fillColor, fillOpacity } = getHexColorAndOpacity(cell.severity);
@@ -111,9 +273,9 @@ export default function HexOverlay({
           color: '#52525b',
           weight: 1,
           opacity: isVisible ? 0.8 : 0,
-          className,
+          className: `${className} hex-cell-traffic`,
           interactive: isVisible,
-          pane: 'hexOverlayPane',
+          pane: 'trafficHexPane',
         }) as CustomPolygon;
 
         polygon._baseFillOpacity = fillOpacity;
@@ -145,52 +307,30 @@ export default function HexOverlay({
           });
         });
 
-        polygon.on('mousedown', (e) => {
-          if (e.originalEvent && typeof e.originalEvent.preventDefault === 'function') {
-            e.originalEvent.preventDefault();
-          }
-        });
-
-        polygon.on('click', (e) => {
-          if (!isHexVisibleAtZoom(map.getZoom())) return;
-          L.DomEvent.stopPropagation(e);
-          polygon.closeTooltip();
-
-          const target = e.originalEvent?.target as HTMLElement | SVGElement | undefined;
-          if (target && typeof target.blur === 'function') {
-            target.blur();
-          }
-          if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
-            (document.activeElement as HTMLElement).blur();
-          }
-
-          const bounds = polygon.getBounds();
-          map.fitBounds(bounds, {
-            padding: [30, 30],
-            maxZoom: 14,
-          });
-        });
-
+        attachCommonEvents(polygon, fillOpacity);
         layerGroup.addLayer(polygon);
       });
-    } else {
-      // Flood mode: render flood hex cells
+    }
+
+    // 3. RENDER CAMERA-VERIFIED FLOOD LAYER (Pane: floodHexPane, zIndex: 360)
+    // Solid bold border, high visual precedence — never hidden behind radar
+    if (isFloodActive) {
       floodHexCells.forEach((cell) => {
         if (!cell.polygon || cell.polygon.length < 3) return;
-        // Suppress Resolution 9 sub-hexagons to avoid cluttering inside macro hexagons
         if (cell.h3_id && cell.h3_id.startsWith('89')) return;
 
-        const { fillColor, fillOpacity, strokeColor, strokeWeight } = getFloodHexColorAndOpacity(cell.flood_severity);
+        const { fillColor, fillOpacity, strokeColor, strokeWeight } =
+          getVerifiedFloodHexColorAndOpacity(cell.flood_severity);
 
         const polygon = L.polygon(cell.polygon as L.LatLngTuple[], {
           fillColor,
           fillOpacity: isVisible ? fillOpacity : 0,
           color: strokeColor,
           weight: strokeWeight,
-          opacity: isVisible ? 0.45 : 0,
-          className,
+          opacity: isVisible ? 0.85 : 0,
+          className: `${className} hex-cell-verified-flood`,
           interactive: isVisible,
-          pane: 'hexOverlayPane',
+          pane: 'floodHexPane',
         }) as CustomPolygon;
 
         polygon._baseFillOpacity = fillOpacity;
@@ -208,7 +348,7 @@ export default function HexOverlay({
           polygon.setStyle({
             weight: strokeWeight + 1,
             color: '#38bdf8',
-            fillOpacity: Math.min(0.45, fillOpacity + 0.12),
+            fillOpacity: Math.min(0.5, fillOpacity + 0.12),
           });
         });
 
@@ -222,32 +362,7 @@ export default function HexOverlay({
           });
         });
 
-        polygon.on('mousedown', (e) => {
-          if (e.originalEvent && typeof e.originalEvent.preventDefault === 'function') {
-            e.originalEvent.preventDefault();
-          }
-        });
-
-        polygon.on('click', (e) => {
-          if (!isFloodVisibleAtZoom(map.getZoom())) return;
-          L.DomEvent.stopPropagation(e);
-          polygon.closeTooltip();
-
-          const target = e.originalEvent?.target as HTMLElement | SVGElement | undefined;
-          if (target && typeof target.blur === 'function') {
-            target.blur();
-          }
-          if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
-            (document.activeElement as HTMLElement).blur();
-          }
-
-          const bounds = polygon.getBounds();
-          map.fitBounds(bounds, {
-            padding: [30, 30],
-            maxZoom: 14,
-          });
-        });
-
+        attachCommonEvents(polygon, fillOpacity);
         layerGroup.addLayer(polygon);
       });
     }
@@ -262,14 +377,14 @@ export default function HexOverlay({
     const handleZoomEnd = () => {
       if (!layerGroupRef.current) return;
       const zoom = map.getZoom();
-      const isVisibleNow = currentMode === 'traffic'
-        ? isHexVisibleAtZoom(zoom)
-        : isFloodVisibleAtZoom(zoom);
+      const isVisibleNow = isFloodVisibleAtZoom(zoom);
 
-      const pane = map.getPane('hexOverlayPane');
-      if (pane) {
-        pane.style.pointerEvents = isVisibleNow ? 'auto' : 'none';
-      }
+      const pR = map.getPane('radarHexPane');
+      if (pR) pR.style.pointerEvents = isVisibleNow ? 'auto' : 'none';
+      const pT = map.getPane('trafficHexPane');
+      if (pT) pT.style.pointerEvents = isVisibleNow ? 'auto' : 'none';
+      const pF = map.getPane('floodHexPane');
+      if (pF) pF.style.pointerEvents = isVisibleNow ? 'auto' : 'none';
 
       layerGroupRef.current.eachLayer((layer) => {
         const poly = layer as CustomPolygon;
@@ -304,7 +419,18 @@ export default function HexOverlay({
       map.off('zoomend', handleZoomEnd);
       layerGroup.clearLayers();
     };
-  }, [map, hexCells, floodHexCells, enabled, currentMode, lang, activeCellsCount]);
+  }, [
+    map,
+    hexCells,
+    floodHexCells,
+    radarHexCells,
+    enabled,
+    isRadarActive,
+    isFloodActive,
+    isTrafficActive,
+    lang,
+    activeCellsCount,
+  ]);
 
   // Clean up layer group when component unmounts
   useEffect(() => {
@@ -328,7 +454,7 @@ export default function HexOverlay({
     return count;
   }, [hexCells]);
 
-  const floodedHexCount = useMemo(() => {
+  const floodedCameraHexCount = useMemo(() => {
     let count = 0;
     floodHexCells.forEach((cell) => {
       const s = cell.flood_severity.toUpperCase().trim();
@@ -339,27 +465,35 @@ export default function HexOverlay({
     return count;
   }, [floodHexCells]);
 
-  const buttonTitle = useMemo(() => {
-    if (currentMode === 'flood') {
-      if (floodedHexCount > 0) {
-        return lang === 'vi'
-          ? `Vùng mưa (${floodedHexCount} khu vực có mưa)`
-          : `Rain zones (${floodedHexCount} rain areas)`;
+  const radarHexCount = useMemo(() => {
+    let count = 0;
+    radarHexCells.forEach((cell) => {
+      const s = cell.flood_severity.toUpperCase().trim();
+      if (s === 'FLOODED_DEEP' || s === 'FLOODED_SHALLOW' || s === 'WET') {
+        count++;
       }
-      return lang === 'vi' ? 'Bật/tắt lớp vùng mưa' : 'Toggle rain zones';
-    }
+    });
+    return count;
+  }, [radarHexCells]);
 
-    if (congestedCount > 0) {
-      return lang === 'vi'
-        ? `Vùng giao thông (${congestedCount} vùng đang ùn tắc)`
-        : `Traffic zones (${congestedCount} congested zones)`;
+  const buttonTitle = useMemo(() => {
+    const parts: string[] = [];
+    if (isFloodActive && floodedCameraHexCount > 0) {
+      parts.push(lang === 'vi' ? `${floodedCameraHexCount} điểm ngập camera` : `${floodedCameraHexCount} camera flood spots`);
     }
-    return lang === 'vi' ? 'Bật/tắt hiển thị vùng giao thông' : 'Toggle traffic zones';
-  }, [currentMode, floodedHexCount, congestedCount, lang]);
+    if (isRadarActive && radarHexCount > 0) {
+      parts.push(lang === 'vi' ? 'Dự báo radar' : 'Radar forecast');
+    }
+    if (isTrafficActive && congestedCount > 0) {
+      parts.push(lang === 'vi' ? `${congestedCount} vùng ùn tắc` : `${congestedCount} congested zones`);
+    }
+    if (parts.length > 0) return parts.join(' • ');
+    return lang === 'vi' ? 'Bật/tắt hiển thị vùng' : 'Toggle zone layers';
+  }, [isFloodActive, isRadarActive, isTrafficActive, floodedCameraHexCount, radarHexCount, congestedCount, lang]);
 
   return (
     <div className="pointer-events-auto flex items-center rounded border border-zinc-800 bg-zinc-950/90 shadow-2xl backdrop-blur-md p-1 gap-1 font-mono text-xs select-none">
-      {/* Main Toggle Button */}
+      {/* Master Toggle Button */}
       <button
         type="button"
         onClick={onToggle}
@@ -389,25 +523,69 @@ export default function HexOverlay({
         <span className="sm:hidden">{lang === 'vi' ? 'Vùng' : 'Zone'}</span>
       </button>
 
-      {/* Mode Switcher Segmented Control (Visible when enabled) */}
+      {/* Independent Layer Toggle Chips (Visible when master overlay enabled) */}
       {enabled && (
         <>
           <span className="w-px h-4 bg-zinc-800 shrink-0 mx-0.5" />
 
-          {/* Rain / Flood Mode Button */}
+          {/* 1. Camera-verified Flood Layer Toggle Chip (Observed Ground Truth) */}
           <button
             type="button"
-            onClick={() => handleModeChange('flood')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold transition-all focus:outline-none cursor-pointer ${
-              currentMode === 'flood'
-                ? 'bg-sky-500 text-zinc-950 font-bold shadow-sm'
-                : 'text-zinc-400 hover:text-sky-300 hover:bg-zinc-900'
+            onClick={handleToggleFlood}
+            aria-pressed={isFloodActive}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold transition-all focus:outline-none cursor-pointer border ${
+              isFloodActive
+                ? 'bg-blue-600 text-white border-blue-500 shadow-sm font-bold'
+                : 'text-zinc-400 hover:text-blue-300 hover:bg-zinc-900 border-transparent'
             }`}
-            title={lang === 'vi' ? 'Hiển thị vùng mưa thời gian thực' : 'Show real-time rain zones'}
+            title={`${FLOOD_I18N.LAYER_FLOOD_VERIFIED[lang]} — ${FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE[lang]}`}
           >
             <svg
               className={`w-3.5 h-3.5 shrink-0 transition-colors ${
-                currentMode === 'flood' ? 'text-zinc-950' : 'text-sky-400'
+                isFloodActive ? 'text-white' : 'text-blue-400'
+              }`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+            </svg>
+            <span className="hidden sm:inline">{FLOOD_I18N.LAYER_FLOOD_VERIFIED[lang]}</span>
+            <span className="sm:hidden">{FLOOD_I18N.LAYER_FLOOD_VERIFIED_SHORT[lang]}</span>
+            {floodLoading ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse ml-0.5" />
+            ) : floodedCameraHexCount > 0 ? (
+              <span
+                className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[9.5px] font-bold ${
+                  isFloodActive
+                    ? 'bg-white text-blue-900'
+                    : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                }`}
+              >
+                {floodedCameraHexCount}
+              </span>
+            ) : null}
+          </button>
+
+          {/* 2. Radar Forecast Layer Toggle Chip (Atmospheric Prediction) */}
+          <button
+            type="button"
+            onClick={handleToggleRadar}
+            aria-pressed={isRadarActive}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold transition-all focus:outline-none cursor-pointer border ${
+              isRadarActive
+                ? 'bg-sky-500 text-zinc-950 border-sky-400 shadow-sm font-bold'
+                : 'text-zinc-400 hover:text-sky-300 hover:bg-zinc-900 border-transparent'
+            }`}
+            title={`${FLOOD_I18N.LAYER_RADAR[lang]} — ${FLOOD_I18N.LAYER_RADAR_SUBTITLE[lang]}`}
+          >
+            <svg
+              className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+                isRadarActive ? 'text-zinc-950' : 'text-sky-400'
               }`}
               viewBox="0 0 24 24"
               fill="none"
@@ -422,48 +600,38 @@ export default function HexOverlay({
               <path d="M8 14v6" />
               <path d="M12 16v6" />
             </svg>
-            <span className="hidden sm:inline">{FLOOD_I18N.LAYER_FLOOD[lang]}</span>
-            {floodLoading ? (
+            <span className="hidden sm:inline">{FLOOD_I18N.LAYER_RADAR[lang]}</span>
+            <span className="sm:hidden">{FLOOD_I18N.LAYER_RADAR_SHORT[lang]}</span>
+            {radarLoading ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-300 animate-pulse ml-0.5" />
+            ) : radarHexCount > 0 ? (
               <span
-                className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold flex items-center gap-1 ${
-                  currentMode === 'flood'
+                className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[9.5px] font-bold ${
+                  isRadarActive
                     ? 'bg-zinc-950 text-sky-400'
                     : 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
                 }`}
-                title={lang === 'vi' ? 'Đang tải dự báo mưa...' : 'Loading rain forecast...'}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-                <span className="inline text-[9px]">{lang === 'vi' ? 'đang tải...' : 'loading...'}</span>
-              </span>
-            ) : floodedHexCount > 0 ? (
-              <span
-                className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold flex items-center gap-1 ${
-                  currentMode === 'flood'
-                    ? 'bg-zinc-950 text-sky-400'
-                    : 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
-                }`}
-                title={lang === 'vi' ? 'Đang có mưa tại TP.HCM' : 'Active rain in HCMC'}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                <span>{lang === 'vi' ? 'Có mưa' : 'Rain'}</span>
+                {lang === 'vi' ? 'Mưa' : 'Rain'}
               </span>
             ) : null}
           </button>
 
-          {/* Traffic Mode Button */}
+          {/* 3. Traffic Density Layer Toggle Chip */}
           <button
             type="button"
-            onClick={() => handleModeChange('traffic')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold transition-all focus:outline-none cursor-pointer ${
-              currentMode === 'traffic'
-                ? 'bg-white text-black font-bold shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            onClick={handleToggleTraffic}
+            aria-pressed={isTrafficActive}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold transition-all focus:outline-none cursor-pointer border ${
+              isTrafficActive
+                ? 'bg-white text-black border-zinc-200 shadow-sm font-bold'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border-transparent'
             }`}
-            title={lang === 'vi' ? 'Hiển thị mật độ giao thông H3' : 'Show traffic density H3'}
+            title={lang === 'vi' ? 'Vùng giao thông (mật độ xe)' : 'Traffic density zones'}
           >
             <svg
               className={`w-3.5 h-3.5 shrink-0 transition-colors ${
-                currentMode === 'traffic' ? 'text-black' : 'text-zinc-400'
+                isTrafficActive ? 'text-black' : 'text-zinc-400'
               }`}
               viewBox="0 0 24 24"
               fill="none"
@@ -479,21 +647,13 @@ export default function HexOverlay({
               <circle cx="17" cy="17" r="2" />
             </svg>
             <span className="hidden sm:inline">{FLOOD_I18N.LAYER_TRAFFIC[lang]}</span>
+            <span className="sm:hidden">{FLOOD_I18N.LAYER_TRAFFIC_SHORT[lang]}</span>
             {trafficLoading ? (
-              <span
-                className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold flex items-center gap-1 ${
-                  currentMode === 'traffic'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                }`}
-                title={lang === 'vi' ? 'Đang tải dữ liệu giao thông H3...' : 'Loading H3 traffic data...'}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
-              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse ml-0.5" />
             ) : congestedCount > 0 ? (
               <span
-                className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold ${
-                  currentMode === 'traffic'
+                className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[9.5px] font-bold ${
+                  isTrafficActive
                     ? 'bg-red-600 text-white'
                     : 'bg-red-500/20 text-red-400 border border-red-500/40'
                 }`}
