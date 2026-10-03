@@ -1151,6 +1151,28 @@ export default function PhuongTreeFilter({
           })
         )}
       </div>
+
+      {/* Footer / Credits */}
+      <div className="px-3 py-2 border-t border-zinc-900 bg-zinc-950 text-[10.5px] text-zinc-500 text-center shrink-0 font-mono">
+        Developed by{' '}
+        <a
+          href="https://thdatvu.vercel.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors font-medium"
+        >
+          ThDat Vu
+        </a>
+        {' and '}
+        <a
+          href="https://github.com/giangdq202"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors font-medium"
+        >
+          Dam Quang Giang
+        </a>
+      </div>
     </div>
   );
 }
