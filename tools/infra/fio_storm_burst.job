@@ -1,0 +1,48 @@
+; FIO Storm-Burst Benchmark Job File
+; Simulates concurrent disk I/O contention on local-edge host (5400RPM HDD)
+; Multi-tenant workload: Archiver + SQLite WAL + Valhalla Tiles + CV Worker
+
+[global]
+ioengine=sync
+direct=0
+runtime=30
+time_based=1
+group_reporting=1
+directory=/tmp/fio_storm_test
+
+[archiver_burst_write]
+filename=fio_archiver_scratch.dat
+rw=write
+bs=64k
+numjobs=2
+size=50M
+rate_iops=25
+description=Sequential writes of camera JPEG frames (64KB chunks)
+
+[sqlite_wal_write]
+filename=fio_sqlite_scratch.dat
+rw=write
+bs=4k
+fsync=1
+numjobs=2
+size=20M
+rate_iops=40
+description=Synchronous WAL transactions with forced fsync commits
+
+[valhalla_tile_read]
+filename=fio_valhalla_scratch.dat
+rw=randread
+bs=128k
+numjobs=2
+size=100M
+rate_iops=30
+description=Random reads of routing graph tiles during route queries
+
+[cv_worker_read]
+filename=fio_cv_scratch.dat
+rw=randread
+bs=64k
+numjobs=1
+size=50M
+rate_iops=10
+description=Snapshot frame reading for CV inference worker
