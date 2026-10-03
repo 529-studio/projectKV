@@ -69,26 +69,26 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
   });
 
   test('getFloodHexColorAndOpacity applies functional blue/cyan palette', () => {
-    // FLOODED_DEEP: deep blue with 0.26 fillOpacity
+    // FLOODED_DEEP: deep blue with 0.18 fillOpacity
     const deep = getFloodHexColorAndOpacity('FLOODED_DEEP');
     assert.equal(deep.fillColor, '#1d4ed8');
-    assert.equal(deep.fillOpacity, 0.26);
+    assert.equal(deep.fillOpacity, 0.18);
     assert.equal(deep.strokeColor, '#1e40af');
-    assert.equal(deep.strokeWeight, 1.5);
+    assert.equal(deep.strokeWeight, 1.0);
 
-    // FLOODED_SHALLOW: cyan with 0.22 fillOpacity
+    // FLOODED_SHALLOW: ocean blue with 0.12 fillOpacity
     const shallow = getFloodHexColorAndOpacity('FLOODED_SHALLOW');
     assert.equal(shallow.fillColor, '#0284c7');
-    assert.equal(shallow.fillOpacity, 0.22);
+    assert.equal(shallow.fillOpacity, 0.12);
     assert.equal(shallow.strokeColor, '#0369a1');
-    assert.equal(shallow.strokeWeight, 1.2);
+    assert.equal(shallow.strokeWeight, 0.75);
 
-    // WET: slate blue with 0.15 fillOpacity
+    // WET: light sky blue with 0.07 fillOpacity
     const wet = getFloodHexColorAndOpacity('WET');
-    assert.equal(wet.fillColor, '#64748b');
-    assert.equal(wet.fillOpacity, 0.15);
-    assert.equal(wet.strokeColor, '#475569');
-    assert.equal(wet.strokeWeight, 1.0);
+    assert.equal(wet.fillColor, '#38bdf8');
+    assert.equal(wet.fillOpacity, 0.07);
+    assert.equal(wet.strokeColor, '#38bdf8');
+    assert.equal(wet.strokeWeight, 0.5);
   });
 
   test('isFloodVisibleAtZoom enables macro zoom (11-13) and hides micro zoom (14+)', () => {
@@ -116,10 +116,12 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
   });
 
   test('getFloodSeverityLabel provides correct Vietnamese diacritics and English labels', () => {
-    assert.equal(getFloodSeverityLabel('FLOODED_DEEP', 'vi'), 'Ngập sâu (nguy hiểm)');
-    assert.equal(getFloodSeverityLabel('FLOODED_DEEP', 'en'), 'Deep water (hazardous)');
-    assert.equal(getFloodSeverityLabel('FLOODED_SHALLOW', 'vi'), 'Ngập nhẹ / Vũng nước');
-    assert.equal(getFloodSeverityLabel('WET', 'vi'), 'Đường ướt / Mưa');
+    assert.equal(getFloodSeverityLabel('FLOODED_DEEP', 'vi'), 'Mưa to (nguy cơ ngập)');
+    assert.equal(getFloodSeverityLabel('FLOODED_DEEP', 'en'), 'Heavy rain (flood risk)');
+    assert.equal(getFloodSeverityLabel('FLOODED_SHALLOW', 'vi'), 'Mưa vừa');
+    assert.equal(getFloodSeverityLabel('FLOODED_SHALLOW', 'en'), 'Moderate rain');
+    assert.equal(getFloodSeverityLabel('WET', 'vi'), 'Mưa nhẹ');
+    assert.equal(getFloodSeverityLabel('WET', 'en'), 'Light rain');
     assert.equal(getFloodSeverityLabel('UNKNOWN', 'vi'), 'Chưa xác minh');
   });
 
@@ -135,7 +137,7 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     };
 
     const viTooltip = formatFloodHexTooltip(cell, 'vi');
-    assert.ok(viTooltip.includes('Ngập sâu (nguy hiểm)'));
+    assert.ok(viTooltip.includes('Mưa to (nguy cơ ngập)'));
     assert.ok(viTooltip.includes('2 camera giám sát'));
     assert.ok(viTooltip.includes('Điểm mưa/ngập nặng nhất'));
     assert.ok(viTooltip.includes('Đường Ung Văn Khiêm'));
@@ -143,7 +145,7 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     assert.ok(!viTooltip.includes('Quận'));
 
     const enTooltip = formatFloodHexTooltip(cell, 'en');
-    assert.ok(enTooltip.includes('Deep water (hazardous)'));
+    assert.ok(enTooltip.includes('Heavy rain (flood risk)'));
     assert.ok(enTooltip.includes('2 cameras monitoring'));
     assert.ok(enTooltip.includes('Worst rain/flood spot'));
   });
@@ -159,8 +161,8 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
 
   test('FLOOD_I18N contains all required bilingual keys with Vietnamese diacritics', () => {
     assert.equal(FLOOD_I18N.LAYER_TRAFFIC.vi, 'Giao thông');
-    assert.equal(FLOOD_I18N.LAYER_FLOOD.vi, 'Khả năng có mưa');
-    assert.equal(FLOOD_I18N.TOOLTIP_TITLE.vi, 'Cảnh báo mưa & ngập');
+    assert.equal(FLOOD_I18N.LAYER_FLOOD.vi, 'Vùng mưa');
+    assert.equal(FLOOD_I18N.TOOLTIP_TITLE.vi, 'Thời tiết khu vực');
     assert.equal(FLOOD_I18N.FILTER_CHIP.vi(3), 'Khu vực có mưa (3)');
     assert.equal(FLOOD_I18N.ACTIVE_ALERT_BADGE.vi(2), 'Vùng có mưa • 2');
   });
