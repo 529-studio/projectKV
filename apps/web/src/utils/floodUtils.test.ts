@@ -6,6 +6,7 @@ import {
   isFloodVisibleAtZoom,
   getFloodInteractivityState,
   formatFloodHexTooltip,
+  formatRadarHexTooltip,
   getFloodSeverityLabel,
   FLOOD_I18N,
   type FloodHexCell,
@@ -125,7 +126,7 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     assert.equal(getFloodSeverityLabel('UNKNOWN', 'vi'), 'Chưa xác minh');
   });
 
-  test('formatFloodHexTooltip shows severity, camera count, and worst camera; never a ward name', () => {
+  test('formatFloodHexTooltip shows severity, camera count, and verified subtitle; never a ward name', () => {
     const cell: FloodHexCell = {
       h3_id: '8765b18a1ffffff',
       resolution: 7,
@@ -137,6 +138,8 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     };
 
     const viTooltip = formatFloodHexTooltip(cell, 'vi');
+    assert.ok(viTooltip.includes('Camera xác nhận ngập'));
+    assert.ok(viTooltip.includes('Xác nhận bởi camera giám sát'));
     assert.ok(viTooltip.includes('Mưa to (nguy cơ ngập)'));
     assert.ok(viTooltip.includes('2 camera giám sát'));
     assert.ok(viTooltip.includes('Điểm mưa/ngập nặng nhất'));
@@ -145,9 +148,35 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     assert.ok(!viTooltip.includes('Quận'));
 
     const enTooltip = formatFloodHexTooltip(cell, 'en');
+    assert.ok(enTooltip.includes('Camera-verified flooding'));
+    assert.ok(enTooltip.includes('Verified by surveillance cameras'));
     assert.ok(enTooltip.includes('Heavy rain (flood risk)'));
     assert.ok(enTooltip.includes('2 cameras monitoring'));
     assert.ok(enTooltip.includes('Worst rain/flood spot'));
+  });
+
+  test('formatRadarHexTooltip explicitly displays forecast-not-observation disclaimer', () => {
+    const radarCell: FloodHexCell = {
+      h3_id: '8765b18a1ffffff',
+      resolution: 7,
+      flood_severity: 'FLOODED_SHALLOW',
+      camera_count: 0,
+      worst_camera: 'radar_rainviewer',
+      worst_camera_name: 'Dự báo radar thời tiết',
+      polygon: samplePoly,
+    };
+
+    const viTooltip = formatRadarHexTooltip(radarCell, 'vi');
+    assert.ok(viTooltip.includes('Dự báo radar'));
+    assert.ok(viTooltip.includes('Dự báo — không phải quan sát thực tế'));
+    assert.ok(viTooltip.includes('Mưa vừa'));
+    assert.ok(viTooltip.includes('Radar thời tiết RainViewer'));
+
+    const enTooltip = formatRadarHexTooltip(radarCell, 'en');
+    assert.ok(enTooltip.includes('Radar forecast'));
+    assert.ok(enTooltip.includes('Forecast — not a live observation'));
+    assert.ok(enTooltip.includes('Moderate rain'));
+    assert.ok(enTooltip.includes('RainViewer weather radar'));
   });
 
   test('honesty rule: never says "OK to go" or "safe" for unknown/unverified data', () => {
@@ -162,8 +191,17 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
   test('FLOOD_I18N contains all required bilingual keys with Vietnamese diacritics', () => {
     assert.equal(FLOOD_I18N.LAYER_TRAFFIC.vi, 'Giao thông');
     assert.equal(FLOOD_I18N.LAYER_FLOOD.vi, 'Vùng mưa');
+    assert.equal(FLOOD_I18N.LAYER_RADAR.vi, 'Dự báo radar');
+    assert.equal(FLOOD_I18N.LAYER_RADAR.en, 'Radar forecast');
+    assert.equal(FLOOD_I18N.LAYER_RADAR_SUBTITLE.vi, 'Dự báo — không phải quan sát thực tế');
+    assert.equal(FLOOD_I18N.LAYER_RADAR_SUBTITLE.en, 'Forecast — not a live observation');
+    assert.equal(FLOOD_I18N.LAYER_FLOOD_VERIFIED.vi, 'Camera xác nhận ngập');
+    assert.equal(FLOOD_I18N.LAYER_FLOOD_VERIFIED.en, 'Camera-verified flooding');
+    assert.equal(FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE.vi, 'Xác nhận bởi camera giám sát');
+    assert.equal(FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE.en, 'Verified by surveillance cameras');
     assert.equal(FLOOD_I18N.TOOLTIP_TITLE.vi, 'Thời tiết khu vực');
-    assert.equal(FLOOD_I18N.FILTER_CHIP.vi(3), 'Khu vực có mưa (3)');
+    assert.equal(FLOOD_I18N.FILTER_CHIP.vi(3), 'Điểm ngập camera (3)');
+    assert.equal(FLOOD_I18N.FILTER_CHIP.en(3), 'Camera flood spots (3)');
     assert.equal(FLOOD_I18N.ACTIVE_ALERT_BADGE.vi(2), 'Vùng có mưa • 2');
   });
 });

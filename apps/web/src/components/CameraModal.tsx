@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
 import { API_ENDPOINTS, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
@@ -41,8 +41,10 @@ export default function CameraModal({
   const [fetchTimestamp, setFetchTimestamp] = useState<number>(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [osdTime, setOsdTime] = useState<string | null>(null);
+  const mountTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
+    mountTimeRef.current = Date.now();
     setImgError(false);
     setFetchTimestamp(Date.now());
     setElapsedSeconds(0);
@@ -51,6 +53,13 @@ export default function CameraModal({
       window.getSelection()?.removeAllRanges();
     }
   }, [camera?.id]);
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target !== e.currentTarget) return;
+    // Guard against synthetic ghost click dispatched by mobile browser right after opening
+    if (Date.now() - mountTimeRef.current < 350) return;
+    onClose();
+  };
 
   // Arrow key navigation for previous / next camera in sequence
   useEffect(() => {
@@ -127,7 +136,7 @@ export default function CameraModal({
   return (
     <div 
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 select-none"
-      onClick={onClose}
+      onClick={handleBackdropClick}
     >
       <div 
         className="bg-zinc-950 border border-zinc-700 shadow-2xl rounded-lg w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col font-mono text-zinc-300 select-none"
@@ -138,7 +147,7 @@ export default function CameraModal({
         <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 flex justify-between items-start select-none">
           <div className="flex-1 min-w-0 mr-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-white font-bold text-lg truncate">{camera.displayName || camera.title}</h2>
+              <h2 className="text-white font-bold text-base sm:text-lg break-words leading-snug">{camera.displayName || camera.title}</h2>
               {sequenceLabel && (
                 <span
                   className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold tracking-wide shrink-0"
