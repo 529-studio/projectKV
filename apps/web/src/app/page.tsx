@@ -23,6 +23,7 @@ import PhuongTreeFilter, {
   computeFilteredCameraIds,
   computeActiveFilterLabel,
 } from '../components/PhuongTreeFilter';
+import { getCameraSequence } from '../utils/cameraSequence';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
@@ -261,6 +262,16 @@ export default function Home() {
       timestamp: fv?.timestamp || tv?.timestamp || new Date().toISOString(),
     };
   }, [selectedCamera, verdicts, floodVerdicts]);
+
+  const cameraSequence = useMemo(() => {
+    return getCameraSequence({
+      currentCamera: selectedCamera,
+      allCameras: cameras,
+      pinnedCameras,
+      selectedCorridor,
+      lang,
+    });
+  }, [selectedCamera, cameras, pinnedCameras, selectedCorridor, lang]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-zinc-950 font-sans text-zinc-300">
@@ -541,6 +552,11 @@ export default function Home() {
         appEnv={appEnv}
         analysisEnabled={analysisEnabled}
         pinCapReached={pinnedCameraIds.length >= PINNED_DOCK_CAP}
+        onPrevCamera={() => cameraSequence.prevCamera && setSelectedCamera(cameraSequence.prevCamera as Camera)}
+        onNextCamera={() => cameraSequence.nextCamera && setSelectedCamera(cameraSequence.nextCamera as Camera)}
+        hasPrevCamera={Boolean(cameraSequence.prevCamera)}
+        hasNextCamera={Boolean(cameraSequence.nextCamera)}
+        sequenceLabel={cameraSequence.contextLabel}
       />
     </div>
   );

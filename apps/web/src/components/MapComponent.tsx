@@ -139,7 +139,7 @@ export default function MapComponent({
           const isDimmed = isFilteredDimmed || isMacroHexDimmed;
           marker.isDimmed = isDimmed;
 
-          const targetR = isDimmed ? Math.max(2.5, Math.round(r * 0.7)) : r;
+          const targetR = isDimmed ? Math.max(4.0, Math.round(r * 0.7)) : r;
           const targetW = isDimmed ? 1 : w;
           const strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
           const opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
@@ -246,7 +246,7 @@ export default function MapComponent({
       const isDimmed = isFilteredDimmed || isMacroHexDimmed;
 
       const baseR = getRadius(zoom, isFew);
-      const radius = isDimmed ? Math.max(2.5, Math.round(baseR * 0.7)) : baseR;
+      const radius = isDimmed ? Math.max(4.0, Math.round(baseR * 0.7)) : baseR;
       const fillColor = getTrafficColor(cam.id, cam.isOnline);
       const strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
       const weight = isDimmed ? 1 : (zoom >= 14 ? 2 : 1.5);
@@ -299,13 +299,13 @@ export default function MapComponent({
 
         const curZ = mapRef.current ? mapRef.current.getZoom() : zoom;
         const curBase = getRadius(curZ, isFew);
-        const hoverRadius = customMarker.isDimmed ? Math.max(2.5, Math.round(curBase * 0.7)) + 2 : curBase + 3;
+        const hoverRadius = customMarker.isDimmed ? Math.max(5.5, Math.round(curBase * 0.7) + 2) : curBase + 3;
+        marker.setRadius(hoverRadius);
         marker.setStyle({ 
-          radius: hoverRadius, 
           color: '#ffffff', 
           weight: customMarker.isDimmed ? 2 : 2.5,
-          opacity: customMarker.isDimmed ? 0.8 : 1,
-          fillOpacity: customMarker.isDimmed ? 0.6 : 1,
+          opacity: 1,
+          fillOpacity: 1,
         });
       });
 
@@ -323,12 +323,14 @@ export default function MapComponent({
         const isDim = isFilteredDim || isMacroDim;
         customMarker.isDimmed = isDim;
 
+        const targetRadius = isDim ? Math.max(4.0, Math.round(curBase * 0.7)) : curBase;
+        marker.setRadius(targetRadius);
+
         const strokeColor = isFilteredDim ? '#27272a' : (isMacroDim ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
         const opacity = isFilteredDim ? 0.25 : (isMacroDim ? 0.35 : 1);
         const fillOpacity = isFilteredDim ? 0.2 : (isMacroDim ? 0.25 : 0.95);
 
         marker.setStyle({ 
-          radius: isDim ? Math.max(2.5, Math.round(curBase * 0.7)) : curBase, 
           fillColor: getTrafficColor(cam.id, cam.isOnline), 
           color: strokeColor, 
           weight: isDim ? 1 : (curZ >= 14 ? 2 : 1.5),

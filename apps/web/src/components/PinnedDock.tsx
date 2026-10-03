@@ -360,6 +360,8 @@ export default function PinnedDock({
           <button
             type="button"
             onClick={(e) => handleUnpin(e, cam.id)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
             className="pointer-events-auto absolute top-1 right-1 w-5 h-5 bg-zinc-900/90 hover:bg-red-600 border border-zinc-700 hover:border-red-500 text-zinc-300 hover:text-white rounded-sm flex items-center justify-center transition-colors cursor-pointer text-xs z-10"
             title={PINNED_DOCK_I18N.UNPIN[lang]}
             aria-label={`${PINNED_DOCK_I18N.UNPIN[lang]}: ${cam.displayName || cam.title}`}
@@ -367,7 +369,7 @@ export default function PinnedDock({
             ×
           </button>
 
-          {/* Touch Fallback Reorder Buttons (◀ ▶) */}
+          {/* Adjacent Camera Navigation Buttons (◀ ▶) */}
           <div
             className={`pointer-events-auto absolute bottom-1 right-1 flex items-center gap-1 z-10 transition-opacity ${
               isMobile ? 'opacity-90' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
@@ -378,11 +380,15 @@ export default function PinnedDock({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleMove(index, 'left');
+                  if (onCameraClick) {
+                    onCameraClick(pinnedCameras[index - 1]);
+                  }
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
                 className={`${presetStyle.controlBtnSize} bg-zinc-950/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white rounded-sm flex items-center justify-center cursor-pointer transition`}
-                title={PINNED_DOCK_I18N.MOVE_LEFT[lang]}
-                aria-label={`${PINNED_DOCK_I18N.MOVE_LEFT[lang]}: ${cam.displayName || cam.title}`}
+                title={lang === 'vi' ? 'Xem camera trước' : 'View previous camera'}
+                aria-label={`${lang === 'vi' ? 'Xem camera trước' : 'View previous camera'}: ${pinnedCameras[index - 1].displayName || pinnedCameras[index - 1].title}`}
               >
                 ◀
               </button>
@@ -392,11 +398,15 @@ export default function PinnedDock({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleMove(index, 'right');
+                  if (onCameraClick) {
+                    onCameraClick(pinnedCameras[index + 1]);
+                  }
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
                 className={`${presetStyle.controlBtnSize} bg-zinc-950/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white rounded-sm flex items-center justify-center cursor-pointer transition`}
-                title={PINNED_DOCK_I18N.MOVE_RIGHT[lang]}
-                aria-label={`${PINNED_DOCK_I18N.MOVE_RIGHT[lang]}: ${cam.displayName || cam.title}`}
+                title={lang === 'vi' ? 'Xem camera sau' : 'View next camera'}
+                aria-label={`${lang === 'vi' ? 'Xem camera sau' : 'View next camera'}: ${pinnedCameras[index + 1].displayName || pinnedCameras[index + 1].title}`}
               >
                 ▶
               </button>
