@@ -189,10 +189,10 @@ export function getFloodHexColorAndOpacity(severity: string): {
 
 /**
  * Returns whether flood hex cells should be visible at the given zoom level.
- * Macro zoom (11–13) is visible; micro zoom (14+) fades out to give focus to individual camera markers.
+ * Macro and corridor zoom (11–14) is visible; micro block zoom (15+) fades out to give focus to individual camera markers.
  */
 export function isFloodVisibleAtZoom(zoom: number): boolean {
-  return zoom <= 13;
+  return zoom <= 14;
 }
 
 /**

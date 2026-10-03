@@ -91,25 +91,25 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     assert.equal(wet.strokeWeight, 0.5);
   });
 
-  test('isFloodVisibleAtZoom enables macro zoom (11-13) and hides micro zoom (14+)', () => {
+  test('isFloodVisibleAtZoom enables macro zoom (11-14) and hides micro zoom (15+)', () => {
     assert.equal(isFloodVisibleAtZoom(10), true);
     assert.equal(isFloodVisibleAtZoom(11), true);
     assert.equal(isFloodVisibleAtZoom(12), true);
     assert.equal(isFloodVisibleAtZoom(13), true);
-    assert.equal(isFloodVisibleAtZoom(14), false);
+    assert.equal(isFloodVisibleAtZoom(14), true);
     assert.equal(isFloodVisibleAtZoom(15), false);
     assert.equal(isFloodVisibleAtZoom(18), false);
   });
 
   test('getFloodInteractivityState controls visibility, pointerEvents, and CSS classes across zoom levels', () => {
-    // Macro zoom (<= 13)
-    const macroState = getFloodInteractivityState(13);
+    // Macro zoom (<= 14)
+    const macroState = getFloodInteractivityState(14);
     assert.equal(macroState.isVisible, true);
     assert.equal(macroState.pointerEvents, 'auto');
     assert.equal(macroState.className, 'hex-cell-polygon');
 
-    // Micro zoom (>= 14)
-    const microState = getFloodInteractivityState(14);
+    // Micro zoom (>= 15)
+    const microState = getFloodInteractivityState(15);
     assert.equal(microState.isVisible, false);
     assert.equal(microState.pointerEvents, 'none');
     assert.equal(microState.className, 'hex-cell-polygon hex-cell-hidden');
