@@ -50,6 +50,7 @@ export default function MapComponent({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const prevFilteredRef = useRef(false);
   const hexOverlayEnabledRef = useRef(hexOverlayEnabled);
+  const activeTooltipMarkerRef = useRef<L.CircleMarker | null>(null);
 
   useEffect(() => {
     hexOverlayEnabledRef.current = hexOverlayEnabled;
@@ -108,6 +109,20 @@ export default function MapComponent({
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
       onMapReady?.(map);
+
+      // Close open camera tooltips when map begins zooming or panning
+      map.on('zoomstart', () => {
+        if (activeTooltipMarkerRef.current) {
+          activeTooltipMarkerRef.current.closeTooltip();
+          activeTooltipMarkerRef.current = null;
+        }
+      });
+      map.on('movestart', () => {
+        if (activeTooltipMarkerRef.current) {
+          activeTooltipMarkerRef.current.closeTooltip();
+          activeTooltipMarkerRef.current = null;
+        }
+      });
 
       // Dynamically scale marker sizes and macro dimming on zoomend
       map.on('zoomend', () => {
@@ -197,6 +212,10 @@ export default function MapComponent({
 
   useEffect(() => {
     if (!mapRef.current || !markersLayerRef.current) return;
+    if (activeTooltipMarkerRef.current) {
+      activeTooltipMarkerRef.current.closeTooltip();
+      activeTooltipMarkerRef.current = null;
+    }
     markersLayerRef.current.clearLayers();
 
     const zoom = mapRef.current.getZoom();
@@ -273,6 +292,11 @@ export default function MapComponent({
       });
 
       marker.on('mouseover', () => {
+        if (activeTooltipMarkerRef.current && activeTooltipMarkerRef.current !== marker) {
+          activeTooltipMarkerRef.current.closeTooltip();
+        }
+        activeTooltipMarkerRef.current = marker;
+
         const curZ = mapRef.current ? mapRef.current.getZoom() : zoom;
         const curBase = getRadius(curZ, isFew);
         const hoverRadius = customMarker.isDimmed ? Math.max(2.5, Math.round(curBase * 0.7)) + 2 : curBase + 3;
@@ -283,10 +307,14 @@ export default function MapComponent({
           opacity: customMarker.isDimmed ? 0.8 : 1,
           fillOpacity: customMarker.isDimmed ? 0.6 : 1,
         });
-        marker.bringToFront();
       });
 
       marker.on('mouseout', () => {
+        marker.closeTooltip();
+        if (activeTooltipMarkerRef.current === marker) {
+          activeTooltipMarkerRef.current = null;
+        }
+
         const curZ = mapRef.current ? mapRef.current.getZoom() : zoom;
         const curBase = getRadius(curZ, isFew);
         const isFilteredDim = customMarker.isFilteredDimmed === true;

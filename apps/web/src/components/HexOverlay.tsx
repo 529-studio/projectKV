@@ -131,10 +131,10 @@ export default function HexOverlay({
             color: '#a1a1aa',
             fillOpacity: Math.min(0.4, fillOpacity + 0.1),
           });
-          polygon.bringToFront();
         });
 
         polygon.on('mouseout', () => {
+          polygon.closeTooltip();
           if (!isHexVisibleAtZoom(map.getZoom())) return;
           polygon.setStyle({
             weight: 1,
@@ -206,10 +206,10 @@ export default function HexOverlay({
             color: '#38bdf8',
             fillOpacity: Math.min(0.45, fillOpacity + 0.12),
           });
-          polygon.bringToFront();
         });
 
         polygon.on('mouseout', () => {
+          polygon.closeTooltip();
           if (!isFloodVisibleAtZoom(map.getZoom())) return;
           polygon.setStyle({
             weight: strokeWeight,
