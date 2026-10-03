@@ -27,9 +27,37 @@ export const FLOOD_I18N = Object.freeze({
     vi: 'Giao thông',
     en: 'Traffic',
   },
+  LAYER_TRAFFIC_SHORT: {
+    vi: 'G.thông',
+    en: 'Traffic',
+  },
   LAYER_FLOOD: {
     vi: 'Vùng mưa',
     en: 'Rain zones',
+  },
+  LAYER_RADAR: {
+    vi: 'Dự báo radar',
+    en: 'Radar forecast',
+  },
+  LAYER_RADAR_SUBTITLE: {
+    vi: 'Dự báo — không phải quan sát thực tế',
+    en: 'Forecast — not a live observation',
+  },
+  LAYER_RADAR_SHORT: {
+    vi: 'Radar',
+    en: 'Radar',
+  },
+  LAYER_FLOOD_VERIFIED: {
+    vi: 'Camera xác nhận ngập',
+    en: 'Camera-verified flooding',
+  },
+  LAYER_FLOOD_VERIFIED_SUBTITLE: {
+    vi: 'Xác nhận bởi camera giám sát',
+    en: 'Verified by surveillance cameras',
+  },
+  LAYER_FLOOD_VERIFIED_SHORT: {
+    vi: 'Camera',
+    en: 'Camera',
   },
   TOOLTIP_TITLE: {
     vi: 'Thời tiết khu vực',
@@ -64,8 +92,8 @@ export const FLOOD_I18N = Object.freeze({
     en: 'Worst rain/flood spot',
   },
   FILTER_CHIP: {
-    vi: (n: number) => `Khu vực có mưa (${n})`,
-    en: (n: number) => `Rain areas (${n})`,
+    vi: (n: number) => `Điểm ngập camera (${n})`,
+    en: (n: number) => `Camera flood spots (${n})`,
   },
   ACTIVE_ALERT_BADGE: {
     vi: (n: number) => `Vùng có mưa • ${n}`,
@@ -234,39 +262,122 @@ export function getFloodSeverityLabel(severity: string, lang: 'vi' | 'en' = 'vi'
 }
 
 /**
- * Formats flood hex cell tooltip content.
+ * Styling for radar forecast hex cells: dashed border and subtle fill.
+ * Visually distinguishes forecast data from camera-verified observations.
+ */
+export function getRadarHexColorAndOpacity(severity: string): {
+  fillColor: string;
+  fillOpacity: number;
+  strokeColor: string;
+  strokeWeight: number;
+  dashArray: string;
+} {
+  const base = getFloodHexColorAndOpacity(severity);
+  return {
+    fillColor: base.fillColor,
+    fillOpacity: Math.max(0.08, base.fillOpacity * 0.85),
+    strokeColor: base.strokeColor,
+    strokeWeight: 1.0,
+    dashArray: '5, 5',
+  };
+}
+
+/**
+ * Styling for camera-verified flood hex cells: solid prominent border and higher fill.
+ * Visual precedence ensures camera observations are never hidden behind radar clouds.
+ */
+export function getVerifiedFloodHexColorAndOpacity(severity: string): {
+  fillColor: string;
+  fillOpacity: number;
+  strokeColor: string;
+  strokeWeight: number;
+} {
+  const base = getFloodHexColorAndOpacity(severity);
+  return {
+    fillColor: base.fillColor,
+    fillOpacity: Math.min(0.35, base.fillOpacity + 0.08),
+    strokeColor: base.strokeColor,
+    strokeWeight: 1.75,
+  };
+}
+
+/**
+ * Formats radar forecast hex cell tooltip content.
+ * Explicitly states: "Dự báo — không phải quan sát thực tế" / "Forecast — not a live observation".
+ */
+export function formatRadarHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'vi'): string {
+  const style = getRadarHexColorAndOpacity(cell.flood_severity);
+  const severityText = getFloodSeverityLabel(cell.flood_severity, lang);
+  const layerTitle = FLOOD_I18N.LAYER_RADAR[lang];
+  const layerSubtitle = FLOOD_I18N.LAYER_RADAR_SUBTITLE[lang];
+  const sourceName = cell.worst_camera.startsWith('open-meteo')
+    ? (lang === 'vi' ? 'Dự báo Open-Meteo' : 'Open-Meteo forecast')
+    : (lang === 'vi' ? 'Radar thời tiết RainViewer' : 'RainViewer weather radar');
+
+  let advice = '';
+  const s = (cell.flood_severity || '').toUpperCase().trim();
+  if (s === 'FLOODED_DEEP') {
+    advice = lang === 'vi' ? 'Mây đối lưu đậm, nguy cơ ngập cục bộ' : 'Heavy convective cloud, localized flood risk';
+  } else if (s === 'FLOODED_SHALLOW') {
+    advice = lang === 'vi' ? 'Mưa vừa diện rộng, chú ý đường trơn' : 'Moderate rain area, slick roads';
+  } else if (s === 'WET') {
+    advice = lang === 'vi' ? 'Mưa nhỏ rải rác / Khả năng có mưa' : 'Scattered light rain / chance of rain';
+  }
+
+  return `<div style="font-family:var(--font-mono, monospace); font-size:10.5px; line-height:1.4;">` +
+    `<div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">` +
+      `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${style.fillColor};"></span>` +
+      `<span style="font-weight:700; color:#ffffff;">${layerTitle} • ${severityText}</span>` +
+    `</div>` +
+    `<div style="font-size:9.5px; color:#38bdf8; margin-bottom:4px; font-style:italic;">` +
+      `⚠ ${layerSubtitle}` +
+    `</div>` +
+    (advice ? `<div style="color:#e4e4e7; margin-bottom:3px;">${advice}</div>` : '') +
+    `<div style="margin-top:2px; color:#d4d4d8;">` +
+      `<span style="color:#71717a;">${lang === 'vi' ? 'Nguồn dữ liệu' : 'Data source'}:</span> ` +
+      `<span style="font-weight:600; color:#f4f4f5;">${sourceName}</span>` +
+    `</div>` +
+  `</div>`;
+}
+
+/**
+ * Formats camera-verified flood hex cell tooltip content.
  * Strictly NEVER shows ward names (ADR-004 §D11 Correction 2).
- * Shows severity badge, camera count, and worst flood camera name.
+ * Shows severity badge, camera count, worst flood camera name, and explicit verification subtitle.
  */
 export function formatFloodHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'vi'): string {
-  const style = getFloodHexColorAndOpacity(cell.flood_severity);
-  const severityText = getFloodSeverityLabel(cell.flood_severity, lang);
+  // If a radar cell is passed, delegate to radar tooltip
   const isRadarSource = cell.worst_camera.startsWith('radar') || cell.worst_camera.startsWith('open-meteo');
-  const countText = isRadarSource && cell.camera_count === 0
-    ? (lang === 'vi' ? 'Dự báo radar thời tiết' : 'Weather radar forecast')
-    : FLOOD_I18N.CAMERAS_MONITORING[lang](cell.camera_count);
-  const worstLabel = isRadarSource && cell.camera_count === 0
-    ? (lang === 'vi' ? 'Nguồn dữ liệu' : 'Data source')
-    : FLOOD_I18N.WORST_FLOOD_CAMERA[lang];
-  const worstName = isRadarSource && cell.camera_count === 0
-    ? (lang === 'vi' ? 'Radar RainViewer' : 'RainViewer Radar')
-    : cell.worst_camera_name || cell.worst_camera || (lang === 'vi' ? 'Không rõ' : 'Unknown');
+  if (isRadarSource && cell.camera_count === 0) {
+    return formatRadarHexTooltip(cell, lang);
+  }
+
+  const style = getVerifiedFloodHexColorAndOpacity(cell.flood_severity);
+  const severityText = getFloodSeverityLabel(cell.flood_severity, lang);
+  const layerTitle = FLOOD_I18N.LAYER_FLOOD_VERIFIED[lang];
+  const layerSubtitle = FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE[lang];
+  const countText = FLOOD_I18N.CAMERAS_MONITORING[lang](cell.camera_count);
+  const worstLabel = FLOOD_I18N.WORST_FLOOD_CAMERA[lang];
+  const worstName = cell.worst_camera_name || cell.worst_camera || (lang === 'vi' ? 'Không rõ' : 'Unknown');
 
   // Commuter practical travel guidance
   let advice = '';
   const s = (cell.flood_severity || '').toUpperCase().trim();
   if (s === 'FLOODED_DEEP') {
-    advice = lang === 'vi' ? 'Mặt đường ngập nước, tầm nhìn kém' : 'Flooded road risk, poor visibility';
+    advice = lang === 'vi' ? 'Camera xác nhận ngập sâu, phương tiện hạn chế qua lại' : 'Camera-verified deep flood, avoid transit';
   } else if (s === 'FLOODED_SHALLOW') {
-    advice = lang === 'vi' ? 'Đường trơn ướt, chú ý giảm tốc độ' : 'Slick wet road, reduce speed';
+    advice = lang === 'vi' ? 'Camera xác nhận ngập nông mép đường, giảm tốc độ' : 'Camera-verified shallow curbside flood, slow down';
   } else if (s === 'WET') {
-    advice = lang === 'vi' ? 'Có mưa rải rác / Khả năng mưa' : 'Scattered light rain';
+    advice = lang === 'vi' ? 'Camera ghi nhận mặt đường ướt' : 'Camera-observed wet road surface';
   }
 
   return `<div style="font-family:var(--font-mono, monospace); font-size:10.5px; line-height:1.4;">` +
-    `<div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">` +
+    `<div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">` +
       `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${style.fillColor};"></span>` +
-      `<span style="font-weight:700; color:#ffffff;">${severityText}</span>` +
+      `<span style="font-weight:700; color:#ffffff;">${layerTitle} • ${severityText}</span>` +
+    `</div>` +
+    `<div style="font-size:9.5px; color:#4ade80; margin-bottom:4px;">` +
+      `✓ ${layerSubtitle}` +
     `</div>` +
     (advice ? `<div style="color:#e4e4e7; margin-bottom:3px;">${advice}</div>` : '') +
     `<div style="color:#a1a1aa;">${countText}</div>` +

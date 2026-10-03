@@ -4,36 +4,43 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FUNCTIONAL_COLORS, VERDICT_I18N, HEX_I18N } from '../config/constants';
 import { FLOOD_I18N } from '../utils/floodUtils';
 import { WEATHER_I18N } from '../utils/weatherUtils';
+import type { ActiveLensMode } from './HexOverlay';
 
 interface MapLegendProps {
   isOpen: boolean;
   onToggle: () => void;
   analysisEnabled?: boolean;
+  lensMode?: ActiveLensMode;
+  // Backwards compatibility props:
   hexOverlayEnabled?: boolean;
-  hexOverlayMode?: 'traffic' | 'flood';
+  showRadar?: boolean;
+  showFlood?: boolean;
+  showTraffic?: boolean;
+  hexOverlayMode?: 'traffic' | 'flood' | 'radar';
   verdictsCount?: number;
   lang?: 'vi' | 'en';
   floodLoading?: boolean;
+  radarLoading?: boolean;
   trafficLoading?: boolean;
 }
 
 interface LegendContentProps {
   lang: 'vi' | 'en';
   analysisEnabled: boolean;
-  hexOverlayEnabled: boolean;
-  hexOverlayMode: 'traffic' | 'flood';
+  effectiveMode: ActiveLensMode;
   verdictsCount: number;
   floodLoading?: boolean;
+  radarLoading?: boolean;
   trafficLoading?: boolean;
 }
 
 function LegendContent({
   lang,
   analysisEnabled,
-  hexOverlayEnabled,
-  hexOverlayMode,
+  effectiveMode,
   verdictsCount,
   floodLoading = false,
+  radarLoading = false,
   trafficLoading = false,
 }: LegendContentProps) {
   return (
@@ -107,57 +114,106 @@ function LegendContent({
         </>
       )}
 
-      {/* Category 3: Regional Overlay (Only rendered when hexOverlayEnabled is true) */}
-      {hexOverlayEnabled && (
+      {/* Category 3: Active Map Lens Overlay */}
+      {effectiveMode !== 'off' && (
         <>
-          <div className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1.5 border-t border-zinc-800/80 flex items-center justify-between">
-            <span>
-              {hexOverlayMode === 'flood'
-                ? (lang === 'vi' ? 'Vùng mưa (Radar thời tiết)' : 'Rain Zones (Weather Radar)')
-                : (lang === 'vi' ? 'Vùng giao thông' : 'Traffic Zones')}
-            </span>
-            {hexOverlayMode === 'flood' && floodLoading && (
-              <span className="flex items-center gap-1 text-sky-400 font-normal lowercase tracking-normal">
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-                <span>{lang === 'vi' ? 'đang tải...' : 'syncing...'}</span>
-              </span>
-            )}
-            {hexOverlayMode === 'traffic' && trafficLoading && (
-              <span className="flex items-center gap-1 text-zinc-400 font-normal lowercase tracking-normal">
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
-                <span>{lang === 'vi' ? 'đang tải...' : 'syncing...'}</span>
-              </span>
-            )}
-          </div>
-          {hexOverlayMode === 'flood' ? (
-            <>
+          {/* LENS 1: Weather Radar Forecast */}
+          {effectiveMode === 'radar' && (
+            <div className="flex flex-col gap-1.5 pt-1.5 border-t border-zinc-800/80">
+              <div className="flex items-center justify-between text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
+                <div className="flex flex-col">
+                  <span className="text-sky-300">{FLOOD_I18N.LAYER_RADAR[lang]}</span>
+                  <span className="text-[9px] text-sky-400/90 font-normal italic lowercase tracking-normal">
+                    ⚠ {FLOOD_I18N.LAYER_RADAR_SUBTITLE[lang]}
+                  </span>
+                </div>
+                {radarLoading && (
+                  <span className="flex items-center gap-1 text-sky-400 font-normal lowercase tracking-normal">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                    <span>{lang === 'vi' ? 'đang tải...' : 'syncing...'}</span>
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2.5">
                 <span
-                  className="w-3.5 h-3.5 rounded-sm border border-blue-600/80 shrink-0"
+                  className="w-3.5 h-3.5 rounded-sm border border-dashed border-blue-400 shrink-0"
+                  style={{ backgroundColor: 'rgba(29, 78, 216, 0.25)' }}
+                />
+                <span className="text-zinc-300">{FLOOD_I18N.DEEP_WATER[lang]}</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="w-3.5 h-3.5 rounded-sm border border-dashed border-sky-400 shrink-0"
+                  style={{ backgroundColor: 'rgba(2, 132, 199, 0.20)' }}
+                />
+                <span className="text-zinc-300">{FLOOD_I18N.SHALLOW_WATER[lang]}</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="w-3.5 h-3.5 rounded-sm border border-dashed border-sky-300 shrink-0"
+                  style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)' }}
+                />
+                <span className="text-zinc-300">{FLOOD_I18N.WET_ROAD[lang]}</span>
+              </div>
+              <div className="text-[9.5px] text-zinc-500 pt-0.5">
+                {WEATHER_I18N.ATTRIBUTION[lang]}
+              </div>
+            </div>
+          )}
+
+          {/* LENS 2: Camera-Verified Flood */}
+          {effectiveMode === 'flood' && (
+            <div className="flex flex-col gap-1.5 pt-1.5 border-t border-zinc-800/80">
+              <div className="flex items-center justify-between text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
+                <div className="flex flex-col">
+                  <span className="text-blue-400">{FLOOD_I18N.LAYER_FLOOD_VERIFIED[lang]}</span>
+                  <span className="text-[9px] text-emerald-400/90 font-normal lowercase tracking-normal">
+                    ✓ {FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE[lang]}
+                  </span>
+                </div>
+                {floodLoading && (
+                  <span className="flex items-center gap-1 text-sky-400 font-normal lowercase tracking-normal">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                    <span>{lang === 'vi' ? 'đang tải...' : 'syncing...'}</span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="w-3.5 h-3.5 rounded-sm border-2 border-blue-600 shrink-0"
                   style={{ backgroundColor: 'rgba(29, 78, 216, 0.45)' }}
                 />
                 <span className="text-zinc-300">{FLOOD_I18N.DEEP_WATER[lang]}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <span
-                  className="w-3.5 h-3.5 rounded-sm border border-sky-500/80 shrink-0"
+                  className="w-3.5 h-3.5 rounded-sm border-2 border-sky-500 shrink-0"
                   style={{ backgroundColor: 'rgba(2, 132, 199, 0.35)' }}
                 />
                 <span className="text-zinc-300">{FLOOD_I18N.SHALLOW_WATER[lang]}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <span
-                  className="w-3.5 h-3.5 rounded-sm border border-sky-400/80 shrink-0"
+                  className="w-3.5 h-3.5 rounded-sm border-2 border-sky-400 shrink-0"
                   style={{ backgroundColor: 'rgba(56, 189, 248, 0.25)' }}
                 />
                 <span className="text-zinc-300">{FLOOD_I18N.WET_ROAD[lang]}</span>
               </div>
-              <div className="text-[9.5px] text-zinc-500 pt-1.5 mt-0.5 border-t border-zinc-800/80">
-                {WEATHER_I18N.ATTRIBUTION[lang]}
+            </div>
+          )}
+
+          {/* LENS 3: Traffic Density */}
+          {effectiveMode === 'traffic' && (
+            <div className="flex flex-col gap-1.5 pt-1.5 border-t border-zinc-800/80">
+              <div className="flex items-center justify-between text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
+                <span>{lang === 'vi' ? 'Vùng giao thông' : 'Traffic Zones'}</span>
+                {trafficLoading && (
+                  <span className="flex items-center gap-1 text-zinc-400 font-normal lowercase tracking-normal">
+                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
+                    <span>{lang === 'vi' ? 'đang tải...' : 'syncing...'}</span>
+                  </span>
+                )}
               </div>
-            </>
-          ) : (
-            <>
               <div className="flex items-center gap-2.5">
                 <span
                   className="w-3.5 h-3.5 rounded-sm border border-emerald-500/60 shrink-0"
@@ -179,7 +235,7 @@ function LegendContent({
                 />
                 <span className="text-zinc-300">{HEX_I18N.ZONE_CONGESTED[lang]}</span>
               </div>
-            </>
+            </div>
           )}
         </>
       )}
@@ -191,28 +247,46 @@ export default function MapLegend({
   isOpen,
   onToggle,
   analysisEnabled = false,
-  hexOverlayEnabled = false,
-  hexOverlayMode = 'flood',
+  lensMode,
+  hexOverlayEnabled = true,
+  showRadar,
+  showFlood,
+  showTraffic,
+  hexOverlayMode = 'radar',
   verdictsCount = 0,
   lang = 'vi',
   floodLoading = false,
+  radarLoading = false,
   trafficLoading = false,
 }: MapLegendProps) {
+  // Derive effective lens mode
+  const effectiveMode: ActiveLensMode = lensMode !== undefined
+    ? lensMode
+    : !hexOverlayEnabled
+      ? 'off'
+      : showRadar
+        ? 'radar'
+        : showFlood
+          ? 'flood'
+          : showTraffic
+            ? 'traffic'
+            : hexOverlayMode;
+
   return (
     <>
       {/* DESKTOP VIEW (md+): Collapsible card */}
-      <div className="hidden md:block z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[230px]">
-        {/* Header row — always visible */}
+      <div className="hidden md:block z-[800] bg-zinc-950/95 border border-zinc-800 hover:border-zinc-700 rounded-lg font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none">
+        {/* Header button — always visible */}
         <button
           onClick={onToggle}
-          className="w-full flex items-center justify-between px-3 py-2 hover:bg-zinc-900/60 transition-colors rounded-md focus:outline-none cursor-pointer"
+          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-zinc-900/60 transition-colors rounded-lg focus:outline-none cursor-pointer"
           aria-expanded={isOpen}
           aria-label={lang === 'vi' ? 'Đóng/mở chú giải bản đồ' : 'Toggle map legend'}
         >
-          <span className="font-bold text-white tracking-wider text-xs uppercase">
-            {lang === 'vi' ? 'CHÚ GIẢI BẢN ĐỒ' : 'MAP LEGEND'}
+          <span className="font-bold text-zinc-300 tracking-wider text-[11px] uppercase">
+            {lang === 'vi' ? 'CHÚ GIẢI' : 'LEGEND'}
           </span>
-          <span className="text-zinc-400 text-xs ml-3 shrink-0">
+          <span className="text-zinc-500 text-xs ml-2 shrink-0">
             {isOpen ? '▾' : '▸'}
           </span>
         </button>
@@ -225,17 +299,17 @@ export default function MapLegend({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: 'easeInOut' }}
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <div className="flex flex-col gap-2 text-zinc-200 text-xs px-3 pb-3 pt-1 border-t border-zinc-800">
+              <div className="flex flex-col gap-2 text-zinc-200 text-xs px-3 pb-3 pt-1 border-t border-zinc-800 min-w-[220px]">
                 <LegendContent
                   lang={lang}
                   analysisEnabled={analysisEnabled}
-                  hexOverlayEnabled={hexOverlayEnabled}
-                  hexOverlayMode={hexOverlayMode}
+                  effectiveMode={effectiveMode}
                   verdictsCount={verdictsCount}
                   floodLoading={floodLoading}
+                  radarLoading={radarLoading}
                   trafficLoading={trafficLoading}
                 />
               </div>
@@ -247,16 +321,16 @@ export default function MapLegend({
       {/* MOBILE VIEW (<md): Trigger button + Bottom sheet modal */}
       <div className="md:hidden">
         {/* Trigger Button */}
-        <div className="z-[800] pointer-events-auto select-none">
+        <div className="pointer-events-auto select-none">
           <button
             onClick={onToggle}
-            className="w-[34px] h-[34px] flex items-center justify-center rounded border border-zinc-700 bg-zinc-950/95 text-zinc-300 hover:text-white shadow-2xl backdrop-blur-md focus:outline-none active:bg-zinc-900 cursor-pointer transition-colors"
+            className="w-11 h-11 flex items-center justify-center rounded-lg border border-zinc-700 hover:border-zinc-400 bg-zinc-950/95 text-zinc-200 hover:text-white shadow-2xl backdrop-blur-md focus:outline-none active:scale-95 cursor-pointer transition-all"
             aria-expanded={isOpen}
             aria-label={lang === 'vi' ? 'Chú giải bản đồ' : 'Map legend'}
             title={lang === 'vi' ? 'Chú giải bản đồ' : 'Map legend'}
           >
             <svg
-              className="w-4 h-4 text-zinc-300"
+              className="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -295,7 +369,7 @@ export default function MapLegend({
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ duration: 0.25, ease: 'easeOut' }}
-                className="fixed bottom-0 left-0 right-0 z-[860] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col max-h-[75vh] font-mono pointer-events-auto select-none pb-6"
+                className="fixed bottom-0 left-0 right-0 z-[860] bg-zinc-950 border-t border-zinc-800 rounded-t-xl shadow-2xl flex flex-col max-h-[75vh] font-mono pointer-events-auto select-none pb-6"
               >
                 {/* Drag handle */}
                 <div className="pt-2.5 pb-1 flex justify-center shrink-0">
@@ -321,10 +395,10 @@ export default function MapLegend({
                   <LegendContent
                     lang={lang}
                     analysisEnabled={analysisEnabled}
-                    hexOverlayEnabled={hexOverlayEnabled}
-                    hexOverlayMode={hexOverlayMode}
+                    effectiveMode={effectiveMode}
                     verdictsCount={verdictsCount}
                     floodLoading={floodLoading}
+                    radarLoading={radarLoading}
                     trafficLoading={trafficLoading}
                   />
                 </div>
