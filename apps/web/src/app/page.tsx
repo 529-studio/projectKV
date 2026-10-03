@@ -7,6 +7,8 @@ import { useCameras, Camera } from '../hooks/useCameras';
 import { useTraffic } from '../hooks/useTraffic';
 import { useFlood } from '../hooks/useFlood';
 import { useWeather } from '../hooks/useWeather';
+import { useRainHexRadar } from '../hooks/useRainHexRadar';
+import { mergeFloodHexCells } from '../utils/rainHexUtils';
 import { type HexOverlayMode } from '../components/HexOverlay';
 import { FLOOD_I18N } from '../utils/floodUtils';
 import { MOBILE_SEARCH_I18N } from '../config/constants';
@@ -24,13 +26,20 @@ import PhuongTreeFilter, {
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
-const RainRadarLayer = dynamic(() => import('../components/RainRadarLayer'), { ssr: false });
 
 export default function Home() {
   const { cameras, loading, error } = useCameras();
   const { verdicts, hexCells, analysisEnabled, appEnv, loading: trafficLoading } = useTraffic();
   const { floodVerdicts, floodHexCells, floodedCameraIds, floodedCameraCount, loading: floodLoading } = useFlood();
   const { weather, radar, loading: weatherLoading } = useWeather();
+  const { rainRadarHexCells, loading: rainRadarLoading } = useRainHexRadar(radar, weather, cameras);
+
+  // Merge camera ground-truth flood observations with real-time RainViewer radar & Open-Meteo rain hexes
+  const activeFloodHexCells = useMemo(() => {
+    return mergeFloodHexCells(floodHexCells, rainRadarHexCells);
+  }, [floodHexCells, rainRadarHexCells]);
+
+  const combinedFloodLoading = floodLoading || rainRadarLoading;
   
   const [map, setMap] = useState<L.Map | null>(null);
   const [hexOverlayEnabled, setHexOverlayEnabled] = useState(true);
@@ -87,11 +96,11 @@ export default function Home() {
 
   const [floodSyncNoticeDismissed, setFloodSyncNoticeDismissed] = useState(false);
   const [showFloodSyncedSuccess, setShowFloodSyncedSuccess] = useState(false);
-  const prevFloodLoadingRef = useRef(floodLoading);
+  const prevFloodLoadingRef = useRef(combinedFloodLoading);
 
   useEffect(() => {
-    if (prevFloodLoadingRef.current && !floodLoading) {
-      if (floodHexCells.size > 0 && !floodSyncNoticeDismissed) {
+    if (prevFloodLoadingRef.current && !combinedFloodLoading) {
+      if (activeFloodHexCells.size > 0 && !floodSyncNoticeDismissed) {
         setShowFloodSyncedSuccess(true);
         const timer = setTimeout(() => {
           setFloodSyncNoticeDismissed(true);
@@ -101,8 +110,8 @@ export default function Home() {
         setFloodSyncNoticeDismissed(true);
       }
     }
-    prevFloodLoadingRef.current = floodLoading;
-  }, [floodLoading, floodHexCells.size, floodSyncNoticeDismissed]);
+    prevFloodLoadingRef.current = combinedFloodLoading;
+  }, [combinedFloodLoading, activeFloodHexCells.size, floodSyncNoticeDismissed]);
 
   // URL sync for active filter (ADR-004 stretch goal)
   useEffect(() => {
@@ -262,21 +271,16 @@ export default function Home() {
             onMapReady={setMap}
             hexOverlayEnabled={hexOverlayEnabled}
           >
-            <RainRadarLayer
-              map={map}
-              radar={radar}
-              enabled={hexOverlayEnabled && hexOverlayMode === 'flood'}
-            />
             <HexOverlay
               map={map}
               hexCells={hexCells}
-              floodHexCells={floodHexCells}
+              floodHexCells={activeFloodHexCells}
               enabled={hexOverlayEnabled}
               onToggle={handleToggleHexOverlay}
               mode={hexOverlayMode}
               onModeChange={handleHexModeChange}
               lang={lang}
-              floodLoading={floodLoading}
+              floodLoading={combinedFloodLoading}
               trafficLoading={trafficLoading}
             />
           </MapComponent>
@@ -317,8 +321,8 @@ export default function Home() {
                   </span>
                   <span className="text-zinc-200 font-semibold">
                     {lang === 'vi'
-                      ? `✓ Đã sẵn sàng dữ liệu dự báo mưa (${floodHexCells.size} vùng)`
-                      : `✓ H3 rain forecast ready (${floodHexCells.size} zones)`}
+                      ? `✓ Đã sẵn sàng dữ liệu dự báo mưa (${activeFloodHexCells.size} vùng)`
+                      : `✓ H3 rain forecast ready (${activeFloodHexCells.size} zones)`}
                   </span>
                 </>
               ) : (
@@ -360,7 +364,7 @@ export default function Home() {
             hexOverlayMode={hexOverlayMode}
             verdictsCount={verdicts.size}
             lang={lang}
-            floodLoading={floodLoading}
+            floodLoading={combinedFloodLoading}
             trafficLoading={trafficLoading}
           />
         </div>
@@ -375,7 +379,7 @@ export default function Home() {
             hexOverlayMode={hexOverlayMode}
             verdictsCount={verdicts.size}
             lang={lang}
-            floodLoading={floodLoading}
+            floodLoading={combinedFloodLoading}
             trafficLoading={trafficLoading}
           />
           <div className="pointer-events-auto">
