@@ -241,8 +241,13 @@ export function getFloodSeverityLabel(severity: string, lang: 'vi' | 'en' = 'vi'
 export function formatFloodHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'vi'): string {
   const style = getFloodHexColorAndOpacity(cell.flood_severity);
   const severityText = getFloodSeverityLabel(cell.flood_severity, lang);
-  const countText = FLOOD_I18N.CAMERAS_MONITORING[lang](cell.camera_count);
-  const worstLabel = FLOOD_I18N.WORST_FLOOD_CAMERA[lang];
+  const isRadarSource = cell.worst_camera.startsWith('radar') || cell.worst_camera.startsWith('open-meteo');
+  const countText = isRadarSource && cell.camera_count === 0
+    ? (lang === 'vi' ? 'Dự báo viễn thám radar' : 'Satellite radar forecast')
+    : FLOOD_I18N.CAMERAS_MONITORING[lang](cell.camera_count);
+  const worstLabel = isRadarSource && cell.camera_count === 0
+    ? (lang === 'vi' ? 'Nguồn dữ liệu' : 'Data source')
+    : FLOOD_I18N.WORST_FLOOD_CAMERA[lang];
   const worstName = cell.worst_camera_name || cell.worst_camera || (lang === 'vi' ? 'Không rõ' : 'Unknown');
 
   return `<div style="font-family:var(--font-mono, monospace); font-size:10.5px; line-height:1.4;">` +

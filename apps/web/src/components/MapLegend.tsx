@@ -152,13 +152,7 @@ function LegendContent({
                 />
                 <span className="text-zinc-300">{FLOOD_I18N.WET_ROAD[lang]}</span>
               </div>
-              <div className="flex items-center gap-2.5 pt-1.5 mt-0.5 border-t border-zinc-800/80">
-                <span
-                  className="w-3.5 h-3.5 rounded-sm border border-sky-400/80 bg-sky-500/25 shrink-0"
-                />
-                <span className="text-zinc-300">{WEATHER_I18N.RADAR_LAYER[lang]}</span>
-              </div>
-              <div className="text-[9.5px] text-zinc-500 pt-0.5">
+              <div className="text-[9.5px] text-zinc-500 pt-1.5 mt-0.5 border-t border-zinc-800/80">
                 {WEATHER_I18N.ATTRIBUTION[lang]}
               </div>
             </>
