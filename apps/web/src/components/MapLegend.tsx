@@ -4,11 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FUNCTIONAL_COLORS, VERDICT_I18N, HEX_I18N } from '../config/constants';
 import { FLOOD_I18N } from '../utils/floodUtils';
 import { WEATHER_I18N } from '../utils/weatherUtils';
+import type { ActiveLensMode } from './HexOverlay';
 
 interface MapLegendProps {
   isOpen: boolean;
   onToggle: () => void;
   analysisEnabled?: boolean;
+  lensMode?: ActiveLensMode;
+  // Backwards compatibility props:
   hexOverlayEnabled?: boolean;
   showRadar?: boolean;
   showFlood?: boolean;
@@ -24,10 +27,7 @@ interface MapLegendProps {
 interface LegendContentProps {
   lang: 'vi' | 'en';
   analysisEnabled: boolean;
-  hexOverlayEnabled: boolean;
-  showRadar: boolean;
-  showFlood: boolean;
-  showTraffic: boolean;
+  effectiveMode: ActiveLensMode;
   verdictsCount: number;
   floodLoading?: boolean;
   radarLoading?: boolean;
@@ -37,10 +37,7 @@ interface LegendContentProps {
 function LegendContent({
   lang,
   analysisEnabled,
-  hexOverlayEnabled,
-  showRadar,
-  showFlood,
-  showTraffic,
+  effectiveMode,
   verdictsCount,
   floodLoading = false,
   radarLoading = false,
@@ -117,11 +114,11 @@ function LegendContent({
         </>
       )}
 
-      {/* Category 3: Regional Overlay Layers (Only rendered when hexOverlayEnabled is true) */}
-      {hexOverlayEnabled && (
+      {/* Category 3: Active Map Lens Overlay */}
+      {effectiveMode !== 'off' && (
         <>
-          {/* Layer 3A: Camera-Verified Flood Layer (Ground Truth Observation) */}
-          {showFlood && (
+          {/* LENS 1: Camera-Verified Flood */}
+          {effectiveMode === 'flood' && (
             <div className="flex flex-col gap-1.5 pt-1.5 border-t border-zinc-800/80">
               <div className="flex items-center justify-between text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
                 <div className="flex flex-col">
@@ -161,8 +158,8 @@ function LegendContent({
             </div>
           )}
 
-          {/* Layer 3B: Weather Radar Forecast Layer (Atmospheric Prediction) */}
-          {showRadar && (
+          {/* LENS 2: Weather Radar Forecast */}
+          {effectiveMode === 'radar' && (
             <div className="flex flex-col gap-1.5 pt-1.5 border-t border-zinc-800/80">
               <div className="flex items-center justify-between text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
                 <div className="flex flex-col">
@@ -205,8 +202,8 @@ function LegendContent({
             </div>
           )}
 
-          {/* Layer 3C: Traffic Zones Layer */}
-          {showTraffic && (
+          {/* LENS 3: Traffic Density */}
+          {effectiveMode === 'traffic' && (
             <div className="flex flex-col gap-1.5 pt-1.5 border-t border-zinc-800/80">
               <div className="flex items-center justify-between text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
                 <span>{lang === 'vi' ? 'Vùng giao thông' : 'Traffic Zones'}</span>
@@ -240,13 +237,6 @@ function LegendContent({
               </div>
             </div>
           )}
-
-          {/* If all 3 sub-layers are toggled off */}
-          {!showFlood && !showRadar && !showTraffic && (
-            <div className="text-[11px] text-zinc-500 italic pt-1.5 border-t border-zinc-800/80">
-              {lang === 'vi' ? 'Chưa bật lớp vùng nào' : 'No zone layers active'}
-            </div>
-          )}
         </>
       )}
     </>
@@ -257,7 +247,8 @@ export default function MapLegend({
   isOpen,
   onToggle,
   analysisEnabled = false,
-  hexOverlayEnabled = false,
+  lensMode,
+  hexOverlayEnabled = true,
   showRadar,
   showFlood,
   showTraffic,
@@ -268,26 +259,34 @@ export default function MapLegend({
   radarLoading = false,
   trafficLoading = false,
 }: MapLegendProps) {
-  // Derive effective active states
-  const effectiveShowRadar = showRadar !== undefined ? showRadar : hexOverlayMode === 'flood';
-  const effectiveShowFlood = showFlood !== undefined ? showFlood : hexOverlayMode === 'flood';
-  const effectiveShowTraffic = showTraffic !== undefined ? showTraffic : hexOverlayMode === 'traffic';
+  // Derive effective lens mode
+  const effectiveMode: ActiveLensMode = lensMode !== undefined
+    ? lensMode
+    : !hexOverlayEnabled
+      ? 'off'
+      : showFlood
+        ? 'flood'
+        : showRadar
+          ? 'radar'
+          : showTraffic
+            ? 'traffic'
+            : hexOverlayMode;
 
   return (
     <>
       {/* DESKTOP VIEW (md+): Collapsible card */}
-      <div className="hidden md:block z-[800] bg-zinc-950/95 border border-zinc-700 rounded-md font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none min-w-[240px]">
-        {/* Header row — always visible */}
+      <div className="hidden md:block z-[800] bg-zinc-950/95 border border-zinc-800 hover:border-zinc-700 rounded-lg font-mono shadow-2xl backdrop-blur-md pointer-events-auto select-none">
+        {/* Header button — always visible */}
         <button
           onClick={onToggle}
-          className="w-full flex items-center justify-between px-3 py-2 hover:bg-zinc-900/60 transition-colors rounded-md focus:outline-none cursor-pointer"
+          className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-zinc-900/60 transition-colors rounded-lg focus:outline-none cursor-pointer"
           aria-expanded={isOpen}
           aria-label={lang === 'vi' ? 'Đóng/mở chú giải bản đồ' : 'Toggle map legend'}
         >
-          <span className="font-bold text-white tracking-wider text-xs uppercase">
-            {lang === 'vi' ? 'CHÚ GIẢI BẢN ĐỒ' : 'MAP LEGEND'}
+          <span className="font-bold text-zinc-300 tracking-wider text-[11px] uppercase">
+            {lang === 'vi' ? 'CHÚ GIẢI' : 'LEGEND'}
           </span>
-          <span className="text-zinc-400 text-xs ml-3 shrink-0">
+          <span className="text-zinc-500 text-xs ml-2 shrink-0">
             {isOpen ? '▾' : '▸'}
           </span>
         </button>
@@ -300,17 +299,14 @@ export default function MapLegend({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: 'easeInOut' }}
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <div className="flex flex-col gap-2 text-zinc-200 text-xs px-3 pb-3 pt-1 border-t border-zinc-800">
+              <div className="flex flex-col gap-2 text-zinc-200 text-xs px-3 pb-3 pt-1 border-t border-zinc-800 min-w-[220px]">
                 <LegendContent
                   lang={lang}
                   analysisEnabled={analysisEnabled}
-                  hexOverlayEnabled={hexOverlayEnabled}
-                  showRadar={effectiveShowRadar}
-                  showFlood={effectiveShowFlood}
-                  showTraffic={effectiveShowTraffic}
+                  effectiveMode={effectiveMode}
                   verdictsCount={verdictsCount}
                   floodLoading={floodLoading}
                   radarLoading={radarLoading}
@@ -328,13 +324,13 @@ export default function MapLegend({
         <div className="z-[800] pointer-events-auto select-none">
           <button
             onClick={onToggle}
-            className="w-[34px] h-[34px] flex items-center justify-center rounded border border-zinc-700 bg-zinc-950/95 text-zinc-300 hover:text-white shadow-2xl backdrop-blur-md focus:outline-none active:bg-zinc-900 cursor-pointer transition-colors"
+            className="w-[32px] h-[32px] flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/95 text-zinc-400 hover:text-white shadow-2xl backdrop-blur-md focus:outline-none active:bg-zinc-900 cursor-pointer transition-colors"
             aria-expanded={isOpen}
             aria-label={lang === 'vi' ? 'Chú giải bản đồ' : 'Map legend'}
             title={lang === 'vi' ? 'Chú giải bản đồ' : 'Map legend'}
           >
             <svg
-              className="w-4 h-4 text-zinc-300"
+              className="w-3.5 h-3.5"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -373,7 +369,7 @@ export default function MapLegend({
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ duration: 0.25, ease: 'easeOut' }}
-                className="fixed bottom-0 left-0 right-0 z-[860] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col max-h-[75vh] font-mono pointer-events-auto select-none pb-6"
+                className="fixed bottom-0 left-0 right-0 z-[860] bg-zinc-950 border-t border-zinc-800 rounded-t-xl shadow-2xl flex flex-col max-h-[75vh] font-mono pointer-events-auto select-none pb-6"
               >
                 {/* Drag handle */}
                 <div className="pt-2.5 pb-1 flex justify-center shrink-0">
@@ -399,10 +395,7 @@ export default function MapLegend({
                   <LegendContent
                     lang={lang}
                     analysisEnabled={analysisEnabled}
-                    hexOverlayEnabled={hexOverlayEnabled}
-                    showRadar={effectiveShowRadar}
-                    showFlood={effectiveShowFlood}
-                    showTraffic={effectiveShowTraffic}
+                    effectiveMode={effectiveMode}
                     verdictsCount={verdictsCount}
                     floodLoading={floodLoading}
                     radarLoading={radarLoading}

@@ -27,6 +27,7 @@ interface MapComponentProps {
   appEnv?: string;
   onMapReady?: (map: L.Map | null) => void;
   hexOverlayEnabled?: boolean;
+  topRightControls?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -43,6 +44,7 @@ export default function MapComponent({
   appEnv = 'production',
   onMapReady,
   hexOverlayEnabled = false,
+  topRightControls,
   children,
 }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
@@ -356,32 +358,41 @@ export default function MapComponent({
     <div className="relative w-full h-full overflow-hidden">
       <div ref={containerRef} className="w-full h-full z-0 absolute inset-0 bg-[#09090b]" />
 
-      {/* Top controls: Toggle chips and active filter chips */}
-      <div className="absolute top-16 left-3 sm:top-3.5 sm:left-14 z-[800] flex flex-wrap items-center gap-2 max-w-[calc(100vw-32px)] sm:max-w-2xl pointer-events-none">
-        {children}
+      {/* Top controls: Unified single row for left lenses and right weather/legend */}
+      <div className="absolute top-16 left-3 right-3 sm:top-3.5 sm:left-14 sm:right-3 z-[800] flex items-start justify-between gap-2 pointer-events-none">
+        <div className="flex flex-wrap items-center gap-2 pointer-events-none min-w-0">
+          {children}
 
-        {/* On-map active filter chip (ADR-004 A3 - Issue #65) */}
-        {isFiltered && activeFilterLabel && (
-          <div
-            className="pointer-events-auto bg-zinc-950/95 border border-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded shadow-2xl backdrop-blur-md flex items-center gap-2 font-mono text-xs select-none transition-all"
-            role="status"
-            aria-live="polite"
-          >
-            <div className="flex items-center gap-1.5 truncate min-w-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <span className="truncate font-semibold text-zinc-100">{activeFilterLabel}</span>
+          {/* On-map active filter chip (ADR-004 A3 - Issue #65) */}
+          {isFiltered && activeFilterLabel && (
+            <div
+              className="pointer-events-auto bg-zinc-950/95 border border-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded shadow-2xl backdrop-blur-md flex items-center gap-2 font-mono text-xs select-none transition-all truncate"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex items-center gap-1.5 truncate min-w-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span className="truncate font-semibold text-zinc-100">{activeFilterLabel}</span>
+              </div>
+              {onFilterClear && (
+                <button
+                  type="button"
+                  onClick={onFilterClear}
+                  className="text-zinc-400 hover:text-white hover:bg-zinc-800 rounded p-0.5 ml-1 transition-colors shrink-0 focus:outline-none cursor-pointer"
+                  aria-label={lang === 'vi' ? 'Xóa bộ lọc' : 'Clear filter'}
+                  title={lang === 'vi' ? 'Xóa bộ lọc (Esc)' : 'Clear filter (Esc)'}
+                >
+                  <span className="text-sm font-bold leading-none block px-1">✕</span>
+                </button>
+              )}
             </div>
-            {onFilterClear && (
-              <button
-                type="button"
-                onClick={onFilterClear}
-                className="text-zinc-400 hover:text-white hover:bg-zinc-800 rounded p-0.5 ml-1 transition-colors shrink-0 focus:outline-none"
-                aria-label={lang === 'vi' ? 'Xóa bộ lọc' : 'Clear filter'}
-                title={lang === 'vi' ? 'Xóa bộ lọc (Esc)' : 'Clear filter (Esc)'}
-              >
-                <span className="text-sm font-bold leading-none block px-1">✕</span>
-              </button>
-            )}
+          )}
+        </div>
+
+        {/* Right controls: Weather Widget & Map Legend */}
+        {topRightControls && (
+          <div className="flex items-start gap-2 shrink-0 pointer-events-auto">
+            {topRightControls}
           </div>
         )}
       </div>

@@ -61,11 +61,11 @@ export default function WeatherWidget({
 
   return (
     <div ref={containerRef} className={`relative select-none font-mono text-xs ${className}`}>
-      {/* TRIGGER BADGE */}
+      {/* TRIGGER BADGE (Compact & Sleek) */}
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-200 transition-all cursor-pointer shadow-lg backdrop-blur-md focus:outline-none"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-950/95 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-200 transition-all cursor-pointer shadow-2xl backdrop-blur-md focus:outline-none text-[11px]"
         title={WEATHER_I18N.RAIN_FORECAST[lang]}
         aria-expanded={isOpen}
       >
@@ -105,19 +105,14 @@ export default function WeatherWidget({
           )}
         </span>
 
-        {/* Temperature & Rain Chance */}
+        {/* Temperature */}
         <span className="font-semibold text-white tracking-tight">
           {formatTemperature(weather.temperature_c)}
         </span>
 
-        <span className="text-zinc-500">•</span>
-
-        <span className="text-zinc-300 truncate max-w-[130px] hidden sm:inline">
-          {desc}
-        </span>
-
+        {/* Rain Chance Tag */}
         {weather.precipitation_probability_percent > 0 && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-950 text-sky-300 border border-sky-800/80">
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-sky-950 text-sky-300 border border-sky-800/80">
             {formatRainProbability(weather.precipitation_probability_percent)}
           </span>
         )}
@@ -135,9 +130,16 @@ export default function WeatherWidget({
           >
             {/* Header */}
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-800">
-              <span className="font-bold text-white text-[11px] uppercase tracking-wider">
-                {WEATHER_I18N.RAIN_FORECAST[lang]}
-              </span>
+              <div className="flex flex-col">
+                <span className="font-bold text-white text-[11px] uppercase tracking-wider">
+                  {WEATHER_I18N.RAIN_FORECAST[lang]}
+                </span>
+                {desc && (
+                  <span className="text-[10px] text-zinc-400 capitalize">
+                    {desc}
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}

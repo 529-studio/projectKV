@@ -92,8 +92,8 @@ export const FLOOD_I18N = Object.freeze({
     en: 'Worst rain/flood spot',
   },
   FILTER_CHIP: {
-    vi: (n: number) => `Khu vực có mưa (${n})`,
-    en: (n: number) => `Rain areas (${n})`,
+    vi: (n: number) => `Điểm ngập camera (${n})`,
+    en: (n: number) => `Camera flood spots (${n})`,
   },
   ACTIVE_ALERT_BADGE: {
     vi: (n: number) => `Vùng có mưa • ${n}`,

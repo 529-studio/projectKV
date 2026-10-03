@@ -199,6 +199,11 @@ export default function PhuongTreeFilter({
   const t = useMemo(() => {
     return {
       title: lang === 'vi' ? 'Khám phá Camera' : 'Camera Explorer',
+      subtitle: lang === 'vi' ? 'Warded • Cảnh báo ngập lụt & giao thông đô thị' : 'Warded • Urban flood alert & traffic intelligence',
+      floodStatusAlert: (n: number) => (lang === 'vi' ? `CẢNH BÁO NGẬP: ${n} điểm camera xác nhận ngập` : `FLOOD ALERT: ${n} camera-verified flood spots`),
+      floodStatusDry: lang === 'vi' ? 'TOÀN THÀNH PHỐ: Không ghi nhận điểm ngập nào' : 'CITYWIDE: No flooding reported by cameras',
+      floodFilterActiveBtn: (n: number) => (lang === 'vi' ? `✓ Đang lọc ${n} camera ngập` : `✓ Filtering ${n} flood cameras`),
+      floodFilterInactiveBtn: (n: number) => (lang === 'vi' ? `Xem danh sách ${n} camera ngập →` : `View ${n} flood cameras →`),
       tabCorridors: lang === 'vi' ? 'Tuyến đường' : 'Corridors',
       tabPhuongs: lang === 'vi' ? 'Phường / Xã' : 'Wards',
       street: lang === 'vi' ? 'Đường' : 'Street',
@@ -475,21 +480,67 @@ export default function PhuongTreeFilter({
 
   return (
     <div className={`flex flex-col h-full bg-zinc-950 font-mono select-none ${className}`}>
-      {/* Header with Title and Language Toggle */}
+      {/* Header with Title, Subtitle, and Language Toggle */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-900/60 shrink-0">
-        <span className="font-bold text-white text-xs uppercase tracking-wider">
-          {t.title}
-        </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-col min-w-0 pr-2">
+          <span className="font-bold text-white text-xs uppercase tracking-wider truncate">
+            {t.title}
+          </span>
+          <span className="text-[10px] text-zinc-400 truncate">
+            {t.subtitle}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}
-            className="text-[10px] uppercase font-bold text-zinc-400 hover:text-white px-1.5 py-0.5 border border-zinc-700 rounded hover:border-zinc-500 transition-colors"
+            className="text-[10px] uppercase font-bold text-zinc-400 hover:text-white px-1.5 py-0.5 border border-zinc-700 rounded hover:border-zinc-500 transition-colors cursor-pointer"
             title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
           >
             {lang === 'vi' ? 'EN' : 'VI'}
           </button>
         </div>
+      </div>
+
+      {/* City Flood Status Hero Card */}
+      <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-950/80 shrink-0">
+        {floodedCameraIds && floodedCameraIds.size > 0 ? (
+          <div className="p-2.5 rounded-lg border border-red-500/40 bg-red-950/20 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+              </span>
+              <span className="font-bold text-red-300">
+                {t.floodStatusAlert(floodedCameraIds.size)}
+              </span>
+            </div>
+            {onToggleFloodFilter && (
+              <button
+                type="button"
+                onClick={onToggleFloodFilter}
+                className={`mt-2 w-full py-1 px-2 rounded text-[11px] font-semibold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                  isFloodFilterActive
+                    ? 'bg-red-500 text-white border-red-400 shadow-sm'
+                    : 'bg-red-950/60 hover:bg-red-900/60 text-red-200 border-red-800/60'
+                }`}
+              >
+                <span>
+                  {isFloodFilterActive
+                    ? t.floodFilterActiveBtn(floodedCameraIds.size)
+                    : t.floodFilterInactiveBtn(floodedCameraIds.size)}
+                </span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/40 text-[11px] text-zinc-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+            <span className="font-medium text-emerald-400 truncate">
+              {t.floodStatusDry}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Explorer Tab Switch: [Theo tuyến đường] vs [Theo phường] */}
@@ -597,16 +648,13 @@ export default function PhuongTreeFilter({
             onClick={onToggleFloodFilter}
             className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all border flex items-center gap-1.5 cursor-pointer ${
               isFloodFilterActive
-                ? 'bg-sky-500/20 text-sky-300 border-sky-400 font-bold shadow-sm'
-                : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:text-sky-300 hover:border-sky-500/50'
+                ? 'bg-blue-600 text-white border-blue-500 font-bold shadow-sm'
+                : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:text-blue-300 hover:border-blue-500/50'
             }`}
-            title={lang === 'vi' ? 'Lọc danh sách chỉ hiển thị camera tại khu vực có mưa' : 'Filter camera list to rain areas'}
+            title={lang === 'vi' ? 'Lọc danh sách chỉ hiển thị camera ngập nước' : 'Filter camera list to flooded cameras'}
           >
             <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
-              <path d="M16 14v6" />
-              <path d="M8 14v6" />
-              <path d="M12 16v6" />
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
             </svg>
             <span>{FLOOD_I18N.FILTER_CHIP[lang](floodedCameraIds.size)}</span>
           </button>
