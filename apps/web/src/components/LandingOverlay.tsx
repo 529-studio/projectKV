@@ -29,10 +29,30 @@ export default function LandingOverlay() {
             </p>
             <button 
               onClick={() => setIsVisible(false)}
-              className="bg-white text-black font-bold py-3 px-8 rounded hover:scale-105 transition-transform duration-200"
+              className="bg-white text-black font-bold py-3 px-8 rounded hover:scale-105 transition-transform duration-200 cursor-pointer"
             >
               Truy cập Hệ thống
             </button>
+            <div className="mt-8 text-xs text-zinc-500 font-mono">
+              Developed by{' '}
+              <a
+                href="https://thdatvu.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-zinc-300 hover:text-white underline underline-offset-4 transition-colors font-medium"
+              >
+                ThDat Vu
+              </a>
+              {' and '}
+              <a
+                href="https://github.com/giangdq202"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-zinc-300 hover:text-white underline underline-offset-4 transition-colors font-medium"
+              >
+                Dam Quang Giang
+              </a>
+            </div>
           </motion.div>
         </motion.div>
       )}
