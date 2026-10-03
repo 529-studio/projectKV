@@ -181,18 +181,10 @@ export function useRainHexRadar(
               flood_severity: severity,
               camera_count: camCount,
               worst_camera: 'radar_rainviewer',
-              worst_camera_name: 'Dự báo radar RainViewer',
+              worst_camera_name: 'Dự báo radar thời tiết',
               polygon: pts,
             });
           }
-        }
-
-        // If radar tiles showed no rain echoes but Open-Meteo detects active rain in HCMC,
-        // blend in baseline wet coverage
-        if (mappedCells.size === 0 && weather && weather.rain_mm > 0) {
-          const monitoredSet = new Set(Object.keys(polygons));
-          const fallback = generateOpenMeteoFallbackHexCells(weather, polygons, monitoredSet);
-          fallback.forEach((cell, id) => mappedCells.set(id, cell));
         }
 
         if (!isCancelled) {
