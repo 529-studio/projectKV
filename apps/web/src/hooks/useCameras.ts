@@ -18,6 +18,7 @@ export interface Camera {
   road_name?: string | null;
   road_key?: string | null;
   road_keys?: string[];
+  status?: string;
 }
 
 export function useCameras() {
