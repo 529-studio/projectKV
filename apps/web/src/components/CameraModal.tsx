@@ -13,6 +13,7 @@ interface CameraModalProps {
   lang?: 'vi' | 'en';
   appEnv?: string;
   analysisEnabled?: boolean;
+  pinCapReached?: boolean;
 }
 
 export default function CameraModal({
@@ -24,6 +25,7 @@ export default function CameraModal({
   lang = 'vi',
   appEnv = 'production',
   analysisEnabled = false,
+  pinCapReached = false,
 }: CameraModalProps) {
   const [imgError, setImgError] = useState(false);
   const [fetchTimestamp, setFetchTimestamp] = useState<number>(Date.now());
@@ -303,12 +305,23 @@ export default function CameraModal({
           </div>
           <button 
             onClick={onTogglePin}
-            className={`px-3 py-1.5 border rounded transition ${isPinned ? 'bg-zinc-200 text-black border-white hover:bg-white' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-600 text-white'}`}
+            title={!isPinned && pinCapReached ? (lang === 'vi' ? 'Đã đạt giới hạn ghim (tối đa 12 camera)' : 'Pin limit reached (maximum 12 cameras)') : undefined}
+            className={`px-3 py-1.5 border rounded transition ${
+              isPinned
+                ? 'bg-zinc-200 text-black border-white hover:bg-white'
+                : pinCapReached
+                ? 'bg-amber-950/80 hover:bg-amber-900 border-amber-700 text-amber-200 cursor-not-allowed'
+                : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-600 text-white'
+            }`}
           >
             {isPinned
               ? lang === 'vi'
                 ? '[- BỎ GHIM]'
                 : '[- UNPIN]'
+              : pinCapReached
+              ? lang === 'vi'
+                ? '[12/12 ĐẦY]'
+                : '[12/12 FULL]'
               : lang === 'vi'
               ? '[+ GHIM THEO DÕI]'
               : '[+ PIN TO DOCK]'}
