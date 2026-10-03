@@ -8,8 +8,6 @@ import { useTraffic } from '../hooks/useTraffic';
 import { useFlood } from '../hooks/useFlood';
 import { useWeather } from '../hooks/useWeather';
 import { useRainHexRadar } from '../hooks/useRainHexRadar';
-import { mergeFloodHexCells } from '../utils/rainHexUtils';
-import { type HexOverlayMode } from '../components/HexOverlay';
 import { FLOOD_I18N } from '../utils/floodUtils';
 import { MOBILE_SEARCH_I18N, PINNED_DOCK_CAP, PINNED_DOCK_I18N } from '../config/constants';
 import LandingOverlay from '../components/LandingOverlay';
@@ -35,16 +33,12 @@ export default function Home() {
   const { weather, radar, loading: weatherLoading } = useWeather();
   const { rainRadarHexCells, loading: rainRadarLoading } = useRainHexRadar(radar, weather, cameras);
 
-  // Merge camera ground-truth flood observations with real-time RainViewer radar & Open-Meteo rain hexes
-  const activeFloodHexCells = useMemo(() => {
-    return mergeFloodHexCells(floodHexCells, rainRadarHexCells);
-  }, [floodHexCells, rainRadarHexCells]);
-
-  const combinedFloodLoading = floodLoading || rainRadarLoading;
-  
   const [map, setMap] = useState<L.Map | null>(null);
   const [hexOverlayEnabled, setHexOverlayEnabled] = useState(true);
-  const [hexOverlayMode, setHexOverlayMode] = useState<HexOverlayMode>('flood');
+  // S9 (Issue #144): Separate camera-verified flood from weather radar forecast
+  const [showRadar, setShowRadar] = useState(true);
+  const [showFlood, setShowFlood] = useState(true);
+  const [showTraffic, setShowTraffic] = useState(false);
   const [isFloodFilterActive, setIsFloodFilterActive] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -82,16 +76,37 @@ export default function Home() {
     }
   }, []);
 
-  // Zone Overview default & persistence (ADR-004 §D11)
+  // Zone Overview default & persistence (ADR-004 §D11 / S9 Issue #144)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = localStorage.getItem('warded_hex_overlay_enabled');
     if (saved === 'false') {
       setHexOverlayEnabled(false);
     }
+    const savedRadar = localStorage.getItem('warded_show_radar');
+    if (savedRadar !== null) {
+      setShowRadar(savedRadar === 'true');
+    }
+    const savedFlood = localStorage.getItem('warded_show_flood');
+    if (savedFlood !== null) {
+      setShowFlood(savedFlood === 'true');
+    }
+    const savedTraffic = localStorage.getItem('warded_show_traffic');
+    if (savedTraffic !== null) {
+      setShowTraffic(savedTraffic === 'true');
+    }
+    // Backward compatibility for legacy 'warded_hex_mode'
     const savedMode = localStorage.getItem('warded_hex_mode');
-    if (savedMode === 'traffic' || savedMode === 'flood') {
-      setHexOverlayMode(savedMode);
+    if (savedRadar === null && savedFlood === null && savedTraffic === null && savedMode) {
+      if (savedMode === 'traffic') {
+        setShowTraffic(true);
+        setShowFlood(false);
+        setShowRadar(false);
+      } else if (savedMode === 'flood') {
+        setShowFlood(true);
+        setShowRadar(true);
+        setShowTraffic(false);
+      }
     }
   }, []);
 
@@ -105,20 +120,43 @@ export default function Home() {
     });
   }, []);
 
-  const handleHexModeChange = useCallback((newMode: HexOverlayMode) => {
-    setHexOverlayMode(newMode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('warded_hex_mode', newMode);
-    }
+  const handleToggleRadar = useCallback(() => {
+    setShowRadar(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('warded_show_radar', String(next));
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleFlood = useCallback(() => {
+    setShowFlood(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('warded_show_flood', String(next));
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleTraffic = useCallback(() => {
+    setShowTraffic(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('warded_show_traffic', String(next));
+      }
+      return next;
+    });
   }, []);
 
   const [floodSyncNoticeDismissed, setFloodSyncNoticeDismissed] = useState(false);
   const [showFloodSyncedSuccess, setShowFloodSyncedSuccess] = useState(false);
-  const prevFloodLoadingRef = useRef(combinedFloodLoading);
+  const prevRadarLoadingRef = useRef(rainRadarLoading);
 
   useEffect(() => {
-    if (prevFloodLoadingRef.current && !combinedFloodLoading) {
-      if (activeFloodHexCells.size > 0 && !floodSyncNoticeDismissed) {
+    if (prevRadarLoadingRef.current && !rainRadarLoading) {
+      if (rainRadarHexCells.size > 0 && !floodSyncNoticeDismissed) {
         setShowFloodSyncedSuccess(true);
         const timer = setTimeout(() => {
           setFloodSyncNoticeDismissed(true);
@@ -128,8 +166,8 @@ export default function Home() {
         setFloodSyncNoticeDismissed(true);
       }
     }
-    prevFloodLoadingRef.current = combinedFloodLoading;
-  }, [combinedFloodLoading, activeFloodHexCells.size, floodSyncNoticeDismissed]);
+    prevRadarLoadingRef.current = rainRadarLoading;
+  }, [rainRadarLoading, rainRadarHexCells.size, floodSyncNoticeDismissed]);
 
   // URL sync for active filter (ADR-004 stretch goal)
   useEffect(() => {
@@ -332,13 +370,19 @@ export default function Home() {
             <HexOverlay
               map={map}
               hexCells={hexCells}
-              floodHexCells={activeFloodHexCells}
+              floodHexCells={floodHexCells}
+              radarHexCells={rainRadarHexCells}
               enabled={hexOverlayEnabled}
               onToggle={handleToggleHexOverlay}
-              mode={hexOverlayMode}
-              onModeChange={handleHexModeChange}
+              showRadar={showRadar}
+              onToggleRadar={handleToggleRadar}
+              showFlood={showFlood}
+              onToggleFlood={handleToggleFlood}
+              showTraffic={showTraffic}
+              onToggleTraffic={handleToggleTraffic}
               lang={lang}
-              floodLoading={combinedFloodLoading}
+              floodLoading={floodLoading}
+              radarLoading={rainRadarLoading}
               trafficLoading={trafficLoading}
             />
           </MapComponent>
@@ -363,9 +407,9 @@ export default function Home() {
           lang={lang}
         />
 
-        {/* H3 Rain Forecast Loading Floating Chip */}
+        {/* H3 Rain Radar Forecast Loading Floating Chip */}
         <AnimatePresence>
-          {hexOverlayEnabled && hexOverlayMode === 'flood' && !floodSyncNoticeDismissed && (
+          {hexOverlayEnabled && showRadar && !floodSyncNoticeDismissed && (
             <motion.div
               initial={{ opacity: 0, y: -6, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -382,8 +426,8 @@ export default function Home() {
                   </span>
                   <span className="text-zinc-200 font-semibold">
                     {lang === 'vi'
-                      ? `✓ Đã sẵn sàng dữ liệu dự báo mưa (${activeFloodHexCells.size} vùng)`
-                      : `✓ H3 rain forecast ready (${activeFloodHexCells.size} zones)`}
+                      ? `✓ Đã sẵn sàng dữ liệu dự báo radar (${rainRadarHexCells.size} vùng)`
+                      : `✓ H3 radar forecast ready (${rainRadarHexCells.size} zones)`}
                   </span>
                 </>
               ) : (
@@ -393,7 +437,7 @@ export default function Home() {
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />
                   </span>
                   <span>
-                    {lang === 'vi' ? 'Đang tải dự báo mưa & ngập nước H3...' : 'Loading H3 rain & flood forecast...'}
+                    {lang === 'vi' ? 'Đang tải dự báo radar thời tiết H3...' : 'Loading H3 weather radar forecast...'}
                   </span>
                 </>
               )}
@@ -422,10 +466,13 @@ export default function Home() {
             onToggle={() => setLegendOpen(prev => !prev)}
             analysisEnabled={analysisEnabled}
             hexOverlayEnabled={hexOverlayEnabled}
-            hexOverlayMode={hexOverlayMode}
+            showRadar={showRadar}
+            showFlood={showFlood}
+            showTraffic={showTraffic}
             verdictsCount={verdicts.size}
             lang={lang}
-            floodLoading={combinedFloodLoading}
+            floodLoading={floodLoading}
+            radarLoading={rainRadarLoading}
             trafficLoading={trafficLoading}
           />
         </div>
@@ -437,10 +484,13 @@ export default function Home() {
             onToggle={() => setLegendOpen(prev => !prev)}
             analysisEnabled={analysisEnabled}
             hexOverlayEnabled={hexOverlayEnabled}
-            hexOverlayMode={hexOverlayMode}
+            showRadar={showRadar}
+            showFlood={showFlood}
+            showTraffic={showTraffic}
             verdictsCount={verdicts.size}
             lang={lang}
-            floodLoading={combinedFloodLoading}
+            floodLoading={floodLoading}
+            radarLoading={rainRadarLoading}
             trafficLoading={trafficLoading}
           />
           <div className="pointer-events-auto">
