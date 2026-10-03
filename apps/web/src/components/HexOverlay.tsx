@@ -100,6 +100,8 @@ export default function HexOverlay({
     if (currentMode === 'traffic') {
       hexCells.forEach((cell) => {
         if (!cell.polygon || cell.polygon.length < 3) return;
+        // Suppress Resolution 9 sub-hexagons to avoid cluttering inside macro hexagons
+        if (cell.h3_id && cell.h3_id.startsWith('89')) return;
 
         const { fillColor, fillOpacity } = getHexColorAndOpacity(cell.severity);
 
@@ -131,10 +133,10 @@ export default function HexOverlay({
             color: '#a1a1aa',
             fillOpacity: Math.min(0.4, fillOpacity + 0.1),
           });
-          polygon.bringToFront();
         });
 
         polygon.on('mouseout', () => {
+          polygon.closeTooltip();
           if (!isHexVisibleAtZoom(map.getZoom())) return;
           polygon.setStyle({
             weight: 1,
@@ -175,6 +177,8 @@ export default function HexOverlay({
       // Flood mode: render flood hex cells
       floodHexCells.forEach((cell) => {
         if (!cell.polygon || cell.polygon.length < 3) return;
+        // Suppress Resolution 9 sub-hexagons to avoid cluttering inside macro hexagons
+        if (cell.h3_id && cell.h3_id.startsWith('89')) return;
 
         const { fillColor, fillOpacity, strokeColor, strokeWeight } = getFloodHexColorAndOpacity(cell.flood_severity);
 
@@ -183,7 +187,7 @@ export default function HexOverlay({
           fillOpacity: isVisible ? fillOpacity : 0,
           color: strokeColor,
           weight: strokeWeight,
-          opacity: isVisible ? 0.85 : 0,
+          opacity: isVisible ? 0.45 : 0,
           className,
           interactive: isVisible,
           pane: 'hexOverlayPane',
@@ -206,10 +210,10 @@ export default function HexOverlay({
             color: '#38bdf8',
             fillOpacity: Math.min(0.45, fillOpacity + 0.12),
           });
-          polygon.bringToFront();
         });
 
         polygon.on('mouseout', () => {
+          polygon.closeTooltip();
           if (!isFloodVisibleAtZoom(map.getZoom())) return;
           polygon.setStyle({
             weight: strokeWeight,
@@ -339,18 +343,18 @@ export default function HexOverlay({
     if (currentMode === 'flood') {
       if (floodedHexCount > 0) {
         return lang === 'vi'
-          ? `Vùng ngập nước (${floodedHexCount} vùng ngập/mưa)`
-          : `Flooded zones (${floodedHexCount} flood/rain zones)`;
+          ? `Vùng mưa (${floodedHexCount} khu vực có mưa)`
+          : `Rain zones (${floodedHexCount} rain areas)`;
       }
-      return lang === 'vi' ? 'Bật/tắt vùng ngập nước H3' : 'Toggle flood zones';
+      return lang === 'vi' ? 'Bật/tắt lớp vùng mưa' : 'Toggle rain zones';
     }
 
     if (congestedCount > 0) {
       return lang === 'vi'
-        ? `Vùng tổng hợp (${congestedCount} vùng đang ùn tắc)`
-        : `Zone overview (${congestedCount} congested zones)`;
+        ? `Vùng giao thông (${congestedCount} vùng đang ùn tắc)`
+        : `Traffic zones (${congestedCount} congested zones)`;
     }
-    return lang === 'vi' ? 'Bật/tắt hiển thị vùng tổng hợp H3' : 'Toggle H3 zone overview';
+    return lang === 'vi' ? 'Bật/tắt hiển thị vùng giao thông' : 'Toggle traffic zones';
   }, [currentMode, floodedHexCount, congestedCount, lang]);
 
   return (
@@ -365,7 +369,7 @@ export default function HexOverlay({
             : 'text-zinc-400 hover:text-zinc-200'
         }`}
         aria-pressed={enabled}
-        aria-label={lang === 'vi' ? 'Bật/tắt vùng tổng hợp' : 'Toggle zone overview'}
+        aria-label={lang === 'vi' ? 'Bật/tắt lớp bản đồ' : 'Toggle map layers'}
         title={buttonTitle}
       >
         <svg
@@ -399,7 +403,7 @@ export default function HexOverlay({
                 ? 'bg-sky-500 text-zinc-950 font-bold shadow-sm'
                 : 'text-zinc-400 hover:text-sky-300 hover:bg-zinc-900'
             }`}
-            title={lang === 'vi' ? 'Hiển thị khả năng có mưa & ngập nước H3' : 'Show rain & flood forecast H3'}
+            title={lang === 'vi' ? 'Hiển thị vùng mưa thời gian thực' : 'Show real-time rain zones'}
           >
             <svg
               className={`w-3.5 h-3.5 shrink-0 transition-colors ${
@@ -426,20 +430,22 @@ export default function HexOverlay({
                     ? 'bg-zinc-950 text-sky-400'
                     : 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
                 }`}
-                title={lang === 'vi' ? 'Đang tải dự báo mưa H3...' : 'Loading H3 rain forecast...'}
+                title={lang === 'vi' ? 'Đang tải dự báo mưa...' : 'Loading rain forecast...'}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
                 <span className="inline text-[9px]">{lang === 'vi' ? 'đang tải...' : 'loading...'}</span>
               </span>
             ) : floodedHexCount > 0 ? (
               <span
-                className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold ${
+                className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold flex items-center gap-1 ${
                   currentMode === 'flood'
                     ? 'bg-zinc-950 text-sky-400'
                     : 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
                 }`}
+                title={lang === 'vi' ? 'Đang có mưa tại TP.HCM' : 'Active rain in HCMC'}
               >
-                {floodedHexCount}
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                <span>{lang === 'vi' ? 'Có mưa' : 'Rain'}</span>
               </span>
             ) : null}
           </button>

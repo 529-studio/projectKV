@@ -1,25 +1,25 @@
 export const FLOOD_CONFIG = Object.freeze({
   MIN_ZOOM: 11,
   MAX_ZOOM: 13,
-  COLOR_DEEP: '#1d4ed8',
-  COLOR_SHALLOW: '#0284c7',
-  COLOR_WET: '#64748b',
+  COLOR_DEEP: '#1d4ed8',      // Deep royal blue for heavy rain
+  COLOR_SHALLOW: '#0284c7',   // Vibrant ocean blue for moderate rain
+  COLOR_WET: '#38bdf8',       // Light sky blue for light rain
   COLOR_DRY: '#22c55e',
   COLOR_UNKNOWN: '#71717a',
   STROKE_DEEP: '#1e40af',
   STROKE_SHALLOW: '#0369a1',
-  STROKE_WET: '#475569',
+  STROKE_WET: '#38bdf8',
   STROKE_DRY: '#16a34a',
   STROKE_UNKNOWN: '#52525b',
-  FILL_OPACITY_DEEP: 0.26,
-  FILL_OPACITY_SHALLOW: 0.22,
-  FILL_OPACITY_WET: 0.15,
-  FILL_OPACITY_DRY: 0.10,
-  FILL_OPACITY_UNKNOWN: 0.12,
-  STROKE_WEIGHT_DEEP: 1.5,
-  STROKE_WEIGHT_SHALLOW: 1.2,
-  STROKE_WEIGHT_WET: 1.0,
-  STROKE_WEIGHT_DRY: 1.0,
+  FILL_OPACITY_DEEP: 0.18,
+  FILL_OPACITY_SHALLOW: 0.12,
+  FILL_OPACITY_WET: 0.07,
+  FILL_OPACITY_DRY: 0.06,
+  FILL_OPACITY_UNKNOWN: 0.08,
+  STROKE_WEIGHT_DEEP: 1.0,
+  STROKE_WEIGHT_SHALLOW: 0.75,
+  STROKE_WEIGHT_WET: 0.5,
+  STROKE_WEIGHT_DRY: 0.5,
 });
 
 export const FLOOD_I18N = Object.freeze({
@@ -28,24 +28,24 @@ export const FLOOD_I18N = Object.freeze({
     en: 'Traffic',
   },
   LAYER_FLOOD: {
-    vi: 'Khả năng có mưa',
-    en: 'Rain chance',
+    vi: 'Vùng mưa',
+    en: 'Rain zones',
   },
   TOOLTIP_TITLE: {
-    vi: 'Cảnh báo mưa & ngập',
-    en: 'Rain & Flood Alert',
+    vi: 'Thời tiết khu vực',
+    en: 'Area Weather',
   },
   DEEP_WATER: {
-    vi: 'Ngập sâu (nguy hiểm)',
-    en: 'Deep water (hazardous)',
+    vi: 'Mưa to (nguy cơ ngập)',
+    en: 'Heavy rain (flood risk)',
   },
   SHALLOW_WATER: {
-    vi: 'Ngập nhẹ / Vũng nước',
-    en: 'Shallow flood / Puddles',
+    vi: 'Mưa vừa',
+    en: 'Moderate rain',
   },
   WET_ROAD: {
-    vi: 'Đường ướt / Mưa',
-    en: 'Wet road / Rain',
+    vi: 'Mưa nhẹ',
+    en: 'Light rain',
   },
   DRY_ROAD: {
     vi: 'Khô ráo',
@@ -189,10 +189,10 @@ export function getFloodHexColorAndOpacity(severity: string): {
 
 /**
  * Returns whether flood hex cells should be visible at the given zoom level.
- * Macro zoom (11–13) is visible; micro zoom (14+) fades out to give focus to individual camera markers.
+ * Macro and corridor zoom (11–14) is visible; micro block zoom (15+) fades out to give focus to individual camera markers.
  */
 export function isFloodVisibleAtZoom(zoom: number): boolean {
-  return zoom <= 13;
+  return zoom <= 14;
 }
 
 /**
@@ -241,18 +241,37 @@ export function getFloodSeverityLabel(severity: string, lang: 'vi' | 'en' = 'vi'
 export function formatFloodHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'vi'): string {
   const style = getFloodHexColorAndOpacity(cell.flood_severity);
   const severityText = getFloodSeverityLabel(cell.flood_severity, lang);
-  const countText = FLOOD_I18N.CAMERAS_MONITORING[lang](cell.camera_count);
-  const worstLabel = FLOOD_I18N.WORST_FLOOD_CAMERA[lang];
-  const worstName = cell.worst_camera_name || cell.worst_camera || (lang === 'vi' ? 'Không rõ' : 'Unknown');
+  const isRadarSource = cell.worst_camera.startsWith('radar') || cell.worst_camera.startsWith('open-meteo');
+  const countText = isRadarSource && cell.camera_count === 0
+    ? (lang === 'vi' ? 'Dự báo radar thời tiết' : 'Weather radar forecast')
+    : FLOOD_I18N.CAMERAS_MONITORING[lang](cell.camera_count);
+  const worstLabel = isRadarSource && cell.camera_count === 0
+    ? (lang === 'vi' ? 'Nguồn dữ liệu' : 'Data source')
+    : FLOOD_I18N.WORST_FLOOD_CAMERA[lang];
+  const worstName = isRadarSource && cell.camera_count === 0
+    ? (lang === 'vi' ? 'Radar RainViewer' : 'RainViewer Radar')
+    : cell.worst_camera_name || cell.worst_camera || (lang === 'vi' ? 'Không rõ' : 'Unknown');
+
+  // Commuter practical travel guidance
+  let advice = '';
+  const s = (cell.flood_severity || '').toUpperCase().trim();
+  if (s === 'FLOODED_DEEP') {
+    advice = lang === 'vi' ? 'Mặt đường ngập nước, tầm nhìn kém' : 'Flooded road risk, poor visibility';
+  } else if (s === 'FLOODED_SHALLOW') {
+    advice = lang === 'vi' ? 'Đường trơn ướt, chú ý giảm tốc độ' : 'Slick wet road, reduce speed';
+  } else if (s === 'WET') {
+    advice = lang === 'vi' ? 'Có mưa rải rác / Khả năng mưa' : 'Scattered light rain';
+  }
 
   return `<div style="font-family:var(--font-mono, monospace); font-size:10.5px; line-height:1.4;">` +
     `<div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">` +
       `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${style.fillColor};"></span>` +
       `<span style="font-weight:700; color:#ffffff;">${severityText}</span>` +
     `</div>` +
-    `<div style="color:#d4d4d8;">${countText}</div>` +
+    (advice ? `<div style="color:#e4e4e7; margin-bottom:3px;">${advice}</div>` : '') +
+    `<div style="color:#a1a1aa;">${countText}</div>` +
     `<div style="margin-top:2px; color:#d4d4d8;">` +
-      `<span style="color:#a1a1aa;">${worstLabel}:</span> ` +
+      `<span style="color:#71717a;">${worstLabel}:</span> ` +
       `<span style="font-weight:600; color:#f4f4f5;">${worstName}</span>` +
     `</div>` +
   `</div>`;
