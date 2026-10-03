@@ -167,7 +167,6 @@ definitions:
         description: '[[lat,lng], ...] boundary for rendering'
         items:
           items:
-            format: float64
             type: number
           type: array
         type: array
@@ -630,6 +629,21 @@ paths:
       summary: List camera zones
       tags:
       - Camera
+  /health:
+    get:
+      description: Returns overall service availability and component statuses (catalog,
+        database, analyzer)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: System health and readiness probe
+      tags:
+      - System
   /healthz:
     get:
       description: Liveness and readiness probe
