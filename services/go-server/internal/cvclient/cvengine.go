@@ -95,7 +95,7 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 
 	// Step 2: POST raw JPEG bytes to /predict.
 	predictURL := a.url + "/predict"
-	predReq, err := http.NewRequestWithContext(ctx, http.MethodPost, predictURL, readerFromBytes(jpegBytes))
+	predReq, err := http.NewRequestWithContext(ctx, http.MethodPost, predictURL, bytes.NewReader(jpegBytes))
 	if err != nil {
 		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: build predict request: %w", err)
 	}
@@ -137,9 +137,4 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 		Timestamp:     now,
 		ObservedAt:    now,
 	}, nil
-}
-
-// readerFromBytes returns an io.Reader backed by b using stdlib bytes.
-func readerFromBytes(b []byte) io.Reader {
-	return bytes.NewReader(b)
 }
