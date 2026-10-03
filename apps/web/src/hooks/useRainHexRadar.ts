@@ -24,8 +24,15 @@ async function loadH3Polygons(): Promise<Record<string, [number, number][]> | nu
     .then((res) => (res.ok ? res.json() : null))
     .then((data) => {
       if (data && typeof data === 'object') {
-        cachedPolygons = data;
-        return data;
+        // Enforce Resolution 7 only (starts with '87') to avoid drawing nested Resolution 9 sub-hexagons
+        const res7Only: Record<string, [number, number][]> = {};
+        for (const [k, v] of Object.entries(data)) {
+          if (!k.startsWith('89')) {
+            res7Only[k] = v as [number, number][];
+          }
+        }
+        cachedPolygons = res7Only;
+        return res7Only;
       }
       return null;
     })
@@ -152,8 +159,9 @@ export function useRainHexRadar(
 
         const mappedCells = new Map<string, FloodHexCell>();
 
-        // Sample each H3 cell centroid against the radar tiles
+        // Sample each H3 cell centroid against the radar tiles (Resolution 7 macro cells only)
         for (const [h3Id, pts] of Object.entries(polygons)) {
+          if (h3Id.startsWith('89')) continue;
           if (!pts || pts.length < 3) continue;
           const [lat, lon] = getPolygonCentroid(pts);
           const { tileX, tileY, pixelX, pixelY } = latLonToTilePixel(lat, lon, 7);
