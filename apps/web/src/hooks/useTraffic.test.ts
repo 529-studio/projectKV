@@ -118,8 +118,8 @@ describe('Traffic Verdict Provenance and Staleness (Issue #64)', () => {
   });
 
   test('VERDICT_I18N contains valid vi and en translations with proper Vietnamese diacritics', () => {
-    assert.equal(VERDICT_I18N.STALE_BADGE.vi, '⏳ Dữ liệu cũ');
-    assert.equal(VERDICT_I18N.STALE_BADGE.en, '⏳ Stale data');
+    assert.equal(VERDICT_I18N.STALE_BADGE.vi, 'Dữ liệu cũ');
+    assert.equal(VERDICT_I18N.STALE_BADGE.en, 'Stale data');
 
     assert.equal(VERDICT_I18N.STALE_DESC.vi, 'Dữ liệu cũ (>3 phút)');
     assert.equal(VERDICT_I18N.STALE_DESC.en, 'Stale (>3 min)');

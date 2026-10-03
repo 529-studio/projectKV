@@ -234,10 +234,25 @@ export default function CameraModal({
                   </span>
                   {verdict?.stale && (
                     <span
-                      className="px-2 py-0.5 rounded border border-zinc-600 bg-zinc-900 text-zinc-400 text-xs font-bold"
+                      className="px-2 py-0.5 rounded border border-zinc-600 bg-zinc-900 text-zinc-400 text-xs font-bold inline-flex items-center gap-1.5"
                       title={lang === 'vi' ? 'Dữ liệu phân tích đã cũ (>3 phút hoặc mất cập nhật)' : 'Analysis verdict is stale (>3 min or frame frozen)'}
                     >
-                      [{lang === 'vi' ? VERDICT_I18N.STALE_BADGE.vi : VERDICT_I18N.STALE_BADGE.en}]
+                      <svg
+                        className="w-3 h-3 shrink-0 text-zinc-400"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M5 22h14" />
+                        <path d="M5 2h14" />
+                        <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" />
+                        <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />
+                      </svg>
+                      <span>{lang === 'vi' ? VERDICT_I18N.STALE_BADGE.vi : VERDICT_I18N.STALE_BADGE.en}</span>
                     </span>
                   )}
                   {verdict?.source === 'mock' && appEnv === 'dev' && (
