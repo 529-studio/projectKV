@@ -158,12 +158,12 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                     self._send_json(500, {"error": f"inference failed: {str(exc)}"})
                     return
 
-            # Standby mode (model weights mounting pending)
+            # Standby mode: no model loaded — return 503 to prevent Go client from
+            # treating this as a real inference result (ADR-004 §14 Finding 1).
             latency = (time.perf_counter() - start_t) * 1000
-            self._send_json(200, {
-                "vehicles_detected": 0,
-                "traffic_severity": "CLEAR",
-                "confidence": 0.95,
+            self._send_json(503, {
+                "source": "standby_dummy",
+                "confidence": 0.0,
                 "latency_ms": round(latency, 2),
                 "mode": "standby_ready",
                 "note": "OpenVINO engine ready. Model weights mountable at runtime."
