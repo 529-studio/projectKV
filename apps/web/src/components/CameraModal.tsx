@@ -147,7 +147,7 @@ export default function CameraModal({
         <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 flex justify-between items-start select-none">
           <div className="flex-1 min-w-0 mr-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-white font-bold text-lg truncate">{camera.displayName || camera.title}</h2>
+              <h2 className="text-white font-bold text-base sm:text-lg break-words leading-snug">{camera.displayName || camera.title}</h2>
               {sequenceLabel && (
                 <span
                   className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold tracking-wide shrink-0"

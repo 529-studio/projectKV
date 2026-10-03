@@ -287,25 +287,25 @@ export default function Home() {
             appEnv={appEnv}
             onMapReady={setMap}
             hexOverlayEnabled={activeLens !== 'off'}
-            topRightControls={
-              <>
-                <WeatherWidget
-                  weather={weather}
-                  loading={weatherLoading}
-                  lang={lang}
-                />
-                <MapLegend
-                  isOpen={legendOpen}
-                  onToggle={() => setLegendOpen(prev => !prev)}
-                  analysisEnabled={analysisEnabled}
-                  lensMode={activeLens}
-                  verdictsCount={verdicts.size}
-                  lang={lang}
-                  floodLoading={floodLoading}
-                  radarLoading={rainRadarLoading}
-                  trafficLoading={trafficLoading}
-                />
-              </>
+            weatherControl={
+              <WeatherWidget
+                weather={weather}
+                loading={weatherLoading}
+                lang={lang}
+              />
+            }
+            legendControl={
+              <MapLegend
+                isOpen={legendOpen}
+                onToggle={() => setLegendOpen(prev => !prev)}
+                analysisEnabled={analysisEnabled}
+                lensMode={activeLens}
+                verdictsCount={verdicts.size}
+                lang={lang}
+                floodLoading={floodLoading}
+                radarLoading={rainRadarLoading}
+                trafficLoading={trafficLoading}
+              />
             }
           >
             <HexOverlay

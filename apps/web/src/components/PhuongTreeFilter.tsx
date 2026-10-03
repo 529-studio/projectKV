@@ -202,7 +202,7 @@ export default function PhuongTreeFilter({
       subtitle: lang === 'vi' ? 'Warded • Cảnh báo ngập lụt & giao thông đô thị' : 'Warded • Urban flood alert & traffic intelligence',
       floodStatusAlert: (n: number) => (lang === 'vi' ? `CẢNH BÁO NGẬP: ${n} điểm camera xác nhận ngập` : `FLOOD ALERT: ${n} camera-verified flood spots`),
       floodStatusDry: lang === 'vi' ? 'TOÀN THÀNH PHỐ: Không ghi nhận điểm ngập nào' : 'CITYWIDE: No flooding reported by cameras',
-      floodFilterActiveBtn: (n: number) => (lang === 'vi' ? `✓ Đang lọc ${n} camera ngập` : `✓ Filtering ${n} flood cameras`),
+      floodFilterActiveBtn: (n: number) => (lang === 'vi' ? `✕ Bỏ lọc ${n} camera ngập` : `✕ Clear ${n} flood cameras`),
       floodFilterInactiveBtn: (n: number) => (lang === 'vi' ? `Xem danh sách ${n} camera ngập →` : `View ${n} flood cameras →`),
       tabCorridors: lang === 'vi' ? 'Tuyến đường' : 'Corridors',
       tabPhuongs: lang === 'vi' ? 'Phường / Xã' : 'Wards',
@@ -662,9 +662,11 @@ export default function PhuongTreeFilter({
             <button
               type="button"
               onClick={onToggleFloodFilter}
-              className="text-[10.5px] text-zinc-400 hover:text-zinc-200 transition-colors font-mono cursor-pointer"
+              className="px-2 py-0.5 rounded text-[11px] font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all font-mono cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
+              title={lang === 'vi' ? 'Xóa lọc' : 'Clear filter'}
             >
-              {lang === 'vi' ? 'Xóa lọc' : 'Clear'}
+              <span className="font-bold text-xs leading-none">✕</span>
+              <span>{lang === 'vi' ? 'Xóa lọc' : 'Clear'}</span>
             </button>
           )}
         </div>
@@ -804,17 +806,19 @@ export default function PhuongTreeFilter({
 
       {/* Active Filter Bar (if a Phường or Corridor is selected) */}
       {activeFilterLabel && (
-        <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 text-[11px] text-zinc-300 shrink-0">
-          <div className="flex items-center gap-1.5 truncate mr-2">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 text-[11px] text-zinc-300 shrink-0 gap-2">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <span className="text-zinc-500 shrink-0">{t.activeFilter}</span>
-            <span className="text-white font-bold truncate">{activeFilterLabel}</span>
+            <span className="text-white font-bold whitespace-normal break-words leading-tight">{activeFilterLabel}</span>
           </div>
           <button
             type="button"
             onClick={handleClearFilter}
-            className="text-zinc-400 hover:text-white text-[10px] underline shrink-0 cursor-pointer"
+            className="px-2 py-0.5 rounded text-[10.5px] font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all shrink-0 cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
+            title={lang === 'vi' ? 'Xóa lọc' : 'Clear filter'}
           >
-            {t.clearFilter}
+            <span className="font-bold text-xs leading-none">✕</span>
+            <span>{t.clearFilter}</span>
           </button>
         </div>
       )}

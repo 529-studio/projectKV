@@ -28,6 +28,8 @@ interface MapComponentProps {
   onMapReady?: (map: L.Map | null) => void;
   hexOverlayEnabled?: boolean;
   topRightControls?: React.ReactNode;
+  weatherControl?: React.ReactNode;
+  legendControl?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -45,6 +47,8 @@ export default function MapComponent({
   onMapReady,
   hexOverlayEnabled = false,
   topRightControls,
+  weatherControl,
+  legendControl,
   children,
 }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
@@ -359,30 +363,33 @@ export default function MapComponent({
       <div ref={containerRef} className="w-full h-full z-0 absolute inset-0 bg-[#09090b]" />
 
       {/* Left controls: Lens switchers & active filter chip */}
-      {/* Desktop (md+): top-3.5 left-14; Mobile (<md): top-16 left-3 */}
-      <div className="absolute top-16 left-3 md:top-3.5 md:left-14 z-[800] flex flex-wrap items-center gap-2 pointer-events-none">
+      {/* Desktop (md+): top-3.5 left-14 in flex-row; Mobile (<md): top-16 left-3 in flex-col */}
+      <div className="absolute top-16 left-3 md:top-3.5 md:left-14 z-[800] flex flex-col md:flex-row items-start md:items-center gap-2 pointer-events-none">
         {children}
 
         {/* On-map active filter chip (ADR-004 A3 - Issue #65) */}
         {isFiltered && activeFilterLabel && (
           <div
-            className="pointer-events-auto bg-zinc-950/95 border border-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded shadow-2xl backdrop-blur-md flex items-center gap-2 font-mono text-xs select-none transition-all truncate"
+            className="pointer-events-auto bg-zinc-950/95 border border-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded-lg shadow-2xl backdrop-blur-md flex items-center gap-2 font-mono text-xs select-none max-w-[calc(100vw-115px)] md:max-w-md transition-all"
             role="status"
             aria-live="polite"
           >
-            <div className="flex items-center gap-1.5 truncate min-w-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <span className="truncate font-semibold text-zinc-100">{activeFilterLabel}</span>
+            <div className="flex items-start gap-1.5 min-w-0 flex-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1" />
+              <span className="font-semibold text-zinc-100 whitespace-normal break-words leading-tight text-[11px] md:text-xs">
+                {activeFilterLabel}
+              </span>
             </div>
             {onFilterClear && (
               <button
                 type="button"
                 onClick={onFilterClear}
-                className="text-zinc-400 hover:text-white hover:bg-zinc-800 rounded p-0.5 ml-1 transition-colors shrink-0 focus:outline-none cursor-pointer"
+                className="px-2 py-1 rounded text-[10.5px] font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all shrink-0 cursor-pointer flex items-center gap-1 shadow-sm active:scale-95 ml-1"
                 aria-label={lang === 'vi' ? 'Xóa bộ lọc' : 'Clear filter'}
                 title={lang === 'vi' ? 'Xóa bộ lọc (Esc)' : 'Clear filter (Esc)'}
               >
-                <span className="text-sm font-bold leading-none block px-1">✕</span>
+                <span className="font-bold text-xs leading-none">✕</span>
+                <span className="leading-none">{lang === 'vi' ? 'Xóa lọc' : 'Clear'}</span>
               </button>
             )}
           </div>
@@ -390,12 +397,32 @@ export default function MapComponent({
       </div>
 
       {/* Right controls: Weather Widget & Map Legend */}
-      {/* Desktop (md+): top-3.5 right-3; Mobile (<md): top-28 right-3 (shifted down below lenses to avoid collision) */}
-      {topRightControls && (
+      {/* If split controls provided: Mobile renders Legend at top-16 right-3 and Weather at top-28 right-3. Desktop renders both together at top-3.5 right-3. */}
+      {weatherControl || legendControl ? (
+        <>
+          {/* Desktop view (md+): Both side-by-side in top-right */}
+          <div className="hidden md:flex absolute top-3.5 right-3 z-[800] items-start gap-2 pointer-events-auto">
+            {weatherControl}
+            {legendControl}
+          </div>
+
+          {/* Mobile view (<md): Legend at top-16 (opposite lens switcher), Weather at top-28 (below legend, opposite filter chip) */}
+          {legendControl && (
+            <div className="md:hidden absolute top-16 right-3 z-[800] pointer-events-auto">
+              {legendControl}
+            </div>
+          )}
+          {weatherControl && (
+            <div className="md:hidden absolute top-28 right-3 z-[800] pointer-events-auto">
+              {weatherControl}
+            </div>
+          )}
+        </>
+      ) : topRightControls ? (
         <div className="absolute top-28 right-3 md:top-3.5 md:right-3 z-[800] flex items-start gap-2 pointer-events-auto">
           {topRightControls}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
