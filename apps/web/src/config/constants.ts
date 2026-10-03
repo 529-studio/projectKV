@@ -97,8 +97,8 @@ export const MAP_CONFIG = Object.freeze({
 
 export const VERDICT_I18N = Object.freeze({
   STALE_BADGE: {
-    vi: '⏳ Dữ liệu cũ',
-    en: '⏳ Stale data',
+    vi: 'Dữ liệu cũ',
+    en: 'Stale data',
   },
   STALE_DESC: {
     vi: 'Dữ liệu cũ (>3 phút)',
