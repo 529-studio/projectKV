@@ -22,6 +22,10 @@ This document defines the core principles, design standards, and mandatory techn
 *   **Zero Bloat Features**:
     *   Do not integrate third-party sharing buttons (Zalo, Waze redirect, etc.) unless specifically requested.
     *   Focus 100% on camera browsing, rapid filtering, and automated scene evaluation.
+*   **Strictly Zero-Emoji in UI (Buttons, Status Icons, Badges, Labels)**:
+    *   Unicode emojis (e.g. ⌛, ⏳, 📌, ⚠️, 🌧️, 🚗, ❌, etc.) are **strictly prohibited** in user-facing UI buttons, status badges, chips, modal headers, navigation tabs, and notifications.
+    *   All visual indicators and icon controls **must** be implemented as clean, scalable, monochromatic SVG vector icons (Lucide / Heroicons style with `fill="none" stroke="currentColor"` or functional status colors: Red/Green/Yellow/Sky/Zinc).
+    *   Emojis render inconsistently across operating systems (iOS vs Android vs Windows vs macOS) and directly violate the high-contrast monochromatic design philosophy.
 
 ---
 
@@ -60,6 +64,10 @@ This document defines the core principles, design standards, and mandatory techn
     *   Whenever a backend API endpoint is added, modified, or removed in `services/go-server`, developers and AI agents **MUST** update the Swagger annotations (godoc comments: `@Summary`, `@Description`, `@Tags`, `@Produce`, `@Success`, `@Router`, etc.) on the corresponding HTTP handler.
     *   Regenerate the Swagger documentation artifacts (`services/go-server/docs/docs.go`, `swagger.json`, and `swagger.yaml`) via `make swagger`.
     *   Pull Requests that introduce, alter, or remove API routes without corresponding Swagger documentation updates are strictly prohibited.
+*   **Zero-Emoji Logging Standard (Backend & Services)**:
+    *   Emojis are **strictly forbidden** in backend logs, console output, telemetry, and error messages across all Go services (`services/go-server/`).
+    *   Always use standardized uppercase prefix tags (e.g. `[INIT]`, `[INFO]`, `[WARN]`, `[ERROR]`, `[FATAL]`) and structured key-value attributes (via standard library `log/slog` or `log.Printf`).
+    *   Emojis in log streams cause multi-byte UTF-8 encoding corruption in headless environments, break grep/regex parsing in CI/CD pipelines, and corrupt log aggregation systems (e.g. Loki, CloudWatch, Datadog, Portainer).
 
 ---
 
