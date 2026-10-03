@@ -107,14 +107,14 @@ function LegendContent({
         </>
       )}
 
-      {/* Category 3: H3 Hex Overlay (Only rendered when hexOverlayEnabled is true) */}
+      {/* Category 3: Regional Overlay (Only rendered when hexOverlayEnabled is true) */}
       {hexOverlayEnabled && (
         <>
           <div className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider pt-1.5 border-t border-zinc-800/80 flex items-center justify-between">
             <span>
               {hexOverlayMode === 'flood'
-                ? (lang === 'vi' ? 'Khả năng có mưa (H3)' : 'Rain Forecast (H3)')
-                : (lang === 'vi' ? 'Vùng tổng hợp (H3)' : 'Zone Overview (H3)')}
+                ? (lang === 'vi' ? 'Vùng mưa (Radar thời tiết)' : 'Rain Zones (Weather Radar)')
+                : (lang === 'vi' ? 'Vùng giao thông' : 'Traffic Zones')}
             </span>
             {hexOverlayMode === 'flood' && floodLoading && (
               <span className="flex items-center gap-1 text-sky-400 font-normal lowercase tracking-normal">
@@ -141,24 +141,18 @@ function LegendContent({
               <div className="flex items-center gap-2.5">
                 <span
                   className="w-3.5 h-3.5 rounded-sm border border-sky-500/80 shrink-0"
-                  style={{ backgroundColor: 'rgba(2, 132, 199, 0.4)' }}
+                  style={{ backgroundColor: 'rgba(2, 132, 199, 0.35)' }}
                 />
                 <span className="text-zinc-300">{FLOOD_I18N.SHALLOW_WATER[lang]}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <span
-                  className="w-3.5 h-3.5 rounded-sm border border-slate-500/80 shrink-0"
-                  style={{ backgroundColor: 'rgba(100, 116, 139, 0.3)' }}
+                  className="w-3.5 h-3.5 rounded-sm border border-sky-400/80 shrink-0"
+                  style={{ backgroundColor: 'rgba(56, 189, 248, 0.25)' }}
                 />
                 <span className="text-zinc-300">{FLOOD_I18N.WET_ROAD[lang]}</span>
               </div>
-              <div className="flex items-center gap-2.5 pt-1.5 mt-0.5 border-t border-zinc-800/80">
-                <span
-                  className="w-3.5 h-3.5 rounded-sm border border-sky-400/80 bg-sky-500/25 shrink-0"
-                />
-                <span className="text-zinc-300">{WEATHER_I18N.RADAR_LAYER[lang]}</span>
-              </div>
-              <div className="text-[9.5px] text-zinc-500 pt-0.5">
+              <div className="text-[9.5px] text-zinc-500 pt-1.5 mt-0.5 border-t border-zinc-800/80">
                 {WEATHER_I18N.ATTRIBUTION[lang]}
               </div>
             </>
