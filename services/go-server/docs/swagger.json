@@ -51,53 +51,6 @@
                 }
             }
         },
-        "/api/cameras/snapshot/{id}": {
-            "get": {
-                "description": "Proxy and cache real-time traffic camera snapshot image from upstream portal",
-                "produces": [
-                    "image/jpeg"
-                ],
-                "tags": [
-                    "Camera"
-                ],
-                "summary": "Get camera snapshot image",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Camera ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "JPEG image data",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "Bad Gateway",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/cameras/{id}": {
             "get": {
                 "description": "Retrieve single camera metadata by its unique identifier",
@@ -539,20 +492,22 @@
         },
         "/health": {
             "get": {
-                "description": "Returns overall service availability and component statuses (catalog, database, analyzer)",
+                "description": "Liveness and readiness probe",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "System"
                 ],
-                "summary": "System health and readiness probe",
+                "summary": "Health check",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }

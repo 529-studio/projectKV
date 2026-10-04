@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const BASE_URL = 'https://giaothong.hochiminhcity.gov.vn';
 
@@ -49,17 +50,20 @@ async function getAllCameras() {
 
   const text = await rpcRes.text();
 
-  // Mock AjaxPro DataTable structure
-  global.Ajax = {
-    Web: {
-      DataTable: function (cols, rows) {
-        this.cols = cols;
-        this.rows = rows;
+  // Sandbox AjaxPro DataTable structure in isolated vm context (CWE-95 remediation)
+  const sandbox = {
+    Ajax: {
+      Web: {
+        DataTable: function (cols, rows) {
+          this.cols = cols;
+          this.rows = rows;
+        }
       }
     }
   };
 
-  const evalResult = eval('(' + text + ')');
+  const script = new vm.Script('(' + text + ')');
+  const evalResult = script.runInNewContext(sandbox, { timeout: 2000 });
   const dataTable = evalResult.value[1][1];
   const rows = dataTable.rows;
 
