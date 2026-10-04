@@ -112,6 +112,15 @@ class CVRequestHandler(BaseHTTPRequestHandler):
 
         self._send_json(404, {"error": "not found"})
 
+    def do_HEAD(self):
+        if self.path in ("/healthz", "/info"):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            return
+        self.send_response(404)
+        self.end_headers()
+
     def do_POST(self):
         if self.path == "/predict":
             content_length = int(self.headers.get("Content-Length", 0))
