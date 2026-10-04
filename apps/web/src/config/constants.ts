@@ -215,8 +215,8 @@ export const PINNED_DOCK_I18N = Object.freeze({
     en: 'MONITORING DOCK',
   },
   COLLAPSED_PILL: {
-    vi: (count: number) => `📌 Đang theo dõi: ${count} cam`,
-    en: (count: number) => `📌 Monitoring: ${count} ${count === 1 ? 'cam' : 'cams'}`,
+    vi: (count: number) => `Đang theo dõi: ${count} cam`,
+    en: (count: number) => `Monitoring: ${count} ${count === 1 ? 'cam' : 'cams'}`,
   },
   CLEAR_ALL: {
     vi: '[XÓA HẾT]',
@@ -254,6 +254,24 @@ export const PINNED_DOCK_I18N = Object.freeze({
   PIN_LIMIT_BADGE: {
     vi: 'ĐÃ ĐẠT GIỚI HẠN',
     en: 'PIN CAP REACHED',
+  },
+  SEVERITY: {
+    CLEAR: {
+      vi: 'Thông thoáng',
+      en: 'Clear',
+    },
+    MODERATE: {
+      vi: 'Vừa phải',
+      en: 'Moderate',
+    },
+    HEAVY: {
+      vi: 'Đông đúc',
+      en: 'Heavy',
+    },
+    CONGESTED: {
+      vi: 'Tắc nghẽn',
+      en: 'Congested',
+    },
   },
   NO_ANALYSIS: {
     vi: 'Chưa phân tích',

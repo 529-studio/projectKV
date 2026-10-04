@@ -334,6 +334,7 @@ export default function Home() {
           lang={lang}
           verdicts={verdicts}
           pinNotice={pinNotice}
+          appEnv={appEnv}
         />
 
         {/* FLOATING STATUS PILL — Non-blocking background AI sync notification */}
