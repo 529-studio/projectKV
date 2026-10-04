@@ -20,7 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("cv-engine")
 
-PORT = int(os.environ.get("PORT", 8000))
+PORT = int(os.environ.get("CV_PORT", os.environ.get("MODEL_PORT", 8000)))
 MODEL_DIR = os.environ.get("MODEL_DIR", "/app/models/yolov8n_openvino_320")
 
 # Attempt to import optional OpenVINO and imaging libraries
