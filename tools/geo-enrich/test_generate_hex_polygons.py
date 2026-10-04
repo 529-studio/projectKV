@@ -3,9 +3,10 @@ import os
 import tempfile
 import unittest
 
-from generate_hex_polygons import generate_polygons
+from generate_hex_polygons import generate_polygons, HAS_H3
 
 
+@unittest.skipUnless(HAS_H3, "h3 package is required for hex polygon tests")
 class TestGenerateHexPolygons(unittest.TestCase):
     def test_generate_polygons(self):
         sample_cameras = [

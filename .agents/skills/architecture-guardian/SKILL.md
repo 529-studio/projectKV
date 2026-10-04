@@ -52,9 +52,7 @@ For every modified `.go` file under `internal/`:
    storage        → (leaf)
    archiver       → storage, hotset
    corridor       → camera, hotset
-   i18n           → (leaf)
    config         → (leaf)
-   platform       → (leaf)
    ```
 4. **Violation**: Any import not in the table above. Report:
    - File path
@@ -106,7 +104,7 @@ Report each issue with the file path and error message.
 For each modified package, verify:
 - No unexported types from sibling packages are accessed via type assertions.
 - HTTP handler packages expose `RegisterRoutes(rg *gin.RouterGroup)`.
-- Leaf packages (`camera`, `i18n`, `config`, `platform`) have **zero** imports
+- Leaf packages (`camera`, `config`, `tilecache`, `storage`, `weather`) have **zero** imports
   of other `internal/` packages.
 
 ### 6. Swagger API Documentation Synchronization

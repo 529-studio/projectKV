@@ -57,13 +57,19 @@ export default function MapComponent({
   const prevFilteredRef = useRef(false);
   const hexOverlayEnabledRef = useRef(hexOverlayEnabled);
   const activeTooltipMarkerRef = useRef<L.CircleMarker | null>(null);
+  const markersMapRef = useRef<Map<string, CustomCircleMarker>>(new Map());
+  const verdictsRef = useRef(verdicts);
 
   useEffect(() => {
     hexOverlayEnabledRef.current = hexOverlayEnabled;
   }, [hexOverlayEnabled]);
 
-  const getTrafficColor = useCallback((camId: string, isOnline: boolean) => {
-    const verdict = verdicts.get(camId);
+  useEffect(() => {
+    verdictsRef.current = verdicts;
+  }, [verdicts]);
+
+  const getTrafficColorForVerdict = useCallback((camId: string, isOnline: boolean, currentVerdicts: Map<string, TrafficVerdict>) => {
+    const verdict = currentVerdicts.get(camId);
     if (isVerdictValid(verdict) && !verdict.stale) {
       if (verdict.source !== 'mock' || appEnv === 'dev') {
         const sev = verdict.severity.toUpperCase();
@@ -73,7 +79,28 @@ export default function MapComponent({
       }
     }
     return isOnline ? FUNCTIONAL_COLORS.ONLINE_DEFAULT : FUNCTIONAL_COLORS.OFFLINE_DEFAULT;
-  }, [verdicts, appEnv]);
+  }, [appEnv]);
+
+  const buildTooltipHtml = useCallback((cam: Camera, verdict: TrafficVerdict | undefined, fillColor: string) => {
+    let trafficInfo = '';
+    if (isVerdictValid(verdict)) {
+      const prefix = lang === 'vi' ? VERDICT_I18N.TRAFFIC_PREFIX.vi : VERDICT_I18N.TRAFFIC_PREFIX.en;
+      if (verdict.stale) {
+        const staleText = lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data';
+        trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${staleText}</span>`;
+      } else if (verdict.source !== 'mock' || appEnv === 'dev') {
+        const sevLabel = getSeverityLabel(verdict.severity, lang);
+        trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">${prefix}: ${sevLabel}</span>`;
+      }
+    }
+    if (cam.isGhost) {
+      trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">[MẤT TÍN HIỆU THỰC ĐỊA]</span>`;
+    } else if (cam.duplicateOf) {
+      trafficInfo += `<br><span style="color:#a1a1aa;">[TRÙNG NGUỒN]</span>`;
+    }
+
+    return `<b>${cam.displayName || cam.title}</b><br><span style="color:#a1a1aa;">${cam.zone}</span>${trafficInfo}`;
+  }, [lang, appEnv]);
 
   const getRadius = (z: number, isFew: boolean = false) => {
     let r = 4;
@@ -223,15 +250,17 @@ export default function MapComponent({
       activeTooltipMarkerRef.current = null;
     }
     markersLayerRef.current.clearLayers();
+    markersMapRef.current.clear();
 
     const zoom = mapRef.current.getZoom();
     const isFew = isFiltered && filteredCameraIds ? filteredCameraIds.size <= 40 : cameras.length <= 40;
     const isMacro = Boolean(hexOverlayEnabled && isHexVisibleAtZoom(zoom));
+    const currentVerdicts = verdictsRef.current;
 
     // Render dimmed markers first, then matching/active markers so matching markers appear on top
     const sortedCameras = [...cameras].sort((a, b) => {
-      const aVerdict = verdicts.get(a.id);
-      const bVerdict = verdicts.get(b.id);
+      const aVerdict = currentVerdicts.get(a.id);
+      const bVerdict = currentVerdicts.get(b.id);
       const aHasAI = isVerdictValid(aVerdict);
       const bHasAI = isVerdictValid(bVerdict);
       const aFilterDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(a.id));
@@ -245,7 +274,7 @@ export default function MapComponent({
     sortedCameras.forEach(cam => {
       if (!cam.latitude || !cam.longitude) return;
 
-      const verdict = verdicts.get(cam.id);
+      const verdict = currentVerdicts.get(cam.id);
       const hasAIVerdict = isVerdictValid(verdict);
       const isFilteredDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(cam.id));
       const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !hasAIVerdict);
@@ -253,7 +282,7 @@ export default function MapComponent({
 
       const baseR = getRadius(zoom, isFew);
       const radius = isDimmed ? Math.max(4.0, Math.round(baseR * 0.7)) : baseR;
-      const fillColor = getTrafficColor(cam.id, cam.isOnline);
+      const fillColor = getTrafficColorForVerdict(cam.id, cam.isOnline, currentVerdicts);
       const strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
       const weight = isDimmed ? 1 : (zoom >= 14 ? 2 : 1.5);
       const opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
@@ -274,25 +303,9 @@ export default function MapComponent({
       customMarker.isFilteredDimmed = isFilteredDimmed;
       customMarker.hasAIVerdict = hasAIVerdict;
       customMarker.camId = cam.id;
+      markersMapRef.current.set(cam.id, customMarker);
 
-      let trafficInfo = '';
-      if (isVerdictValid(verdict)) {
-        const prefix = lang === 'vi' ? VERDICT_I18N.TRAFFIC_PREFIX.vi : VERDICT_I18N.TRAFFIC_PREFIX.en;
-        if (verdict.stale) {
-          const staleText = lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data';
-          trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${staleText}</span>`;
-        } else if (verdict.source !== 'mock' || appEnv === 'dev') {
-          const sevLabel = getSeverityLabel(verdict.severity, lang);
-          trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">${prefix}: ${sevLabel}</span>`;
-        }
-      }
-      if (cam.isGhost) {
-        trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">[MẤT TÍN HIỆU THỰC ĐỊA]</span>`;
-      } else if (cam.duplicateOf) {
-        trafficInfo += `<br><span style="color:#a1a1aa;">[TRÙNG NGUỒN]</span>`;
-      }
-
-      marker.bindTooltip(`<b>${cam.displayName || cam.title}</b><br><span style="color:#a1a1aa;">${cam.zone}</span>${trafficInfo}`, {
+      marker.bindTooltip(buildTooltipHtml(cam, verdict, fillColor), {
         direction: 'top',
         offset: [0, -4]
       });
@@ -337,7 +350,7 @@ export default function MapComponent({
         const fillOpacity = isFilteredDim ? 0.2 : (isMacroDim ? 0.25 : 0.95);
 
         marker.setStyle({ 
-          fillColor: getTrafficColor(cam.id, cam.isOnline), 
+          fillColor: getTrafficColorForVerdict(cam.id, cam.isOnline, verdictsRef.current), 
           color: strokeColor, 
           weight: isDim ? 1 : (curZ >= 14 ? 2 : 1.5),
           opacity,
@@ -356,7 +369,43 @@ export default function MapComponent({
 
       markersLayerRef.current?.addLayer(marker);
     });
-  }, [cameras, verdicts, getTrafficColor, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled]);
+  }, [cameras, getTrafficColorForVerdict, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled, buildTooltipHtml]);
+
+  // In-place marker style and tooltip updates on SSE live verdict streams without tearing down DOM layers
+  useEffect(() => {
+    if (!markersLayerRef.current || markersMapRef.current.size === 0) return;
+
+    const curZoom = mapRef.current ? mapRef.current.getZoom() : MAP_CONFIG.DEFAULT_ZOOM;
+    const isMacro = Boolean(hexOverlayEnabledRef.current && isHexVisibleAtZoom(curZoom));
+
+    cameras.forEach((cam) => {
+      const marker = markersMapRef.current.get(cam.id);
+      if (!marker) return;
+
+      const verdict = verdicts.get(cam.id);
+      const hasAIVerdict = isVerdictValid(verdict);
+      marker.hasAIVerdict = hasAIVerdict;
+
+      const isFilteredDimmed = marker.isFilteredDimmed === true;
+      const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !hasAIVerdict);
+      const isDimmed = isFilteredDimmed || isMacroHexDimmed;
+      marker.isDimmed = isDimmed;
+
+      const fillColor = getTrafficColorForVerdict(cam.id, cam.isOnline, verdicts);
+      const strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
+      const opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
+      const fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
+
+      marker.setStyle({
+        fillColor,
+        color: strokeColor,
+        opacity,
+        fillOpacity,
+      });
+
+      marker.setTooltipContent(buildTooltipHtml(cam, verdict, fillColor));
+    });
+  }, [verdicts, cameras, getTrafficColorForVerdict, buildTooltipHtml]);
 
   return (
     <div className="relative w-full h-full overflow-hidden">

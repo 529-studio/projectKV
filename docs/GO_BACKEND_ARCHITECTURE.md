@@ -54,9 +54,7 @@ cvclient       → hotset, camera    (implements hotset.Analyzer)
 store          → camera            (implements verdict repo interfaces defined by hotset/httpserver as needed)
 ws             → hotset            (for verdict types only)
 live           → hotset, camera    (verdict types, SSE hub, H3 hex cell aggregation)
-i18n           → (leaf)
 config         → (leaf)
-platform       → (leaf — logger setup)
 tilecache      → (leaf)
 storage        → (leaf — minimal object storage interface and local driver)
 archiver       → storage, hotset   (event-driven snapshot archiver and retention policy)
@@ -79,8 +77,6 @@ services/go-server/
 ├── internal/
 │   ├── config/
 │   │   └── config.go                  # Config struct + LoadFromEnv()
-│   ├── platform/
-│   │   └── logger.go                  # slog.Logger setup (JSON in prod, text in dev)
 │   ├── httpserver/
 │   │   ├── server.go                  # gin.Engine setup, global middleware, graceful shutdown
 │   │   └── router.go                  # top-level route grouping, calls each module's RegisterRoutes

@@ -60,7 +60,7 @@ func TestVerdictRepo_Save_InsertsRow(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	verdicts, err := repo.GetLatest()
+	verdicts, err := repo.GetLatest(context.Background())
 	if err != nil {
 		t.Fatalf("GetLatest: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestVerdictRepo_Save_UpsertUpdatesExisting(t *testing.T) {
 		t.Fatalf("second Save (upsert): %v", err)
 	}
 
-	verdicts, err := repo.GetLatest()
+	verdicts, err := repo.GetLatest(context.Background())
 	if err != nil {
 		t.Fatalf("GetLatest: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestVerdictRepo_GetLatest_EmptyDB_ReturnsNil(t *testing.T) {
 	db := openTestDB(t)
 	repo := store.NewVerdictRepo(db)
 
-	verdicts, err := repo.GetLatest()
+	verdicts, err := repo.GetLatest(context.Background())
 	if err != nil {
 		t.Fatalf("GetLatest on empty DB: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestVerdictRepo_GetLatest_MultipleCameras(t *testing.T) {
 		}
 	}
 
-	got, err := repo.GetLatest()
+	got, err := repo.GetLatest(context.Background())
 	if err != nil {
 		t.Fatalf("GetLatest: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestVerdictRepo_GetLatest_OrderedByUpdatedAtDesc(t *testing.T) {
 	_ = repo.Save(ctx, store.Verdict{CameraID: "mid", Severity: "HEAVY", Confidence: 0.7, Timestamp: t1})
 	_ = repo.Save(ctx, store.Verdict{CameraID: "new", Severity: "CONGESTED", Confidence: 0.9, Timestamp: t2})
 
-	got, err := repo.GetLatest()
+	got, err := repo.GetLatest(context.Background())
 	if err != nil {
 		t.Fatalf("GetLatest: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestVerdictRepo_ConcurrentSaves(t *testing.T) {
 		t.Errorf("concurrent save failed: %v", err)
 	}
 
-	latest, err := repo.GetLatest()
+	latest, err := repo.GetLatest(context.Background())
 	if err != nil {
 		t.Fatalf("GetLatest: %v", err)
 	}
