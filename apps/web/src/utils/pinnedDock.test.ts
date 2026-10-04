@@ -62,11 +62,17 @@ test('PINNED_DOCK_I18N contains all required keys and correct Vietnamese diacrit
   assert.equal(PINNED_DOCK_I18N.MOVE_LEFT.vi, 'Di chuyển sang trái');
   assert.equal(PINNED_DOCK_I18N.MOVE_RIGHT.vi, 'Di chuyển sang phải');
   assert.equal(PINNED_DOCK_I18N.DRAG_TO_REORDER.vi, 'Kéo để sắp xếp lại');
+  assert.equal(PINNED_DOCK_I18N.PIN_COUNT_BADGE.vi(6, 12), 'Đang ghim 6 / Tối đa 12 camera');
+  assert.equal(PINNED_DOCK_I18N.PIN_COUNT_BADGE_COMPACT.vi(6, 12), '6/12 tối đa');
+  assert.equal(PINNED_DOCK_I18N.PIN_COUNT_TOOLTIP.vi(6, 12), 'Đang ghim 6 trên tối đa 12 camera');
 
   // 3. Verify English strings and pluralization
   assert.equal(PINNED_DOCK_I18N.TITLE.en, 'MONITORING DOCK');
   assert.equal(PINNED_DOCK_I18N.COLLAPSED_PILL.en(1), 'Monitoring: 1 cam');
   assert.equal(PINNED_DOCK_I18N.COLLAPSED_PILL.en(2), 'Monitoring: 2 cams');
+  assert.equal(PINNED_DOCK_I18N.PIN_COUNT_BADGE.en(6, 12), 'Pinned 6 / Max 12 cameras');
+  assert.equal(PINNED_DOCK_I18N.PIN_COUNT_BADGE_COMPACT.en(6, 12), '6/12 max');
+  assert.equal(PINNED_DOCK_I18N.PIN_COUNT_TOOLTIP.en(6, 12), 'Pinned 6 out of maximum 12 cameras');
   assert.equal(PINNED_DOCK_I18N.CLEAR_ALL.en, '[CLEAR ALL]');
   assert.equal(PINNED_DOCK_I18N.COLLAPSE.en, 'Collapse');
   assert.equal(PINNED_DOCK_I18N.EXPAND.en, 'Expand');
