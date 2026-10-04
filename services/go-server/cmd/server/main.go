@@ -249,10 +249,18 @@ func main() {
 		analysisEnabled = true
 		log.Printf("[INIT] ANALYZER=vlm active (model=%s, interval=%ds, maxParallel=%d, fixedCameras=%d). Hot Set scheduler will run Gemini multimodal vision analysis.",
 			cfg.GeminiModel, cfg.HotsetIntervalSeconds, cfg.HotsetMaxParallel, cfg.HotsetFixedMaxCameras)
+	case "onnx":
+		if cfg.CVEngineURL == "" {
+			log.Fatalf("[FATAL] Refusing to start: ANALYZER=onnx requires CV_ENGINE_URL to be set.")
+		}
+		analyzer = cvclient.NewCVEngineAnalyzer(cfg.CVEngineURL, nil)
+		analysisEnabled = true
+		log.Printf("[INIT] ANALYZER=onnx active (url=%s, interval=%ds, maxParallel=%d, fixedCameras=%d). Hot Set scheduler will run self-hosted OpenVINO inference.",
+			cfg.CVEngineURL, cfg.HotsetIntervalSeconds, cfg.HotsetMaxParallel, cfg.HotsetFixedMaxCameras)
 	case "none", "":
 		log.Println("[INIT] ANALYZER=none: Analysis scheduler is disabled. No camera_verdicts will be recorded and no SSE camera_update will be emitted.")
 	default:
-		log.Fatalf("[FATAL] Unknown ANALYZER=%q (valid options: none, mock, vlm)", cfg.Analyzer)
+		log.Fatalf("[FATAL] Unknown ANALYZER=%q (valid options: none, mock, vlm, onnx)", cfg.Analyzer)
 	}
 
 	frozenDetector := hotset.NewFrozenDetector(cfg.FrozenFrameThreshold)

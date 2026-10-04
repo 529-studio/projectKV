@@ -67,8 +67,8 @@ services:
     networks:
       - core-network
     environment:
-      - PORT=8000
-      - MODEL_DIR=/app/models/yolov8n_openvino_320
+      - PORT=${MODEL_PORT:-8000}
+      - MODEL_DIR=${MODEL_DIR:-/app/models/yolov8n_openvino_320}
     deploy:
       resources:
         limits:
@@ -76,10 +76,14 @@ services:
           memory: "${MODEL_MEMORY_LIMIT:-512M}"
     labels:
       - "traefik.enable=false"
+    volumes:
+      - warded-model-weights:/app/models
 
 volumes:
   warded-stg-data:
     name: ${DATA_VOLUME_NAME:-warded-stg_warded-stg-data}
+  warded-model-weights:
+    name: ${MODEL_VOLUME_NAME:-warded-stg_warded-model-weights}
 
 networks:
   core-network:
