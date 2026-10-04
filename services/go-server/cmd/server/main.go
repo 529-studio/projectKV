@@ -17,17 +17,14 @@ import (
 
 	_ "github.com/529-studio/projectKV/services/go-server/docs"
 	"github.com/529-studio/projectKV/services/go-server/internal/archiver"
-	"github.com/529-studio/projectKV/services/go-server/internal/cache"
 	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
 	"github.com/529-studio/projectKV/services/go-server/internal/corridor"
 	"github.com/529-studio/projectKV/services/go-server/internal/cvclient"
-	"github.com/529-studio/projectKV/services/go-server/internal/handlers"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
-	"github.com/529-studio/projectKV/services/go-server/internal/models"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
 	"github.com/529-studio/projectKV/services/go-server/internal/storage"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
@@ -51,7 +48,7 @@ func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
 	if a.repo == nil {
 		return []hotset.Verdict{}
 	}
-	verdicts, err := a.repo.GetLatest()
+	verdicts, err := a.repo.GetLatest(context.Background())
 	if err != nil {
 		log.Printf("[WARN] Failed to query latest verdicts: %v", err)
 		return []hotset.Verdict{}
@@ -163,19 +160,11 @@ func main() {
 
 	// 1. Load camera catalog into memory
 	log.Printf("[INIT] Loading cameras from: %s", cfg.CamerasFilePath)
-	camStore, err := models.LoadCameraStore(cfg.CamerasFilePath)
-	if err != nil {
-		log.Fatalf("[FATAL] Failed to load camera store: %v", err)
-	}
-
 	camCatalog, err := camera.LoadCatalog(cfg.CamerasFilePath)
 	if err != nil {
-		log.Printf("[WARN] Failed to load structured camera catalog: %v", err)
+		log.Fatalf("[FATAL] Failed to load camera catalog: %v", err)
 	}
-	var camCatalogHandler *camera.Handler
-	if camCatalog != nil {
-		camCatalogHandler = camera.NewHandler(camCatalog)
-	}
+	camCatalogHandler := camera.NewHandler(camCatalog)
 
 	// 2. Initialize HotSet registry for active camera tracking.
 	// activeTTL = 120 s; seed fixed critical cameras when analysis is enabled
@@ -186,10 +175,21 @@ func main() {
 	}
 	hotsetRegistry := hotset.NewRegistry(fixedCameras, 120*time.Second)
 
-	// 3. Initialize in-memory cache with singleflight dedup (legacy handler).
-	snapCache := cache.NewSnapshotCache(cfg.CacheTTL)
-	stopEvictCh := make(chan struct{})
-	snapCache.StartEvictionRoutine(cfg.CacheEvictInterval, cfg.CacheMaxAge, stopEvictCh)
+	// 3. Initialize proxycache with TTL cache and periodic background purge (Issue #124)
+	proxyCache := proxycache.NewCache(cfg.CacheTTL)
+	stopPurgeCh := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopPurgeCh:
+				return
+			case <-ticker.C:
+				proxyCache.Purge()
+			}
+		}
+	}()
 
 	// 4. proxycache handler — wraps the DOT portal proxy with TTL cache and
 	// HotSet Touch (Dependency Inversion: Touch is injected as a callback so
@@ -198,7 +198,6 @@ func main() {
 	if upstreamBase == "" {
 		upstreamBase = "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx"
 	}
-	proxyCache := proxycache.NewCache(cfg.CacheTTL)
 	proxyHandler := proxycache.NewHandler(proxyCache, upstreamBase, func(id, name, zone, snapshotURL string) {
 		if camCatalog != nil {
 			if cam, ok := camCatalog.ByID(id); ok {
@@ -337,7 +336,7 @@ func main() {
 	// Pre-seed aggregators with latest stored verdicts from SQLite so GET /api/flood-hex
 	// and GET /api/traffic-status return cached data immediately on cold boot.
 	if verdictRepo != nil {
-		if storedVerdicts, err := verdictRepo.GetLatest(); err == nil && len(storedVerdicts) > 0 {
+		if storedVerdicts, err := verdictRepo.GetLatest(context.Background()); err == nil && len(storedVerdicts) > 0 {
 			staleThreshold := time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second
 			if staleThreshold <= 0 {
 				staleThreshold = 180 * time.Second
@@ -476,46 +475,14 @@ func main() {
 		go hotsetScheduler.Run(schedulerCtx)
 	}
 
-	cameraHandler := handlers.NewCameraHandler(camStore, snapCache)
-	cameraHandler.SetHealthProbe(func() map[string]string {
-		components := make(map[string]string)
-		if camStore != nil && camStore.Total > 0 {
-			components["catalog"] = "ok"
-		} else {
-			components["catalog"] = "degraded: no cameras loaded"
-		}
-
-		if verdictRepo != nil {
-			components["database"] = "ok"
-		} else {
-			components["database"] = "degraded: uninitialized"
-		}
-
-		if hotsetScheduler != nil {
-			if breaker := hotsetScheduler.Breaker(); breaker != nil {
-				if breaker.State() == hotset.StateOpen {
-					components["analyzer"] = fmt.Sprintf("degraded: circuit breaker open (%v)", breaker.LastError())
-				} else {
-					components["analyzer"] = "ok"
-				}
-			} else {
-				components["analyzer"] = "ok"
-			}
-		} else {
-			components["analyzer"] = "disabled"
-		}
-
-		return components
-	})
-
 	// 8. Setup Gin Engine
 	router := gin.Default()
 	router.Use(middleware.CORSMiddleware())
 	router.Use(middleware.RateLimitMiddleware(cfg.RateLimitRPS, cfg.RateLimitBurst))
 
-	// Health check
-	router.GET("/health", cameraHandler.HealthCheck)
-	router.HEAD("/health", cameraHandler.HealthCheck)
+	// Health check probes
+	router.GET("/health", httpserver.Healthz)
+	router.HEAD("/health", httpserver.Healthz)
 	router.GET("/healthz", httpserver.Healthz)
 
 	// WebSocket Live Broadcast (Issue #9: GET /ws/live) — kept until D1 FE migration verified.
@@ -541,19 +508,11 @@ func main() {
 	// API Group
 	api := router.Group("/api")
 	{
-		api.GET("/cameras", func(c *gin.Context) {
-			if camCatalogHandler != nil {
-				camCatalogHandler.GetCameras(c)
-				return
-			}
-			cameraHandler.GetCameras(c)
-		})
-		api.HEAD("/cameras", cameraHandler.GetCameras)
-		if camCatalogHandler != nil {
-			api.GET("/cameras/:id", camCatalogHandler.GetCameraByID)
-			api.GET("/zones", camCatalogHandler.GetZones)
-			api.GET("/phuong", camCatalogHandler.GetPhuongs)
-		}
+		api.GET("/cameras", camCatalogHandler.GetCameras)
+		api.HEAD("/cameras", camCatalogHandler.GetCameras)
+		api.GET("/cameras/:id", camCatalogHandler.GetCameraByID)
+		api.GET("/zones", camCatalogHandler.GetZones)
+		api.GET("/phuong", camCatalogHandler.GetPhuongs)
 		// Proxy cache snapshot routes (wraps proxycache.Handler)
 		proxyHandler.RegisterRoutes(api)
 		// Traffic and flood congestion status endpoints (Issue #8)
@@ -616,7 +575,18 @@ func main() {
 		log.Printf(" [DOC] Swagger UI:   http://localhost:%s/swagger/index.html", cfg.Port)
 		log.Printf(" [WS]  WebSocket:    ws://localhost:%s%s", cfg.Port, ws.RouteLive)
 		log.Printf(" [SSE] Live stream:  http://localhost:%s%s", cfg.Port, live.RouteStream)
-		log.Printf(" [CAM] Loaded %d cameras into memory (%d online)", camStore.Total, camStore.OnlineCount)
+		totalCams := 0
+		onlineCams := 0
+		if camCatalog != nil {
+			all := camCatalog.All()
+			totalCams = len(all)
+			for _, c := range all {
+				if c.IsOnline {
+					onlineCams++
+				}
+			}
+		}
+		log.Printf(" [CAM] Loaded %d cameras into memory (%d online)", totalCams, onlineCams)
 		log.Println("================================================================")
 
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -630,7 +600,7 @@ func main() {
 	<-quit
 
 	log.Println("[SHUTDOWN] Shutting down Camera View server...")
-	close(stopEvictCh)
+	close(stopPurgeCh)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

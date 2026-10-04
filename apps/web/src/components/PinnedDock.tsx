@@ -53,7 +53,9 @@ export default function PinnedDock({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  // Age tracker (ticks every 5 seconds)
+  // Controlled snapshot image refresh timestamp (15s cadence, matching backend proxy cache TTL)
+  const [snapshotRefreshTime, setSnapshotRefreshTime] = useState<number>(Date.now());
+  // Age tracker (ticks every 5 seconds for elapsed time display only)
   const [now, setNow] = useState<number>(Date.now());
   const tilesMetaRef = useRef<Map<string, TileMeta>>(new Map());
 
@@ -73,6 +75,14 @@ export default function PinnedDock({
     if (savedView && (savedView === 'strip' || savedView === 'grid')) {
       setViewMode(savedView);
     }
+  }, []);
+
+  // Timer to refresh snapshot image URLs every 15s (prevents cache busting on re-render)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSnapshotRefreshTime(Date.now());
+    }, 15000);
+    return () => clearInterval(timer);
   }, []);
 
   // Timer to tick elapsed time for image age display
@@ -307,7 +317,7 @@ export default function PinnedDock({
       >
         {/* Camera snapshot image */}
         <img
-          src={`${getApiUrl(API_ENDPOINTS.SNAPSHOT(cam.id))}?t=${now}`}
+          src={`${getApiUrl(API_ENDPOINTS.SNAPSHOT(cam.id))}?t=${snapshotRefreshTime}`}
           onLoad={() => {
             const existing = tilesMetaRef.current.get(cam.id) || {
               mountedAt: Date.now(),

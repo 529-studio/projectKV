@@ -315,38 +315,6 @@ paths:
       summary: Get camera by ID
       tags:
       - Camera
-  /api/cameras/snapshot/{id}:
-    get:
-      description: Proxy and cache real-time traffic camera snapshot image from upstream
-        portal
-      parameters:
-      - description: Camera ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - image/jpeg
-      responses:
-        "200":
-          description: JPEG image data
-          schema:
-            type: string
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "502":
-          description: Bad Gateway
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Get camera snapshot image
-      tags:
-      - Camera
   /api/config:
     get:
       description: Returns lightweight runtime configuration including whether AI
@@ -631,17 +599,17 @@ paths:
       - Camera
   /health:
     get:
-      description: Returns overall service availability and component statuses (catalog,
-        database, analyzer)
+      description: Liveness and readiness probe
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            additionalProperties: true
+            additionalProperties:
+              type: string
             type: object
-      summary: System health and readiness probe
+      summary: Health check
       tags:
       - System
   /healthz:
