@@ -215,8 +215,20 @@ export const PINNED_DOCK_I18N = Object.freeze({
     en: 'MONITORING DOCK',
   },
   COLLAPSED_PILL: {
-    vi: (count: number) => `📌 Đang theo dõi: ${count} cam`,
-    en: (count: number) => `📌 Monitoring: ${count} ${count === 1 ? 'cam' : 'cams'}`,
+    vi: (count: number) => `Đang theo dõi: ${count} cam`,
+    en: (count: number) => `Monitoring: ${count} ${count === 1 ? 'cam' : 'cams'}`,
+  },
+  PIN_COUNT_BADGE: {
+    vi: (count: number, cap: number) => `Đang ghim ${count} / Tối đa ${cap} camera`,
+    en: (count: number, cap: number) => `Pinned ${count} / Max ${cap} cameras`,
+  },
+  PIN_COUNT_BADGE_COMPACT: {
+    vi: (count: number, cap: number) => `${count}/${cap} tối đa`,
+    en: (count: number, cap: number) => `${count}/${cap} max`,
+  },
+  PIN_COUNT_TOOLTIP: {
+    vi: (count: number, cap: number) => `Đang ghim ${count} trên tối đa ${cap} camera`,
+    en: (count: number, cap: number) => `Pinned ${count} out of maximum ${cap} cameras`,
   },
   CLEAR_ALL: {
     vi: '[XÓA HẾT]',
@@ -254,6 +266,24 @@ export const PINNED_DOCK_I18N = Object.freeze({
   PIN_LIMIT_BADGE: {
     vi: 'ĐÃ ĐẠT GIỚI HẠN',
     en: 'PIN CAP REACHED',
+  },
+  SEVERITY: {
+    CLEAR: {
+      vi: 'Thông thoáng',
+      en: 'Clear',
+    },
+    MODERATE: {
+      vi: 'Vừa phải',
+      en: 'Moderate',
+    },
+    HEAVY: {
+      vi: 'Đông đúc',
+      en: 'Heavy',
+    },
+    CONGESTED: {
+      vi: 'Tắc nghẽn',
+      en: 'Congested',
+    },
   },
   NO_ANALYSIS: {
     vi: 'Chưa phân tích',
