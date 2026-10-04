@@ -74,8 +74,18 @@ func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
 // lowercase for case-insensitive matching.
 var criticalKeywords = []string{
 	"an sương", "cát lái", "mỹ thủy", "ngã 4 ga", "quốc lộ 1",
-	"nguyễn văn linh", "điện biên phủ", "võ văn kiệt", "phạm văn đồng",
-	"cầu sài gòn", "xô viết nghệ tĩnh", "hành trình", "bình thái",
+	"nguyễn văn linh", "điện biên phủ", "võ văn kiệt", "mai chí thọ",
+	"cộng hòa", "phạm văn đồng", "cầu sài gòn", "xô viết nghệ tĩnh",
+	"hành trình", "bình thái",
+}
+
+// priorityCorridors contains the 4 priority corridors confirmed in Sprint 3 S1 (Option 1b).
+// Reference: docs/spike-vehicle-capacity.md §5 and Issue #136.
+var priorityCorridors = map[string]struct{}{
+	"vo_van_kiet":   {},
+	"mai_chi_tho":   {},
+	"dien_bien_phu": {},
+	"cong_hoa":      {},
 }
 
 // buildFixedHotSet selects a deterministic set of critical cameras from the
@@ -101,9 +111,35 @@ func buildFixedHotSet(reader camera.Reader, maxCameras int) []hotset.Camera {
 		eligible = append(eligible, c)
 	}
 
-	// First pass: prefer known critical choke points.
 	var critical []hotset.Camera
+	used := make(map[string]struct{}, len(eligible))
+
+	// Pass 1: Prioritize S2 curated intersection cameras on S1 priority corridors (Option 1b).
+	// Exactly 2 road_keys ensures intersection choke points are selected over mid-block cameras.
 	for _, c := range eligible {
+		if len(c.RoadKeys) == 2 {
+			isPriority := false
+			for _, rk := range c.RoadKeys {
+				if _, ok := priorityCorridors[rk]; ok {
+					isPriority = true
+					break
+				}
+			}
+			if isPriority {
+				critical = append(critical, cameraToHotSet(c))
+				used[c.ID] = struct{}{}
+				if maxCameras > 0 && len(critical) >= maxCameras {
+					return critical
+				}
+			}
+		}
+	}
+
+	// Pass 2: Prefer remaining known critical choke points via criticalKeywords.
+	for _, c := range eligible {
+		if _, ok := used[c.ID]; ok {
+			continue
+		}
 		name := strings.ToLower(c.DisplayName)
 		if name == "" {
 			name = strings.ToLower(c.Title)
@@ -111,24 +147,22 @@ func buildFixedHotSet(reader camera.Reader, maxCameras int) []hotset.Camera {
 		for _, kw := range criticalKeywords {
 			if strings.Contains(name, kw) {
 				critical = append(critical, cameraToHotSet(c))
+				used[c.ID] = struct{}{}
 				break
 			}
 		}
 		if maxCameras > 0 && len(critical) >= maxCameras {
-			break
+			return critical
 		}
 	}
 
-	// Second pass: pad with the remaining eligible cameras up to maxCameras.
-	used := make(map[string]struct{}, len(critical))
-	for _, c := range critical {
-		used[c.ID] = struct{}{}
-	}
+	// Pass 3: Pad with the remaining eligible cameras up to maxCameras.
 	for _, c := range eligible {
 		if _, ok := used[c.ID]; ok {
 			continue
 		}
 		critical = append(critical, cameraToHotSet(c))
+		used[c.ID] = struct{}{}
 		if maxCameras > 0 && len(critical) >= maxCameras {
 			break
 		}

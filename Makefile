@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu lint-go swagger geo-enrich test-enrich normalize-roads hex-polygons test-eval benchmark-mock
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock
 
 help:
 	@echo "========================================================"
@@ -22,6 +22,7 @@ help:
 	@echo "  make crawl           - Update camera dataset from traffic portal"
 	@echo "  make geo-enrich      - Run batch Phường point-in-polygon enrichment"
 	@echo "  make normalize-roads - Run road name normalization (road_key)"
+	@echo "  make curate-hotset   - Curate Hot Set vehicle-detection camera list (S2)"
 	@echo "  make hex-polygons    - Precompute H3 hex polygon boundaries"
 	@echo "  make test-enrich     - Run unit tests for geo-enrich tool"
 	@echo "  make test-eval       - Run unit tests for eval benchmark harness"
@@ -80,6 +81,9 @@ geo-enrich:
 
 normalize-roads:
 	python3 tools/geo-enrich/normalize_roads.py --input cameras_enriched.json --output cameras_enriched.json
+
+curate-hotset:
+	python3 tools/geo-enrich/curate_hotset_cameras.py --input cameras_enriched.json --output tools/geo-enrich/data/curated_hotset_cameras.json --summary
 
 hex-polygons:
 	python3 tools/geo-enrich/generate_hex_polygons.py --cameras cameras_enriched.json --output h3_hex_polygons.json
