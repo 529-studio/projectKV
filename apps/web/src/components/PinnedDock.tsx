@@ -66,10 +66,31 @@ export default function PinnedDock({
   const [now, setNow] = useState<number>(Date.now());
   const tilesMetaRef = useRef<Map<string, TileMeta>>(new Map());
 
-  // Drag tracking refs
+  // Horizontal scroll track refs
+  const desktopTrackRef = useRef<HTMLDivElement>(null);
+  const mobileTrackRef = useRef<HTMLDivElement>(null);
+
+  // Drag-to-scroll & reorder state refs
   const pointerStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const isDraggingRef = useRef(false);
+  const startScrollLeft = useRef(0);
+  const isDraggingScrollRef = useRef(false);
+  const isReorderingRef = useRef(false);
+  const hasMovedRef = useRef(false);
   const draggedCamIdRef = useRef<string | null>(null);
+  const lastClientX = useRef(0);
+  const lastTime = useRef(0);
+  const velocity = useRef(0);
+  const momentumAnimId = useRef<number | null>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const capturedElementRef = useRef<HTMLElement | null>(null);
+
+  // Clean up timers and animations on unmount
+  useEffect(() => {
+    return () => {
+      if (momentumAnimId.current) cancelAnimationFrame(momentumAnimId.current);
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
+  }, []);
 
   // Initialize preferences from localStorage
   useEffect(() => {
@@ -131,30 +152,168 @@ export default function PinnedDock({
     [pinnedCameras, onReorder]
   );
 
-  // Reorder via Pointer Events (Drag & Drop)
-  const handlePointerDown = (e: React.PointerEvent, camId: string) => {
-    if (e.button !== 0) return; // left click / primary touch only
-    pointerStartPos.current = { x: e.clientX, y: e.clientY };
-    draggedCamIdRef.current = camId;
-    isDraggingRef.current = false;
+  // Stop momentum animation
+  const stopMomentum = useCallback(() => {
+    if (momentumAnimId.current) {
+      cancelAnimationFrame(momentumAnimId.current);
+      momentumAnimId.current = null;
+    }
+  }, []);
+
+  // Handle vertical wheel scroll on horizontal track
+  const handleTrackWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (viewMode === 'grid') return;
+    if (e.deltaY !== 0 && e.deltaX === 0) {
+      const track = desktopTrackRef.current;
+      if (track) {
+        track.scrollLeft += e.deltaY;
+      }
+    }
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!draggedCamIdRef.current) return;
-    const dx = Math.abs(e.clientX - pointerStartPos.current.x);
-    const dy = Math.abs(e.clientY - pointerStartPos.current.y);
+  // Drag-to-scroll on empty track background
+  const handleTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>, isMobile: boolean) => {
+    if (e.button !== 0) return;
+    if (e.target !== e.currentTarget) return; // Only if clicked directly on empty track space
+    stopMomentum();
+    const track = isMobile ? mobileTrackRef.current : desktopTrackRef.current;
+    if (!track) return;
+    pointerStartPos.current = { x: e.clientX, y: e.clientY };
+    startScrollLeft.current = track.scrollLeft;
+    isDraggingScrollRef.current = true;
+    hasMovedRef.current = false;
+    lastClientX.current = e.clientX;
+    lastTime.current = performance.now();
+    velocity.current = 0;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      capturedElementRef.current = e.currentTarget;
+    } catch {
+      // fallback
+    }
+  };
 
-    if (!isDraggingRef.current && (dx > 6 || dy > 6)) {
-      isDraggingRef.current = true;
-      setDraggedId(draggedCamIdRef.current);
+  const handleTrackPointerMove = (e: React.PointerEvent<HTMLDivElement>, isMobile: boolean) => {
+    if (isDraggingScrollRef.current && viewMode === 'strip') {
+      const activeTrack = isMobile ? mobileTrackRef.current : desktopTrackRef.current;
+      if (!activeTrack) return;
+      const dx = e.clientX - pointerStartPos.current.x;
+      if (Math.abs(dx) > 4) {
+        hasMovedRef.current = true;
+      }
+      const now = performance.now();
+      const dt = now - lastTime.current;
+      if (dt > 0) {
+        velocity.current = (e.clientX - lastClientX.current) / dt;
+      }
+      lastClientX.current = e.clientX;
+      lastTime.current = now;
+      activeTrack.scrollLeft = startScrollLeft.current - dx;
+    }
+  };
+
+  const handleTrackPointerUp = (e: React.PointerEvent<HTMLDivElement>, isMobile: boolean) => {
+    if (isDraggingScrollRef.current) {
+      if (capturedElementRef.current) {
+        try {
+          capturedElementRef.current.releasePointerCapture(e.pointerId);
+        } catch {
+          // fallback
+        }
+        capturedElementRef.current = null;
+      }
+      const activeTrack = isMobile ? mobileTrackRef.current : desktopTrackRef.current;
+      if (viewMode === 'strip' && activeTrack && Math.abs(velocity.current) > 0.15) {
+        let currentVel = velocity.current * 14;
+        const step = () => {
+          if (Math.abs(currentVel) > 0.5 && activeTrack) {
+            activeTrack.scrollLeft -= currentVel;
+            currentVel *= 0.92;
+            momentumAnimId.current = requestAnimationFrame(step);
+          }
+        };
+        momentumAnimId.current = requestAnimationFrame(step);
+      }
+      isDraggingScrollRef.current = false;
+      hasMovedRef.current = false;
+    }
+  };
+
+  // Pointer event handlers on camera tiles (supports drag-to-scroll & reorder)
+  const handlePointerDown = (e: React.PointerEvent, camId: string, isMobile: boolean) => {
+    if (e.button !== 0) return; // left click / primary touch only
+    stopMomentum();
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+
+    const activeTrack = isMobile ? mobileTrackRef.current : desktopTrackRef.current;
+    pointerStartPos.current = { x: e.clientX, y: e.clientY };
+    startScrollLeft.current = activeTrack ? activeTrack.scrollLeft : 0;
+    draggedCamIdRef.current = camId;
+    isDraggingScrollRef.current = false;
+    isReorderingRef.current = false;
+    hasMovedRef.current = false;
+    lastClientX.current = e.clientX;
+    lastTime.current = performance.now();
+    velocity.current = 0;
+
+    // In strip mode, start long-press timer for reordering
+    if (viewMode === 'strip') {
+      longPressTimer.current = setTimeout(() => {
+        if (!hasMovedRef.current && draggedCamIdRef.current) {
+          isReorderingRef.current = true;
+          setDraggedId(draggedCamIdRef.current);
+        }
+      }, 280);
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent, isMobile: boolean) => {
+    if (!draggedCamIdRef.current) return;
+    const dx = e.clientX - pointerStartPos.current.x;
+    const dy = e.clientY - pointerStartPos.current.y;
+
+    if (!hasMovedRef.current && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+      hasMovedRef.current = true;
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+
+      if (viewMode === 'grid') {
+        isReorderingRef.current = true;
+        setDraggedId(draggedCamIdRef.current);
+      } else if (!isReorderingRef.current) {
+        isDraggingScrollRef.current = true;
+      }
+
       try {
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        capturedElementRef.current = e.currentTarget as HTMLElement;
       } catch {
-        // pointer capture fallback
+        // fallback
       }
     }
 
-    if (isDraggingRef.current) {
+    const activeTrack = isMobile ? mobileTrackRef.current : desktopTrackRef.current;
+
+    // 1. Drag-to-scroll in strip mode
+    if (isDraggingScrollRef.current && viewMode === 'strip' && activeTrack) {
+      const now = performance.now();
+      const dt = now - lastTime.current;
+      if (dt > 0) {
+        velocity.current = (e.clientX - lastClientX.current) / dt;
+      }
+      lastClientX.current = e.clientX;
+      lastTime.current = now;
+
+      activeTrack.scrollLeft = startScrollLeft.current - dx;
+    }
+
+    // 2. Drag-to-reorder
+    if (isReorderingRef.current) {
       const elem = document.elementFromPoint(e.clientX, e.clientY);
       const tile = elem?.closest('[data-camera-id]');
       if (tile) {
@@ -163,11 +322,54 @@ export default function PinnedDock({
           setDragOverId(targetId);
         }
       }
+
+      // Auto-scroll near edges in strip mode
+      if (viewMode === 'strip' && activeTrack) {
+        const rect = activeTrack.getBoundingClientRect();
+        const edgeThreshold = 60;
+        if (e.clientX < rect.left + edgeThreshold) {
+          activeTrack.scrollLeft -= 8;
+        } else if (e.clientX > rect.right - edgeThreshold) {
+          activeTrack.scrollLeft += 8;
+        }
+      }
     }
   };
 
-  const handlePointerUp = (e: React.PointerEvent, cam: Camera) => {
-    if (isDraggingRef.current && draggedCamIdRef.current) {
+  const handlePointerUp = (e: React.PointerEvent, cam: Camera, isMobile: boolean) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+
+    if (capturedElementRef.current) {
+      try {
+        capturedElementRef.current.releasePointerCapture(e.pointerId);
+      } catch {
+        // fallback
+      }
+      capturedElementRef.current = null;
+    }
+
+    const activeTrack = isMobile ? mobileTrackRef.current : desktopTrackRef.current;
+
+    if (isDraggingScrollRef.current && viewMode === 'strip' && activeTrack) {
+      e.stopPropagation();
+      e.preventDefault();
+
+      // Smooth momentum glide
+      if (Math.abs(velocity.current) > 0.15) {
+        let currentVel = velocity.current * 14;
+        const step = () => {
+          if (Math.abs(currentVel) > 0.5 && activeTrack) {
+            activeTrack.scrollLeft -= currentVel;
+            currentVel *= 0.92;
+            momentumAnimId.current = requestAnimationFrame(step);
+          }
+        };
+        momentumAnimId.current = requestAnimationFrame(step);
+      }
+    } else if (isReorderingRef.current && draggedCamIdRef.current) {
       e.stopPropagation();
       e.preventDefault();
 
@@ -182,14 +384,8 @@ export default function PinnedDock({
           onReorder(newIds);
         }
       }
-
-      try {
-        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch {
-        // release capture fallback
-      }
-    } else if (!isDraggingRef.current) {
-      // Normal click
+    } else if (!hasMovedRef.current) {
+      // Normal click without movement
       if (onCameraClick) {
         onCameraClick(cam);
         setIsMobileExpanded(false);
@@ -197,16 +393,25 @@ export default function PinnedDock({
     }
 
     draggedCamIdRef.current = null;
-    isDraggingRef.current = false;
+    isDraggingScrollRef.current = false;
+    isReorderingRef.current = false;
     setDraggedId(null);
     setDragOverId(null);
+    hasMovedRef.current = false;
   };
 
   const handlePointerCancel = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    stopMomentum();
     draggedCamIdRef.current = null;
-    isDraggingRef.current = false;
+    isDraggingScrollRef.current = false;
+    isReorderingRef.current = false;
     setDraggedId(null);
     setDragOverId(null);
+    hasMovedRef.current = false;
   };
 
   // Keyboard navigation for reordering and selection
@@ -305,19 +510,21 @@ export default function PinnedDock({
         data-camera-id={cam.id}
         tabIndex={0}
         onKeyDown={(e) => handleKeyDown(e, index, cam)}
-        onPointerDown={(e) => handlePointerDown(e, cam.id)}
-        onPointerMove={handlePointerMove}
-        onPointerUp={(e) => handlePointerUp(e, cam)}
+        onPointerDown={(e) => handlePointerDown(e, cam.id, isMobile)}
+        onPointerMove={(e) => handlePointerMove(e, isMobile)}
+        onPointerUp={(e) => handlePointerUp(e, cam, isMobile)}
         onPointerCancel={handlePointerCancel}
         onClick={() => {
-          if (!isDraggingRef.current && onCameraClick) {
+          if (!hasMovedRef.current && !isDraggingScrollRef.current && !isReorderingRef.current && onCameraClick) {
             onCameraClick(cam);
             setIsMobileExpanded(false);
           }
         }}
         role="button"
         aria-label={`${cam.displayName || cam.title}. ${PINNED_DOCK_I18N.DRAG_TO_REORDER[lang]}`}
-        className={`relative ${presetStyle.tileClass} bg-black border rounded-sm select-none cursor-grab active:cursor-grabbing overflow-hidden transition-all outline-none focus:ring-1 focus:ring-zinc-400 group ${
+        className={`relative ${presetStyle.tileClass} bg-black border rounded-sm select-none ${
+          viewMode === 'strip' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+        } overflow-hidden transition-all outline-none focus:ring-1 focus:ring-zinc-400 group ${
           isDragging
             ? 'opacity-40 border-white scale-[0.98] z-20 shadow-2xl'
             : isDragOver
@@ -596,10 +803,16 @@ export default function PinnedDock({
         {/* Content Area: Horizontal Scroll Track or Responsive Multi-Column Grid */}
         {!isDesktopCollapsed && (
           <div
+            ref={desktopTrackRef}
+            onWheel={handleTrackWheel}
+            onPointerDown={(e) => handleTrackPointerDown(e, false)}
+            onPointerMove={(e) => handleTrackPointerMove(e, false)}
+            onPointerUp={(e) => handleTrackPointerUp(e, false)}
+            onPointerCancel={handlePointerCancel}
             className={
               viewMode === 'grid'
-                ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 p-2 max-h-[45vh] overflow-y-auto'
-                : `flex gap-2 p-2 overflow-x-auto ${presetStyle.trackHeight} items-center`
+                ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 p-2 max-h-[45vh] overflow-y-auto select-none'
+                : `flex gap-2 p-2 overflow-x-auto ${presetStyle.trackHeight} items-center select-none cursor-grab active:cursor-grabbing`
             }
           >
             {pinnedCameras.map((cam, idx) => renderTile(cam, idx, false))}
@@ -752,10 +965,15 @@ export default function PinnedDock({
 
                 {/* Mobile Content Track */}
                 <div
+                  ref={mobileTrackRef}
+                  onPointerDown={(e) => handleTrackPointerDown(e, true)}
+                  onPointerMove={(e) => handleTrackPointerMove(e, true)}
+                  onPointerUp={(e) => handleTrackPointerUp(e, true)}
+                  onPointerCancel={handlePointerCancel}
                   className={
                     viewMode === 'grid'
                       ? 'grid grid-cols-2 gap-2 p-3 overflow-y-auto max-h-[45vh]'
-                      : `flex gap-2.5 p-3 overflow-x-auto ${presetStyle.trackHeight} items-center`
+                      : `flex gap-2.5 p-3 overflow-x-auto ${presetStyle.trackHeight} items-center select-none`
                   }
                 >
                   {pinnedCameras.map((cam, idx) => renderTile(cam, idx, true))}
