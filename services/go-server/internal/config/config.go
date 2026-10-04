@@ -221,9 +221,10 @@ type ServerConfig struct {
 	CacheTTL                      time.Duration
 	CacheEvictInterval            time.Duration
 	CacheMaxAge                   time.Duration
-	Analyzer                      string // "none" | "mock" | "vlm" (default: "none")
+	Analyzer                      string // "none" | "mock" | "vlm" | "onnx" (default: "none")
 	CloudVisionAPIKey             string
 	GeminiModel                   string        // default: "gemini-3.5-flash-lite"
+	CVEngineURL                   string        // default: "http://localhost:8000" or from CV_ENGINE_URL
 	AppEnv                        string        // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
 	StorageDriver                 string        // default: "local"
 	StorageLocalRoot              string        // default: "./data/proofs"
@@ -314,6 +315,8 @@ func LoadConfig() *ServerConfig {
 		geminiModel = "gemini-3.5-flash-lite"
 	}
 
+	cvEngineURL := strings.TrimSpace(os.Getenv("CV_ENGINE_URL"))
+
 	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if appEnv == "" {
 		if os.Getenv("GIN_MODE") == "release" {
@@ -399,6 +402,7 @@ func LoadConfig() *ServerConfig {
 	if analyzer == "vlm" {
 		hotsetIntervalSeconds = 60 // safe default for free tier
 	}
+	// onnx: 30s cycle matches S1 Option 1b capacity arithmetic (25.1s used, 16% headroom).
 	if val := os.Getenv("HOTSET_INTERVAL_SECONDS"); val != "" {
 		if v, err := strconv.Atoi(val); err == nil && v > 0 {
 			hotsetIntervalSeconds = v
@@ -418,6 +422,8 @@ func LoadConfig() *ServerConfig {
 	hotsetFixedMaxCameras := 40
 	if analyzer == "vlm" {
 		hotsetFixedMaxCameras = 2 // 2 choke points prevents burning through 500 RPD daily quota
+	} else if analyzer == "onnx" {
+		hotsetFixedMaxCameras = 57 // S1 Option 1b: 4 priority corridors (DBP + CH + MCT + VVK = 57 cameras)
 	} else if analyzer == "none" || analyzer == "" {
 		hotsetFixedMaxCameras = 0
 	}
@@ -458,6 +464,7 @@ func LoadConfig() *ServerConfig {
 		Analyzer:                      analyzer,
 		CloudVisionAPIKey:             cloudVisionAPIKey,
 		GeminiModel:                   geminiModel,
+		CVEngineURL:                   cvEngineURL,
 		AppEnv:                        appEnv,
 		StorageDriver:                 storageDriver,
 		StorageLocalRoot:              storageLocalRoot,
