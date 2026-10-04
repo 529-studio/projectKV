@@ -21,6 +21,12 @@ from enrich import (
     write_unmatched_report,
 )
 
+try:
+    import h3
+    HAS_H3 = True
+except ImportError:
+    HAS_H3 = False
+
 
 class TestGeoEnrich(unittest.TestCase):
 
@@ -238,6 +244,7 @@ class TestGeoEnrich(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_h3_resolutions("-1,7")
 
+    @unittest.skipUnless(HAS_H3, "h3 package required")
     def test_h3_enrichment_known_coordinates(self):
         cameras = [
             {
@@ -263,6 +270,7 @@ class TestGeoEnrich(unittest.TestCase):
         self.assertEqual(enriched[1]["h3_res7"], "8765b5644ffffff")
         self.assertEqual(enriched[1]["h3_res9"], "8965b564483ffff")
 
+    @unittest.skipUnless(HAS_H3, "h3 package required")
     def test_h3_enrichment_missing_and_invalid_coordinates(self):
         cameras = [
             {
@@ -286,6 +294,7 @@ class TestGeoEnrich(unittest.TestCase):
         self.assertIsNone(enriched[1]["h3_res7"])
         self.assertIsNone(enriched[1]["h3_res9"])
 
+    @unittest.skipUnless(HAS_H3, "h3 package required")
     def test_h3_resolution_hierarchy(self):
         import h3
         cameras = [
@@ -303,6 +312,7 @@ class TestGeoEnrich(unittest.TestCase):
         # Res 7 must be the ancestor/parent of Res 9
         self.assertEqual(h3.cell_to_parent(res9, 7), res7)
 
+    @unittest.skipUnless(HAS_H3, "h3 package required")
     def test_h3_enrichment_idempotent(self):
         cameras = [
             {"id": "c1", "latitude": 10.776889, "longitude": 106.700806},

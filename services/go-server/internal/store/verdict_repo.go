@@ -64,12 +64,12 @@ func (r *VerdictRepo) Save(ctx context.Context, v Verdict) error {
 
 // GetLatest returns the most recent verdict for every camera currently in the
 // camera_verdicts table, ordered by updated_at descending.
-func (r *VerdictRepo) GetLatest() ([]Verdict, error) {
+func (r *VerdictRepo) GetLatest(ctx context.Context) ([]Verdict, error) {
 	query := fmt.Sprintf(`SELECT camera_id, severity, COALESCE(flood_severity, ''), confidence, COALESCE(source, ''), COALESCE(observed_at, updated_at), updated_at
 		 FROM %s
 		 ORDER BY updated_at DESC`, TableCameraVerdicts)
 
-	rows, err := r.db.QueryContext(context.Background(), query)
+	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query verdicts: %w", err)
 	}

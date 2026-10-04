@@ -15,12 +15,15 @@ import sys
 
 try:
     import h3
+    HAS_H3 = True
 except ImportError:
-    print("Error: 'h3' package is required. Install via pip install h3>=4.0.0", file=sys.stderr)
-    sys.exit(1)
+    h3 = None
+    HAS_H3 = False
 
 
 def generate_polygons(cameras_path: str, output_path: str, precision: int = 7) -> int:
+    if not HAS_H3 or h3 is None:
+        raise ImportError("The 'h3' package is required. Install via pip install h3>=4.0.0")
     with open(cameras_path, "r", encoding="utf-8") as f:
         cameras = json.load(f)
 
@@ -65,6 +68,10 @@ def main():
 
     if not os.path.exists(args.cameras):
         print(f"Error: Cameras file not found: {args.cameras}", file=sys.stderr)
+        return 1
+
+    if not HAS_H3 or h3 is None:
+        print("Error: 'h3' package is required. Install via pip install h3>=4.0.0", file=sys.stderr)
         return 1
 
     count = generate_polygons(args.cameras, args.output)

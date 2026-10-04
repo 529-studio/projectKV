@@ -24,9 +24,7 @@ cvclient       → hotset, camera
 store          → camera
 ws             → hotset
 live           → hotset, camera
-i18n           → (leaf)
 config         → (leaf)
-platform       → (leaf)
 tilecache      → (leaf)
 storage        → (leaf)
 archiver       → storage, hotset
