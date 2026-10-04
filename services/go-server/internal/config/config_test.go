@@ -320,3 +320,96 @@ func TestLoadFromEnv_Hex_DefaultsAndCustom(t *testing.T) {
 		t.Errorf("expected HexMinCameras=4, got %d", cfg2.HexMinCameras)
 	}
 }
+
+func TestLoadConfig_PCU_Defaults(t *testing.T) {
+	_ = os.Unsetenv("PCU_WEIGHT_MOTORCYCLE")
+	_ = os.Unsetenv("PCU_WEIGHT_CAR")
+	_ = os.Unsetenv("PCU_WEIGHT_BUS")
+	_ = os.Unsetenv("PCU_WEIGHT_TRUCK")
+	_ = os.Unsetenv("PCU_WEIGHT_CONTAINER")
+	_ = os.Unsetenv("PCU_CAPACITY_FLOOR")
+	_ = os.Unsetenv("PCU_THRESHOLD_MODERATE")
+	_ = os.Unsetenv("PCU_THRESHOLD_HEAVY")
+	_ = os.Unsetenv("PCU_THRESHOLD_CONGESTED")
+
+	cfg := config.LoadConfig()
+	if cfg.PCUWeightMotorcycle != 0.2 {
+		t.Errorf("expected default PCUWeightMotorcycle=0.2, got %f", cfg.PCUWeightMotorcycle)
+	}
+	if cfg.PCUWeightCar != 1.0 {
+		t.Errorf("expected default PCUWeightCar=1.0, got %f", cfg.PCUWeightCar)
+	}
+	if cfg.PCUWeightBus != 2.0 {
+		t.Errorf("expected default PCUWeightBus=2.0, got %f", cfg.PCUWeightBus)
+	}
+	if cfg.PCUWeightTruck != 2.0 {
+		t.Errorf("expected default PCUWeightTruck=2.0, got %f", cfg.PCUWeightTruck)
+	}
+	if cfg.PCUWeightContainer != 3.0 {
+		t.Errorf("expected default PCUWeightContainer=3.0, got %f", cfg.PCUWeightContainer)
+	}
+	if cfg.PCUCapacityFloor != 25.0 {
+		t.Errorf("expected default PCUCapacityFloor=25.0, got %f", cfg.PCUCapacityFloor)
+	}
+	if cfg.PCUThresholdModerate != 0.35 {
+		t.Errorf("expected default PCUThresholdModerate=0.35, got %f", cfg.PCUThresholdModerate)
+	}
+	if cfg.PCUThresholdHeavy != 0.70 {
+		t.Errorf("expected default PCUThresholdHeavy=0.70, got %f", cfg.PCUThresholdHeavy)
+	}
+	if cfg.PCUThresholdCongested != 0.90 {
+		t.Errorf("expected default PCUThresholdCongested=0.90, got %f", cfg.PCUThresholdCongested)
+	}
+}
+
+func TestLoadConfig_PCU_Custom(t *testing.T) {
+	_ = os.Setenv("PCU_WEIGHT_MOTORCYCLE", "0.25")
+	_ = os.Setenv("PCU_WEIGHT_CAR", "1.1")
+	_ = os.Setenv("PCU_WEIGHT_BUS", "2.2")
+	_ = os.Setenv("PCU_WEIGHT_TRUCK", "2.5")
+	_ = os.Setenv("PCU_WEIGHT_CONTAINER", "3.5")
+	_ = os.Setenv("PCU_CAPACITY_FLOOR", "30.0")
+	_ = os.Setenv("PCU_THRESHOLD_MODERATE", "0.40")
+	_ = os.Setenv("PCU_THRESHOLD_HEAVY", "0.75")
+	_ = os.Setenv("PCU_THRESHOLD_CONGESTED", "0.95")
+	defer func() {
+		_ = os.Unsetenv("PCU_WEIGHT_MOTORCYCLE")
+		_ = os.Unsetenv("PCU_WEIGHT_CAR")
+		_ = os.Unsetenv("PCU_WEIGHT_BUS")
+		_ = os.Unsetenv("PCU_WEIGHT_TRUCK")
+		_ = os.Unsetenv("PCU_WEIGHT_CONTAINER")
+		_ = os.Unsetenv("PCU_CAPACITY_FLOOR")
+		_ = os.Unsetenv("PCU_THRESHOLD_MODERATE")
+		_ = os.Unsetenv("PCU_THRESHOLD_HEAVY")
+		_ = os.Unsetenv("PCU_THRESHOLD_CONGESTED")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.PCUWeightMotorcycle != 0.25 {
+		t.Errorf("expected PCUWeightMotorcycle=0.25, got %f", cfg.PCUWeightMotorcycle)
+	}
+	if cfg.PCUWeightCar != 1.1 {
+		t.Errorf("expected PCUWeightCar=1.1, got %f", cfg.PCUWeightCar)
+	}
+	if cfg.PCUWeightBus != 2.2 {
+		t.Errorf("expected PCUWeightBus=2.2, got %f", cfg.PCUWeightBus)
+	}
+	if cfg.PCUWeightTruck != 2.5 {
+		t.Errorf("expected PCUWeightTruck=2.5, got %f", cfg.PCUWeightTruck)
+	}
+	if cfg.PCUWeightContainer != 3.5 {
+		t.Errorf("expected PCUWeightContainer=3.5, got %f", cfg.PCUWeightContainer)
+	}
+	if cfg.PCUCapacityFloor != 30.0 {
+		t.Errorf("expected PCUCapacityFloor=30.0, got %f", cfg.PCUCapacityFloor)
+	}
+	if cfg.PCUThresholdModerate != 0.40 {
+		t.Errorf("expected PCUThresholdModerate=0.40, got %f", cfg.PCUThresholdModerate)
+	}
+	if cfg.PCUThresholdHeavy != 0.75 {
+		t.Errorf("expected PCUThresholdHeavy=0.75, got %f", cfg.PCUThresholdHeavy)
+	}
+	if cfg.PCUThresholdCongested != 0.95 {
+		t.Errorf("expected PCUThresholdCongested=0.95, got %f", cfg.PCUThresholdCongested)
+	}
+}
