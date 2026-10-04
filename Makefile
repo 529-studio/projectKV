@@ -48,7 +48,7 @@ test-pcu:
 	cd services/go-server && go test ./internal/cvclient/... -run TestPCU -v
 
 dev-cv:
-	cd services/cv-engine && python3 server.py
+	cd services/cv-engine && CV_PORT=8000 PORT=8000 python3 server.py
 
 lint-go:
 	cd services/go-server && golangci-lint run
