@@ -58,3 +58,11 @@ __pycache__/
 # Spike & Temporary Sandbox Directories
 .tmp_*
 .tmp_spike_routing/
+
+# ML Models, Weights & Checkpoints (Avoid Git Bloat & License Contamination)
+*.pt
+*.bin
+*.onnx
+yolov8n_openvino_model/
+models/
+
