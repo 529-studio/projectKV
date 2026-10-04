@@ -243,6 +243,15 @@ type ServerConfig struct {
 	HexResolution                 int           // default: 7 (HEX_RESOLUTION)
 	HexMinCameras                 int           // default: 3 (HEX_MIN_CAMERAS)
 	HexPolygonFilePath            string        // default: resolvePath("h3_hex_polygons.json")
+	PCUWeightMotorcycle           float64       // default: 0.2 (PCU_WEIGHT_MOTORCYCLE)
+	PCUWeightCar                  float64       // default: 1.0 (PCU_WEIGHT_CAR)
+	PCUWeightBus                  float64       // default: 2.0 (PCU_WEIGHT_BUS)
+	PCUWeightTruck                float64       // default: 2.0 (PCU_WEIGHT_TRUCK)
+	PCUWeightContainer            float64       // default: 3.0 (PCU_WEIGHT_CONTAINER)
+	PCUCapacityFloor              float64       // default: 25.0 (PCU_CAPACITY_FLOOR)
+	PCUThresholdModerate          float64       // default: 0.35 (PCU_THRESHOLD_MODERATE)
+	PCUThresholdHeavy             float64       // default: 0.70 (PCU_THRESHOLD_HEAVY)
+	PCUThresholdCongested         float64       // default: 0.90 (PCU_THRESHOLD_CONGESTED)
 }
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -452,6 +461,69 @@ func LoadConfig() *ServerConfig {
 		hexPolygonFilePath = resolvePath("h3_hex_polygons.json")
 	}
 
+	pcuWeightMotorcycle := 0.2
+	if val := os.Getenv("PCU_WEIGHT_MOTORCYCLE"); val != "" {
+		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+			pcuWeightMotorcycle = v
+		}
+	}
+
+	pcuWeightCar := 1.0
+	if val := os.Getenv("PCU_WEIGHT_CAR"); val != "" {
+		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+			pcuWeightCar = v
+		}
+	}
+
+	pcuWeightBus := 2.0
+	if val := os.Getenv("PCU_WEIGHT_BUS"); val != "" {
+		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+			pcuWeightBus = v
+		}
+	}
+
+	pcuWeightTruck := 2.0
+	if val := os.Getenv("PCU_WEIGHT_TRUCK"); val != "" {
+		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+			pcuWeightTruck = v
+		}
+	}
+
+	pcuWeightContainer := 3.0
+	if val := os.Getenv("PCU_WEIGHT_CONTAINER"); val != "" {
+		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+			pcuWeightContainer = v
+		}
+	}
+
+	pcuCapacityFloor := 25.0
+	if val := os.Getenv("PCU_CAPACITY_FLOOR"); val != "" {
+		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			pcuCapacityFloor = v
+		}
+	}
+
+	pcuThresholdModerate := 0.35
+	if val := os.Getenv("PCU_THRESHOLD_MODERATE"); val != "" {
+		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			pcuThresholdModerate = v
+		}
+	}
+
+	pcuThresholdHeavy := 0.70
+	if val := os.Getenv("PCU_THRESHOLD_HEAVY"); val != "" {
+		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			pcuThresholdHeavy = v
+		}
+	}
+
+	pcuThresholdCongested := 0.90
+	if val := os.Getenv("PCU_THRESHOLD_CONGESTED"); val != "" {
+		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			pcuThresholdCongested = v
+		}
+	}
+
 	return &ServerConfig{
 		Port:                          port,
 		CamerasFilePath:               camerasPath,
@@ -483,5 +555,14 @@ func LoadConfig() *ServerConfig {
 		HexResolution:                 hexResolution,
 		HexMinCameras:                 hexMinCameras,
 		HexPolygonFilePath:            hexPolygonFilePath,
+		PCUWeightMotorcycle:           pcuWeightMotorcycle,
+		PCUWeightCar:                  pcuWeightCar,
+		PCUWeightBus:                  pcuWeightBus,
+		PCUWeightTruck:                pcuWeightTruck,
+		PCUWeightContainer:            pcuWeightContainer,
+		PCUCapacityFloor:              pcuCapacityFloor,
+		PCUThresholdModerate:          pcuThresholdModerate,
+		PCUThresholdHeavy:             pcuThresholdHeavy,
+		PCUThresholdCongested:         pcuThresholdCongested,
 	}
 }

@@ -20,7 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("cv-engine")
 
-PORT = int(os.environ.get("PORT", 8000))
+PORT = int(os.environ.get("CV_PORT", os.environ.get("MODEL_PORT", 8000)))
 MODEL_DIR = os.environ.get("MODEL_DIR", "/app/models/yolov8n_openvino_320")
 
 # Attempt to import optional OpenVINO and imaging libraries
@@ -135,7 +135,37 @@ class CVRequestHandler(BaseHTTPRequestHandler):
 
                     # Parse output detections (YOLO format)
                     latency = (time.perf_counter() - start_t) * 1000
-                    vehicles = int(np.sum(output_data > 0.5)) if output_data is not None else 0
+
+                    vehicle_counts = {
+                        "motorcycle": 0,
+                        "car": 0,
+                        "bus": 0,
+                        "truck": 0,
+                        "container": 0,
+                    }
+
+                    if output_data is not None and hasattr(output_data, "shape"):
+                        data = output_data[0] if output_data.ndim == 3 else output_data
+                        if data.ndim == 2 and data.shape[0] >= 12:
+                            # COCO vehicle classes: 2: car (row 6), 3: motorcycle (row 7), 5: bus (row 9), 7: truck (row 11)
+                            vehicle_counts["motorcycle"] = int(np.sum(data[7, :] > 0.45))
+                            vehicle_counts["car"] = int(np.sum(data[6, :] > 0.45))
+                            vehicle_counts["bus"] = int(np.sum(data[9, :] > 0.45))
+                            vehicle_counts["truck"] = int(np.sum(data[11, :] > 0.45))
+                            vehicles = sum(vehicle_counts.values())
+                        elif data.ndim == 2 and data.shape[0] == 9:
+                            # DatapolisX 5-class model: 0: motorcycle, 1: car, 2: bus, 3: truck, 4: container
+                            vehicle_counts["motorcycle"] = int(np.sum(data[4, :] > 0.45))
+                            vehicle_counts["car"] = int(np.sum(data[5, :] > 0.45))
+                            vehicle_counts["bus"] = int(np.sum(data[6, :] > 0.45))
+                            vehicle_counts["truck"] = int(np.sum(data[7, :] > 0.45))
+                            vehicle_counts["container"] = int(np.sum(data[8, :] > 0.45))
+                            vehicles = sum(vehicle_counts.values())
+                        else:
+                            vehicles = int(np.sum(output_data > 0.5))
+                            vehicle_counts["car"] = vehicles
+                    else:
+                        vehicles = 0
 
                     severity = "CLEAR"
                     if vehicles > 35:
@@ -147,6 +177,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
 
                     self._send_json(200, {
                         "vehicles_detected": vehicles,
+                        "vehicle_counts": vehicle_counts,
                         "traffic_severity": severity,
                         "confidence": 0.88,
                         "latency_ms": round(latency, 2),
