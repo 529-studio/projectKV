@@ -1,0 +1,26 @@
+# Local development Docker Compose configuration for OpenVINO inference service
+# Usage:
+#   docker compose -f docker-compose.local.yml up -d
+#   docker compose -f docker-compose.local.yml logs -f
+#   docker compose -f docker-compose.local.yml down
+
+services:
+  warded-model:
+    build:
+      context: .
+      dockerfile: services/cv-engine/Dockerfile
+    image: projectkv-cv-engine:local
+    container_name: warded-model
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - MODEL_DIR=/app/models/yolov8n_openvino_320
+    volumes:
+      - ./yolov8n_openvino_model:/app/models/yolov8n_openvino_320:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: "512M"
