@@ -9,6 +9,11 @@ import {
   PINNED_DOCK_I18N,
   PINNED_DOCK_CAP,
 } from '../config/constants';
+import {
+  getDockSeverity,
+  getDockSeverityLabel,
+  getDockSeverityVisual,
+} from '../utils/pinnedDock';
 
 export type DockSizePreset = 'S' | 'M' | 'L';
 export type DockViewMode = 'strip' | 'grid';
@@ -23,6 +28,7 @@ export interface PinnedDockProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   verdicts?: Map<string, any>;
   pinNotice?: string | null;
+  appEnv?: string;
 }
 
 interface TileMeta {
@@ -39,6 +45,7 @@ export default function PinnedDock({
   lang = 'vi',
   verdicts,
   pinNotice,
+  appEnv,
 }: PinnedDockProps) {
   // Mobile drawer state
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
@@ -288,6 +295,9 @@ export default function PinnedDock({
     const verdict = verdicts?.get(cam.id);
     const isStale = verdict?.stale || false;
     const isOnline = cam.isOnline && !cam.isGhost && cam.status !== 'DOWN';
+    const dockSeverity = getDockSeverity(verdict, appEnv);
+    const severityLabel = getDockSeverityLabel(dockSeverity, lang);
+    const severityVisual = getDockSeverityVisual(dockSeverity);
 
     return (
       <div
@@ -330,10 +340,10 @@ export default function PinnedDock({
           loading="lazy"
         />
 
-        {/* Top Badges Bar: Status dot + Age + Severity placeholder */}
-        <div className="absolute top-1 left-1 right-1 flex items-center justify-between pointer-events-none gap-1">
+        {/* Top Badges Bar: Status dot + Age + Severity badge */}
+        <div className="absolute top-1 left-1 right-7 flex items-center justify-between pointer-events-none gap-1">
           {/* Online / Stale / Offline dot */}
-          <div className="flex items-center gap-1 bg-black/85 border border-zinc-700/80 px-1 py-0.5 rounded-sm backdrop-blur-sm">
+          <div className="flex items-center gap-1 bg-black/85 border border-zinc-700/80 px-1 py-0.5 rounded-sm backdrop-blur-sm shrink-0">
             <span
               className={`inline-block w-1.5 h-1.5 rounded-full ${
                 !isOnline
@@ -343,7 +353,7 @@ export default function PinnedDock({
                   : 'bg-emerald-500'
               }`}
             />
-            <span className={`${presetStyle.badgeSize} font-mono text-zinc-300 uppercase leading-none`}>
+            <span className={`${presetStyle.badgeSize} font-mono text-zinc-300 uppercase leading-none whitespace-nowrap`}>
               {!isOnline
                 ? PINNED_DOCK_I18N.OFFLINE[lang]
                 : isStale
@@ -352,11 +362,30 @@ export default function PinnedDock({
             </span>
           </div>
 
-          {/* Severity Badge: explicit "no analysis" placeholder state for S5 */}
-          <div className="bg-black/90 border border-zinc-700/90 text-zinc-400 px-1 py-0.5 rounded-sm font-mono leading-none tracking-tight">
-            <span className={`${presetStyle.badgeSize} text-zinc-400`}>
-              — {PINNED_DOCK_I18N.NO_ANALYSIS[lang]}
-            </span>
+          {/* Severity Badge: live severity indicator when fresh & verified; falls back to S5 placeholder */}
+          <div
+            className={`bg-black/90 border ${severityVisual.borderClass} px-1 py-0.5 rounded-sm font-mono leading-none tracking-tight flex items-center gap-1 shrink-0`}
+            title={severityLabel}
+          >
+            {dockSeverity ? (
+              <>
+                {severityVisual.isPulsing ? (
+                  <span className="relative flex h-1.5 w-1.5 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                    <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${severityVisual.dotClass}`} />
+                  </span>
+                ) : (
+                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${severityVisual.dotClass} shrink-0`} />
+                )}
+                <span className={`${presetStyle.badgeSize} ${severityVisual.textClass} whitespace-nowrap`}>
+                  {severityLabel}
+                </span>
+              </>
+            ) : (
+              <span className={`${presetStyle.badgeSize} text-zinc-400 whitespace-nowrap`}>
+                — {PINNED_DOCK_I18N.NO_ANALYSIS[lang]}
+              </span>
+            )}
           </div>
         </div>
 
@@ -442,7 +471,12 @@ export default function PinnedDock({
         {/* Notice Banner (Pin Cap Feedback) */}
         {pinNotice && (
           <div className="px-3 py-1 bg-amber-950/90 border-b border-amber-800 text-amber-200 text-xs font-mono flex items-center justify-between">
-            <span>⚠️ {pinNotice}</span>
+            <span className="flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>{pinNotice}</span>
+            </span>
           </div>
         )}
 
@@ -451,7 +485,9 @@ export default function PinnedDock({
           {/* Left: Title + Camera Count / Cap */}
           <div className="flex items-center gap-2">
             <span className="font-bold text-white tracking-wide flex items-center gap-1.5">
-              <span>📌</span>
+              <svg className="w-3.5 h-3.5 text-zinc-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 4v4l2 3v2h-6v6l-1 1-1-1v-6H4V11l2-3V4a1 1 0 011-1h8a1 1 0 011 1z" />
+              </svg>
               <span>{PINNED_DOCK_I18N.TITLE[lang]}</span>
             </span>
 
@@ -586,11 +622,14 @@ export default function PinnedDock({
             <button
               type="button"
               onClick={() => setIsMobileExpanded(true)}
-              className={`px-3.5 py-1.5 rounded-full bg-zinc-950/95 border text-zinc-200 font-mono text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-2 cursor-pointer active:scale-95 transition-all ${
+              className={`px-3.5 py-1.5 rounded-full bg-zinc-950/95 border text-zinc-200 font-mono text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all ${
                 isCapReached ? 'border-amber-600' : 'border-zinc-700 hover:border-zinc-500'
               }`}
               aria-label={PINNED_DOCK_I18N.COLLAPSED_PILL[lang](pinnedCameras.length)}
             >
+              <svg className="w-3.5 h-3.5 text-zinc-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 4v4l2 3v2h-6v6l-1 1-1-1v-6H4V11l2-3V4a1 1 0 011-1h8a1 1 0 011 1z" />
+              </svg>
               <span>{PINNED_DOCK_I18N.COLLAPSED_PILL[lang](pinnedCameras.length)}</span>
               <span className="text-[10px] text-zinc-400">
                 [{pinnedCameras.length}/{PINNED_DOCK_CAP}]
