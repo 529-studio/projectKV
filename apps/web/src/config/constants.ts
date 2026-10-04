@@ -218,6 +218,18 @@ export const PINNED_DOCK_I18N = Object.freeze({
     vi: (count: number) => `Đang theo dõi: ${count} cam`,
     en: (count: number) => `Monitoring: ${count} ${count === 1 ? 'cam' : 'cams'}`,
   },
+  PIN_COUNT_BADGE: {
+    vi: (count: number, cap: number) => `Đang ghim ${count} / Tối đa ${cap} camera`,
+    en: (count: number, cap: number) => `Pinned ${count} / Max ${cap} cameras`,
+  },
+  PIN_COUNT_BADGE_COMPACT: {
+    vi: (count: number, cap: number) => `${count}/${cap} tối đa`,
+    en: (count: number, cap: number) => `${count}/${cap} max`,
+  },
+  PIN_COUNT_TOOLTIP: {
+    vi: (count: number, cap: number) => `Đang ghim ${count} trên tối đa ${cap} camera`,
+    en: (count: number, cap: number) => `Pinned ${count} out of maximum ${cap} cameras`,
+  },
   CLEAR_ALL: {
     vi: '[XÓA HẾT]',
     en: '[CLEAR ALL]',

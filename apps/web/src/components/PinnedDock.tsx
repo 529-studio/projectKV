@@ -700,13 +700,14 @@ export default function PinnedDock({
 
             {/* Pin Count & Cap badge */}
             <span
-              className={`px-1.5 py-0.5 rounded border text-[11px] font-semibold ${
+              title={PINNED_DOCK_I18N.PIN_COUNT_TOOLTIP[lang](pinnedCameras.length, PINNED_DOCK_CAP)}
+              className={`px-2 py-0.5 rounded border text-[11px] font-semibold ${
                 isCapReached
                   ? 'bg-amber-950/90 border-amber-600 text-amber-300'
                   : 'bg-zinc-950 border-zinc-700 text-zinc-300'
               }`}
             >
-              [{pinnedCameras.length}/{PINNED_DOCK_CAP} {pinnedCameras.length === 1 ? 'CAM' : 'CAMS'}]
+              [{PINNED_DOCK_I18N.PIN_COUNT_BADGE[lang](pinnedCameras.length, PINNED_DOCK_CAP)}]
             </span>
 
             {isCapReached && (
@@ -844,8 +845,11 @@ export default function PinnedDock({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 4v4l2 3v2h-6v6l-1 1-1-1v-6H4V11l2-3V4a1 1 0 011-1h8a1 1 0 011 1z" />
               </svg>
               <span>{PINNED_DOCK_I18N.COLLAPSED_PILL[lang](pinnedCameras.length)}</span>
-              <span className="text-[10px] text-zinc-400">
-                [{pinnedCameras.length}/{PINNED_DOCK_CAP}]
+              <span
+                title={PINNED_DOCK_I18N.PIN_COUNT_TOOLTIP[lang](pinnedCameras.length, PINNED_DOCK_CAP)}
+                className="text-[10px] text-zinc-400"
+              >
+                [{PINNED_DOCK_I18N.PIN_COUNT_BADGE_COMPACT[lang](pinnedCameras.length, PINNED_DOCK_CAP)}]
               </span>
               <span className="text-zinc-400 text-xs">▴</span>
             </button>
@@ -889,13 +893,14 @@ export default function PinnedDock({
                         {PINNED_DOCK_I18N.TITLE[lang]}
                       </span>
                       <span
+                        title={PINNED_DOCK_I18N.PIN_COUNT_TOOLTIP[lang](pinnedCameras.length, PINNED_DOCK_CAP)}
                         className={`px-1.5 py-0.5 rounded border text-[10px] ${
                           isCapReached
                             ? 'bg-amber-950/90 border-amber-600 text-amber-300'
                             : 'bg-zinc-900 border-zinc-700 text-zinc-300'
                         }`}
                       >
-                        [{pinnedCameras.length}/{PINNED_DOCK_CAP}]
+                        [{PINNED_DOCK_I18N.PIN_COUNT_BADGE_COMPACT[lang](pinnedCameras.length, PINNED_DOCK_CAP)}]
                       </span>
                     </div>
 
