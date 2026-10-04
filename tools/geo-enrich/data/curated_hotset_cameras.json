@@ -1,0 +1,1219 @@
+{
+  "metadata": {
+    "description": "Curated Hot Set vehicle-detection camera manifest (Issue #136, S2)",
+    "reference": "docs/spike-vehicle-capacity.md §5 (Option 1b)",
+    "rule": "road_keys.length == 2 AND road_keys ∩ corridors != empty AND isOnline == true AND status == 'UP' AND not isGhost AND not duplicateOf",
+    "corridors": [
+      "vo_van_kiet",
+      "mai_chi_tho",
+      "dien_bien_phu",
+      "cong_hoa"
+    ],
+    "total_cameras": 57,
+    "counts_by_corridor": {
+      "vo_van_kiet": 23,
+      "mai_chi_tho": 13,
+      "dien_bien_phu": 11,
+      "cong_hoa": 10
+    }
+  },
+  "cameras": [
+    {
+      "id": "56de42f611f398ec0c481290",
+      "displayName": "Võ Văn Kiệt - An Bình",
+      "title": "TTH 12.1",
+      "latitude": 10.7493356862526,
+      "longitude": 106.673292517662,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481290",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "an_binh"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "An Đông",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5661ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481298",
+      "displayName": "Võ Văn Kiệt - An Dương Vương 1",
+      "title": "TTH 18.1",
+      "latitude": 10.7263616348268,
+      "longitude": 106.61993265152,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481298",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "an_duong_vuong"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "An Lạc",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b529effffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481299",
+      "displayName": "Võ Văn Kiệt - An Dương Vương 2",
+      "title": "TTH 18.2",
+      "latitude": 10.7265671915496,
+      "longitude": 106.620351076126,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481299",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "an_duong_vuong"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Phú Định",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b529effffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481296",
+      "displayName": "Võ Văn Kiệt - Cao Văn Lầu",
+      "title": "TTH 16.1",
+      "latitude": 10.7442498171975,
+      "longitude": 106.650842428207,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481296",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "cao_van_lau"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Bình Tiên",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b566cffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481295",
+      "displayName": "Võ Văn Kiệt - Cầu Chà Và 1 (dạ cầu)",
+      "title": "TTH 15.1",
+      "latitude": 10.7490827124077,
+      "longitude": 106.659994125366,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481295",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "cau_cha_va"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Chợ Lớn",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b566cffffff"
+    },
+    {
+      "id": "5b5995a3fd4edb0019c7d9ab",
+      "displayName": "Võ Văn Kiệt - Cầu Chà Và 2 (trên cầu)",
+      "title": "TTH 15.2",
+      "latitude": 10.7489404145267,
+      "longitude": 106.660348176956,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5b5995a3fd4edb0019c7d9ab",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "cau_cha_va"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Chợ Lớn",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b566cffffff"
+    },
+    {
+      "id": "5822adbbedeb6c0012a2d65f",
+      "displayName": "Võ Văn Kiệt - Cầu Chữ Y 1",
+      "title": "TTH 10.1",
+      "latitude": 10.7519444666594,
+      "longitude": 106.68367266655,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5822adbbedeb6c0012a2d65f",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "cau_chu_y"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Chợ Quán",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5661ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48128e",
+      "displayName": "Võ Văn Kiệt - Cầu Chữ Y 2",
+      "title": "TTH 10.2",
+      "latitude": 10.7514332528817,
+      "longitude": 106.684101819992,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48128e",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "cau_chu_y"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Chợ Quán",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5661ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481288",
+      "displayName": "Võ Văn Kiệt - Cầu Ông Lãnh 1",
+      "title": "TTH 7.1",
+      "latitude": 10.7637917349984,
+      "longitude": 106.697652339935,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481288",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "cau_ong_lanh"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Cầu Ông Lãnh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5660ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481289",
+      "displayName": "Võ Văn Kiệt - Cầu Ông Lãnh 2",
+      "title": "TTH 7.2",
+      "latitude": 10.7639024056841,
+      "longitude": 106.698285341263,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481289",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "cau_ong_lanh"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Bến Thành",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5660ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48128f",
+      "displayName": "Võ Văn Kiệt - Huỳnh Mẫn Đạt",
+      "title": "TTH 11.1",
+      "latitude": 10.751960277381,
+      "longitude": 106.677197813988,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48128f",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "huynh_man_dat"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "An Đông",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5661ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481293",
+      "displayName": "Võ Văn Kiệt - Hải Thượng Lãn Ông 1",
+      "title": "TTH 14.1",
+      "latitude": 10.7499786604875,
+      "longitude": 106.663234233856,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481293",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "hai_thuong_lan_ong"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Chợ Lớn",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b566cffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48129a",
+      "displayName": "Võ Văn Kiệt - Hồ Học Lãm 1",
+      "title": "TTH 19.1",
+      "latitude": 10.722239929521,
+      "longitude": 106.610904335976,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48129a",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "ho_hoc_lam"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "An Lạc",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b529effffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48129b",
+      "displayName": "Võ Văn Kiệt - Hồ Học Lãm 2",
+      "title": "TTH 19.2",
+      "latitude": 10.721839351587,
+      "longitude": 106.611467599869,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48129b",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "ho_hoc_lam"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "An Lạc",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b529effffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481287",
+      "displayName": "Võ Văn Kiệt - Ký Con",
+      "title": "TTH 6.1",
+      "latitude": 10.7654781410386,
+      "longitude": 106.700146794319,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481287",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "ky_con"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Bến Thành",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5660ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481291",
+      "displayName": "Võ Văn Kiệt - Nguyễn Tri Phương 1",
+      "title": "TTH 13.1",
+      "latitude": 10.7503370389747,
+      "longitude": 106.668738126755,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481291",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "nguyen_tri_phuong"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "An Đông",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5661ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481297",
+      "displayName": "Võ Văn Kiệt - Nguyễn Tri Phương 2",
+      "title": "TTH 13.2",
+      "latitude": 10.7503686605855,
+      "longitude": 106.670079231262,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481297",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "nguyen_tri_phuong"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "An Đông",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5661ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48128b",
+      "displayName": "Võ Văn Kiệt - Nguyễn Văn Cừ 1",
+      "title": "TTH 9.1",
+      "latitude": 10.7543213358374,
+      "longitude": 106.68691277504,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48128b",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "nguyen_van_cu"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Cầu Ông Lãnh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5660ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48128c",
+      "displayName": "Võ Văn Kiệt - Nguyễn Văn Cừ 2",
+      "title": "TTH 9.2",
+      "latitude": 10.7536415,
+      "longitude": 106.6864407,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48128c",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "nguyen_van_cu"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Chợ Quán",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5661ffffff"
+    },
+    {
+      "id": "662b85481afb9c00172dd0f1",
+      "displayName": "Võ Văn Kiệt - Pasteur",
+      "title": "TTH 399",
+      "latitude": 10.7687191761474,
+      "longitude": 106.703091859818,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=662b85481afb9c00172dd0f1",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "pasteur"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Sài Gòn",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5660ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481292",
+      "displayName": "Võ Văn Kiệt - Phạm Phú Thứ",
+      "title": "TTH 17.1",
+      "latitude": 10.7413616378753,
+      "longitude": 106.645520925522,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481292",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "pham_phu_thu"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Bình Tiên",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b566cffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48129c",
+      "displayName": "Võ Văn Kiệt - Quốc Lộ 1",
+      "title": "TTH 20.1",
+      "latitude": 10.7170534584198,
+      "longitude": 106.600942611694,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48129c",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "quoc_lo_1"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Tân Nhựt",
+      "phuong_type": "Xã",
+      "zone": "",
+      "h3_res7": "8765b5298ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48128a",
+      "displayName": "Võ Văn Kiệt - Trần Đình Xu 2",
+      "title": "TTH 8.2",
+      "latitude": 10.7587798913611,
+      "longitude": 106.692545413971,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48128a",
+      "corridor": "vo_van_kiet",
+      "matched_corridors": [
+        "vo_van_kiet"
+      ],
+      "road_keys": [
+        "vo_van_kiet",
+        "tran_dinh_xu"
+      ],
+      "road_name": "Võ Văn Kiệt",
+      "phuong_name": "Cầu Ông Lãnh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5660ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48127f",
+      "displayName": "Mai Chí Thọ - Lương Định Của 1",
+      "title": "TTH 2.1",
+      "latitude": 10.791531914198,
+      "longitude": 106.751103401184,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48127f",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "luong_dinh_cua"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5674ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481280",
+      "displayName": "Mai Chí Thọ - Lương Định Của 2",
+      "title": "TTH 2.2",
+      "latitude": 10.792627978172,
+      "longitude": 106.751446723938,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481280",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "luong_dinh_cua"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "Bình Trưng",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5674ffffff"
+    },
+    {
+      "id": "5822b5ededeb6c0012a2d66a",
+      "displayName": "Mai Chí Thọ - Nguyễn Cơ Thạch 1",
+      "title": "TTH 5.1",
+      "latitude": 10.7732144077704,
+      "longitude": 106.722586154938,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5822b5ededeb6c0012a2d66a",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "nguyen_co_thach"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5666ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481286",
+      "displayName": "Mai Chí Thọ - Nguyễn Cơ Thạch 2",
+      "title": "TTH 5.2",
+      "latitude": 10.7733830435244,
+      "longitude": 106.722918748856,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481286",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "nguyen_co_thach"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5666ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481283",
+      "displayName": "Mai Chí Thọ - Trần Não 1",
+      "title": "TTH 4.1",
+      "latitude": 10.775796632403,
+      "longitude": 106.72761797905,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481283",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "tran_nao"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5675ffffff"
+    },
+    {
+      "id": "58175c81edeb6c0012a2d5c2",
+      "displayName": "Mai Chí Thọ - Trần Não 2",
+      "title": "TTH 4.2",
+      "latitude": 10.7757228548636,
+      "longitude": 106.727376580238,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=58175c81edeb6c0012a2d5c2",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "tran_nao"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5675ffffff"
+    },
+    {
+      "id": "6878bab06145d3001ba517f7",
+      "displayName": "Mai Chí Thọ - Trần Quý Kiên (1)",
+      "title": "TTH 230.1",
+      "latitude": 10.7820887360004,
+      "longitude": 106.739709377289,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=6878bab06145d3001ba517f7",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "tran_quy_kien"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b575bffffff"
+    },
+    {
+      "id": "649da495a6068200171a6cb6",
+      "displayName": "Mai Chí Thọ - Trần Quý Kiên (3)",
+      "title": "TTH 230.3",
+      "latitude": 10.7817936319045,
+      "longitude": 106.740009784698,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=649da495a6068200171a6cb6",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "tran_quy_kien"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b575bffffff"
+    },
+    {
+      "id": "5a10c79f02eb490011a0b0dd",
+      "displayName": "Mai Chí Thọ - Tố Hữu (C6)",
+      "title": "TTH 59.1",
+      "latitude": 10.7713172490313,
+      "longitude": 106.716717481613,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5a10c79f02eb490011a0b0dd",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "to_huu"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5666ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48127d",
+      "displayName": "Mai Chí Thọ - Võ Nguyên Giáp (Cát Lái cầu A)",
+      "title": "TTH 1.1",
+      "latitude": 10.8049847689326,
+      "longitude": 106.752707362175,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48127d",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "vo_nguyen_giap"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5676ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c48127e",
+      "displayName": "Mai Chí Thọ - Võ Nguyên Giáp (Cát Lái cầu B)",
+      "title": "TTH 1.2",
+      "latitude": 10.8062546704304,
+      "longitude": 106.754064559937,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c48127e",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "vo_nguyen_giap"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5676ffffff"
+    },
+    {
+      "id": "6623f1996f998a001b252805",
+      "displayName": "Mai Chí Thọ - Xa Lộ Hà Nội (3)",
+      "title": "TTH 294",
+      "latitude": 10.809194919668,
+      "longitude": 106.756038665771,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=6623f1996f998a001b252805",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "xa_lo_ha_noi"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "An Khánh",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5676ffffff"
+    },
+    {
+      "id": "56de42f611f398ec0c481282",
+      "displayName": "Mai Chí Thọ - Đồng Văn Cống 2",
+      "title": "TTH 3.2",
+      "latitude": 10.7876851195878,
+      "longitude": 106.74994468689,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56de42f611f398ec0c481282",
+      "corridor": "mai_chi_tho",
+      "matched_corridors": [
+        "mai_chi_tho"
+      ],
+      "road_keys": [
+        "mai_chi_tho",
+        "dong_van_cong"
+      ],
+      "road_name": "Mai Chí Thọ",
+      "phuong_name": "Bình Trưng",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5674ffffff"
+    },
+    {
+      "id": "58af8b69bd82540010390c28",
+      "displayName": "Nam Kỳ Khởi Nghĩa - Điện Biên Phủ 1",
+      "title": "TTH 35.4",
+      "latitude": 10.7832744191822,
+      "longitude": 106.69091463089,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=58af8b69bd82540010390c28",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "nam_ky_khoi_nghia",
+        "dien_bien_phu"
+      ],
+      "road_name": "Nam Kỳ Khởi Nghĩa",
+      "phuong_name": "Xuân Hoà",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5663ffffff"
+    },
+    {
+      "id": "58af8d68bd82540010390c2e",
+      "displayName": "Nam Kỳ Khởi Nghĩa - Điện Biên Phủ 2",
+      "title": "TTH 35.5",
+      "latitude": 10.7833376554873,
+      "longitude": 106.690700054169,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=58af8d68bd82540010390c2e",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "nam_ky_khoi_nghia",
+        "dien_bien_phu"
+      ],
+      "road_name": "Nam Kỳ Khởi Nghĩa",
+      "phuong_name": "Xuân Hoà",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5663ffffff"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515acf2",
+      "displayName": "Điện Biên Phủ - Cách Mạng Tháng Tám",
+      "title": "ITS 1.1",
+      "latitude": 10.7765712954739,
+      "longitude": 106.683694124222,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5deb576d1dc17d7c5515acf2",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "dien_bien_phu",
+        "cach_mang_thang_tam"
+      ],
+      "road_name": "Điện Biên Phủ",
+      "phuong_name": "Bàn Cờ",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5663ffffff"
+    },
+    {
+      "id": "662b857b1afb9c00172dd106",
+      "displayName": "Điện Biên Phủ - Nguyễn Bỉnh Khiêm",
+      "title": "TTH 400",
+      "latitude": 10.7920852162229,
+      "longitude": 106.699739098549,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=662b857b1afb9c00172dd106",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "dien_bien_phu",
+        "nguyen_binh_khiem"
+      ],
+      "road_name": "Điện Biên Phủ",
+      "phuong_name": "Tân Định",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5662ffffff"
+    },
+    {
+      "id": "66b1c426779f74001867415e",
+      "displayName": "Điện Biên Phủ - Nguyễn Gia Trí",
+      "title": "TTH 419",
+      "latitude": 10.8010801833774,
+      "longitude": 106.715161800385,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=66b1c426779f74001867415e",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "dien_bien_phu",
+        "nguyen_gia_tri"
+      ],
+      "road_name": "Điện Biên Phủ",
+      "phuong_name": "Thạnh Mỹ Tây",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5671ffffff"
+    },
+    {
+      "id": "5a606dbc8576340017d0662b",
+      "displayName": "Điện Biên Phủ - Nguyễn Hữu Cảnh",
+      "title": "TTH 40.4",
+      "latitude": 10.7978184191454,
+      "longitude": 106.721127033234,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5a606dbc8576340017d0662b",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "dien_bien_phu",
+        "nguyen_huu_canh"
+      ],
+      "road_name": "Điện Biên Phủ",
+      "phuong_name": "Thạnh Mỹ Tây",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5671ffffff"
+    },
+    {
+      "id": "587c79e9b807da0011e33d3d",
+      "displayName": "Điện Biên Phủ - Nguyễn Văn Thương 2",
+      "title": "TTH 40.3",
+      "latitude": 10.7986878751089,
+      "longitude": 106.718965172768,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=587c79e9b807da0011e33d3d",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "dien_bien_phu",
+        "nguyen_van_thuong"
+      ],
+      "road_name": "Điện Biên Phủ",
+      "phuong_name": "Thạnh Mỹ Tây",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5671ffffff"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515ad02",
+      "displayName": "Điện Biên Phủ - Pasteur",
+      "title": "ITS 3.4",
+      "latitude": 10.7843441648872,
+      "longitude": 106.691552996635,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5deb576d1dc17d7c5515ad02",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "dien_bien_phu",
+        "pasteur"
+      ],
+      "road_name": "Điện Biên Phủ",
+      "phuong_name": "Xuân Hoà",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5663ffffff"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515acfc",
+      "displayName": "Điện Biên Phủ - Trương Định",
+      "title": "ITS 2.5",
+      "latitude": 10.7800124617515,
+      "longitude": 106.68729364872,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5deb576d1dc17d7c5515acfc",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "dien_bien_phu",
+        "truong_dinh"
+      ],
+      "road_name": "Điện Biên Phủ",
+      "phuong_name": "Xuân Hoà",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5663ffffff"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515ad05",
+      "displayName": "Điện Biên Phủ - Đinh Tiên Hoàng",
+      "title": "ITS 4.1",
+      "latitude": 10.790705,
+      "longitude": 106.697491,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5deb576d1dc17d7c5515ad05",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "dien_bien_phu",
+        "dinh_tien_hoang"
+      ],
+      "road_name": "Điện Biên Phủ",
+      "phuong_name": "Tân Định",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5662ffffff"
+    },
+    {
+      "id": "63ae7a9cbfd3d90017e8f303",
+      "displayName": "Điện Biên Phủ – Cao Thắng",
+      "title": "TTH 199",
+      "latitude": 10.7727295794518,
+      "longitude": 106.679091453552,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=63ae7a9cbfd3d90017e8f303",
+      "corridor": "dien_bien_phu",
+      "matched_corridors": [
+        "dien_bien_phu"
+      ],
+      "road_keys": [
+        "dien_bien_phu",
+        "cao_thang"
+      ],
+      "road_name": "Điện Biên Phủ",
+      "phuong_name": "Bàn Cờ",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5663ffffff"
+    },
+    {
+      "id": "59414c883dcfc400106f260b",
+      "displayName": "Cộng Hòa - Bình Giã",
+      "title": "TTH 38.9",
+      "latitude": 10.8018653200436,
+      "longitude": 106.645107865334,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=59414c883dcfc400106f260b",
+      "corridor": "cong_hoa",
+      "matched_corridors": [
+        "cong_hoa"
+      ],
+      "road_keys": [
+        "cong_hoa",
+        "binh_gia"
+      ],
+      "road_name": "Cộng Hòa",
+      "phuong_name": "Tân Bình",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5641ffffff"
+    },
+    {
+      "id": "58ad6214bd82540010390be2",
+      "displayName": "Cộng Hòa - Hoàng Hoa Thám",
+      "title": "TTH 38.8",
+      "latitude": 10.8013120360293,
+      "longitude": 106.647366285324,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=58ad6214bd82540010390be2",
+      "corridor": "cong_hoa",
+      "matched_corridors": [
+        "cong_hoa"
+      ],
+      "road_keys": [
+        "cong_hoa",
+        "hoang_hoa_tham"
+      ],
+      "road_name": "Cộng Hòa",
+      "phuong_name": "Tân Bình",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5641ffffff"
+    },
+    {
+      "id": "586e1f18f9fab7001111b0a5",
+      "displayName": "Cộng Hòa - Trường Chinh",
+      "title": "TTH 38.1",
+      "latitude": 10.8070661399436,
+      "longitude": 106.634953022003,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=586e1f18f9fab7001111b0a5",
+      "corridor": "cong_hoa",
+      "matched_corridors": [
+        "cong_hoa"
+      ],
+      "road_keys": [
+        "cong_hoa",
+        "truong_chinh"
+      ],
+      "road_name": "Cộng Hòa",
+      "phuong_name": "Tân Bình",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b564cffffff"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515ad08",
+      "displayName": "Cộng Hòa - Tân Kỳ Tân Quý",
+      "title": "ITS 6.2",
+      "latitude": 10.8041364085074,
+      "longitude": 106.637651324272,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5deb576d1dc17d7c5515ad08",
+      "corridor": "cong_hoa",
+      "matched_corridors": [
+        "cong_hoa"
+      ],
+      "road_keys": [
+        "cong_hoa",
+        "tan_ky_tan_quy"
+      ],
+      "road_name": "Cộng Hòa",
+      "phuong_name": "Tân Bình",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b564cffffff"
+    },
+    {
+      "id": "587476e3b807da0011e33cee",
+      "displayName": "Cộng Hòa - Út Tịch 1",
+      "title": "TTH 38.4",
+      "latitude": 10.8010380283306,
+      "longitude": 106.657853722572,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=587476e3b807da0011e33cee",
+      "corridor": "cong_hoa",
+      "matched_corridors": [
+        "cong_hoa"
+      ],
+      "road_keys": [
+        "cong_hoa",
+        "ut_tich"
+      ],
+      "road_name": "Cộng Hòa",
+      "phuong_name": "Tân Sơn Nhất",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5645ffffff"
+    },
+    {
+      "id": "5874769eb807da0011e33cec",
+      "displayName": "Cộng Hòa - Út Tịch 2",
+      "title": "TTH 38.3",
+      "latitude": 10.8001053464053,
+      "longitude": 106.657757163048,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5874769eb807da0011e33cec",
+      "corridor": "cong_hoa",
+      "matched_corridors": [
+        "cong_hoa"
+      ],
+      "road_keys": [
+        "cong_hoa",
+        "ut_tich"
+      ],
+      "road_name": "Cộng Hòa",
+      "phuong_name": "Tân Sơn Nhất",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5645ffffff"
+    },
+    {
+      "id": "662b57711afb9c00172d90a7",
+      "displayName": "Cộng Hòa - Đường A4",
+      "title": "TTH 358",
+      "latitude": 10.8017125083701,
+      "longitude": 106.649898290634,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=662b57711afb9c00172d90a7",
+      "corridor": "cong_hoa",
+      "matched_corridors": [
+        "cong_hoa"
+      ],
+      "road_keys": [
+        "cong_hoa",
+        "duong_a4"
+      ],
+      "road_name": "Cộng Hòa",
+      "phuong_name": "Bảy Hiền",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5641ffffff"
+    },
+    {
+      "id": "586e1d4ef9fab7001111b0a2",
+      "displayName": "Cộng Hòa - Đường C 18",
+      "title": "TTH 38.2",
+      "latitude": 10.8016071209638,
+      "longitude": 106.651110649109,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=586e1d4ef9fab7001111b0a2",
+      "corridor": "cong_hoa",
+      "matched_corridors": [
+        "cong_hoa"
+      ],
+      "road_keys": [
+        "cong_hoa",
+        "duong_c"
+      ],
+      "road_name": "Cộng Hòa",
+      "phuong_name": "Bảy Hiền",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5641ffffff"
+    },
+    {
+      "id": "662b57471afb9c00172d9095",
+      "displayName": "Cộng Hòa - Ấp Bắc",
+      "title": "TTH 357",
+      "latitude": 10.8023975256098,
+      "longitude": 106.641572713852,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=662b57471afb9c00172d9095",
+      "corridor": "cong_hoa",
+      "matched_corridors": [
+        "cong_hoa"
+      ],
+      "road_keys": [
+        "cong_hoa",
+        "ap_bac"
+      ],
+      "road_name": "Cộng Hòa",
+      "phuong_name": "Tân Bình",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5641ffffff"
+    },
+    {
+      "id": "5d8cdbdc766c88001718896a",
+      "displayName": "Hoàng Văn Thụ - Cộng Hòa",
+      "title": "TTH 163",
+      "latitude": 10.8006744408059,
+      "longitude": 106.660782694817,
+      "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5d8cdbdc766c88001718896a",
+      "corridor": "cong_hoa",
+      "matched_corridors": [
+        "cong_hoa"
+      ],
+      "road_keys": [
+        "hoang_van_thu",
+        "cong_hoa"
+      ],
+      "road_name": "Hoàng Văn Thụ",
+      "phuong_name": "Tân Sơn Nhất",
+      "phuong_type": "Phường",
+      "zone": "",
+      "h3_res7": "8765b5645ffffff"
+    }
+  ]
+}

@@ -89,3 +89,38 @@ func TestBuildFixedHotSet_PrioritisesCriticalKeywordsAndPads(t *testing.T) {
 		t.Errorf("expected third camera to be cam-regular-1, got %s", res[2].ID)
 	}
 }
+
+func TestBuildFixedHotSet_PrioritisesS1PriorityCorridorIntersections(t *testing.T) {
+	cams := []camera.Camera{
+		// 1. Regular camera
+		{ID: "cam-regular", Title: "Đường Thường", IsOnline: true},
+		// 2. Keyword camera, but not intersection (mid-block or single road)
+		{ID: "cam-an-suong-kw", Title: "Nút giao An Sương", IsOnline: true, RoadKeys: []string{"quoc_lo_1"}},
+		// 3. Priority corridor intersection (vo_van_kiet, 2 keys) -> should be #1 priority
+		{ID: "cam-vvk-intersection", Title: "Võ Văn Kiệt - An Bình", IsOnline: true, RoadKeys: []string{"vo_van_kiet", "an_binh"}},
+		// 4. Priority corridor intersection (cong_hoa, 2 keys) -> should be #2 priority
+		{ID: "cam-cong-hoa-intersection", Title: "Cộng Hòa - Út Tịch", IsOnline: true, RoadKeys: []string{"cong_hoa", "ut_tich"}},
+		// 5. Priority corridor mid-block (len == 1) -> does not qualify for Pass 1, but matches criticalKeywords in Pass 2
+		{ID: "cam-vvk-midblock", Title: "Võ Văn Kiệt giữa cầu", IsOnline: true, RoadKeys: []string{"vo_van_kiet"}},
+	}
+
+	reader := &dummyCameraReader{cameras: cams}
+	res := buildFixedHotSet(reader, 3)
+
+	if len(res) != 3 {
+		t.Fatalf("expected 3 cameras, got %d", len(res))
+	}
+
+	// First two MUST be the 2-key intersection cameras on priority corridors
+	if res[0].ID != "cam-vvk-intersection" {
+		t.Errorf("expected first camera to be cam-vvk-intersection, got %s", res[0].ID)
+	}
+	if res[1].ID != "cam-cong-hoa-intersection" {
+		t.Errorf("expected second camera to be cam-cong-hoa-intersection, got %s", res[1].ID)
+	}
+
+	// Third is keyword match from Pass 2 (An Sương or VVK midblock)
+	if res[2].ID != "cam-an-suong-kw" && res[2].ID != "cam-vvk-midblock" {
+		t.Errorf("expected third camera to be a keyword match, got %s", res[2].ID)
+	}
+}
