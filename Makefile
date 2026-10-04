@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-api build-go test-go lint-go swagger geo-enrich test-enrich normalize-roads hex-polygons test-eval benchmark-mock
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-api build-go test-go test-pcu lint-go swagger geo-enrich test-enrich normalize-roads hex-polygons test-eval benchmark-mock
 
 help:
 	@echo "========================================================"
@@ -12,6 +12,8 @@ help:
 	@echo "  make dev-web         - Run static server for Frontend (apps/web - port 3001)"
 	@echo "  make build-go        - Compile standalone Go backend binary"
 	@echo "  make test-go         - Run Go test suite"
+	@echo "  make test-pcu        - Run PCU Saturation Index unit tests (verbose)"
+	@echo "  make dev-cv          - Run Python cv-engine inference server (port 8000)"
 	@echo "  make lint-go         - Run Go linter"
 	@echo "  make swagger         - Regenerate Swagger API documentation"
 	@echo "  make install         - Install dependencies & activate git hooks"
@@ -41,6 +43,12 @@ build-go:
 
 test-go:
 	cd services/go-server && go test ./... -race
+
+test-pcu:
+	cd services/go-server && go test ./internal/cvclient/... -run TestPCU -v
+
+dev-cv:
+	cd services/cv-engine && CV_PORT=8000 PORT=8000 python3 server.py
 
 lint-go:
 	cd services/go-server && golangci-lint run
