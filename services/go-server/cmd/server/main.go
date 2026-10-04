@@ -253,10 +253,26 @@ func main() {
 		if cfg.CVEngineURL == "" {
 			log.Fatalf("[FATAL] Refusing to start: ANALYZER=onnx requires CV_ENGINE_URL to be set.")
 		}
-		analyzer = cvclient.NewCVEngineAnalyzer(cfg.CVEngineURL, nil)
+		pcuConfig := cvclient.PCUConfig{
+			Weights: cvclient.PCUWeights{
+				Motorcycle: cfg.PCUWeightMotorcycle,
+				Car:        cfg.PCUWeightCar,
+				Bus:        cfg.PCUWeightBus,
+				Truck:      cfg.PCUWeightTruck,
+				Container:  cfg.PCUWeightContainer,
+			},
+			Thresholds: cvclient.PCUBucketThresholds{
+				Moderate:  cfg.PCUThresholdModerate,
+				Heavy:     cfg.PCUThresholdHeavy,
+				Congested: cfg.PCUThresholdCongested,
+			},
+			CapacityFloor: cfg.PCUCapacityFloor,
+		}
+		pcuCalc := cvclient.NewPCUCalculator(pcuConfig)
+		analyzer = cvclient.NewCVEngineAnalyzer(cfg.CVEngineURL, nil, cvclient.WithPCUCalculator(pcuCalc))
 		analysisEnabled = true
-		log.Printf("[INIT] ANALYZER=onnx active (url=%s, interval=%ds, maxParallel=%d, fixedCameras=%d). Hot Set scheduler will run self-hosted OpenVINO inference.",
-			cfg.CVEngineURL, cfg.HotsetIntervalSeconds, cfg.HotsetMaxParallel, cfg.HotsetFixedMaxCameras)
+		log.Printf("[INIT] ANALYZER=onnx active (url=%s, interval=%ds, maxParallel=%d, fixedCameras=%d, pcuFloor=%.1f). Hot Set scheduler will run self-hosted OpenVINO inference with PCU-weighted Saturation Index.",
+			cfg.CVEngineURL, cfg.HotsetIntervalSeconds, cfg.HotsetMaxParallel, cfg.HotsetFixedMaxCameras, cfg.PCUCapacityFloor)
 	case "none", "":
 		log.Println("[INIT] ANALYZER=none: Analysis scheduler is disabled. No camera_verdicts will be recorded and no SSE camera_update will be emitted.")
 	default:
