@@ -15,14 +15,25 @@ import (
 // cvPredictResponse is the JSON payload returned by POST /predict when the
 // OpenVINO model is loaded and inference succeeds.
 type cvPredictResponse struct {
-	TrafficSeverity  string  `json:"traffic_severity"`
-	Confidence       float64 `json:"confidence"`
-	VehiclesDetected int     `json:"vehicles_detected"`
-	LatencyMs        float64 `json:"latency_ms"`
-	Model            string  `json:"model"`
+	TrafficSeverity  string        `json:"traffic_severity"`
+	Confidence       float64       `json:"confidence"`
+	VehiclesDetected int           `json:"vehicles_detected"`
+	VehicleCounts    VehicleCounts `json:"vehicle_counts,omitempty"`
+	LatencyMs        float64       `json:"latency_ms"`
+	Model            string        `json:"model"`
 	// Source is present only on standby responses; non-empty means no-model.
 	Source string `json:"source"`
 	Mode   string `json:"mode"`
+}
+
+// CVEngineOption configures an optional parameter for CVEngineAnalyzer.
+type CVEngineOption func(*CVEngineAnalyzer)
+
+// WithPCUCalculator configures a custom PCUCalculator on CVEngineAnalyzer.
+func WithPCUCalculator(calc *PCUCalculator) CVEngineOption {
+	return func(a *CVEngineAnalyzer) {
+		a.calculator = calc
+	}
 }
 
 // CVEngineAnalyzer calls the self-hosted OpenVINO cv-engine microservice at
@@ -33,22 +44,32 @@ type cvPredictResponse struct {
 //  2. POST url+"/predict" with body = JPEG bytes, Content-Type: application/octet-stream.
 //  3. HTTP 503 or source=="standby_dummy" → error (no model loaded).
 //  4. Non-200 → error.
-//  5. 200 → parse JSON → hotset.Verdict{Source: "onnx"}.
+//  5. 200 → parse JSON → calculate PCU Saturation Index → hotset.Verdict{Source: "onnx"}.
 type CVEngineAnalyzer struct {
-	url    string
-	client *http.Client
+	url        string
+	client     *http.Client
+	calculator *PCUCalculator
 }
 
 // Ensure CVEngineAnalyzer satisfies hotset.Analyzer at compile time.
 var _ hotset.Analyzer = (*CVEngineAnalyzer)(nil)
 
 // NewCVEngineAnalyzer constructs a CVEngineAnalyzer pointing at url.
-// If client is nil, SharedClient is used.
-func NewCVEngineAnalyzer(url string, client *http.Client) *CVEngineAnalyzer {
+// If client is nil, SharedClient is used. If WithPCUCalculator is omitted,
+// a default PCUCalculator with baseline weights (ADR-004 §9 D15) is initialized.
+func NewCVEngineAnalyzer(url string, client *http.Client, opts ...CVEngineOption) *CVEngineAnalyzer {
 	if client == nil {
 		client = SharedClient
 	}
-	return &CVEngineAnalyzer{url: url, client: client}
+	a := &CVEngineAnalyzer{
+		url:        url,
+		client:     client,
+		calculator: NewPCUCalculator(DefaultPCUConfig()),
+	}
+	for _, opt := range opts {
+		opt(a)
+	}
+	return a
 }
 
 // unknownVerdict returns a zero-confidence UNKNOWN verdict for cam, used on
@@ -127,10 +148,19 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine standby: source=standby_dummy, no model loaded")
 	}
 
+	// Step 5: Compute PCU-weighted Saturation Index severity.
+	severity := resp.TrafficSeverity
+	if a.calculator != nil {
+		pcuSev, _, _ := a.calculator.Calculate(cam.ID, resp.VehicleCounts, resp.VehiclesDetected)
+		if pcuSev != "" {
+			severity = pcuSev
+		}
+	}
+
 	now := time.Now()
 	return hotset.Verdict{
 		CameraID:      cam.ID,
-		Severity:      resp.TrafficSeverity,
+		Severity:      severity,
 		FloodSeverity: hotset.SeverityUnknown, // cv-engine v1 does not detect flood
 		Confidence:    resp.Confidence,
 		Source:        "onnx",

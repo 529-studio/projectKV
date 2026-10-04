@@ -80,6 +80,26 @@ func TestCVEngineAnalyzer_Analyze_Success(t *testing.T) {
 	}
 }
 
+func TestCVEngineAnalyzer_Analyze_PCUCalculation(t *testing.T) {
+	// 50 motorcycles * 0.2 = 10.0 PCU. With default floor 25.0, SI = 0.40 -> MODERATE.
+	// Even if server sends raw traffic_severity="CLEAR", Go PCU business logic re-maps to MODERATE.
+	predictBody := `{"traffic_severity":"CLEAR","confidence":0.92,"vehicles_detected":50,"vehicle_counts":{"motorcycle":50,"car":0,"bus":0,"truck":0,"container":0}}`
+	srv, analyzer := makeCVEngineTestServer(t, http.StatusOK, http.StatusOK, predictBody)
+
+	cam := hotset.Camera{
+		ID:          "cam-pcu-test",
+		SnapshotURL: srv.URL + "/snapshot/cam-pcu-test.jpg",
+	}
+
+	v, err := analyzer.Analyze(context.Background(), cam)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if v.Severity != hotset.SeverityModerate {
+		t.Errorf("expected PCU re-mapped severity MODERATE, got %q", v.Severity)
+	}
+}
+
 func TestCVEngineAnalyzer_Analyze_StandbyRejected(t *testing.T) {
 	predictBody := `{"source":"standby_dummy","confidence":0.0,"mode":"standby_ready"}`
 	srv, analyzer := makeCVEngineTestServer(t, http.StatusOK, http.StatusServiceUnavailable, predictBody)
