@@ -32,9 +32,9 @@ Sprint 3 focused on two core objectives:
 | **Supplementary Features, Fixes & Refactors** | 0 | 6 PRs | PR #129, PR #151, PR #152, PR #155 (#124–#127), PR #156, PR #157 |
 | **Total Pull Requests** | — | **16 Pull Requests** | #129, #145, #146, #147, #148, #149, #150, #151, #152, #153, #154, #155, #156, #157, #158, #159 |
 | **Open Pull Requests on Sprint 3** | 0 | 1 open (PR #159 in review) | **1 PR Open for Human Merge** |
-| **Go Backend Test Suite** | 22 packages | 22 packages (17 active suites) | **100% Passing under `-race` (0 failures, 0 races)** |
+| **Go Backend Test Suite** | 22 packages (Sprint 2) | 17 packages (16 active test suites, 193 unit tests; 5 dead packages eliminated in PR #155) | **100% Passing under `-race` (0 failures, 0 races)** |
 | **Web Client Unit Tests** | 76 tests (Sprint 2) | 92 tests (15 suites) | **100% Passing (0 failures)** |
-| **Tooling Tests (`tools/geo-enrich`)** | 21 tests (Sprint 2) | 31 tests | **100% Passing (0 failures)** |
+| **Tooling Tests (`tools/geo-enrich`)** | 26 tests (Sprint 2) | 31 tests (5 added in PR #159) | **100% Passing (0 failures)** |
 | **Tooling Tests (`tools/eval`)** | 0 tests | 10 tests | **100% Passing (0 failures)** |
 | **ESLint & TypeScript Validity** | 0 errors | 0 errors | **Clean** |
 | **Next.js Production Build** | Passing | Passing | **Exported cleanly (5/5 static routes)** |
@@ -268,7 +268,7 @@ python3 -m unittest discover -s tools/eval -p "*test*.py"
 
 # 3. Go Backend Test Suite (with race detector)
 cd services/go-server && go test -race ./...
-# Result: ok across all 17 active packages (0 failures, 0 races, 0 memory leaks)
+# Result: ok across all 16 active test packages (193 tests passed, 0 failures, 0 races)
 
 # 4. PCU Saturation Index Boundary Tests
 make test-pcu
