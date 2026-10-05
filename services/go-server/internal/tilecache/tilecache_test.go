@@ -96,3 +96,20 @@ func TestTileCacheHitAndMiss(t *testing.T) {
 		t.Errorf("expected upstream requestCount to remain 1 on HIT, got %d", requestCount)
 	}
 }
+
+func TestResilientHTTPClient(t *testing.T) {
+	client := newResilientHTTPClient()
+	if client == nil {
+		t.Fatal("expected non-nil resilient HTTP client")
+	}
+	if client.Timeout != defaultTimeout {
+		t.Errorf("expected timeout %v, got %v", defaultTimeout, client.Timeout)
+	}
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || transport == nil {
+		t.Fatal("expected *http.Transport configured on client")
+	}
+	if !transport.ForceAttemptHTTP2 {
+		t.Errorf("expected ForceAttemptHTTP2=true")
+	}
+}
