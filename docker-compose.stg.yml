@@ -6,6 +6,9 @@ services:
     pull_policy: always
     networks:
       - core-network
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       - PORT=${BE_PORT:-3000}
       - GIN_MODE=${GIN_MODE:-release}
