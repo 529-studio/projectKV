@@ -96,6 +96,7 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 	if err != nil {
 		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: build snapshot request: %w", err)
 	}
+	snapReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CameraViewProxy/1.0)")
 	snapResp, err := a.client.Do(snapReq)
 	if err != nil {
 		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: fetch snapshot: %w", err)
