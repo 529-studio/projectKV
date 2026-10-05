@@ -6,10 +6,12 @@ This document defines the core principles, design standards, and mandatory techn
 
 2. **Issue Estimation Mandate**: Before starting any issue or task, AI agents and developers MUST provide an explicit completion time estimate (active effort hours/days and expected delivery window) based on task scope.
 
-3. **End-to-End Bug Reproduction**: When investigating any bug or regression, you MUST simulate and reproduce the failure end-to-end from a real user/client perspective before attempting fixes. Passing unit tests alone is NEVER sufficient.
+3. **Sound Solutions Over Shortcuts**: Once an issue is estimated, never shy away from implementation effort or choose sub-optimal shortcuts out of convenience. Always select and build the most robust, rational, and maintainable solution for the project.
 
-4. **Git Flow & Zero Direct Push**: Direct push to `main` and `dev` is strictly prohibited. Create feature/fix/doc branches (`feat/*`, `fix/*`, `docs/*`), push, and open PR targeting `dev`. AI agents must NEVER auto-merge PRs.
+4. **End-to-End Bug Reproduction**: When investigating any bug or regression, you MUST simulate and reproduce the failure end-to-end from a real user/client perspective before attempting fixes. Passing unit tests alone is NEVER sufficient.
 
-5. **Living Documentation Maintenance**: Whenever a PR is created or merged, developers/agents MUST update `docs/project_status.md` and `docs/lesson_learn.md`. Codebase, git history, and PR list are the sole source of truth; never fabricate claims.
+5. **Git Flow & Zero Direct Push**: Direct push to `main` and `dev` is strictly prohibited. Create feature/fix/doc branches (`feat/*`, `fix/*`, `docs/*`), push, and open PR targeting `dev`. AI agents must NEVER auto-merge PRs.
 
-6. **Architecture Standards**: Follow leaf modulith pattern in `services/go-server` (see `GO_BACKEND_ARCHITECTURE.md`). Hand-written SQL only (no ORM). Never fetch snapshots directly from frontend; use backend proxy cache. Run `make swagger` on API route changes.
+6. **Living Documentation Maintenance**: Whenever a PR is created or merged, developers/agents MUST update `docs/project_status.md` and `docs/lesson_learn.md`. Codebase, git history, and PR list are the sole source of truth; never fabricate claims.
+
+7. **Architecture Standards**: Follow leaf modulith pattern in `services/go-server` (see `GO_BACKEND_ARCHITECTURE.md`). Hand-written SQL only (no ORM). Never fetch snapshots directly from frontend; use backend proxy cache. Run `make swagger` on API route changes.
