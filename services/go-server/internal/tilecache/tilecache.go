@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,6 +23,47 @@ const (
 	defaultUpstream  = "https://tile.openstreetmap.org"
 	defaultTimeout   = 10 * time.Second
 )
+
+// newResilientHTTPClient constructs an HTTP client equipped with a resilient
+// DNS dialer that queries public resolvers (1.1.1.1, 8.8.8.8) when the host or
+// container DNS environment fails to resolve upstream map tile domains.
+func newResilientHTTPClient() *http.Client {
+	dialer := &net.Dialer{
+		Timeout:   defaultTimeout,
+		KeepAlive: 30 * time.Second,
+		Resolver: &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{Timeout: 2 * time.Second}
+				// 1. Try Cloudflare public DNS (1.1.1.1:53)
+				conn, err := d.DialContext(ctx, "udp", "1.1.1.1:53")
+				if err == nil {
+					return conn, nil
+				}
+				// 2. Fallback to Google public DNS (8.8.8.8:53)
+				conn, err = d.DialContext(ctx, "udp", "8.8.8.8:53")
+				if err == nil {
+					return conn, nil
+				}
+				// 3. Fallback to default system resolver address
+				return d.DialContext(ctx, network, address)
+			},
+		},
+	}
+	transport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           dialer.DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	return &http.Client{
+		Timeout:   defaultTimeout,
+		Transport: transport,
+	}
+}
 
 // Manager manages reading, fetching, and persisting map tiles.
 type Manager struct {
@@ -39,9 +81,7 @@ func NewManager(cacheDir string) *Manager {
 	return &Manager{
 		cacheDir:    cacheDir,
 		upstreamURL: defaultUpstream,
-		httpClient: &http.Client{
-			Timeout: defaultTimeout,
-		},
+		httpClient:  newResilientHTTPClient(),
 	}
 }
 
