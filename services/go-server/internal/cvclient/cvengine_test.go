@@ -26,6 +26,10 @@ func makeCVEngineTestServer(t *testing.T, snapshotStatus int, predictStatus int,
 			http.Error(w, "not found", snapshotStatus)
 			return
 		}
+		if r.Header.Get("User-Agent") != "Mozilla/5.0 (compatible; CameraViewProxy/1.0)" {
+			http.Error(w, "forbidden: missing or invalid user-agent", http.StatusForbidden)
+			return
+		}
 		w.Header().Set("Content-Type", "image/jpeg")
 		_, _ = w.Write([]byte("\xff\xd8\xff\xe0minimal-jpeg"))
 	})
@@ -186,5 +190,37 @@ func TestCVEngineAnalyzer_Analyze_ContextCancelled(t *testing.T) {
 	}
 	if v.Severity != hotset.SeverityUnknown {
 		t.Errorf("expected severity UNKNOWN on timeout, got %q", v.Severity)
+	}
+}
+
+func TestCVEngineAnalyzer_Analyze_SetsUserAgentHeader(t *testing.T) {
+	var capturedUA string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/snapshot/", func(w http.ResponseWriter, r *http.Request) {
+		capturedUA = r.Header.Get("User-Agent")
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("\xff\xd8\xff\xe0minimal-jpeg"))
+	})
+	mux.HandleFunc("/predict", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"traffic_severity":"CLEAR","confidence":0.9,"latency_ms":10}`)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	analyzer := NewCVEngineAnalyzer(srv.URL, srv.Client())
+	cam := hotset.Camera{
+		ID:          "cam-ua-test",
+		SnapshotURL: srv.URL + "/snapshot/cam-ua-test.jpg",
+	}
+
+	_, err := analyzer.Analyze(context.Background(), cam)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	const expectedUA = "Mozilla/5.0 (compatible; CameraViewProxy/1.0)"
+	if capturedUA != expectedUA {
+		t.Errorf("expected User-Agent %q on snapshot fetch, got %q", expectedUA, capturedUA)
 	}
 }
