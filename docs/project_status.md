@@ -19,7 +19,7 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 |---|---|:---:|---|
 | **Web Client** (`apps/web`) | Next.js 15 (App Router), React 19, Tailwind CSS, Leaflet | `3001` | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal drag-to-scroll pinned camera dock, bilingual UI (`vi` default with full diacritics, `en` secondary). |
 | **Backend API** (`services/go-server`) | Go 1.24, Gin, SQLite (WAL mode) | `3000` | Snapshot proxy cache with 15s in-memory TTL, camera catalog, hotset scheduler (30s cycle), PCU Saturation Index calculator, SSE (`/api/live/stream`), WebSockets (`/ws/live`), Swagger docs. |
-| **CV Engine** (`services/cv-engine`) | Python 3.11, OpenVINO IR runtime, YOLOv8n FP16 | `8000` | Automated vehicle detection (`POST /predict`), class counting (motorcycle, car, bus, truck), `GET /healthz` healthchecks. |
+| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR runtime, YOLOv8n FP16 | `8000` | Automated vehicle detection (`POST /predict`), class counting (motorcycle, car, bus, truck), `GET /healthz` healthchecks, multi-threaded request processing. |
 
 ---
 

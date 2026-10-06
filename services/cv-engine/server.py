@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from io import BytesIO
 
 logging.basicConfig(
@@ -76,16 +76,32 @@ def load_model():
         logger.error("Failed to compile OpenVINO model: %s", exc)
 
 
+class CVServer(ThreadingHTTPServer):
+    """Multi-threaded HTTP server with resilient socket disconnect handling."""
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        # Ignore broken pipe and connection reset errors caused by abrupt client disconnections
+        exc_type, exc_val, _ = sys.exc_info()
+        if exc_type in (BrokenPipeError, ConnectionResetError):
+            logger.warning("Client %s disconnected abruptly: %s", client_address, exc_val)
+            return
+        super().handle_error(request, client_address)
+
+
 class CVRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler for CV inference and health monitoring."""
 
     def _send_json(self, status_code: int, data: dict):
-        body = json.dumps(data).encode("utf-8")
-        self.send_response(status_code)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            body = json.dumps(data).encode("utf-8")
+            self.send_response(status_code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError) as exc:
+            logger.warning("Client disconnected before response could be sent: %s", exc)
 
     def do_GET(self):
         if self.path in ("/healthz", "/health"):
@@ -113,13 +129,16 @@ class CVRequestHandler(BaseHTTPRequestHandler):
         self._send_json(404, {"error": "not found"})
 
     def do_HEAD(self):
-        if self.path in ("/healthz", "/info"):
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
+        try:
+            if self.path in ("/healthz", "/info"):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                return
+            self.send_response(404)
             self.end_headers()
-            return
-        self.send_response(404)
-        self.end_headers()
+        except (BrokenPipeError, ConnectionResetError) as exc:
+            logger.warning("Client disconnected during HEAD request: %s", exc)
 
     def do_POST(self):
         if self.path == "/predict":
@@ -128,7 +147,11 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "empty request body"})
                 return
 
-            post_data = self.rfile.read(content_length)
+            try:
+                post_data = self.rfile.read(content_length)
+            except (BrokenPipeError, ConnectionResetError) as exc:
+                logger.warning("Client disconnected while reading request body: %s", exc)
+                return
             start_t = time.perf_counter()
 
             # If model is loaded and image decoding is available, execute inference
@@ -222,8 +245,8 @@ class CVRequestHandler(BaseHTTPRequestHandler):
 def run():
     load_model()
     server_address = ("", PORT)
-    httpd = HTTPServer(server_address, CVRequestHandler)
-    logger.info("ProjectKV CV Engine running on port %d...", PORT)
+    httpd = CVServer(server_address, CVRequestHandler)
+    logger.info("ProjectKV CV Engine running on port %d (ThreadingHTTPServer)...", PORT)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
