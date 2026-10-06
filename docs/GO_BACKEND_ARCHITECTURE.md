@@ -123,7 +123,7 @@ Also update at repo root:
 ```
 Makefile                # add: dev-go, build-go, test-go, lint-go targets; remove/deprecate dev-node once migration verified
 .githooks/pre-commit     # NEW — gofmt + go vet check before commit (see §7)
-.github/workflows/go-ci.yml   # NEW — build/vet/lint/test on PR (see §7)
+.github/workflows/ci.yml      # Go build/vet/lint/test in the `verify-backend` job (see §7)
 .claude/skills/go-modulith/SKILL.md   # NEW — see §8
 ```
 
@@ -229,29 +229,27 @@ go vet ./...
 ```
 Wire this into `make install`/`make setup-hooks` alongside the existing pre-push hook, same as the current pattern for `.githooks/pre-push`.
 
-**`.github/workflows/go-ci.yml`** (new, English-only per `AGENTS.md` §4):
+**`.github/workflows/ci.yml` — `verify-backend` job** (Go build/vet/lint/test). This was originally a standalone `go-ci.yml`, but it duplicated the PR-triggered `verify-backend` job and was merged into it during the Oct 2026 GitHub Actions compute audit (issue #173) to remove the redundant runner minutes:
 ```yaml
-name: go-ci
-on:
-  pull_request:
-    branches: [dev, main]
-jobs:
-  build-and-test:
+  verify-backend:
+    name: Verify Go Backend
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/go-server
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
-      - run: go build ./...
-      - run: go vet ./...
+          go-version-file: 'services/go-server/go.mod'
       - uses: golangci/golangci-lint-action@v6
         with:
           working-directory: services/go-server
-      - run: go test ./... -race -cover
+          install-mode: "goinstall"
+      - run: |
+          cd services/go-server
+          go vet ./...
+          go test -v ./... -race -cover
+          go build -v ./...
 ```
 
 **`.golangci.yml`**:
