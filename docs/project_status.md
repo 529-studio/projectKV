@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **97 Pull Requests** processed across repository history:
-  - **92 Merged** to `dev`
-  - **5 Closed** without merging
-  - **0 Open** PRs currently pending
+- **Lifetime PR History**: Exactly **102 Pull Requests** processed across repository history:
+  - **94 Merged** to `dev`
+  - **7 Closed** without merging
+  - **1 Open** PR currently pending (#174 targeting `dev`)
 - **Camera Catalog**:
   - **837 total cameras** loaded in `cameras_enriched.json`
   - **701 online cameras** (status `UP`, `isOnline: true`, verified non-ghost)
