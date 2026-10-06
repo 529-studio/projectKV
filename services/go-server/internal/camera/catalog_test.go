@@ -306,7 +306,7 @@ func TestLoadCatalog(t *testing.T) {
 	}
 }
 
-func TestCatalog_DeduplicationAndGhost(t *testing.T) {
+func TestCatalog_Deduplication(t *testing.T) {
 	cams := []Camera{
 		{
 			ID:          "595dd9ac3dcfc400106f28b4",
@@ -339,19 +339,18 @@ func TestCatalog_DeduplicationAndGhost(t *testing.T) {
 		t.Errorf("expected DuplicateOf to be 595ddc123dcfc400106f28ba, got %s", dupCam.DuplicateOf)
 	}
 
-	// Verify ghost camera conversion to offline
+	// Ghost state is no longer hardcoded in the catalog: the static liveness
+	// (isOnline/status) must be preserved verbatim from the JSON catalog.
 	ghostCam, ok := cat.ByID("595ddbbf3dcfc400106f28b8")
 	if !ok {
 		t.Fatal("expected ghost camera to exist")
 	}
-	if !ghostCam.IsGhost {
-		t.Error("expected IsGhost to be true")
+	if ghostCam.IsGhost {
+		t.Error("expected IsGhost to remain false; catalog no longer hardcodes ghost state")
 	}
-	if ghostCam.IsOnline {
-		t.Error("expected IsOnline to be false for ghost camera")
-	}
-	if ghostCam.Status != "DOWN" {
-		t.Errorf("expected Status to be DOWN, got %s", ghostCam.Status)
+	if !ghostCam.IsOnline || ghostCam.Status != "UP" {
+		t.Errorf("expected catalog-provided state to be preserved, got isOnline=%v status=%s",
+			ghostCam.IsOnline, ghostCam.Status)
 	}
 
 	// Verify regular camera untouched
