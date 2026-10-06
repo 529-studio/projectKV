@@ -167,7 +167,7 @@ func (s *Service) GetWeather(ctx context.Context) (*WeatherData, error) {
 		return &cached, nil
 	}
 
-	reqURL := fmt.Sprintf("%s?latitude=%.4f&longitude=%.4f&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code&hourly=precipitation_probability,precipitation,rain,weather_code&timezone=Asia%%2FHo_Chi_Minh&forecast_days=1",
+	reqURL := fmt.Sprintf("%s?latitude=%.4f&longitude=%.4f&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code&hourly=precipitation_probability,precipitation,rain,weather_code&timezone=Asia%%2FHo_Chi_Minh&forecast_days=2",
 		s.openMeteoURL, s.lat, s.lon)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
@@ -209,9 +209,11 @@ func (s *Service) GetWeather(ctx context.Context) (*WeatherData, error) {
 
 	viDesc, enDesc := WMOToDescription(omResp.Current.WeatherCode)
 
-	// Determine precipitation probability: use matching hourly slot or fallback to current
-	prob := 0
+	// Determine precipitation probability and hourly forecast starting at the current hour slot.
+	// Open-Meteo current.time reports in 15-minute intervals (e.g. 14:15), whereas hourly.time
+	// reports on-the-hour slots (e.g. 14:00). We normalize to the hour slot to find the correct index.
 	currentTimeStr := omResp.Current.Time
+	targetHourStr := truncateToHour(currentTimeStr)
 	hourlyList := make([]HourlyForecast, 0, len(omResp.Hourly.Time))
 
 	for i, t := range omResp.Hourly.Time {
@@ -237,25 +239,36 @@ func (s *Service) GetWeather(ctx context.Context) (*WeatherData, error) {
 			WeatherDescVi:            hVi,
 			WeatherDescEn:            hEn,
 		})
-
-		if t == currentTimeStr {
-			prob = hourProb
-		}
 	}
 
-	// If exact current hour not found, take first hourly probability if available
-	if prob == 0 && len(hourlyList) > 0 {
-		prob = hourlyList[0].PrecipitationProbability
-	}
-
-	// Limit hourly forecast to next 12 hours from current hour
+	// Limit hourly forecast to next 12 hours starting from the current hour slot
 	currentIdx := 0
+	found := false
 	for i, h := range hourlyList {
-		if h.Time == currentTimeStr {
+		if h.Time == targetHourStr {
 			currentIdx = i
+			found = true
 			break
 		}
 	}
+
+	// Fallback if exact hour slot not found: match closest preceding slot <= targetHourStr
+	if !found {
+		for i, h := range hourlyList {
+			if h.Time <= targetHourStr {
+				currentIdx = i
+			} else {
+				break
+			}
+		}
+	}
+
+	// Determine precipitation probability: align with the resolved current hour slot
+	prob := 0
+	if currentIdx < len(hourlyList) {
+		prob = hourlyList[currentIdx].PrecipitationProbability
+	}
+
 	endIdx := currentIdx + 12
 	if endIdx > len(hourlyList) {
 		endIdx = len(hourlyList)
@@ -386,4 +399,23 @@ func (s *Service) GetRadar(ctx context.Context) (*RadarMetadata, error) {
 
 	cached := *radarData
 	return &cached, nil
+}
+
+// truncateToHour normalizes an ISO 8601 or RFC3339 timestamp string into "YYYY-MM-DDTHH:00" format,
+// ensuring clean alignment between Open-Meteo current.time (15-min intervals) and hourly.time slots.
+func truncateToHour(timeStr string) string {
+	layouts := []string{
+		"2006-01-02T15:04",
+		time.RFC3339,
+		"2006-01-02T15:04:05",
+	}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, timeStr); err == nil {
+			return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location()).Format("2006-01-02T15:04")
+		}
+	}
+	if len(timeStr) >= 13 {
+		return timeStr[:13] + ":00"
+	}
+	return timeStr
 }
