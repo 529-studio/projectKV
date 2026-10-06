@@ -345,7 +345,7 @@ export default function Home() {
         />
 
         {/* MOBILE FLOATING QUICK SEARCH BAR (hidden on md+) */}
-        <div className="md:hidden absolute top-3 left-3 right-3 z-[810] pointer-events-auto">
+        <div className="md:hidden absolute top-3 left-3 right-3 z-810 pointer-events-auto">
           <button
             type="button"
             onClick={() => {
@@ -374,7 +374,7 @@ export default function Home() {
               </span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-[10px] font-mono font-medium text-zinc-400 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded">
+              <span className="text-[10px] font-mono font-medium text-zinc-400 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded-sm">
                 {MOBILE_SEARCH_I18N.BADGE[lang]}
               </span>
             </div>
@@ -387,7 +387,7 @@ export default function Home() {
             setShouldFocusSearch(true);
             setMobileDrawerOpen(true);
           }}
-          className="md:hidden absolute bottom-20 right-3 z-[830] w-11 h-11 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+          className="md:hidden absolute bottom-20 right-3 z-830 w-11 h-11 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md"
           aria-label={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
           title={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
         >

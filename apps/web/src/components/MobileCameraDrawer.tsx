@@ -63,7 +63,7 @@ export default function MobileCameraDrawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[850] bg-black/60 md:hidden"
+            className="fixed inset-0 z-850 bg-black/60 md:hidden"
             onClick={onClose}
           />
 
@@ -74,7 +74,7 @@ export default function MobileCameraDrawer({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ duration: 0.28, ease: 'easeOut' }}
-            className="fixed bottom-0 left-0 right-0 z-[860] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden max-h-[85vh] h-[80vh]"
+            className="fixed bottom-0 left-0 right-0 z-860 bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden max-h-[85vh] h-[80vh]"
           >
             {/* Drag handle and close header */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 shrink-0">

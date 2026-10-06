@@ -135,7 +135,7 @@ export default function CameraModal({
 
   return (
     <div 
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 select-none"
+      className="fixed inset-0 z-9999 flex items-center justify-center bg-black/80 backdrop-blur-xs p-3 sm:p-4 select-none"
       onClick={handleBackdropClick}
     >
       <div 
@@ -147,10 +147,10 @@ export default function CameraModal({
         <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 flex justify-between items-start select-none">
           <div className="flex-1 min-w-0 mr-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-white font-bold text-base sm:text-lg break-words leading-snug">{camera.displayName || camera.title}</h2>
+              <h2 className="text-white font-bold text-base sm:text-lg wrap-break-word leading-snug">{camera.displayName || camera.title}</h2>
               {sequenceLabel && (
                 <span
-                  className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold tracking-wide shrink-0"
+                  className="px-2 py-0.5 rounded-sm border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold tracking-wide shrink-0"
                   title={lang === 'vi' ? 'Vị trí trong danh sách camera' : 'Camera sequence position'}
                 >
                   [{sequenceLabel}]
@@ -199,22 +199,22 @@ export default function CameraModal({
             </div>
             <div className="flex flex-wrap gap-2 mt-2 text-xs font-bold items-center">
               {camera.isGhost ? (
-                <span className="px-2 py-0.5 rounded border bg-amber-950/70 border-amber-800 text-amber-400">
+                <span className="px-2 py-0.5 rounded-sm border bg-amber-950/70 border-amber-800 text-amber-400">
                   {lang === 'vi' ? '[MẤT TÍN HIỆU THỰC ĐỊA]' : '[NO FIELD SIGNAL]'}
                 </span>
               ) : isActuallyAvailable ? (
-                <span className="px-2 py-0.5 rounded border bg-zinc-800 border-zinc-600 text-white">
+                <span className="px-2 py-0.5 rounded-sm border bg-zinc-800 border-zinc-600 text-white">
                   {lang === 'vi' ? '[HOẠT ĐỘNG]' : '[ONLINE]'}
                 </span>
               ) : (
-                <span className="px-2 py-0.5 rounded border bg-red-950/70 border-red-800 text-red-400">
+                <span className="px-2 py-0.5 rounded-sm border bg-red-950/70 border-red-800 text-red-400">
                   {lang === 'vi' ? '[MẤT KẾT NỐI]' : '[OFFLINE]'}
                 </span>
               )}
 
               {camera.duplicateOf && (
                 <span
-                  className="px-2 py-0.5 rounded border bg-zinc-900 border-zinc-700 text-zinc-400 text-[11px]"
+                  className="px-2 py-0.5 rounded-sm border bg-zinc-900 border-zinc-700 text-zinc-400 text-[11px]"
                   title={
                     lang === 'vi'
                       ? `Trùng nguồn video với camera ID: ${camera.duplicateOf}`
@@ -229,12 +229,12 @@ export default function CameraModal({
 
               {isActuallyAvailable && hasRealVerdict && (
                 <>
-                  <span className="px-2 py-0.5 rounded border" style={{ borderColor: severityColor, color: severityColor, backgroundColor: `${severityColor}20` }}>
+                  <span className="px-2 py-0.5 rounded-sm border" style={{ borderColor: severityColor, color: severityColor, backgroundColor: `${severityColor}20` }}>
                     {severityLabel}
                   </span>
                   {verdict?.stale && (
                     <span
-                      className="px-2 py-0.5 rounded border border-zinc-600 bg-zinc-900 text-zinc-400 text-xs font-bold inline-flex items-center gap-1.5"
+                      className="px-2 py-0.5 rounded-sm border border-zinc-600 bg-zinc-900 text-zinc-400 text-xs font-bold inline-flex items-center gap-1.5"
                       title={lang === 'vi' ? 'Dữ liệu phân tích đã cũ (>3 phút hoặc mất cập nhật)' : 'Analysis verdict is stale (>3 min or frame frozen)'}
                     >
                       <svg
@@ -257,7 +257,7 @@ export default function CameraModal({
                   )}
                   {verdict?.source === 'mock' && appEnv === 'dev' && (
                     <span
-                      className="px-2 py-0.5 rounded border border-yellow-500/80 bg-yellow-500/10 text-yellow-400 text-xs font-bold tracking-wider"
+                      className="px-2 py-0.5 rounded-sm border border-yellow-500/80 bg-yellow-500/10 text-yellow-400 text-xs font-bold tracking-wider"
                       title={lang === 'vi' ? 'Dữ liệu giả lập chạy trong môi trường dev' : 'Simulated verdict in dev mode'}
                     >
                       [{lang === 'vi' ? VERDICT_I18N.DEMO_BADGE.vi : VERDICT_I18N.DEMO_BADGE.en}]
@@ -265,7 +265,7 @@ export default function CameraModal({
                   )}
                   {verdict?.flood_severity && verdict.flood_severity !== 'DRY' && verdict.flood_severity !== 'UNKNOWN' && (
                     <span
-                      className="px-2 py-0.5 rounded border border-sky-500/80 bg-sky-500/20 text-sky-300 text-xs font-bold inline-flex items-center gap-1.5"
+                      className="px-2 py-0.5 rounded-sm border border-sky-500/80 bg-sky-500/20 text-sky-300 text-xs font-bold inline-flex items-center gap-1.5"
                       title={lang === 'vi' ? 'Tình trạng mưa / ngập nước thực địa' : 'Local rain / flood status'}
                     >
                       <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -282,7 +282,7 @@ export default function CameraModal({
 
               {isActuallyAvailable && !hasRealVerdict && analysisEnabled && (
                 <span
-                  className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-900/90 text-zinc-400 text-xs font-mono"
+                  className="px-2 py-0.5 rounded-sm border border-zinc-700 bg-zinc-900/90 text-zinc-400 text-xs font-mono"
                   title={
                     lang === 'vi'
                       ? 'Camera hoạt động bình thường, đang chờ kết quả phân tích AI'
@@ -386,7 +386,7 @@ export default function CameraModal({
               <div>
                 <button
                   onClick={handleRefresh}
-                  className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-500 rounded text-xs font-mono transition-colors"
+                  className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-500 rounded-sm text-xs font-mono transition-colors"
                 >
                   {lang === 'vi' ? '↻ THỬ LẠI KẾT NỐI' : '↻ RETRY CONNECTION'}
                 </button>

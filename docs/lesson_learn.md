@@ -104,3 +104,16 @@
   2. **Defensive Socket Error Handling**: Network services must catch `(BrokenPipeError, ConnectionResetError)` on client write operations to gracefully handle client timeouts and connection drops without dumping traceback noise.
   3. **Inference Concurrency Verification**: Verify runtime thread-safety (such as OpenVINO `create_infer_request()`) under multi-threaded load to ensure parallelism does not introduce race conditions or segfaults.
 
+---
+
+## Lesson 7: Transitive Vulnerability Elimination via Major Framework Upgrades (Tailwind CSS v4 & Rust Oxide Pipeline)
+
+- **Incident & Tracking:** Issue #166, Pull Request #171 (`feat/166-tailwind-v4-migration`).
+- **Symptom:**
+  Dependabot reported high-severity vulnerability CVE-2026-93687 (GHSA-vfj7-8cjw-p6xm) in `braces`, plus related advisories in `postcss-selector-parser <7.1.6` and `source-map-js`.
+- **Root Cause:**
+  `tailwindcss` v3 relied on a JavaScript-based file watching and glob matching pipeline (`chokidar@3.6.0`, `micromatch@4.0.8`, `postcss-nested`). These packages transitively pull in unmaintained dependencies with stack-exhaustion denial-of-service risks. Because `braces` 3.0.3 was the latest release with no standalone patch on npm, standard `npm audit fix` could not resolve it under Tailwind v3.
+- **Mandatory Takeaway:**
+  1. **Sound Solutions Over Shortcuts**: Rather than dismissing build-time vulnerabilities as unexploitable and leaving security debt in the repository, committing the engineering effort to migrate to modern architecture (Tailwind CSS v4 with `@tailwindcss/postcss` and the Rust Oxide engine) permanently drops vulnerable legacy dependencies.
+  2. **Automated Migration & Verification**: Tailwind CSS v4 eliminates the entire `chokidar` / `micromatch` / `braces` dependency chain. Running official migration tooling followed by strict unit test runs (`npm test`) and production static export builds (`npm run build`) guarantees zero UI regressions during major framework migrations.
+

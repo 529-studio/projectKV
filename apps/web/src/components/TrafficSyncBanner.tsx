@@ -36,7 +36,7 @@ export default function TrafficSyncBanner({
   }
 
   return (
-    <div className="fixed top-16 md:top-3.5 left-1/2 -translate-x-1/2 z-[850] pointer-events-none w-auto max-w-[calc(100vw-32px)] sm:max-w-md">
+    <div className="fixed top-16 md:top-3.5 left-1/2 -translate-x-1/2 z-850 pointer-events-none w-auto max-w-[calc(100vw-32px)] sm:max-w-md">
       <AnimatePresence>
         <motion.div
           initial={{ opacity: 0, y: -10, scale: 0.96 }}
@@ -89,7 +89,7 @@ export default function TrafficSyncBanner({
           <button
             type="button"
             onClick={() => setDismissed(true)}
-            className="text-zinc-500 hover:text-white transition-colors p-1 -mr-1 -mt-1 sm:mt-0 rounded focus:outline-none shrink-0"
+            className="text-zinc-500 hover:text-white transition-colors p-1 -mr-1 -mt-1 sm:mt-0 rounded-sm focus:outline-hidden shrink-0"
             aria-label={lang === 'vi' ? 'Đóng thông báo' : 'Dismiss notice'}
             title={lang === 'vi' ? 'Đóng thông báo' : 'Dismiss notice'}
           >

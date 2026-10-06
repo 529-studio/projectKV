@@ -522,9 +522,9 @@ export default function PinnedDock({
         }}
         role="button"
         aria-label={`${cam.displayName || cam.title}. ${PINNED_DOCK_I18N.DRAG_TO_REORDER[lang]}`}
-        className={`relative ${presetStyle.tileClass} bg-black border rounded-sm select-none ${
+        className={`relative ${presetStyle.tileClass} bg-black border rounded-xs select-none ${
           viewMode === 'strip' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
-        } overflow-hidden transition-all outline-none focus:ring-1 focus:ring-zinc-400 group ${
+        } overflow-hidden transition-all outline-hidden focus:ring-1 focus:ring-zinc-400 group ${
           isDragging
             ? 'opacity-40 border-white scale-[0.98] z-20 shadow-2xl'
             : isDragOver
@@ -542,7 +542,7 @@ export default function PinnedDock({
             };
             tilesMetaRef.current.set(cam.id, { ...existing, lastLoadedAt: Date.now() });
           }}
-          className="w-full h-full object-cover rounded-sm opacity-85 group-hover:opacity-100 transition-opacity pointer-events-none"
+          className="w-full h-full object-cover rounded-xs opacity-85 group-hover:opacity-100 transition-opacity pointer-events-none"
           alt={cam.title || 'Traffic camera snapshot'}
           loading="lazy"
         />
@@ -550,7 +550,7 @@ export default function PinnedDock({
         {/* Top Badges Bar: Status dot + Age + Severity badge */}
         <div className="absolute top-1 left-1 right-7 flex items-center justify-between pointer-events-none gap-1">
           {/* Online / Stale / Offline dot */}
-          <div className="flex items-center gap-1 bg-black/85 border border-zinc-700/80 px-1 py-0.5 rounded-sm backdrop-blur-sm shrink-0">
+          <div className="flex items-center gap-1 bg-black/85 border border-zinc-700/80 px-1 py-0.5 rounded-xs backdrop-blur-xs shrink-0">
             <span
               className={`inline-block w-1.5 h-1.5 rounded-full ${
                 !isOnline
@@ -571,7 +571,7 @@ export default function PinnedDock({
 
           {/* Severity Badge: live severity indicator when fresh & verified; falls back to S5 placeholder */}
           <div
-            className={`bg-black/90 border ${severityVisual.borderClass} px-1 py-0.5 rounded-sm font-mono leading-none tracking-tight flex items-center gap-1 shrink-0`}
+            className={`bg-black/90 border ${severityVisual.borderClass} px-1 py-0.5 rounded-xs font-mono leading-none tracking-tight flex items-center gap-1 shrink-0`}
             title={severityLabel}
           >
             {dockSeverity ? (
@@ -597,7 +597,7 @@ export default function PinnedDock({
         </div>
 
         {/* Bottom Title Bar */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-1.5 pointer-events-none">
+        <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/95 via-black/80 to-transparent p-1.5 pointer-events-none">
           <div
             className={`font-mono text-white truncate font-medium ${presetStyle.titleSize}`}
             title={cam.displayName || cam.title}
@@ -614,7 +614,7 @@ export default function PinnedDock({
             onClick={(e) => handleUnpin(e, cam.id)}
             onPointerDown={(e) => e.stopPropagation()}
             onPointerUp={(e) => e.stopPropagation()}
-            className="pointer-events-auto absolute top-1 right-1 w-5 h-5 bg-zinc-900/90 hover:bg-red-600 border border-zinc-700 hover:border-red-500 text-zinc-300 hover:text-white rounded-sm flex items-center justify-center transition-colors cursor-pointer text-xs z-10"
+            className="pointer-events-auto absolute top-1 right-1 w-5 h-5 bg-zinc-900/90 hover:bg-red-600 border border-zinc-700 hover:border-red-500 text-zinc-300 hover:text-white rounded-xs flex items-center justify-center transition-colors cursor-pointer text-xs z-10"
             title={PINNED_DOCK_I18N.UNPIN[lang]}
             aria-label={`${PINNED_DOCK_I18N.UNPIN[lang]}: ${cam.displayName || cam.title}`}
           >
@@ -638,7 +638,7 @@ export default function PinnedDock({
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onPointerUp={(e) => e.stopPropagation()}
-                className={`${presetStyle.controlBtnSize} bg-zinc-950/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white rounded-sm flex items-center justify-center cursor-pointer transition`}
+                className={`${presetStyle.controlBtnSize} bg-zinc-950/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white rounded-xs flex items-center justify-center cursor-pointer transition`}
                 title={lang === 'vi' ? 'Xem camera trước' : 'View previous camera'}
                 aria-label={`${lang === 'vi' ? 'Xem camera trước' : 'View previous camera'}: ${pinnedCameras[index - 1].displayName || pinnedCameras[index - 1].title}`}
               >
@@ -656,7 +656,7 @@ export default function PinnedDock({
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onPointerUp={(e) => e.stopPropagation()}
-                className={`${presetStyle.controlBtnSize} bg-zinc-950/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white rounded-sm flex items-center justify-center cursor-pointer transition`}
+                className={`${presetStyle.controlBtnSize} bg-zinc-950/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white rounded-xs flex items-center justify-center cursor-pointer transition`}
                 title={lang === 'vi' ? 'Xem camera sau' : 'View next camera'}
                 aria-label={`${lang === 'vi' ? 'Xem camera sau' : 'View next camera'}: ${pinnedCameras[index + 1].displayName || pinnedCameras[index + 1].title}`}
               >
@@ -674,7 +674,7 @@ export default function PinnedDock({
       {/* =======================================================
           DESKTOP VIEW (md+): Horizontal strip or Full-width Grid
          ======================================================= */}
-      <div className="hidden md:block absolute bottom-0 left-0 right-0 z-[800] bg-zinc-950/95 border-t border-zinc-800 shadow-2xl backdrop-blur-md transition-all">
+      <div className="hidden md:block absolute bottom-0 left-0 right-0 z-800 bg-zinc-950/95 border-t border-zinc-800 shadow-2xl backdrop-blur-md transition-all">
         {/* Notice Banner (Pin Cap Feedback) */}
         {pinNotice && (
           <div className="px-3 py-1 bg-amber-950/90 border-b border-amber-800 text-amber-200 text-xs font-mono flex items-center justify-between">
@@ -720,15 +720,15 @@ export default function PinnedDock({
           {/* Right: Controls (Size Presets, Grid Toggle, Clear, Collapse) */}
           <div className="flex items-center gap-2">
             {/* Size Presets (S / M / L) */}
-            <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded p-0.5 text-[10.5px]">
+            <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-sm p-0.5 text-[10.5px]">
               {(['S', 'M', 'L'] as DockSizePreset[]).map((size) => (
                 <button
                   key={size}
                   type="button"
                   onClick={() => handleSizeChange(size)}
-                  className={`px-1.5 py-0.5 rounded-sm transition cursor-pointer font-bold ${
+                  className={`px-1.5 py-0.5 rounded-xs transition cursor-pointer font-bold ${
                     sizePreset === size
-                      ? 'bg-zinc-800 text-white shadow-sm'
+                      ? 'bg-zinc-800 text-white shadow-xs'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                   title={`${PINNED_DOCK_I18N.SIZE_PRESETS[size][lang]}`}
@@ -740,11 +740,11 @@ export default function PinnedDock({
             </div>
 
             {/* View Mode Toggle (Strip vs Full-width Grid) */}
-            <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded p-0.5 text-[10.5px]">
+            <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-sm p-0.5 text-[10.5px]">
               <button
                 type="button"
                 onClick={() => handleViewModeChange('strip')}
-                className={`px-2 py-0.5 rounded-sm transition cursor-pointer flex items-center gap-1 ${
+                className={`px-2 py-0.5 rounded-xs transition cursor-pointer flex items-center gap-1 ${
                   viewMode === 'strip'
                     ? 'bg-zinc-800 text-white'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -758,7 +758,7 @@ export default function PinnedDock({
               <button
                 type="button"
                 onClick={() => handleViewModeChange('grid')}
-                className={`px-2 py-0.5 rounded-sm transition cursor-pointer flex items-center gap-1 ${
+                className={`px-2 py-0.5 rounded-xs transition cursor-pointer flex items-center gap-1 ${
                   viewMode === 'grid'
                     ? 'bg-zinc-800 text-white'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -775,7 +775,7 @@ export default function PinnedDock({
             <button
               type="button"
               onClick={onClear}
-              className="px-2 py-0.5 bg-zinc-950 border border-zinc-700 hover:border-red-500 text-zinc-400 hover:text-red-400 rounded transition cursor-pointer text-[10.5px]"
+              className="px-2 py-0.5 bg-zinc-950 border border-zinc-700 hover:border-red-500 text-zinc-400 hover:text-red-400 rounded-sm transition cursor-pointer text-[10.5px]"
             >
               {PINNED_DOCK_I18N.CLEAR_ALL[lang]}
             </button>
@@ -831,7 +831,7 @@ export default function PinnedDock({
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[820] pointer-events-auto select-none"
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-820 pointer-events-auto select-none"
           >
             <button
               type="button"
@@ -867,7 +867,7 @@ export default function PinnedDock({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="fixed inset-0 z-[840] bg-black/60 md:hidden"
+                className="fixed inset-0 z-840 bg-black/60 md:hidden"
                 onClick={() => setIsMobileExpanded(false)}
               />
 
@@ -878,7 +878,7 @@ export default function PinnedDock({
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ duration: 0.26, ease: 'easeOut' }}
-                className="fixed bottom-0 left-0 right-0 z-[850] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden pb-4 max-h-[60vh]"
+                className="fixed bottom-0 left-0 right-0 z-850 bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden pb-4 max-h-[60vh]"
               >
                 {/* Drag handle */}
                 <div className="pt-2 pb-1 flex justify-center shrink-0">
@@ -908,7 +908,7 @@ export default function PinnedDock({
                       <button
                         type="button"
                         onClick={onClear}
-                        className="px-2 py-0.5 bg-zinc-900 border border-zinc-700 hover:border-zinc-400 text-zinc-400 hover:text-white rounded text-[10.5px] transition cursor-pointer"
+                        className="px-2 py-0.5 bg-zinc-900 border border-zinc-700 hover:border-zinc-400 text-zinc-400 hover:text-white rounded-sm text-[10.5px] transition cursor-pointer"
                       >
                         {PINNED_DOCK_I18N.CLEAR_ALL[lang]}
                       </button>
@@ -928,13 +928,13 @@ export default function PinnedDock({
 
                   {/* Size Preset & View Controls on Mobile */}
                   <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 text-[10px]">
+                    <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-sm p-0.5 text-[10px]">
                       {(['S', 'M', 'L'] as DockSizePreset[]).map((size) => (
                         <button
                           key={size}
                           type="button"
                           onClick={() => handleSizeChange(size)}
-                          className={`px-2 py-0.5 rounded-sm transition cursor-pointer font-bold ${
+                          className={`px-2 py-0.5 rounded-xs transition cursor-pointer font-bold ${
                             sizePreset === size
                               ? 'bg-zinc-800 text-white'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -945,11 +945,11 @@ export default function PinnedDock({
                       ))}
                     </div>
 
-                    <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 text-[10px]">
+                    <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-sm p-0.5 text-[10px]">
                       <button
                         type="button"
                         onClick={() => handleViewModeChange('strip')}
-                        className={`px-2 py-0.5 rounded-sm transition cursor-pointer ${
+                        className={`px-2 py-0.5 rounded-xs transition cursor-pointer ${
                           viewMode === 'strip' ? 'bg-zinc-800 text-white' : 'text-zinc-400'
                         }`}
                       >
@@ -958,7 +958,7 @@ export default function PinnedDock({
                       <button
                         type="button"
                         onClick={() => handleViewModeChange('grid')}
-                        className={`px-2 py-0.5 rounded-sm transition cursor-pointer ${
+                        className={`px-2 py-0.5 rounded-xs transition cursor-pointer ${
                           viewMode === 'grid' ? 'bg-zinc-800 text-white' : 'text-zinc-400'
                         }`}
                       >

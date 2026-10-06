@@ -403,9 +403,9 @@ export default function HexOverlay({
         type="button"
         onClick={() => handleSelectMode('radar')}
         aria-pressed={currentMode === 'radar'}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all focus:outline-none cursor-pointer border ${
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all focus:outline-hidden cursor-pointer border ${
           currentMode === 'radar'
-            ? 'bg-sky-500 text-zinc-950 border-sky-400 shadow-sm font-bold'
+            ? 'bg-sky-500 text-zinc-950 border-sky-400 shadow-xs font-bold'
             : 'text-zinc-400 hover:text-sky-300 hover:bg-zinc-900 border-transparent'
         }`}
         title={`${FLOOD_I18N.LAYER_RADAR[lang]} — ${FLOOD_I18N.LAYER_RADAR_SUBTITLE[lang]}`}
@@ -449,9 +449,9 @@ export default function HexOverlay({
         type="button"
         onClick={() => handleSelectMode('flood')}
         aria-pressed={currentMode === 'flood'}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all focus:outline-none cursor-pointer border ${
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all focus:outline-hidden cursor-pointer border ${
           currentMode === 'flood'
-            ? 'bg-blue-600 text-white border-blue-500 shadow-sm font-bold'
+            ? 'bg-blue-600 text-white border-blue-500 shadow-xs font-bold'
             : 'text-zinc-400 hover:text-blue-300 hover:bg-zinc-900 border-transparent'
         }`}
         title={`${FLOOD_I18N.LAYER_FLOOD_VERIFIED[lang]} — ${FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE[lang]}`}
@@ -496,9 +496,9 @@ export default function HexOverlay({
         type="button"
         onClick={() => handleSelectMode('traffic')}
         aria-pressed={currentMode === 'traffic'}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all focus:outline-none cursor-pointer border ${
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all focus:outline-hidden cursor-pointer border ${
           currentMode === 'traffic'
-            ? 'bg-white text-black border-zinc-200 shadow-sm font-bold'
+            ? 'bg-white text-black border-zinc-200 shadow-xs font-bold'
             : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border-transparent'
         }`}
         title={lang === 'vi' ? 'Vùng giao thông (mật độ xe)' : 'Traffic density zones'}

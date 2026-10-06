@@ -413,7 +413,7 @@ export default function MapComponent({
 
       {/* Left controls: Lens switchers & active filter chip */}
       {/* Desktop (md+): top-3.5 left-14 in flex-row; Mobile (<md): top-16 left-3 in flex-col */}
-      <div className="absolute top-16 left-3 md:top-3.5 md:left-14 z-[800] flex flex-col md:flex-row items-start md:items-center gap-2 pointer-events-none">
+      <div className="absolute top-16 left-3 md:top-3.5 md:left-14 z-800 flex flex-col md:flex-row items-start md:items-center gap-2 pointer-events-none">
         {children}
 
         {/* On-map active filter chip (ADR-004 A3 - Issue #65) */}
@@ -425,7 +425,7 @@ export default function MapComponent({
           >
             <div className="flex items-start gap-1.5 min-w-0 flex-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1" />
-              <span className="font-semibold text-zinc-100 whitespace-normal break-words leading-tight text-[11px] md:text-xs">
+              <span className="font-semibold text-zinc-100 whitespace-normal wrap-break-word leading-tight text-[11px] md:text-xs">
                 {activeFilterLabel}
               </span>
             </div>
@@ -433,7 +433,7 @@ export default function MapComponent({
               <button
                 type="button"
                 onClick={onFilterClear}
-                className="px-2 py-1 rounded text-[10.5px] font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all shrink-0 cursor-pointer flex items-center gap-1 shadow-sm active:scale-95 ml-1"
+                className="px-2 py-1 rounded-sm text-[10.5px] font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all shrink-0 cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 ml-1"
                 aria-label={lang === 'vi' ? 'Xóa bộ lọc' : 'Clear filter'}
                 title={lang === 'vi' ? 'Xóa bộ lọc (Esc)' : 'Clear filter (Esc)'}
               >
@@ -450,25 +450,25 @@ export default function MapComponent({
       {weatherControl || legendControl ? (
         <>
           {/* Desktop view (md+): Both side-by-side in top-right */}
-          <div className="hidden md:flex absolute top-3.5 right-3 z-[800] items-start gap-2 pointer-events-auto">
+          <div className="hidden md:flex absolute top-3.5 right-3 z-800 items-start gap-2 pointer-events-auto">
             {weatherControl}
             {legendControl}
           </div>
 
           {/* Mobile view (<md): Legend trigger at bottom-20 left-3 (bottom left corner, opposite to search FAB), Weather at top-28 right-3 */}
           {legendControl && (
-            <div className="md:hidden absolute bottom-20 left-3 z-[830] pointer-events-auto">
+            <div className="md:hidden absolute bottom-20 left-3 z-830 pointer-events-auto">
               {legendControl}
             </div>
           )}
           {weatherControl && (
-            <div className="md:hidden absolute top-28 right-3 z-[800] pointer-events-auto">
+            <div className="md:hidden absolute top-28 right-3 z-800 pointer-events-auto">
               {weatherControl}
             </div>
           )}
         </>
       ) : topRightControls ? (
-        <div className="absolute top-28 right-3 md:top-3.5 md:right-3 z-[800] flex items-start gap-2 pointer-events-auto">
+        <div className="absolute top-28 right-3 md:top-3.5 md:right-3 z-800 flex items-start gap-2 pointer-events-auto">
           {topRightControls}
         </div>
       ) : null}

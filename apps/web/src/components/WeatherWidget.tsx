@@ -65,7 +65,7 @@ export default function WeatherWidget({
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-950/95 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-200 transition-all cursor-pointer shadow-2xl backdrop-blur-md focus:outline-none text-[11px]"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-950/95 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-200 transition-all cursor-pointer shadow-2xl backdrop-blur-md focus:outline-hidden text-[11px]"
         title={WEATHER_I18N.RAIN_FORECAST[lang]}
         aria-expanded={isOpen}
       >
@@ -112,7 +112,7 @@ export default function WeatherWidget({
 
         {/* Rain Chance Tag */}
         {weather.precipitation_probability_percent > 0 && (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-sky-950 text-sky-300 border border-sky-800/80">
+          <span className="px-1.5 py-0.2 rounded-sm text-[10px] font-bold bg-sky-950 text-sky-300 border border-sky-800/80">
             {formatRainProbability(weather.precipitation_probability_percent)}
           </span>
         )}
@@ -126,7 +126,7 @@ export default function WeatherWidget({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.96 }}
             transition={{ duration: 0.18 }}
-            className="absolute top-full mt-2 right-0 w-72 p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 shadow-2xl z-[900] text-zinc-300 font-mono text-xs"
+            className="absolute top-full mt-2 right-0 w-72 p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 shadow-2xl z-900 text-zinc-300 font-mono text-xs"
           >
             {/* Header */}
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-800">
@@ -181,7 +181,7 @@ export default function WeatherWidget({
                     <div key={idx} className="flex flex-col items-center">
                       <span className="text-[9px] text-zinc-400">{formatHour(h.time)}</span>
                       {/* Bar indicator */}
-                      <div className="w-2.5 h-12 bg-zinc-900 rounded-sm my-1 flex flex-col justify-end overflow-hidden">
+                      <div className="w-2.5 h-12 bg-zinc-900 rounded-xs my-1 flex flex-col justify-end overflow-hidden">
                         <div
                           className="w-full bg-sky-500 transition-all rounded-xs"
                           style={{ height: `${Math.min(100, Math.max(8, h.precipitation_probability_percent))}%` }}

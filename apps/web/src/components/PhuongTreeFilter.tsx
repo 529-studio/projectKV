@@ -494,7 +494,7 @@ export default function PhuongTreeFilter({
           <button
             type="button"
             onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}
-            className="text-[10px] uppercase font-bold text-zinc-400 hover:text-white px-1.5 py-0.5 border border-zinc-700 rounded hover:border-zinc-500 transition-colors cursor-pointer"
+            className="text-[10px] uppercase font-bold text-zinc-400 hover:text-white px-1.5 py-0.5 border border-zinc-700 rounded-sm hover:border-zinc-500 transition-colors cursor-pointer"
             title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
           >
             {lang === 'vi' ? 'EN' : 'VI'}
@@ -521,7 +521,7 @@ export default function PhuongTreeFilter({
                 onClick={onToggleFloodFilter}
                 className={`mt-2 w-full py-1 px-2 rounded text-[11px] font-semibold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
                   isFloodFilterActive
-                    ? 'bg-red-500 text-white border-red-400 shadow-sm'
+                    ? 'bg-red-500 text-white border-red-400 shadow-xs'
                     : 'bg-red-950/60 hover:bg-red-900/60 text-red-200 border-red-800/60'
                 }`}
               >
@@ -608,7 +608,7 @@ export default function PhuongTreeFilter({
               placeholder={t.searchPlaceholder}
               value={searchTerm}
               onChange={e => onSearchChange(e.target.value)}
-              className="w-full bg-transparent text-xs text-white placeholder-zinc-500 focus:outline-none font-mono"
+              className="w-full bg-transparent text-xs text-white placeholder-zinc-500 focus:outline-hidden font-mono"
               autoComplete="off"
               spellCheck={false}
             />
@@ -618,7 +618,7 @@ export default function PhuongTreeFilter({
               <button
                 type="button"
                 onClick={() => onSearchChange('')}
-                className="ml-1 text-zinc-400 hover:text-white p-0.5 rounded hover:bg-zinc-800 transition-colors shrink-0 focus:outline-none"
+                className="ml-1 text-zinc-400 hover:text-white p-0.5 rounded-sm hover:bg-zinc-800 transition-colors shrink-0 focus:outline-hidden"
                 aria-label={lang === 'vi' ? 'Xóa từ khóa tìm kiếm' : 'Clear search keyword'}
                 title={lang === 'vi' ? 'Xóa tìm kiếm' : 'Clear search'}
               >
@@ -648,7 +648,7 @@ export default function PhuongTreeFilter({
             onClick={onToggleFloodFilter}
             className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all border flex items-center gap-1.5 cursor-pointer ${
               isFloodFilterActive
-                ? 'bg-blue-600 text-white border-blue-500 font-bold shadow-sm'
+                ? 'bg-blue-600 text-white border-blue-500 font-bold shadow-xs'
                 : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:text-blue-300 hover:border-blue-500/50'
             }`}
             title={lang === 'vi' ? 'Lọc danh sách chỉ hiển thị camera ngập nước' : 'Filter camera list to flooded cameras'}
@@ -662,7 +662,7 @@ export default function PhuongTreeFilter({
             <button
               type="button"
               onClick={onToggleFloodFilter}
-              className="px-2 py-0.5 rounded text-[11px] font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all font-mono cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
+              className="px-2 py-0.5 rounded-sm text-[11px] font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all font-mono cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
               title={lang === 'vi' ? 'Xóa lọc' : 'Clear filter'}
             >
               <span className="font-bold text-xs leading-none">✕</span>
@@ -745,7 +745,7 @@ export default function PhuongTreeFilter({
 
           {canScrollRight && (
             <>
-              <div className="pointer-events-none absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-zinc-950 via-zinc-950/80 to-transparent" />
+              <div className="pointer-events-none absolute right-0 top-0 bottom-2 w-8 bg-linear-to-l from-zinc-950 via-zinc-950/80 to-transparent" />
               <button
                 type="button"
                 onClick={() => scrollArterials('right')}
@@ -809,12 +809,12 @@ export default function PhuongTreeFilter({
         <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 text-[11px] text-zinc-300 shrink-0 gap-2">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <span className="text-zinc-500 shrink-0">{t.activeFilter}</span>
-            <span className="text-white font-bold whitespace-normal break-words leading-tight">{activeFilterLabel}</span>
+            <span className="text-white font-bold whitespace-normal wrap-break-word leading-tight">{activeFilterLabel}</span>
           </div>
           <button
             type="button"
             onClick={handleClearFilter}
-            className="px-2 py-0.5 rounded text-[10.5px] font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all shrink-0 cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
+            className="px-2 py-0.5 rounded-sm text-[10.5px] font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all shrink-0 cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
             title={lang === 'vi' ? 'Xóa lọc' : 'Clear filter'}
           >
             <span className="font-bold text-xs leading-none">✕</span>
@@ -850,7 +850,7 @@ export default function PhuongTreeFilter({
               return (
                 <div
                   key={`city-corr-${corr.name}`}
-                  className="border border-zinc-800/80 rounded bg-zinc-900/30 overflow-hidden transition-colors"
+                  className="border border-zinc-800/80 rounded-sm bg-zinc-900/30 overflow-hidden transition-colors"
                 >
                   <div
                     onClick={() => handleSelectCityCorridor(corr.name)}
@@ -865,7 +865,7 @@ export default function PhuongTreeFilter({
                       <button
                         type="button"
                         onClick={e => toggleCityCorridorExpand(corr.name, e)}
-                        className="text-zinc-400 hover:text-white text-xs w-4 h-4 flex items-center justify-center shrink-0 focus:outline-none"
+                        className="text-zinc-400 hover:text-white text-xs w-4 h-4 flex items-center justify-center shrink-0 focus:outline-hidden"
                         aria-label={lang === 'vi' ? 'Đóng/mở' : 'Toggle corridor'}
                       >
                         {isExpanded ? '▾' : '▸'}
@@ -873,19 +873,19 @@ export default function PhuongTreeFilter({
                       {/* Severity badge dot: only shown when corridor has real, non-stale verdict */}
                       {worstSev === 'CONGESTED' && (
                         <span
-                          className="w-2 h-2 rounded-full bg-rose-500 shrink-0 shadow-sm"
+                          className="w-2 h-2 rounded-full bg-rose-500 shrink-0 shadow-xs"
                           title={lang === 'vi' ? 'Ùn tắc' : 'Congested'}
                         />
                       )}
                       {worstSev === 'MODERATE' && (
                         <span
-                          className="w-2 h-2 rounded-full bg-amber-400 shrink-0 shadow-sm"
+                          className="w-2 h-2 rounded-full bg-amber-400 shrink-0 shadow-xs"
                           title={lang === 'vi' ? 'Đông xe' : 'Moderate'}
                         />
                       )}
                       {worstSev === 'CLEAR' && (
                         <span
-                          className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-sm"
+                          className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-xs"
                           title={lang === 'vi' ? 'Thông thoáng' : 'Clear'}
                         />
                       )}
@@ -908,17 +908,17 @@ export default function PhuongTreeFilter({
 
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       {corr.congestedCount > 0 && (
-                        <span className="text-[9.5px] font-bold text-red-400 bg-red-950/50 border border-red-800/60 px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <span className="text-[9.5px] font-bold text-red-400 bg-red-950/50 border border-red-800/60 px-1.5 py-0.5 rounded-sm flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
                           <span>{corr.congestedCount} {t.congestedTag}</span>
                         </span>
                       )}
                       {corr.congestedCount === 0 && corr.moderateCount > 0 && (
-                        <span className="text-[9.5px] font-bold text-yellow-400 bg-yellow-950/50 border border-yellow-800/60 px-1.5 py-0.5 rounded">
+                        <span className="text-[9.5px] font-bold text-yellow-400 bg-yellow-950/50 border border-yellow-800/60 px-1.5 py-0.5 rounded-sm">
                           {corr.moderateCount} {t.moderateTag}
                         </span>
                       )}
-                      <span className="text-[10px] text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800">
+                      <span className="text-[10px] text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded-sm border border-zinc-800">
                         {corr.totalCameras}
                       </span>
                     </div>
@@ -944,7 +944,7 @@ export default function PhuongTreeFilter({
                                 e.stopPropagation();
                                 onCameraClick(cam as Camera);
                               }}
-                              className="flex items-center justify-between px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800/70 active:bg-zinc-700 cursor-pointer rounded transition-colors group"
+                              className="flex items-center justify-between px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800/70 active:bg-zinc-700 cursor-pointer rounded-sm transition-colors group"
                               title={cam.displayName || cam.title}
                             >
                               <div className="flex items-center gap-2 truncate flex-1 min-w-0">
@@ -982,7 +982,7 @@ export default function PhuongTreeFilter({
             return (
               <div
                 key={group.key}
-                className="border border-zinc-800/80 rounded bg-zinc-900/30 overflow-hidden transition-colors"
+                className="border border-zinc-800/80 rounded-sm bg-zinc-900/30 overflow-hidden transition-colors"
               >
                 {/* TIER 1: Phường Header */}
                 <div
@@ -997,14 +997,14 @@ export default function PhuongTreeFilter({
                     <button
                       type="button"
                       onClick={e => togglePhuongExpand(group.key, e)}
-                      className="text-zinc-400 hover:text-white text-xs w-4 h-4 flex items-center justify-center shrink-0 focus:outline-none"
+                      className="text-zinc-400 hover:text-white text-xs w-4 h-4 flex items-center justify-center shrink-0 focus:outline-hidden"
                       aria-label={lang === 'vi' ? 'Đóng/mở' : 'Toggle ward'}
                     >
                       {isExpanded ? '▾' : '▸'}
                     </button>
                     <span className="text-xs truncate">{group.displayName}</span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 shrink-0 ml-2">
+                  <span className="text-[10px] text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded-sm border border-zinc-800 shrink-0 ml-2">
                     {group.totalCameras}
                   </span>
                 </div>
@@ -1054,7 +1054,7 @@ export default function PhuongTreeFilter({
                                     <button
                                       type="button"
                                       onClick={e => toggleCorridorExpand(corridorId, e)}
-                                      className="text-zinc-500 hover:text-white text-[11px] w-3.5 h-3.5 flex items-center justify-center shrink-0 focus:outline-none"
+                                      className="text-zinc-500 hover:text-white text-[11px] w-3.5 h-3.5 flex items-center justify-center shrink-0 focus:outline-hidden"
                                       aria-label={lang === 'vi' ? 'Đóng/mở đường' : 'Toggle corridor'}
                                     >
                                       {isCorrExpanded ? '▾' : '▸'}
@@ -1115,7 +1115,7 @@ export default function PhuongTreeFilter({
                                         <div
                                           key={cam.id}
                                           onClick={() => onCameraClick(cam)}
-                                          className="flex items-center justify-between px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800/70 active:bg-zinc-700 cursor-pointer rounded transition-colors group"
+                                          className="flex items-center justify-between px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800/70 active:bg-zinc-700 cursor-pointer rounded-sm transition-colors group"
                                           title={cam.displayName || cam.title}
                                         >
                                           <div className="flex items-center gap-2 truncate flex-1 min-w-0">

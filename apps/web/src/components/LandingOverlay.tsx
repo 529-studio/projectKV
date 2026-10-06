@@ -12,7 +12,7 @@ export default function LandingOverlay() {
           initial={{ opacity: 1, backdropFilter: 'blur(12px)' }}
           exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
           transition={{ duration: 0.6, ease: 'easeInOut' }}
-          className="fixed inset-0 z-[9999] bg-black/85 flex items-center justify-center pointer-events-auto"
+          className="fixed inset-0 z-9999 bg-black/85 flex items-center justify-center pointer-events-auto"
         >
           <motion.div 
             initial={{ y: 20, opacity: 0 }}
@@ -29,7 +29,7 @@ export default function LandingOverlay() {
             </p>
             <button 
               onClick={() => setIsVisible(false)}
-              className="bg-white text-black font-bold py-3 px-8 rounded hover:scale-105 transition-transform duration-200 cursor-pointer"
+              className="bg-white text-black font-bold py-3 px-8 rounded-sm hover:scale-105 transition-transform duration-200 cursor-pointer"
             >
               Truy cập Hệ thống
             </button>
