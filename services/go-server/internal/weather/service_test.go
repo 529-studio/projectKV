@@ -260,7 +260,7 @@ func TestService_GetWeather_NonZeroMinuteAlignment(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(payloadBytes)
+		_, _ = w.Write(payloadBytes)
 	}))
 	defer server.Close()
 
@@ -327,7 +327,7 @@ func TestService_GetWeather_LateNightMidnightSpan(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(payloadBytes)
+		_, _ = w.Write(payloadBytes)
 	}))
 	defer server.Close()
 
@@ -371,7 +371,7 @@ func TestService_GetWeather_MissingHourFallback(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(payloadBytes)
+		_, _ = w.Write(payloadBytes)
 	}))
 	defer server.Close()
 
