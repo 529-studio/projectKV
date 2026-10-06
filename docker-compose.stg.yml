@@ -10,6 +10,7 @@ services:
       - 1.1.1.1
       - 8.8.8.8
     environment:
+      - APP_ENV=${APP_ENV}
       - PORT=${BE_PORT:-3000}
       - GIN_MODE=${GIN_MODE:-release}
       - CAMERAS_FILE_PATH=${CAMERAS_FILE_PATH:-/app/cameras_enriched.json}
