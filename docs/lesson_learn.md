@@ -144,7 +144,7 @@
 
 ## Lesson 9: Competing Sources of Truth & Silent Drift (Ghost Camera Catalog Resync)
 
-- **Incident & Tracking:** Issue #178, Pull Request (`fix/178-camera-catalog-ghost-resync`).
+- **Incident & Tracking:** Issue #178, Pull Request #179 (`fix/178-camera-catalog-ghost-resync`).
 - **Symptom:**
   Users clicking cameras that the map showed as online were greeted with the snapshot failure modal (`KHÔNG THỂ TẢI HÌNH ẢNH SNAPSHOT — Máy chủ proxy báo lỗi 502/503`). A full live audit of all 837 feeds found **712 live** and **125 placeholder/ghost** at scan time, while the committed catalog still advertised 711 cameras as `UP` — including **21 cameras returning the 2,638-byte "IMAGE NOT AVAILABLE" placeholder**.
 - **Root Cause:**

@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **102 Pull Requests** processed across repository history:
-  - **94 Merged** to `dev`
-  - **7 Closed** without merging
-  - **1 Open** PR currently pending (#174 targeting `dev`)
+- **Lifetime PR History**: Exactly **106 Pull Requests** processed across repository history:
+  - **97 Merged** to `dev`
+  - **8 Closed** without merging
+  - **1 Open** PR currently pending (#179 targeting `dev`, camera catalog resync for Issue #178)
 - **Camera Catalog**:
   - **837 total cameras** loaded in `cameras_enriched.json`
   - **712 online cameras** (status `UP`, `isOnline: true`) and **125 offline** (status `NOT_IMAGE`) as of the latest city-wide health audit (2026-10-06)
@@ -39,7 +39,7 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
     3. Điện Biên Phủ (`dien_bien_phu`): 11 cameras
     4. Cộng Hòa (`cong_hoa`): 10 cameras
   - Curated strictly via A6 rule: `len(road_keys) == 2` (n nút giao, descartes mid-block straight stretches).
-- **Camera Health Audit & Catalog Resync (Issue #178)**:
+- **Camera Health Audit & Catalog Resync (Issue #178, PR #179)**:
   - `tools/crawler/audit_all_cameras.js` probes all 837 snapshots against the live DOT upstream (15 workers, 5s timeout) and classifies each feed (`SUCCESS`, `GHOST_PLACEHOLDER`, `EMPTY_BODY`, `TIMEOUT`, `NETWORK_ERROR`, `HTTP_*`).
   - `tools/crawler/sync_catalog_from_audit.js` re-synchronizes `cameras_all.json` / `cameras_enriched.json` from the probe report (deterministic outcomes only; transient errors leave entries untouched). This replaced the former hardcoded `KnownGhostCameras` map, which had drifted out of sync, making the JSON catalog the single source of truth for static liveness.
   - `.github/workflows/camera-health-audit.yml` runs the audit daily (01:00 UTC) and opens a resync Pull Request against `dev` when drift is detected (never auto-merges).
