@@ -48,6 +48,11 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - 48-hour upstream lookahead buffer (`forecast_days=2`) enabling rolling 12-hour forecast windows spanning past midnight.
 - **Signal Separation**:
   - Independent layer toggles: Ground-truth camera-verified flood hexes (`HexOverlay.tsx`) are completely separated from Doppler weather radar reflectivity (`RainRadarLayer.tsx`).
+- **GitHub Actions Compute (Oct 2026 Audit, #173)**:
+  - Consolidated the standalone `go-ci.yml` into the `ci.yml` `verify-backend` job, removing duplicate Go verification on every backend PR.
+  - `ci.yml` now triggers on `pull_request` only; the redundant post-merge `push` re-verification was removed (build/deploy remains covered by `docker-publish.yml`).
+  - Added `concurrency` with `cancel-in-progress: true` to `ci.yml`, `branch-guard.yml`, and `auto-request-reviewers.yml` (`docker-publish.yml` already had it) to cancel superseded runs on rapid pushes.
+  - Removed the informational `ci-gate` aggregation job: `dev` and `main` have no native branch protection on the Free-tier private repo, so it gated nothing.
 
 ---
 

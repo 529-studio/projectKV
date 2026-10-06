@@ -11,22 +11,12 @@ on:
       - '.github/workflows/auto-request-reviewers.yml'
       - '.github/workflows/branch-guard.yml'
       - '.github/workflows/docker-publish.yml'
-      - '.github/workflows/go-ci.yml'
       - '.env.example'
       - '.env.stg.example'
-  push:
-    branches: [main, dev]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.agents/**'
-      - '.githooks/**'
-      - '.github/workflows/auto-request-reviewers.yml'
-      - '.github/workflows/branch-guard.yml'
-      - '.github/workflows/docker-publish.yml'
-      - '.github/workflows/go-ci.yml'
-      - '.env.example'
-      - '.env.stg.example'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -76,12 +66,18 @@ jobs:
         with:
           go-version-file: 'services/go-server/go.mod'
 
+      - name: Lint Go Backend
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: services/go-server
+          install-mode: "goinstall"
+
       - name: Verify and Test Go Backend
         run: |
           cd services/go-server
           go vet ./...
-          go test -v ./...
-          go build -v -o bin/server ./cmd/server
+          go test -v ./... -race -cover
+          go build -v ./...
 
   verify-frontend:
     name: Verify Web Frontend
@@ -133,27 +129,3 @@ jobs:
             console.log('Total valid cameras count:', data.length);
             if (!Array.isArray(data) || data.length === 0) process.exit(1);
           "
-
-  ci-gate:
-    name: CI Gate
-    needs: [detect-changes, verify-backend, verify-frontend, verify-tools-dataset]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Evaluate All CI Job Results
-        run: |
-          echo "Backend check result: ${{ needs.verify-backend.result }}"
-          echo "Frontend check result: ${{ needs.verify-frontend.result }}"
-          echo "Tools & Dataset check result: ${{ needs.verify-tools-dataset.result }}"
-
-          if [ "${{ needs.verify-backend.result }}" = "failure" ] || \
-             [ "${{ needs.verify-backend.result }}" = "cancelled" ] || \
-             [ "${{ needs.verify-frontend.result }}" = "failure" ] || \
-             [ "${{ needs.verify-frontend.result }}" = "cancelled" ] || \
-             [ "${{ needs.verify-tools-dataset.result }}" = "failure" ] || \
-             [ "${{ needs.verify-tools-dataset.result }}" = "cancelled" ]; then
-            echo "❌ CI Verification failed on one or more active components."
-            exit 1
-          fi
-
-          echo "✅ All active CI checks passed or were safely skipped."
