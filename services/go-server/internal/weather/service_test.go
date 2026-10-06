@@ -2,9 +2,11 @@ package weather
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -166,6 +168,225 @@ func TestService_GetWeather_FallbackStale(t *testing.T) {
 	}
 	if staleData == nil || staleData.Temperature != 29.5 {
 		t.Errorf("expected stale data with temp 29.5, got %v", staleData)
+	}
+}
+
+func TestTruncateToHour(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"2026-10-06T14:15", "2026-10-06T14:00"},
+		{"2026-10-06T14:00", "2026-10-06T14:00"},
+		{"2026-10-06T14:59", "2026-10-06T14:00"},
+		{"2026-10-06T00:30", "2026-10-06T00:00"},
+		{"2026-10-06T14:45:00", "2026-10-06T14:00"},
+		{"2026-10-06T14:30:00+07:00", "2026-10-06T14:00"},
+	}
+
+	for _, tt := range tests {
+		got := truncateToHour(tt.input)
+		if got != tt.expected {
+			t.Errorf("truncateToHour(%q): expected %q, got %q", tt.input, tt.expected, got)
+		}
+	}
+}
+
+func TestService_GetWeather_NonZeroMinuteAlignment(t *testing.T) {
+	// Simulate realistic Open-Meteo response where current.time is 14:15,
+	// and hourly.time is a 48h array starting at midnight (00:00).
+	var times []string
+	var probs []int
+	var rains []float64
+	var codes []int
+
+	for day := 6; day <= 7; day++ {
+		for hour := 0; hour < 24; hour++ {
+			times = append(times, fmt.Sprintf("2026-10-%02dT%02d:00", day, hour))
+			probs = append(probs, (hour*3)%100)
+			rains = append(rains, float64(hour)*0.1)
+			codes = append(codes, 61)
+		}
+	}
+
+	type omHourly struct {
+		Time                     []string  `json:"time"`
+		PrecipitationProbability []int     `json:"precipitation_probability"`
+		Rain                     []float64 `json:"rain"`
+		WeatherCode              []int     `json:"weather_code"`
+	}
+	type omCurrent struct {
+		Time                string  `json:"time"`
+		Interval            int     `json:"interval"`
+		Temperature2m       float64 `json:"temperature_2m"`
+		RelativeHumidity2m  int     `json:"relative_humidity_2m"`
+		ApparentTemperature float64 `json:"apparent_temperature"`
+		Precipitation       float64 `json:"precipitation"`
+		Rain                float64 `json:"rain"`
+		WeatherCode         int     `json:"weather_code"`
+	}
+	type omPayload struct {
+		Latitude  float64   `json:"latitude"`
+		Longitude float64   `json:"longitude"`
+		Current   omCurrent `json:"current"`
+		Hourly    omHourly  `json:"hourly"`
+	}
+
+	payload := omPayload{
+		Latitude:  10.7909,
+		Longitude: 106.7109,
+		Current: omCurrent{
+			Time:                "2026-10-06T14:15",
+			Interval:            900,
+			Temperature2m:       28.0,
+			RelativeHumidity2m:  80,
+			ApparentTemperature: 33.0,
+			Precipitation:       1.2,
+			Rain:                1.2,
+			WeatherCode:         95,
+		},
+		Hourly: omHourly{
+			Time:                     times,
+			PrecipitationProbability: probs,
+			Rain:                     rains,
+			WeatherCode:              codes,
+		},
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.RawQuery, "forecast_days=2") {
+			t.Errorf("expected forecast_days=2 in query, got %q", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(payloadBytes)
+	}))
+	defer server.Close()
+
+	svc := NewService(
+		WithOpenMeteoURL(server.URL),
+		WithWeatherTTL(500*time.Millisecond),
+	)
+
+	ctx := context.Background()
+	data, err := svc.GetWeather(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// 1. Current probability should match the 14:00 slot (42%), NOT 00:00 slot (0%)
+	if data.PrecipitationProbability != 42 {
+		t.Errorf("expected current rain prob 42%% from 14:00 slot, got %d%%", data.PrecipitationProbability)
+	}
+
+	// 2. Hourly forecast must start at current hour slot (14:00), NOT midnight (00:00)
+	if len(data.Hourly) != 12 {
+		t.Fatalf("expected 12 hourly items, got %d", len(data.Hourly))
+	}
+	if data.Hourly[0].Time != "2026-10-06T14:00" {
+		t.Errorf("expected first hourly slot to be '2026-10-06T14:00', got %q", data.Hourly[0].Time)
+	}
+	if data.Hourly[0].PrecipitationProbability != 42 {
+		t.Errorf("expected first hourly prob 42%%, got %d%%", data.Hourly[0].PrecipitationProbability)
+	}
+
+	// 3. 12th hour should reach into tomorrow: 14:00 + 11h = 01:00 next day
+	if data.Hourly[11].Time != "2026-10-07T01:00" {
+		t.Errorf("expected 12th hourly slot to be '2026-10-07T01:00', got %q", data.Hourly[11].Time)
+	}
+}
+
+func TestService_GetWeather_LateNightMidnightSpan(t *testing.T) {
+	// Verify that querying late at night (e.g. 23:45) returns a full 12-hour slice
+	// spanning seamlessly from 23:00 today into 10:00 tomorrow morning.
+	var times []string
+	var probs []int
+
+	for day := 6; day <= 7; day++ {
+		for hour := 0; hour < 24; hour++ {
+			times = append(times, fmt.Sprintf("2026-10-%02dT%02d:00", day, hour))
+			probs = append(probs, hour*2)
+		}
+	}
+
+	payload := map[string]any{
+		"latitude":  10.7909,
+		"longitude": 106.7109,
+		"current": map[string]any{
+			"time":         "2026-10-06T23:45",
+			"weather_code": 80,
+		},
+		"hourly": map[string]any{
+			"time":                      times,
+			"precipitation_probability": probs,
+		},
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(payloadBytes)
+	}))
+	defer server.Close()
+
+	svc := NewService(WithOpenMeteoURL(server.URL))
+	data, err := svc.GetWeather(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(data.Hourly) != 12 {
+		t.Fatalf("expected 12 hourly items across midnight, got %d", len(data.Hourly))
+	}
+	if data.Hourly[0].Time != "2026-10-06T23:00" {
+		t.Errorf("expected start at 23:00, got %q", data.Hourly[0].Time)
+	}
+	if data.Hourly[1].Time != "2026-10-07T00:00" {
+		t.Errorf("expected 2nd hour at next-day midnight, got %q", data.Hourly[1].Time)
+	}
+	if data.Hourly[11].Time != "2026-10-07T10:00" {
+		t.Errorf("expected 12th hour at 10:00 tomorrow, got %q", data.Hourly[11].Time)
+	}
+}
+
+func TestService_GetWeather_MissingHourFallback(t *testing.T) {
+	// If exact current hour slot is missing from hourly data,
+	// it should fallback gracefully to the closest preceding slot.
+	payload := map[string]any{
+		"latitude":  10.7909,
+		"longitude": 106.7109,
+		"current": map[string]any{
+			"time":         "2026-10-06T14:30",
+			"weather_code": 80,
+		},
+		"hourly": map[string]any{
+			"time":                      []string{"2026-10-06T12:00", "2026-10-06T13:00", "2026-10-06T16:00"},
+			"precipitation_probability": []int{10, 20, 30},
+		},
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(payloadBytes)
+	}))
+	defer server.Close()
+
+	svc := NewService(WithOpenMeteoURL(server.URL))
+	data, err := svc.GetWeather(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Closest preceding hour slot to 14:00 is 13:00 (prob = 20)
+	if data.PrecipitationProbability != 20 {
+		t.Errorf("expected fallback prob 20 from 13:00, got %d", data.PrecipitationProbability)
+	}
+	if data.Hourly[0].Time != "2026-10-06T13:00" {
+		t.Errorf("expected fallback start at 13:00, got %q", data.Hourly[0].Time)
 	}
 }
 
