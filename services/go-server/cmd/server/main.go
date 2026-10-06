@@ -101,8 +101,9 @@ func buildFixedHotSet(reader camera.Reader, maxCameras int) []hotset.Camera {
 		return nil
 	}
 
-	// Filter out offline, ghost and duplicate streams so the Hot Set only
-	// contains feeds that can actually produce snapshots.
+	// Filter out offline, ghost (catalog-sourced via audit resync), and
+	// duplicate streams so the Hot Set only contains feeds that can actually
+	// produce snapshots.
 	eligible := make([]camera.Camera, 0, len(all))
 	for _, c := range all {
 		if !c.IsOnline || c.IsGhost || c.DuplicateOf != "" {

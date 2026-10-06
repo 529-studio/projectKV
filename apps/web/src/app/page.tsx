@@ -27,7 +27,7 @@ const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: 
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
 
 export default function Home() {
-  const { cameras, loading, error } = useCameras();
+  const { cameras, loading, error, markCameraGhost } = useCameras();
   const { verdicts, hexCells, analysisEnabled, appEnv, loading: trafficLoading } = useTraffic();
   const { floodVerdicts, floodHexCells, floodedCameraIds, floodedCameraCount, loading: floodLoading } = useFlood();
   const { weather, radar, loading: weatherLoading } = useWeather();
@@ -38,7 +38,16 @@ export default function Home() {
   // Default to 'radar' as it is driven by real-time rain radar API
   const [activeLens, setActiveLens] = useState<ActiveLensMode>('radar');
   const [isFloodFilterActive, setIsFloodFilterActive] = useState(false);
-  const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
+  // Store only the selected camera id and derive the live object from the
+  // cameras array so runtime updates (e.g. markCameraGhost) propagate instantly.
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const selectedCamera = useMemo(
+    () => (selectedCameraId ? cameras.find(c => c.id === selectedCameraId) ?? null : null),
+    [selectedCameraId, cameras]
+  );
+  const handleSelectCamera = useCallback((cam: Camera | null) => {
+    setSelectedCameraId(cam ? cam.id : null);
+  }, []);
   const [searchTerm, setSearchTerm] = useState('');
   const [pinnedCameraIds, setPinnedCameraIds] = useState<string[]>([]);
   const [pinNotice, setPinNotice] = useState<string | null>(null);
@@ -131,8 +140,8 @@ export default function Home() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (selectedCamera) {
-          setSelectedCamera(null);
+        if (selectedCameraId) {
+          handleSelectCamera(null);
         } else if (isFiltered) {
           handleFilterClear();
         }
@@ -140,7 +149,7 @@ export default function Home() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCamera, isFiltered, handleFilterClear]);
+  }, [selectedCameraId, isFiltered, handleFilterClear, handleSelectCamera]);
 
   // Set of camera IDs matching the active filter for focus dimming (ADR-004 A3)
   const filteredCameraIds = useMemo(() => {
@@ -263,7 +272,7 @@ export default function Home() {
             selectedCorridor={selectedCorridor}
             onSelectPhuong={setSelectedPhuong}
             onSelectCorridor={setSelectedCorridor}
-            onCameraClick={setSelectedCamera}
+            onCameraClick={handleSelectCamera}
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             lang={lang}
@@ -278,7 +287,7 @@ export default function Home() {
           <MapComponent
             cameras={cameras}
             verdicts={verdicts}
-            onCameraClick={setSelectedCamera}
+            onCameraClick={handleSelectCamera}
             selectedCamera={selectedCamera}
             isFiltered={isFiltered}
             filteredCameraIds={filteredCameraIds}
@@ -330,7 +339,7 @@ export default function Home() {
           onUnpin={togglePin} 
           onClear={handleClearPins}
           onReorder={handleReorderPins}
-          onCameraClick={setSelectedCamera}
+          onCameraClick={handleSelectCamera}
           lang={lang}
           verdicts={verdicts}
           pinNotice={pinNotice}
@@ -420,7 +429,7 @@ export default function Home() {
             setMobileDrawerOpen(false);
             setShouldFocusSearch(false);
           }}
-          onCameraClick={setSelectedCamera}
+          onCameraClick={handleSelectCamera}
           selectedPhuong={selectedPhuong}
           selectedCorridor={selectedCorridor}
           onSelectPhuong={setSelectedPhuong}
@@ -437,18 +446,19 @@ export default function Home() {
       <CameraModal 
         camera={selectedCamera} 
         verdict={selectedCameraVerdict} 
-        onClose={() => setSelectedCamera(null)} 
+        onClose={() => handleSelectCamera(null)} 
         isPinned={selectedCamera ? pinnedCameraIds.includes(selectedCamera.id) : false}
         onTogglePin={() => selectedCamera && togglePin(selectedCamera.id)}
         lang={lang}
         appEnv={appEnv}
         analysisEnabled={analysisEnabled}
         pinCapReached={pinnedCameraIds.length >= PINNED_DOCK_CAP}
-        onPrevCamera={() => cameraSequence.prevCamera && setSelectedCamera(cameraSequence.prevCamera as Camera)}
-        onNextCamera={() => cameraSequence.nextCamera && setSelectedCamera(cameraSequence.nextCamera as Camera)}
+        onPrevCamera={() => cameraSequence.prevCamera && handleSelectCamera(cameraSequence.prevCamera as Camera)}
+        onNextCamera={() => cameraSequence.nextCamera && handleSelectCamera(cameraSequence.nextCamera as Camera)}
         hasPrevCamera={Boolean(cameraSequence.prevCamera)}
         hasNextCamera={Boolean(cameraSequence.nextCamera)}
         sequenceLabel={cameraSequence.contextLabel}
+        onGhostDetected={markCameraGhost}
       />
     </div>
   );

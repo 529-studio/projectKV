@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { API_ENDPOINTS, getApiUrl } from '../config/constants';
 
 export interface Camera {
@@ -59,5 +59,14 @@ export function useCameras() {
     fetchCameras();
   }, []);
 
-  return { cameras, loading, error };
+  // markCameraGhost flips a camera to the runtime "no field signal" state after
+  // the snapshot proxy reports a GHOST_CAMERA (503) response. This keeps the
+  // map, sidebar, dock and modal consistent without waiting for a catalog resync.
+  const markCameraGhost = useCallback((id: string) => {
+    setCameras(prev =>
+      prev.map(c => (c.id === id ? { ...c, isGhost: true, isOnline: false } : c))
+    );
+  }, []);
+
+  return { cameras, loading, error, markCameraGhost };
 }
