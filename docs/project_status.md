@@ -2,7 +2,7 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.0.1  
+**Document Version:** 1.0.2  
 **Last Updated:** 2026-10-06  
 
 ---
@@ -25,19 +25,25 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **102 Pull Requests** processed across repository history:
-  - **94 Merged** to `dev`
-  - **7 Closed** without merging
-  - **1 Open** PR currently pending (#174 targeting `dev`)
+- **Lifetime PR History**: Exactly **106 Pull Requests** processed across repository history:
+  - **97 Merged** to `dev`
+  - **8 Closed** without merging
+  - **1 Open** PR currently pending (#179 targeting `dev`, camera catalog resync for Issue #178)
 - **Camera Catalog**:
   - **837 total cameras** loaded in `cameras_enriched.json`
-  - **701 online cameras** (status `UP`, `isOnline: true`, verified non-ghost)
+  - **712 online cameras** (status `UP`, `isOnline: true`) and **125 offline** (status `NOT_IMAGE`) as of the latest city-wide health audit (2026-10-06)
+  - Static liveness (`isOnline` / `status`) is verified by live upstream probing; runtime placeholder detection runs in `proxycache` and surfaces `503 GHOST_CAMERA`
   - **57 curated intersection cameras (Hot Set)** across 4 priority commuter corridors:
     1. Võ Văn Kiệt (`vo_van_kiet`): 23 cameras
     2. Mai Chí Thọ (`mai_chi_tho`): 13 cameras
     3. Điện Biên Phủ (`dien_bien_phu`): 11 cameras
     4. Cộng Hòa (`cong_hoa`): 10 cameras
   - Curated strictly via A6 rule: `len(road_keys) == 2` (n nút giao, descartes mid-block straight stretches).
+- **Camera Health Audit & Catalog Resync (Issue #178, PR #179)**:
+  - `tools/crawler/audit_all_cameras.js` probes all 837 snapshots against the live DOT upstream (15 workers, 5s timeout) and classifies each feed (`SUCCESS`, `GHOST_PLACEHOLDER`, `EMPTY_BODY`, `TIMEOUT`, `NETWORK_ERROR`, `HTTP_*`).
+  - `tools/crawler/sync_catalog_from_audit.js` re-synchronizes `cameras_all.json` / `cameras_enriched.json` from the probe report (deterministic outcomes only; transient errors leave entries untouched). This replaced the former hardcoded `KnownGhostCameras` map, which had drifted out of sync, making the JSON catalog the single source of truth for static liveness.
+  - `.github/workflows/camera-health-audit.yml` runs the audit daily (01:00 UTC) and opens a resync Pull Request against `dev` when drift is detected (never auto-merges).
+  - The web client promotes a `503 GHOST_CAMERA` snapshot response into shared state (`useCameras.markCameraGhost`), immediately reflecting field signal loss across the map, sidebar, dock and modal.
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).
