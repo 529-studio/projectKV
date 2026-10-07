@@ -12,6 +12,7 @@ services:
     environment:
       - PORT=${BE_PORT:-3000}
       - GIN_MODE=${GIN_MODE:-release}
+      - APP_ENV=${APP_ENV:-staging}
       - CAMERAS_FILE_PATH=${CAMERAS_FILE_PATH:-/app/cameras_enriched.json}
       - HEX_POLYGON_FILE_PATH=${HEX_POLYGON_FILE_PATH:-/app/h3_hex_polygons.json}
       - SQLITE_PATH=${SQLITE_PATH:-/app/data/camera-view.db}
