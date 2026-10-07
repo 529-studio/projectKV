@@ -1,0 +1,106 @@
+name: Camera Health Audit
+
+# Periodically probes the live DOT upstream for every camera in the catalog,
+# re-synchronizes the static catalog (cameras_all.json / cameras_enriched.json)
+# with observed reality, and opens a Pull Request when drift is detected.
+#
+# Policy: never pushes directly to dev/main — always opens a PR for review
+# (AGENTS.md §5). Automated PRs are never auto-merged.
+
+on:
+  schedule:
+    # Daily at 01:00 UTC (08:00 Asia/Ho_Chi_Minh).
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: camera-health-audit
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  audit:
+    name: Probe upstream & resync catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Probe all cameras against live upstream
+        run: node tools/crawler/audit_all_cameras.js
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-audit-report
+          path: tools/crawler/audit_results.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Re-synchronize static catalog from audit
+        run: node tools/crawler/sync_catalog_from_audit.js --write
+
+      - name: Open resync Pull Request on drift
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- cameras_all.json cameras_enriched.json; then
+            echo "Catalog is already in sync with upstream; no PR required."
+            exit 0
+          fi
+
+          echo "Catalog drift detected. Preparing resync Pull Request..."
+
+          BRANCH="chore/camera-catalog-resync-$(date -u +%Y%m%d)-${{ github.run_number }}"
+          TITLE="chore(data): resync camera catalog from health audit ($(date -u +%Y-%m-%d))"
+          # Capture the diff summary before committing (working tree vs index).
+          CHANGED=$(git diff --stat -- cameras_all.json cameras_enriched.json | tail -n 1)
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add cameras_all.json cameras_enriched.json
+          git commit -m "$TITLE"
+          git push -u origin "$BRANCH"
+
+          gh pr create \
+            --base dev \
+            --head "$BRANCH" \
+            --title "$TITLE" \
+            --label backend \
+            --label tooling \
+            --body "$(cat <<EOF
+          ### Automated camera catalog resync
+
+          The daily camera health audit detected divergence between the static
+          catalog and the live DOT upstream.
+
+          **Summary:** \`${CHANGED}\`
+
+          The catalog liveness fields (\`isOnline\` / \`status\`) have been updated to
+          match the latest upstream probe. Deterministic outcomes only:
+          - \`SUCCESS\` -> \`isOnline: true\`, \`status: "UP"\`
+          - \`GHOST_PLACEHOLDER\` / \`EMPTY_BODY\` -> \`isOnline: false\`, \`status: "NOT_IMAGE"\`
+          - Transient outcomes (timeout / network / HTTP 5xx) leave entries untouched.
+
+          The full probe report is available as the \`camera-audit-report\` artifact
+          attached to this workflow run (retained 30 days).
+
+          _Opened automatically by \`.github/workflows/camera-health-audit.yml\`. Not auto-merged._
+          EOF
+          )"

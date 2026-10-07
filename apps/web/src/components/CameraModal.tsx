@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
 import { API_ENDPOINTS, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
@@ -19,6 +19,7 @@ interface CameraModalProps {
   hasPrevCamera?: boolean;
   hasNextCamera?: boolean;
   sequenceLabel?: string;
+  onGhostDetected?: (id: string) => void;
 }
 
 export default function CameraModal({
@@ -36,12 +37,15 @@ export default function CameraModal({
   hasPrevCamera = false,
   hasNextCamera = false,
   sequenceLabel,
+  onGhostDetected,
 }: CameraModalProps) {
   const [imgError, setImgError] = useState(false);
   const [fetchTimestamp, setFetchTimestamp] = useState<number>(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [osdTime, setOsdTime] = useState<string | null>(null);
   const mountTimeRef = useRef<number>(Date.now());
+  // Camera id whose ghost probe is currently in flight (prevents duplicate probes).
+  const probeInFlightRef = useRef<string | null>(null);
 
   useEffect(() => {
     mountTimeRef.current = Date.now();
@@ -115,6 +119,37 @@ export default function CameraModal({
     setFetchTimestamp(Date.now());
     setElapsedSeconds(0);
   };
+
+  // When the <img> fails to render, probe the proxy once to distinguish a known
+  // offline camera (503 GHOST_CAMERA) from a genuine transient network error.
+  // A ghost response is promoted into shared client state so the map, sidebar
+  // and dock all reflect the real field signal loss immediately.
+  const handleImageError = useCallback(() => {
+    const id = camera?.id;
+    if (!id || !onGhostDetected) {
+      setImgError(true);
+      return;
+    }
+    if (probeInFlightRef.current === id) return;
+    probeInFlightRef.current = id;
+    fetch(`${getApiUrl(API_ENDPOINTS.SNAPSHOT(id))}?probe=${Date.now()}`)
+      .then(async (res) => {
+        if (res.status === 503) {
+          const body = await res.json().catch(() => null);
+          if (body && body.is_ghost) {
+            onGhostDetected(id);
+            return;
+          }
+        }
+        setImgError(true);
+      })
+      .catch(() => setImgError(true))
+      .finally(() => {
+        if (probeInFlightRef.current === id) {
+          probeInFlightRef.current = null;
+        }
+      });
+  }, [camera?.id, onGhostDetected]);
 
   if (!camera) return null;
 
@@ -398,7 +433,7 @@ export default function CameraModal({
               src={`${getApiUrl(API_ENDPOINTS.SNAPSHOT(camera.id))}?t=${fetchTimestamp}`}
               className="w-full h-full object-contain"
               alt="Live Snapshot"
-              onError={() => setImgError(true)}
+              onError={handleImageError}
             />
           )}
         </div>
