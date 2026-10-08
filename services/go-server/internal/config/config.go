@@ -247,7 +247,7 @@ type ServerConfig struct {
 	PCUWeightCar                  float64       // default: 1.0 (PCU_WEIGHT_CAR)
 	PCUWeightBus                  float64       // default: 2.0 (PCU_WEIGHT_BUS)
 	PCUWeightTruck                float64       // default: 2.0 (PCU_WEIGHT_TRUCK)
-	PCUWeightContainer            float64       // default: 3.0 (PCU_WEIGHT_CONTAINER)
+	PCUWeightContainer            float64       // default: 2.0 (PCU_WEIGHT_CONTAINER, folded into Truck per ADR-005 T6)
 	PCUCapacityFloor              float64       // default: 25.0 (PCU_CAPACITY_FLOOR)
 	PCUThresholdModerate          float64       // default: 0.35 (PCU_THRESHOLD_MODERATE)
 	PCUThresholdHeavy             float64       // default: 0.70 (PCU_THRESHOLD_HEAVY)
@@ -489,7 +489,8 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
-	pcuWeightContainer := 3.0
+	// Default PCUWeightContainer matches PCUWeightTruck (2.0) per ADR-005 T6 / decision-container-class-gap.md.
+	pcuWeightContainer := pcuWeightTruck
 	if val := os.Getenv("PCU_WEIGHT_CONTAINER"); val != "" {
 		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
 			pcuWeightContainer = v

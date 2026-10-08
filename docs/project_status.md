@@ -52,6 +52,7 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).
   - Traffic Scoring: Passenger Car Unit (PCU) Saturation Index ($SI = PCU_{current} / PCU_{capacity}$), mapping into `CLEAR`, `MODERATE`, `HEAVY`, `CONGESTED`.
   - Archiver Direct Frame Delivery (Issue #182): Archiver pipeline directly saves the analyzed frame (`Verdict.RawFrame`) forwarded from the inference analyzers (`cvengine`, `cloudvision`, `mock`), eliminating reliance on viewer proxy cache hits while preserving fallback to `proxycache` and mock frames.
+  - Container Vehicle Class Resolution (Issue #186, ADR-005 T6): Resolved dead code gap where COCO model only outputs 4 vehicle classes. Per `docs/decision-container-class-gap.md`, Container is folded into heavy freight vehicle weight (`Truck = 2.0`), aligning with COCO ground truth and HCMC peak-hour freight restrictions.
 - **Weather Service**:
   - Open-Meteo current & hourly forecast integrated with 5-minute in-memory cache and stale fallback.
   - Aligned to target hour bucket (`truncateToHour`) to resolve 15-minute `current.time` vs hourly `hourly.time` divergence (#172).
