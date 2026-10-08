@@ -25,8 +25,8 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **115 Pull Requests** processed across repository history:
-  - **107 Merged** to `dev`
+- **Lifetime PR History**: Exactly **116 Pull Requests** processed across repository history:
+  - **108 Merged** to `dev`
   - **8 Closed** without merging
   - **0 Open** PRs pending
 - **Staging Infrastructure Configuration (Stack 14)**:
@@ -51,11 +51,17 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Curated 10 high-confidence ground-truth cameras in `tools/eval/fixtures/smoke_test_cameras.json` (5 `CLEAR` off-peak baselines, 5 `CONGESTED` peak rush-hour baselines) across 4 priority corridors (`vo_van_kiet`, `mai_chi_tho`, `dien_bien_phu`, `cong_hoa`).
   - Implemented automated verification script `tools/eval/verify_smoke_set.py` and unit test suite `tools/eval/verify_smoke_set_test.py` to objectively gate model predictions without relying on anecdotal staging UI spot-checks.
   - Detailed physical and operational rationale documented in `tools/eval/smoke_test_cameras.md`.
-- **Evaluation Dataset & Progress Tracking (Sprint 4 T3, Issue #194)**:
+- **Evaluation Dataset & Progress Tracking (Sprint 4 T3, Issue #194, PR #199)**:
   - Strictly excluded all pre-10-06 mock frames (107 bytes) from ground-truth dataset.
   - Implemented `tools/eval/collect_real_frames.py` and `tools/eval/dataset_progress.py` to fetch, validate, and audit real frames against ADR-004 §D6 targets.
   - Ingested initial batch of 70 real labeled frames from 2026-10-08 evening peak (40 rain target satisfied, 14 moderate, 14 heavy/congested).
   - Active passive accumulation window maintained for remaining flood frames (≥60 required by D6 safety gate).
+- **Real D6 Accuracy Gate & OpenVINO Benchmark (Sprint 4 T4, Issue #195)**:
+  - Executed `tools/eval/benchmark.py` against live self-hosted OpenVINO container across the 70 real frames.
+  - Traffic Macro F1: **0.224** (below 0.70 target), demonstrating that uncalibrated cold-start capacity floors (25.0 PCU) and occlusion under congestion degrade accuracy, providing direct empirical requirement for T5 PCU calibration.
+  - Flood Safety Gate: **INCOMPLETE** (0 flood frames evaluated; passive environmental accumulation window remains open per Lesson 14).
+  - Known-state smoke-test validation: **2/10 PASS (20.0%)** on curated baselines (`docs/reports/smoke_eval_d6_real.md`).
+  - Full empirical findings committed to `docs/reports/eval_report_d6_real.md`.
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).

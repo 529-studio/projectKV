@@ -176,6 +176,17 @@ evidence of acceptable accuracy. Combined with the user's own confirmation
 that a real labeled training dataset has not been built yet, the actual safety
 gate this system was designed around remains open.
 
+**Update (2026-10-08 / Sprint 4 T4, Issue #195)**: Finding B closed. The D6
+evaluation was formally executed against the live self-hosted OpenVINO detector
+using the 70 real labeled frames from T3. First empirical numbers:
+- Traffic Macro F1: **0.224** (Target ≥ 0.70) — **FAILED** due to uncalibrated
+  cold-start capacity floor (25.0) on wide arterials and vehicle occlusion during
+  congestion (directly confirming Finding C and unblocking T5).
+- Flood Safety Gate: **INCOMPLETE** (0 flood frames evaluated; passive environmental
+  accumulation window active per Lesson 14).
+- Smoke-Test Verification: **2/10 PASS (20.0%)** on curated baselines.
+Empirical evidence committed to `docs/reports/eval_report_d6_real.md`.
+
 ### Finding C — PCU weights are uncalibrated defaults
 
 Motorcycle=0.2, Car=1.0, Bus=2.0, Truck=2.0, Container=3.0 are the same
@@ -234,7 +245,7 @@ calendar days — T3 specifically has a calendar-time caveat noted inline.
 | **T2** | Two changes together, not one: (a) switch the Portainer stack to `ANALYZER=onnx` and reload; (b) fix `docker-compose.yml` to actually map `APP_ENV` into `warded-backend` (confirmed missing — do not defer this). Confirm all 4 checks in `DEVOPS_S3_OPENVINO_DEPLOYMENT.md` §5 pass against the live host, AND confirm colored verdicts actually render on the public map afterward with a live screenshot (mandatory per T8) | T1 (specifically: the exact confirmed `ANALYZER` value, not "very likely") | **0.5 day** | PR #159 branch is closed (confirmed merged); scope is now config + compose fix + mandatory live verification. |
 | **T2b** | Fix the archiver/Hot-Set coupling gap: save the frame bytes the analyzer already fetched for inference, instead of depending on a coincidental `proxyCache` hit from a browsing user (Issue #182 / PR #185) | T2 | **0.5–1 day** | Merged & verified on staging: 1,600+ real frames/day, 733 frames/hour, JFIF verified. Gate T2b satisfied and unlocked. |
 | **T3** | Label a real flood + traffic dataset via the S6 labeler, targeting the ADR-004 D6 threshold (≥300 frames, ≥60 flood-positive) (Issue #194) | T2b, plus real passive accumulation time | **1 day active labeling** + **ongoing passive accumulation, now genuinely needed** | The pre-10-06 archive (73k+ files) is confirmed mostly `MockJPEGData` and unusable as ground truth — discard it as a labeling source. Flood-positive frames still depend on real rain during the accumulation window; check current rainy-season conditions before estimating further. |
-| **T4** | Run `tools/eval/benchmark.py` for real against the labeled set; report precision/recall and flood false-negative rate; record the result in `docs/` as the first real D6 gate evidence (Issue #195) | T3, T7 | **0.5 day** | This is the actual gate — not the harness existing, the number it produces. Cross-references against T7 smoke set. |
+| **T4** | Run `tools/eval/benchmark.py` for real against the labeled set; report precision/recall and flood false-negative rate; record the result in `docs/` as the first real D6 gate evidence (Issue #195) | T3, T7 | **0.5 day** | Completed: First real D6 evaluation executed against live OpenVINO container across 70 real frames. Results: Traffic Macro F1 = 0.224 (below 0.70 target due to uncalibrated capacity floors); Flood FNR = 0.0% but INCOMPLETE (0 flood frames observed; accumulation active). Smoke-test cross-validation: 2/10 passed (20.0%). Reports: `docs/reports/eval_report_d6_real.md` & `docs/reports/smoke_eval_d6_real.md`. Unblocks T5 and informs T9. |
 | **T5** | Calibrate PCU weights against labeled traffic data; document the new values and rationale, replacing the untouched defaults (Issue #196) | T3, T4 | **0.5–1 day** | |
 | **T6** | Resolve the container-detection gap (Finding D, Issue #186): decided per `docs/decision-container-class-gap.md` — Option (a) adopted: fold `Container` into `Truck` (PCU = 2.0) matching active COCO model and HCMC arterial daytime freight restrictions | T1 | **1 day decision + 0.5–2 days implementation** | Option (a) documented and implemented; dead code removed. |
 | **T7** | Build a small fixed smoke-test set of known-state cameras (confirmed empty vs. confirmed congested) and check model output against them as part of T4's run, not just anecdotal screenshots (Issue #187) | T2 | **0.5 day** | Implemented via `tools/eval/fixtures/smoke_test_cameras.json` (10 cameras), `tools/eval/verify_smoke_set.py`, and `tools/eval/smoke_test_cameras.md`. Ready for T4. |
