@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5d8cdbdc766c88001718896a_1791453025",
+  "camera_id": "5d8cdbdc766c88001718896a",
+  "image_path": "data/proofs/2026-10-08/5d8cdbdc766c88001718896a/1791453025_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
+  "notes": "Corridor cong_hoa evening peak observation for Hoàng Văn Thụ - Cộng Hòa"
+}

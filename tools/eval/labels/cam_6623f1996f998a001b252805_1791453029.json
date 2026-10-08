@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6623f1996f998a001b252805_1791453029",
+  "camera_id": "6623f1996f998a001b252805",
+  "image_path": "data/proofs/2026-10-08/6623f1996f998a001b252805/1791453029_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
+  "notes": "Corridor mai_chi_tho evening peak observation for Mai Chí Thọ - Xa Lộ Hà Nội (3)"
+}

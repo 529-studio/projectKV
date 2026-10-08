@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_66b1c426779f74001867415e_1791453023",
+  "camera_id": "66b1c426779f74001867415e",
+  "image_path": "data/proofs/2026-10-08/66b1c426779f74001867415e/1791453023_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
+  "notes": "Smoke set baseline (dien_bien_phu): Gateway chokepoint between Hàng Xanh intersection and Saigon Bridge. Dense university traffic and side-street merging cause dense queue spillbacks during evening rush hours (SI >= 0.90)."
+}

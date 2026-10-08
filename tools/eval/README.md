@@ -274,3 +274,33 @@ python3 -m unittest discover -s tools/eval -p "*_test.py"
 make test-eval
 ```
 
+---
+
+## 10. Real Dataset Collection & Progress Tracking (Sprint 4 T3 / Issue #194)
+
+Per ADR-004 §D6 and Issue #194, all pre-10-06 mock placeholder frames (107 bytes) are strictly discarded. Only real frames captured from 2026-10-08 onwards are ingested into `tools/eval/labels/`.
+
+### 10.1 Collecting Real Frames (`collect_real_frames.py`)
+
+Fetches real camera snapshots directly from DOT upstream or staging volume into `data/proofs/<YYYY-MM-DD>/<camera_id>/<timestamp>_sample.jpg` with valid JFIF magic byte (`ffd8ffe0`) and file size verification (>20KB):
+
+```bash
+# Fetch snapshots across all 57 priority corridor hotset cameras
+make collect-frames
+
+# Or fetch for a specific corridor
+python3 tools/eval/collect_real_frames.py --corridor mai_chi_tho
+```
+
+### 10.2 Auditing Dataset Composition (`dataset_progress.py`)
+
+Audits all active JSON label files in `tools/eval/labels/` against ADR-004 §D6 gate targets (≥300 frames, ≥60 flood-positive, ≥30 night):
+
+```bash
+# Display terminal progress dashboard
+make dataset-progress
+
+# Export Markdown progress report
+python3 tools/eval/dataset_progress.py --output-markdown docs/reports/dataset_progress.md
+```
+

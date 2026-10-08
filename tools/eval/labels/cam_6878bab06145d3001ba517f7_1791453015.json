@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6878bab06145d3001ba517f7_1791453015",
+  "camera_id": "6878bab06145d3001ba517f7",
+  "image_path": "data/proofs/2026-10-08/6878bab06145d3001ba517f7/1791453015_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
+  "notes": "Corridor mai_chi_tho evening peak observation for Mai Chí Thọ - Trần Quý Kiên (1)"
+}
