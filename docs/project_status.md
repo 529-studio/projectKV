@@ -2,8 +2,8 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.0.2  
-**Last Updated:** 2026-10-06  
+**Document Version:** 1.0.3  
+**Last Updated:** 2026-10-07  
 
 ---
 
@@ -25,10 +25,13 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **106 Pull Requests** processed across repository history:
-  - **97 Merged** to `dev`
+- **Lifetime PR History**: Exactly **107 Pull Requests** processed across repository history:
+  - **99 Merged** to `dev`
   - **8 Closed** without merging
-  - **1 Open** PR currently pending (#179 targeting `dev`, camera catalog resync for Issue #178)
+  - **0 Open** PRs pending
+- **Staging Infrastructure Configuration (Stack 14)**:
+  - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
+  - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
 - **Camera Catalog**:
   - **837 total cameras** loaded in `cameras_enriched.json`
   - **712 online cameras** (status `UP`, `isOnline: true`) and **125 offline** (status `NOT_IMAGE`) as of the latest city-wide health audit (2026-10-06)
