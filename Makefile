@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock smoke-eval
 
 help:
 	@echo "========================================================"
@@ -27,6 +27,7 @@ help:
 	@echo "  make test-enrich     - Run unit tests for geo-enrich tool"
 	@echo "  make test-eval       - Run unit tests for eval benchmark harness"
 	@echo "  make benchmark-mock  - Run AI benchmark harness in mock mode"
+	@echo "  make smoke-eval      - Run known-state smoke camera verification (mock dry-run)"
 
 install:
 	cd services/go-server && go mod download
@@ -96,6 +97,9 @@ test-eval:
 
 benchmark-mock:
 	python3 tools/eval/benchmark.py --analyzer mock
+
+smoke-eval:
+	python3 tools/eval/verify_smoke_set.py --mock --strict
 
 docker-build:
 	docker build -t warded-stg:latest .
