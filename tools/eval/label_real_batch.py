@@ -265,7 +265,27 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         labeled_count += 1
 
+    # Also generate manifest.json for interactive browser-based labeler (labeler.html)
+    manifest_path = REPO_ROOT / "tools" / "eval" / "manifest.json"
+    manifest_items = []
+    for lp in sorted(args.labels_out_dir.glob("*.json")):
+        with open(lp, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        manifest_items.append({
+            "frame_id": data.get("frame_id", lp.stem),
+            "camera_id": data.get("camera_id", ""),
+            "image_url": "/" + data.get("image_path", "").lstrip("/"),
+            "rel_url": "../../" + data.get("image_path", "").lstrip("/"),
+            "labels": data.get("labels", {}),
+            "notes": data.get("notes", ""),
+            "annotator": data.get("annotator", ""),
+        })
+
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_items, f, indent=2, ensure_ascii=False)
+
     print(f"Successfully generated {labeled_count} real label files in {args.labels_out_dir}")
+    print(f"Exported interactive labeler manifest to {manifest_path} ({len(manifest_items)} items)")
     return 0
 
 
