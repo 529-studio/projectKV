@@ -109,6 +109,10 @@ func TestCloudVisionAnalyzer_Analyze_Success(t *testing.T) {
 	if v.ObservedAt.IsZero() {
 		t.Error("expected non-zero ObservedAt")
 	}
+	expectedBytes := []byte("\xff\xd8\xff\xe0mock-jpeg-bytes")
+	if !bytes.Equal(v.RawFrame, expectedBytes) {
+		t.Errorf("expected RawFrame %q, got %q", expectedBytes, v.RawFrame)
+	}
 }
 
 func TestCloudVisionAnalyzer_Analyze_LowConfidence_DegradesToUnknown(t *testing.T) {

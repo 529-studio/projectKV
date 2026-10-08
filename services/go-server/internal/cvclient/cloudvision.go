@@ -177,6 +177,7 @@ func (a *CloudVisionAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (h
 		Source:        "vlm",
 		ObservedAt:    now,
 		Timestamp:     now,
+		RawFrame:      imgBytes,
 	}, nil
 }
 

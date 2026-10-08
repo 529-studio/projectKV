@@ -170,4 +170,19 @@
   1. **Git as the Single Source of Truth for CD**: Never rely solely on ad-hoc UI or host edits on Portainer. Every environment variable used by container services must be codified in `docker-compose.stg.yml` and `.env.stg.example`.
   2. **Safe Fallbacks in Compose**: Always provide defensive compose fallbacks (`APP_ENV=${APP_ENV:-staging}`) to ensure predictable container behavior even if host variables are temporarily omitted.
 
+---
+
+## Lesson 11: Decoupled Scheduled Pipelines vs. On-Demand Proxy Caches (Archiver Integration Gap)
+
+- **Incident & Tracking:** Issue #182, Pull Request (`feat/182-archiver-direct-frame-delivery`).
+- **Symptom:**
+  Following the production migration to OpenVINO (`ANALYZER=onnx`, 2026-10-06), real frame archiving dropped to ~40 frames/day (54 on 10-06, 26 on 10-07), far below the expected ~57 cameras / 5-minute sampling rate (~16,000 frames/day). This severely choked dataset accumulation needed for model evaluation (ADR-004 D6 gate).
+- **Root Cause:**
+  In `cmd/server/main.go`, the snapshot archiver fan-out was wired exclusively to `proxyCache.Get(v.CameraID)`. However, `proxyCache` is an on-demand cache populated strictly when web users view a camera feed (with a short 10s-15s TTL). Meanwhile, the Hot Set scheduler runs periodic inference against 57 cameras independently of viewer traffic. Because scheduler runs rarely coincided with viewer requests, `proxyCache.Get` missed almost every cycle.
+- **Mandatory Takeaway:**
+  1. **Direct Pipeline Carrier**: When a pipeline component (Hot Set scheduler) already performs network I/O to fetch data (raw snapshot bytes for model inference), it must directly forward those bytes to downstream consumers (snapshot archiver) via carrier fields (`Verdict.RawFrame`) rather than assuming an auxiliary viewer cache is populated.
+  2. **Layered Fallbacks**: Prioritize direct frame bytes, but preserve viewer cache lookups as a graceful fallback for non-scheduled or viewer-triggered ingestion paths.
+  3. **Zero-Overhead Serialization**: Tag internal carrier fields (`RawFrame []byte json:"-"`) to guarantee large binary buffers are omitted from API, SSE, and WebSocket serialization loops.
+
+
 

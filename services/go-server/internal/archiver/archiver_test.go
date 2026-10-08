@@ -3,6 +3,7 @@ package archiver_test
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -197,6 +198,51 @@ func TestArchiver_OnVerdict(t *testing.T) {
 	err = arch.OnVerdict(v, nil)
 	if err != nil {
 		t.Errorf("OnVerdict with nil frameReader returned error: %v", err)
+	}
+}
+
+func TestArchiver_OnVerdict_DirectRawFrame(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := storage.NewLocalStorage(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create local storage: %v", err)
+	}
+
+	cfg := archiver.Config{
+		SampleInterval: 300 * time.Second,
+		RetentionDays:  14,
+		MaxDiskMB:      100,
+	}
+	arch := archiver.New(store, tmpDir, cfg, nil)
+
+	t0 := time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)
+	rawPayload := []byte("direct-analyzed-jpeg-bytes")
+
+	v := hotset.Verdict{
+		CameraID:  "cam_direct",
+		Severity:  hotset.SeverityCongested,
+		Timestamp: t0,
+		RawFrame:  rawPayload,
+	}
+
+	// Pass nil frameReader: should automatically consume v.RawFrame
+	if err := arch.OnVerdict(v, nil); err != nil {
+		t.Fatalf("OnVerdict failed: %v", err)
+	}
+
+	expectedPath := archiver.StoragePath(t0, "cam_direct", t0.Unix(), archiver.ReasonStateChange)
+	rc, err := store.Get(context.Background(), expectedPath)
+	if err != nil {
+		t.Fatalf("failed to read archived file: %v", err)
+	}
+	defer rc.Close()
+
+	savedBytes, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("failed to read stream: %v", err)
+	}
+	if !bytes.Equal(savedBytes, rawPayload) {
+		t.Errorf("expected archived content %q, got %q", rawPayload, savedBytes)
 	}
 }
 

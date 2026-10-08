@@ -1,6 +1,7 @@
 package cvclient
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -76,5 +77,42 @@ func TestMockAnalyzer_ThreadSafe(t *testing.T) {
 		if err := <-errCh; err != nil {
 			t.Fatalf("concurrent analyze error: %v", err)
 		}
+	}
+}
+
+func TestMockAnalyzer_RawFrame(t *testing.T) {
+	ctx := context.Background()
+	cam := hotset.Camera{ID: "cam-frame-test"}
+
+	// 1. Default constructor: RawFrame is nil
+	defaultAnalyzer := NewMockAnalyzer()
+	v1, err := defaultAnalyzer.Analyze(ctx, cam)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v1.RawFrame != nil {
+		t.Errorf("expected default RawFrame to be nil, got %v", v1.RawFrame)
+	}
+
+	// 2. Initialized with mock frame bytes
+	mockData := []byte("custom-mock-frame")
+	customAnalyzer := NewMockAnalyzer(mockData)
+	v2, err := customAnalyzer.Analyze(ctx, cam)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !bytes.Equal(v2.RawFrame, mockData) {
+		t.Errorf("expected RawFrame %q, got %q", mockData, v2.RawFrame)
+	}
+
+	// 3. Dynamically set mock frame
+	updatedData := []byte("updated-mock-frame")
+	defaultAnalyzer.SetMockFrame(updatedData)
+	v3, err := defaultAnalyzer.Analyze(ctx, cam)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !bytes.Equal(v3.RawFrame, updatedData) {
+		t.Errorf("expected updated RawFrame %q, got %q", updatedData, v3.RawFrame)
 	}
 }
