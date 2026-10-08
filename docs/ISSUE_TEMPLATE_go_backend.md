@@ -42,6 +42,7 @@ specifically to stop scope creep in agent-driven work.
 - [ ] Unit tests included for non-trivial logic (state changes, error paths)
 - [ ] `architecture-guardian` sub-agent review run and passed (or violations
       listed and justified)
+- [ ] Real production verification evidence attached to PR before merge: For any task claiming to serve real/live data (not mock), attach real operational proof (actual API response snippet, live container log output, or screenshot from the live deployment). Passing unit tests alone is strictly insufficient.
 - [ ] Feature branch pushed, PR opened against `dev` per `AGENTS.md` workflow
       (no direct push — the existing pre-push hook enforces this regardless)
 
