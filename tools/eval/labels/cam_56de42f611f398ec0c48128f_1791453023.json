@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_56de42f611f398ec0c48128f_1791453023",
+  "camera_id": "56de42f611f398ec0c48128f",
+  "image_path": "data/proofs/2026-10-08/56de42f611f398ec0c48128f/1791453023_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
+  "notes": "Corridor vo_van_kiet evening peak observation for Võ Văn Kiệt - Huỳnh Mẫn Đạt"
+}
