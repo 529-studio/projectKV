@@ -3,12 +3,12 @@
   "camera_id": "649da495a6068200171a6cb6",
   "image_path": "data/proofs/2026-10-08/649da495a6068200171a6cb6/1791453016_sample.jpg",
   "labels": {
-    "traffic": "CLEAR",
+    "traffic": "MODERATE",
     "flood": "NONE",
     "time_of_day": "day",
-    "weather": "rain"
+    "weather": "dry"
   },
   "annotator": "sprint4_t3_curator",
-  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
-  "notes": "Corridor mai_chi_tho evening peak observation for Mai Chí Thọ - Trần Quý Kiên (3)"
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Evening rush hour volume on expressway corridor for Mai Chí Thọ - Trần Quý Kiên (3)"
 }

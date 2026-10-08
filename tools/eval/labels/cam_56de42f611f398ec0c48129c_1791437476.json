@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_56de42f611f398ec0c48129c_1791437476",
+  "camera_id": "56de42f611f398ec0c48129c",
+  "image_path": "data/proofs/2026-10-08/56de42f611f398ec0c48129c/1791437476_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Smoke set off-peak baseline (vo_van_kiet): High-capacity grade-separated highway junction at the southwest edge of the city. Outside peak holiday or rush hours, traffic disperses freely across wide grade-separated ramps (SI < 0.35)."
+}

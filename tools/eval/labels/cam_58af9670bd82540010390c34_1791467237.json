@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58af9670bd82540010390c34_1791467237",
+  "camera_id": "58af9670bd82540010390c34",
+  "image_path": "data/proofs/2026-10-08/58af9670bd82540010390c34/1791467237_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Off-peak night rain multi-lane flow on expressway corridor for Phạm Văn Đồng - Phan Văn Trị 1"
+}

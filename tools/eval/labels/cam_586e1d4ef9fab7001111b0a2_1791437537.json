@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_586e1d4ef9fab7001111b0a2_1791437537",
+  "camera_id": "586e1d4ef9fab7001111b0a2",
+  "image_path": "data/proofs/2026-10-08/586e1d4ef9fab7001111b0a2/1791437537_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Midday signalized volume on bottleneck corridor for Cộng Hòa - Đường C 18"
+}

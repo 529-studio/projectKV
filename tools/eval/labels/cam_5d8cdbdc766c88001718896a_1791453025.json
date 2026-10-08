@@ -3,12 +3,12 @@
   "camera_id": "5d8cdbdc766c88001718896a",
   "image_path": "data/proofs/2026-10-08/5d8cdbdc766c88001718896a/1791453025_sample.jpg",
   "labels": {
-    "traffic": "HEAVY",
+    "traffic": "CONGESTED",
     "flood": "NONE",
     "time_of_day": "day",
-    "weather": "rain"
+    "weather": "dry"
   },
   "annotator": "sprint4_t3_curator",
-  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
-  "notes": "Corridor cong_hoa evening peak observation for Hoàng Văn Thụ - Cộng Hòa"
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Evening rush hour chronic gridlock on bottleneck corridor for Hoàng Văn Thụ - Cộng Hòa"
 }

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5822b5ededeb6c0012a2d66a_1791437470",
+  "camera_id": "5822b5ededeb6c0012a2d66a",
+  "image_path": "data/proofs/2026-10-08/5822b5ededeb6c0012a2d66a/1791437470_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Smoke set off-peak baseline (mai_chi_tho): Wide 12-lane boulevard across the Thủ Thiêm urban axis. Off-peak volume is low with wide continuous lanes, clear line-of-sight, and minimal cross-traffic friction. Consistently produces low PCU count (SI < 0.35)."
+}
