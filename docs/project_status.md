@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **108 Pull Requests** processed across repository history:
-  - **100 Merged** to `dev`
+- **Lifetime PR History**: Exactly **110 Pull Requests** processed across repository history:
+  - **101 Merged** to `dev`
   - **8 Closed** without merging
-  - **0 Open** PRs pending
+  - **1 Open** PR pending (#189)
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
