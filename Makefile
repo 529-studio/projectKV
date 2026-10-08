@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock smoke-eval collect-frames dataset-progress
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress
 
 help:
 	@echo "========================================================"
@@ -27,6 +27,7 @@ help:
 	@echo "  make test-enrich     - Run unit tests for geo-enrich tool"
 	@echo "  make test-eval       - Run unit tests for eval benchmark harness"
 	@echo "  make benchmark-mock  - Run AI benchmark harness in mock mode"
+	@echo "  make benchmark-real  - Run AI benchmark harness against live OpenVINO cv-engine (T4)"
 	@echo "  make smoke-eval      - Run known-state smoke camera verification (mock dry-run)"
 	@echo "  make collect-frames  - Fetch real camera frames from Hot Set into data/proofs"
 	@echo "  make dataset-progress - Audit evaluation dataset composition progress (T3 / D6)"
@@ -99,6 +100,9 @@ test-eval:
 
 benchmark-mock:
 	python3 tools/eval/benchmark.py --analyzer mock
+
+benchmark-real:
+	python3 tools/eval/benchmark.py --analyzer cv-engine --output-report docs/reports/eval_report_d6_real.md --output-json tools/eval/results/eval_d6_real_openvino.json
 
 smoke-eval:
 	python3 tools/eval/verify_smoke_set.py --mock --strict

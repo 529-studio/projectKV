@@ -1,0 +1,798 @@
+{
+  "timestamp": "2026-10-08T13:19:44.596211+00:00",
+  "analyzer": "cv-engine",
+  "model": "yolov8n_openvino_320",
+  "total_frames": 70,
+  "flood_gate": {
+    "actual_positives": 0,
+    "detected_positives": 0,
+    "false_negatives": 0,
+    "false_positives": 0,
+    "true_negatives": 70,
+    "false_negative_rate": 0.0,
+    "max_fnr_threshold": 0.05,
+    "passed": false,
+    "status_label": "INCOMPLETE (0 flood positive frames evaluated - accumulation window active)",
+    "missed_frames": []
+  },
+  "traffic_macro_f1": 0.2244047619047619,
+  "traffic_weighted_f1": 0.3885714285714286,
+  "flood_macro_f1": 1.0,
+  "flood_weighted_f1": 1.0,
+  "traffic_metrics": {
+    "CLEAR": {
+      "cls_name": "CLEAR",
+      "tp": 23,
+      "fp": 19,
+      "fn": 19,
+      "tn": 9,
+      "support": 42
+    },
+    "MODERATE": {
+      "cls_name": "MODERATE",
+      "tp": 3,
+      "fp": 7,
+      "fn": 11,
+      "tn": 49,
+      "support": 14
+    },
+    "HEAVY": {
+      "cls_name": "HEAVY",
+      "tp": 0,
+      "fp": 5,
+      "fn": 7,
+      "tn": 58,
+      "support": 7
+    },
+    "CONGESTED": {
+      "cls_name": "CONGESTED",
+      "tp": 1,
+      "fp": 12,
+      "fn": 6,
+      "tn": 51,
+      "support": 7
+    }
+  },
+  "flood_metrics": {
+    "NONE": {
+      "cls_name": "NONE",
+      "tp": 70,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "support": 70
+    },
+    "SHALLOW": {
+      "cls_name": "SHALLOW",
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "tn": 70,
+      "support": 0
+    },
+    "DEEP": {
+      "cls_name": "DEEP",
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "tn": 70,
+      "support": 0
+    }
+  },
+  "weather_slices": {
+    "rain": {
+      "total_frames": 70,
+      "traffic_accuracy": 0.38571428571428573,
+      "flood_accuracy": 1.0
+    }
+  },
+  "time_of_day_slices": {
+    "day": {
+      "total_frames": 70,
+      "traffic_accuracy": 0.38571428571428573,
+      "flood_accuracy": 1.0
+    }
+  },
+  "predictions": [
+    {
+      "frame_id": "cam_56de42f611f398ec0c48127d_1791453015",
+      "camera_id": "56de42f611f398ec0c48127d",
+      "traffic": "MODERATE",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=14.0, SI=0.56, vehicles=7",
+      "latency_ms": 24.411916732788086,
+      "saturation_index": 0.56
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48127d_1791453029",
+      "camera_id": "56de42f611f398ec0c48127d",
+      "traffic": "MODERATE",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=11.0, SI=0.44, vehicles=6",
+      "latency_ms": 8.637189865112305,
+      "saturation_index": 0.44
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48127e_1791453015",
+      "camera_id": "56de42f611f398ec0c48127e",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=2.0, SI=0.08, vehicles=2",
+      "latency_ms": 8.440732955932617,
+      "saturation_index": 0.08
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48127e_1791453024",
+      "camera_id": "56de42f611f398ec0c48127e",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=1.0, SI=0.04, vehicles=1",
+      "latency_ms": 8.29625129699707,
+      "saturation_index": 0.04
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48127f_1791453015",
+      "camera_id": "56de42f611f398ec0c48127f",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=6.0, SI=0.24, vehicles=6",
+      "latency_ms": 8.807897567749023,
+      "saturation_index": 0.24
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48127f_1791453025",
+      "camera_id": "56de42f611f398ec0c48127f",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=8.0, SI=0.32, vehicles=8",
+      "latency_ms": 8.468866348266602,
+      "saturation_index": 0.32
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481280_1791453015",
+      "camera_id": "56de42f611f398ec0c481280",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=5.0, SI=0.20, vehicles=5",
+      "latency_ms": 8.260726928710938,
+      "saturation_index": 0.2
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481280_1791453029",
+      "camera_id": "56de42f611f398ec0c481280",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=4.0, SI=0.16, vehicles=4",
+      "latency_ms": 8.130073547363281,
+      "saturation_index": 0.16
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481282_1791453015",
+      "camera_id": "56de42f611f398ec0c481282",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 8.44120979309082,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481282_1791453024",
+      "camera_id": "56de42f611f398ec0c481282",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 8.101224899291992,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481283_1791453015",
+      "camera_id": "56de42f611f398ec0c481283",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=23.0, SI=0.92, vehicles=23",
+      "latency_ms": 8.185148239135742,
+      "saturation_index": 0.92
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481283_1791453024",
+      "camera_id": "56de42f611f398ec0c481283",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=4.0, SI=0.16, vehicles=4",
+      "latency_ms": 49.340009689331055,
+      "saturation_index": 0.16
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481286_1791453015",
+      "camera_id": "56de42f611f398ec0c481286",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 9.061813354492188,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481286_1791453025",
+      "camera_id": "56de42f611f398ec0c481286",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 8.867025375366211,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481287_1791453027",
+      "camera_id": "56de42f611f398ec0c481287",
+      "traffic": "HEAVY",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=21.0, SI=0.84, vehicles=21",
+      "latency_ms": 8.199930191040039,
+      "saturation_index": 0.84
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481288_1791453024",
+      "camera_id": "56de42f611f398ec0c481288",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=6.0, SI=0.24, vehicles=6",
+      "latency_ms": 8.085966110229492,
+      "saturation_index": 0.24
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481289_1791453024",
+      "camera_id": "56de42f611f398ec0c481289",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 8.088827133178711,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48128a_1791453029",
+      "camera_id": "56de42f611f398ec0c48128a",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=4.6, SI=0.18, vehicles=7",
+      "latency_ms": 48.91085624694824,
+      "saturation_index": 0.184
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48128b_1791453023",
+      "camera_id": "56de42f611f398ec0c48128b",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=45.0, SI=1.00, vehicles=45",
+      "latency_ms": 9.898900985717773,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48128c_1791453023",
+      "camera_id": "56de42f611f398ec0c48128c",
+      "traffic": "MODERATE",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=11.0, SI=0.44, vehicles=10",
+      "latency_ms": 9.09280776977539,
+      "saturation_index": 0.44
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48128e_1791453025",
+      "camera_id": "56de42f611f398ec0c48128e",
+      "traffic": "HEAVY",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=19.0, SI=0.76, vehicles=19",
+      "latency_ms": 8.821964263916016,
+      "saturation_index": 0.76
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48128f_1791453023",
+      "camera_id": "56de42f611f398ec0c48128f",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=42.0, SI=1.00, vehicles=34",
+      "latency_ms": 8.285999298095703,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481290_1791453027",
+      "camera_id": "56de42f611f398ec0c481290",
+      "traffic": "MODERATE",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=14.0, SI=0.56, vehicles=13",
+      "latency_ms": 8.107900619506836,
+      "saturation_index": 0.56
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481291_1791453025",
+      "camera_id": "56de42f611f398ec0c481291",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=4.0, SI=0.16, vehicles=4",
+      "latency_ms": 8.11910629272461,
+      "saturation_index": 0.16
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481292_1791453028",
+      "camera_id": "56de42f611f398ec0c481292",
+      "traffic": "MODERATE",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=11.8, SI=0.47, vehicles=10",
+      "latency_ms": 49.39603805541992,
+      "saturation_index": 0.47200000000000003
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481293_1791453023",
+      "camera_id": "56de42f611f398ec0c481293",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 9.246110916137695,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481295_1791453029",
+      "camera_id": "56de42f611f398ec0c481295",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 8.966922760009766,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481296_1791453028",
+      "camera_id": "56de42f611f398ec0c481296",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 8.317947387695312,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481297_1791453023",
+      "camera_id": "56de42f611f398ec0c481297",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 8.130788803100586,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481298_1791453024",
+      "camera_id": "56de42f611f398ec0c481298",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=52.0, SI=1.00, vehicles=42",
+      "latency_ms": 8.045196533203125,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c481299_1791453023",
+      "camera_id": "56de42f611f398ec0c481299",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=28.0, SI=1.00, vehicles=25",
+      "latency_ms": 8.089065551757812,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48129a_1791453025",
+      "camera_id": "56de42f611f398ec0c48129a",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 50.16207695007324,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48129b_1791453024",
+      "camera_id": "56de42f611f398ec0c48129b",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 9.130001068115234,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_56de42f611f398ec0c48129c_1791453025",
+      "camera_id": "56de42f611f398ec0c48129c",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 8.775711059570312,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_58175c81edeb6c0012a2d5c2_1791453016",
+      "camera_id": "58175c81edeb6c0012a2d5c2",
+      "traffic": "MODERATE",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=16.0, SI=0.64, vehicles=16",
+      "latency_ms": 8.482933044433594,
+      "saturation_index": 0.64
+    },
+    {
+      "frame_id": "cam_58175c81edeb6c0012a2d5c2_1791453029",
+      "camera_id": "58175c81edeb6c0012a2d5c2",
+      "traffic": "HEAVY",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=22.0, SI=0.88, vehicles=22",
+      "latency_ms": 7.9288482666015625,
+      "saturation_index": 0.88
+    },
+    {
+      "frame_id": "cam_5822adbbedeb6c0012a2d65f_1791453023",
+      "camera_id": "5822adbbedeb6c0012a2d65f",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=7.0, SI=0.28, vehicles=7",
+      "latency_ms": 8.221149444580078,
+      "saturation_index": 0.28
+    },
+    {
+      "frame_id": "cam_5822b5ededeb6c0012a2d66a_1791453015",
+      "camera_id": "5822b5ededeb6c0012a2d66a",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=27.0, SI=1.00, vehicles=27",
+      "latency_ms": 48.95377159118652,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_5822b5ededeb6c0012a2d66a_1791453023",
+      "camera_id": "5822b5ededeb6c0012a2d66a",
+      "traffic": "HEAVY",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=19.0, SI=0.70, vehicles=19",
+      "latency_ms": 9.635210037231445,
+      "saturation_index": 0.7037037037037037
+    },
+    {
+      "frame_id": "cam_586e1d4ef9fab7001111b0a2_1791453028",
+      "camera_id": "586e1d4ef9fab7001111b0a2",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=1.0, SI=0.04, vehicles=1",
+      "latency_ms": 9.305953979492188,
+      "saturation_index": 0.04
+    },
+    {
+      "frame_id": "cam_586e1f18f9fab7001111b0a5_1791453029",
+      "camera_id": "586e1f18f9fab7001111b0a5",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 8.726119995117188,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_5874769eb807da0011e33cec_1791453023",
+      "camera_id": "5874769eb807da0011e33cec",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=1.0, SI=0.04, vehicles=1",
+      "latency_ms": 8.320093154907227,
+      "saturation_index": 0.04
+    },
+    {
+      "frame_id": "cam_587476e3b807da0011e33cee_1791453023",
+      "camera_id": "587476e3b807da0011e33cee",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=6.0, SI=0.24, vehicles=3",
+      "latency_ms": 8.420944213867188,
+      "saturation_index": 0.24
+    },
+    {
+      "frame_id": "cam_587c79e9b807da0011e33d3d_1791453023",
+      "camera_id": "587c79e9b807da0011e33d3d",
+      "traffic": "MODERATE",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=13.0, SI=0.52, vehicles=7",
+      "latency_ms": 8.03995132446289,
+      "saturation_index": 0.52
+    },
+    {
+      "frame_id": "cam_58ad6214bd82540010390be2_1791453025",
+      "camera_id": "58ad6214bd82540010390be2",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 46.404123306274414,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_58af8b69bd82540010390c28_1791453027",
+      "camera_id": "58af8b69bd82540010390c28",
+      "traffic": "MODERATE",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=10.0, SI=0.40, vehicles=10",
+      "latency_ms": 9.536027908325195,
+      "saturation_index": 0.4
+    },
+    {
+      "frame_id": "cam_58af8d68bd82540010390c2e_1791453024",
+      "camera_id": "58af8d68bd82540010390c2e",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=52.0, SI=1.00, vehicles=47",
+      "latency_ms": 9.184122085571289,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_59414c883dcfc400106f260b_1791453027",
+      "camera_id": "59414c883dcfc400106f260b",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 8.774995803833008,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_5a10c79f02eb490011a0b0dd_1791453015",
+      "camera_id": "5a10c79f02eb490011a0b0dd",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=32.0, SI=1.00, vehicles=32",
+      "latency_ms": 8.49604606628418,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_5a10c79f02eb490011a0b0dd_1791453023",
+      "camera_id": "5a10c79f02eb490011a0b0dd",
+      "traffic": "MODERATE",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=16.2, SI=0.51, vehicles=17",
+      "latency_ms": 8.390188217163086,
+      "saturation_index": 0.50625
+    },
+    {
+      "frame_id": "cam_5a606dbc8576340017d0662b_1791453024",
+      "camera_id": "5a606dbc8576340017d0662b",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.2, SI=0.01, vehicles=1",
+      "latency_ms": 8.280754089355469,
+      "saturation_index": 0.008
+    },
+    {
+      "frame_id": "cam_5b5995a3fd4edb0019c7d9ab_1791453023",
+      "camera_id": "5b5995a3fd4edb0019c7d9ab",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.8, SI=0.03, vehicles=4",
+      "latency_ms": 49.26705360412598,
+      "saturation_index": 0.032
+    },
+    {
+      "frame_id": "cam_5d8cdbdc766c88001718896a_1791453025",
+      "camera_id": "5d8cdbdc766c88001718896a",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=41.2, SI=1.00, vehicles=46",
+      "latency_ms": 9.045600891113281,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_5deb576d1dc17d7c5515acf2_1791453025",
+      "camera_id": "5deb576d1dc17d7c5515acf2",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=8.0, SI=0.32, vehicles=8",
+      "latency_ms": 8.916854858398438,
+      "saturation_index": 0.32
+    },
+    {
+      "frame_id": "cam_5deb576d1dc17d7c5515acfc_1791453029",
+      "camera_id": "5deb576d1dc17d7c5515acfc",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=8.0, SI=0.32, vehicles=8",
+      "latency_ms": 8.355855941772461,
+      "saturation_index": 0.32
+    },
+    {
+      "frame_id": "cam_5deb576d1dc17d7c5515ad02_1791453023",
+      "camera_id": "5deb576d1dc17d7c5515ad02",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=28.0, SI=1.00, vehicles=28",
+      "latency_ms": 8.033990859985352,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_5deb576d1dc17d7c5515ad05_1791453027",
+      "camera_id": "5deb576d1dc17d7c5515ad05",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=6.0, SI=0.24, vehicles=6",
+      "latency_ms": 8.32223892211914,
+      "saturation_index": 0.24
+    },
+    {
+      "frame_id": "cam_5deb576d1dc17d7c5515ad08_1791453023",
+      "camera_id": "5deb576d1dc17d7c5515ad08",
+      "traffic": "MODERATE",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=10.0, SI=0.40, vehicles=10",
+      "latency_ms": 8.188247680664062,
+      "saturation_index": 0.4
+    },
+    {
+      "frame_id": "cam_63ae7a9cbfd3d90017e8f303_1791453025",
+      "camera_id": "63ae7a9cbfd3d90017e8f303",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 50.13895034790039,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_649da495a6068200171a6cb6_1791453016",
+      "camera_id": "649da495a6068200171a6cb6",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 9.325981140136719,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_649da495a6068200171a6cb6_1791453030",
+      "camera_id": "649da495a6068200171a6cb6",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 9.002923965454102,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_6623f1996f998a001b252805_1791453016",
+      "camera_id": "6623f1996f998a001b252805",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=26.0, SI=1.00, vehicles=13",
+      "latency_ms": 8.183002471923828,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_6623f1996f998a001b252805_1791453029",
+      "camera_id": "6623f1996f998a001b252805",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 9.296894073486328,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_662b57471afb9c00172d9095_1791453025",
+      "camera_id": "662b57471afb9c00172d9095",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=6.0, SI=0.24, vehicles=6",
+      "latency_ms": 9.53984260559082,
+      "saturation_index": 0.24
+    },
+    {
+      "frame_id": "cam_662b57711afb9c00172d90a7_1791453025",
+      "camera_id": "662b57711afb9c00172d90a7",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=0.0, SI=0.00, vehicles=0",
+      "latency_ms": 50.234079360961914,
+      "saturation_index": 0.0
+    },
+    {
+      "frame_id": "cam_662b85481afb9c00172dd0f1_1791453025",
+      "camera_id": "662b85481afb9c00172dd0f1",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=28.0, SI=1.00, vehicles=23",
+      "latency_ms": 9.283065795898438,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_662b857b1afb9c00172dd106_1791453024",
+      "camera_id": "662b857b1afb9c00172dd106",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=6.0, SI=0.24, vehicles=6",
+      "latency_ms": 8.806943893432617,
+      "saturation_index": 0.24
+    },
+    {
+      "frame_id": "cam_66b1c426779f74001867415e_1791453023",
+      "camera_id": "66b1c426779f74001867415e",
+      "traffic": "CONGESTED",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=31.0, SI=1.00, vehicles=25",
+      "latency_ms": 8.28695297241211,
+      "saturation_index": 1.0
+    },
+    {
+      "frame_id": "cam_6878bab06145d3001ba517f7_1791453015",
+      "camera_id": "6878bab06145d3001ba517f7",
+      "traffic": "HEAVY",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=22.0, SI=0.88, vehicles=18",
+      "latency_ms": 8.107662200927734,
+      "saturation_index": 0.88
+    },
+    {
+      "frame_id": "cam_6878bab06145d3001ba517f7_1791453024",
+      "camera_id": "6878bab06145d3001ba517f7",
+      "traffic": "CLEAR",
+      "flood": "NONE",
+      "confidence": 0.88,
+      "description": "PCU=5.0, SI=0.20, vehicles=5",
+      "latency_ms": 8.034229278564453,
+      "saturation_index": 0.2
+    }
+  ]
+}
