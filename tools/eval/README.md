@@ -237,3 +237,40 @@ Use **"Export All JSON"** to download a single array file (`labels_export.json`)
 3. Verify labels against the schema using `python3 tools/eval/benchmark_test.py`.
 4. Run `python3 tools/eval/benchmark.py` to regenerate the baseline report in `tools/eval/reports/`.
 
+---
+
+## 9. Known-State Smoke-Test Camera Set (Sprint 4 T7 / ADR-005 Finding B)
+
+To avoid regressions and subjective verification on staging UI, a curated set of **10 cameras with deterministic baseline states** is defined in [`fixtures/smoke_test_cameras.json`](./fixtures/smoke_test_cameras.json) and detailed in [`smoke_test_cameras.md`](./smoke_test_cameras.md):
+
+- **5 Free-Flow Baselines (`CLEAR`)**: Wide boulevards and highway interchanges (`mai_chi_tho`, `vo_van_kiet`, `dien_bien_phu`) with consistently low off-peak volume ($SI < 0.35$).
+- **5 Chronic Bottlenecks (`CONGESTED`)**: Critical gateway intersections and freight junctions (`cong_hoa`, `dien_bien_phu`, `mai_chi_tho`) with chronic peak rush-hour gridlock ($SI \ge 0.90$).
+
+### 9.1 Running Smoke-Test Verification (`verify_smoke_set.py`)
+
+Run automated baseline verification against mock outputs, recorded verdicts, or live backend APIs:
+
+```bash
+# 1. Dry-run mock verification in CI / offline test
+python3 tools/eval/verify_smoke_set.py --mock --strict
+
+# 2. Verify precomputed predictions file
+python3 tools/eval/verify_smoke_set.py --verdicts my_predictions.json --strict
+
+# 3. Verify against live Go backend on staging/local
+python3 tools/eval/verify_smoke_set.py --backend-url http://localhost:3000
+
+# 4. Generate Markdown and JSON summary reports
+python3 tools/eval/verify_smoke_set.py --mock --output-markdown reports/smoke_report.md --output-json reports/smoke_report.json
+```
+
+### 9.2 Running Smoke-Test Unit Tests
+
+```bash
+# Run unit tests directly
+python3 -m unittest discover -s tools/eval -p "*_test.py"
+
+# Or via Makefile
+make test-eval
+```
+

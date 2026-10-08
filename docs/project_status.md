@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **110 Pull Requests** processed across repository history:
-  - **101 Merged** to `dev`
+- **Lifetime PR History**: Exactly **113 Pull Requests** processed across repository history:
+  - **105 Merged** to `dev`
   - **8 Closed** without merging
-  - **1 Open** PR pending (#189)
+  - **0 Open** PRs pending
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
@@ -47,6 +47,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - `tools/crawler/sync_catalog_from_audit.js` re-synchronizes `cameras_all.json` / `cameras_enriched.json` from the probe report (deterministic outcomes only; transient errors leave entries untouched). This replaced the former hardcoded `KnownGhostCameras` map, which had drifted out of sync, making the JSON catalog the single source of truth for static liveness.
   - `.github/workflows/camera-health-audit.yml` runs the audit daily (01:00 UTC) and opens a resync Pull Request against `dev` when drift is detected (never auto-merges).
   - The web client promotes a `503 GHOST_CAMERA` snapshot response into shared state (`useCameras.markCameraGhost`), immediately reflecting field signal loss across the map, sidebar, dock and modal.
+- **Known-State Smoke-Test Camera Set (Sprint 4 T7, Issue #187)**:
+  - Curated 10 high-confidence ground-truth cameras in `tools/eval/fixtures/smoke_test_cameras.json` (5 `CLEAR` off-peak baselines, 5 `CONGESTED` peak rush-hour baselines) across 4 priority corridors (`vo_van_kiet`, `mai_chi_tho`, `dien_bien_phu`, `cong_hoa`).
+  - Implemented automated verification script `tools/eval/verify_smoke_set.py` and unit test suite `tools/eval/verify_smoke_set_test.py` to objectively gate model predictions without relying on anecdotal staging UI spot-checks.
+  - Detailed physical and operational rationale documented in `tools/eval/smoke_test_cameras.md`.
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).
