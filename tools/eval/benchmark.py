@@ -487,6 +487,137 @@ Rules:
         )
 
 
+class CVEngineAnalyzer(BaseAnalyzer):
+    """
+    Calls self-hosted OpenVINO cv-engine microservice (POST /predict with raw JPEG bytes).
+    Computes PCU Saturation Index (SI) and maps to traffic severity conforming to
+    ADR-004 §9 D15, ADR-005 T6 (Container folded into Truck = 2.0), and cvclient/pcu.go.
+    """
+    name: str = "cv-engine"
+    model: str = "yolov8n_openvino_320"
+
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8000",
+        use_pcu: bool = True,
+        capacity_floor: float = 25.0,
+        request_timeout: float = 10.0,
+    ):
+        self.base_url = base_url.rstrip("/")
+        self.use_pcu = use_pcu
+        self.capacity_floor = capacity_floor
+        self.request_timeout = request_timeout
+        self.capacities: Dict[str, float] = {}
+
+        # PCU weights conforming to cvclient/pcu.go and ADR-005 T6
+        self.pcu_weights = {
+            "motorcycle": 0.2,
+            "car": 1.0,
+            "bus": 2.0,
+            "truck": 2.0,
+            "container": 2.0,
+        }
+        # Thresholds conforming to cvclient/pcu.go
+        self.pcu_thresholds = {
+            "moderate": 0.35,
+            "heavy": 0.70,
+            "congested": 0.90,
+        }
+
+    def _calculate_pcu(self, camera_id: str, counts: Dict[str, int], fallback_total: int) -> Tuple[str, float, float]:
+        total_vehicles = sum(counts.values()) if counts else fallback_total
+        if counts and total_vehicles > 0:
+            pcu_total = (
+                counts.get("motorcycle", 0) * self.pcu_weights["motorcycle"]
+                + counts.get("car", 0) * self.pcu_weights["car"]
+                + counts.get("bus", 0) * self.pcu_weights["bus"]
+                + counts.get("truck", 0) * self.pcu_weights["truck"]
+                + counts.get("container", 0) * self.pcu_weights["container"]
+            )
+        elif fallback_total > 0:
+            pcu_total = float(fallback_total) * self.pcu_weights["car"]
+        else:
+            return "CLEAR", 0.0, 0.0
+
+        hist_max = self.capacities.get(camera_id, 0.0)
+        if pcu_total > hist_max:
+            hist_max = pcu_total
+            self.capacities[camera_id] = hist_max
+
+        eff_capacity = max(hist_max, self.capacity_floor)
+        if eff_capacity < 1.0:
+            eff_capacity = 1.0
+        saturation_index = pcu_total / eff_capacity
+
+        if saturation_index >= self.pcu_thresholds["congested"]:
+            severity = "CONGESTED"
+        elif saturation_index >= self.pcu_thresholds["heavy"]:
+            severity = "HEAVY"
+        elif saturation_index >= self.pcu_thresholds["moderate"]:
+            severity = "MODERATE"
+        else:
+            severity = "CLEAR"
+
+        return severity, pcu_total, saturation_index
+
+    def analyze(self, frame: LabeledFrame) -> Prediction:
+        if not frame.image_path.is_file():
+            raise FileNotFoundError(f"Image not found for frame {frame.frame_id}: {frame.image_path}")
+
+        image_bytes = frame.image_path.read_bytes()
+        url = f"{self.base_url}/predict"
+        req = urllib.request.Request(
+            url,
+            data=image_bytes,
+            headers={"Content-Type": "application/octet-stream"},
+            method="POST",
+        )
+
+        t0 = time.time()
+        try:
+            with urllib.request.urlopen(req, timeout=self.request_timeout) as resp:
+                resp_bytes = resp.read()
+            latency = (time.time() - t0) * 1000.0
+            data = json.loads(resp_bytes.decode("utf-8"))
+        except Exception as e:
+            return Prediction(
+                frame_id=frame.frame_id,
+                traffic="UNKNOWN",
+                flood="UNKNOWN",
+                confidence=0.0,
+                description=f"cv-engine request error: {e}",
+                latency_ms=(time.time() - t0) * 1000.0,
+            )
+
+        model_name = data.get("model", self.model)
+        self.model = model_name
+        counts = data.get("vehicle_counts", {})
+        vehicles = int(data.get("vehicles_detected", 0))
+        confidence = float(data.get("confidence", 0.88))
+
+        if self.use_pcu:
+            traffic_sev, pcu_total, si = self._calculate_pcu(frame.camera_id, counts, vehicles)
+            desc = f"PCU={pcu_total:.1f}, SI={si:.2f}, vehicles={vehicles}"
+        else:
+            traffic_sev = str(data.get("traffic_severity", "UNKNOWN")).upper()
+            si = 0.0
+            desc = f"Raw cv-engine severity, vehicles={vehicles}"
+
+        # Per Finding B: cv-engine v1 is an object detector and does not detect flood.
+        # It reports NONE for flood severity.
+        flood_sev = "NONE"
+
+        return Prediction(
+            frame_id=frame.frame_id,
+            traffic=traffic_sev,
+            flood=flood_sev,
+            confidence=confidence,
+            description=desc,
+            raw_response={**data, "saturation_index": si, "camera_id": frame.camera_id},
+            latency_ms=latency,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Metrics Computation
 # ---------------------------------------------------------------------------
@@ -611,14 +742,16 @@ def evaluate_flood_safety_gate(
                 true_negatives += 1
 
     fnr = (false_negatives / actual_positives) if actual_positives > 0 else 0.0
-    passed = fnr <= max_fnr
 
     if actual_positives == 0:
-        status_label = "INCOMPLETE (0 flood positive frames evaluated)"
-    elif passed:
-        status_label = f"PASS ✅ ({fnr * 100:.1f}% FNR ≤ {max_fnr * 100:.1f}%)"
+        passed = False
+        status_label = "INCOMPLETE (0 flood positive frames evaluated - accumulation window active)"
+    elif fnr <= max_fnr:
+        passed = True
+        status_label = f"PASS ({fnr * 100:.1f}% FNR <= {max_fnr * 100:.1f}%)"
     else:
-        status_label = f"FAIL ❌ ({fnr * 100:.1f}% FNR > {max_fnr * 100:.1f}%)"
+        passed = False
+        status_label = f"FAIL ({fnr * 100:.1f}% FNR > {max_fnr * 100:.1f}%)"
 
     return FloodGateResult(
         actual_positives=actual_positives,
@@ -669,7 +802,7 @@ def evaluate_composition_progress(frames: List[LabeledFrame]) -> List[Dict[str, 
         fn = item["filter"]
         count = sum(1 for f in frames if fn(f))
         pct = (count / tgt) * 100.0 if tgt > 0 else 0.0
-        status = "✅ Complete" if count >= tgt else f"⏳ {count}/{tgt} ({pct:.0f}%)"
+        status = "[COMPLETE]" if count >= tgt else f"[{count}/{tgt} ({pct:.0f}%)]"
         results.append({
             "category": cat,
             "current": count,
@@ -720,13 +853,19 @@ def run_benchmark(
     pred_records = [
         {
             "frame_id": p.frame_id,
+            "camera_id": getattr(f, "camera_id", ""),
             "traffic": p.traffic,
             "flood": p.flood,
             "confidence": p.confidence,
             "description": p.description,
             "latency_ms": p.latency_ms,
+            "saturation_index": (
+                p.raw_response.get("saturation_index")
+                if isinstance(p.raw_response, dict)
+                else None
+            ),
         }
-        for p in predictions
+        for f, p in zip(frames, predictions)
     ]
 
     return BenchmarkResult(
@@ -766,12 +905,21 @@ def generate_markdown_report(res: BenchmarkResult) -> str:
     # Executive Summary & Gate Status
     lines.append("## 1. Executive Summary & Accuracy Gate")
     lines.append("")
-    gate_badge = "✅ **PASS**" if res.flood_gate.passed else "❌ **FAIL (SAFETY GATE BREACH)**"
+    if res.flood_gate.actual_positives == 0:
+        gate_badge = "**INCOMPLETE** (0 flood frames evaluated; passive accumulation window active)"
+    elif res.flood_gate.passed:
+        gate_badge = "**PASS**"
+    else:
+        gate_badge = "**FAIL (SAFETY GATE BREACH)**"
+
+    traffic_badge = "**[PASS]**" if res.traffic_macro_f1 >= 0.7 else "**[FAIL]** (Below 0.70 Target)"
+    flood_badge = "**[PASS]**" if res.flood_macro_f1 >= 0.8 else "**[FAIL]** (Below 0.80 Target)"
+
     lines.append(f"| Gate Metric | Target | Actual Value | Verdict |")
     lines.append(f"|---|---|---|---|")
     lines.append(f"| **Flood False-Negative Rate (FNR)** | ≤ {res.flood_gate.max_fnr_threshold * 100:.1f}% | **{res.flood_gate.false_negative_rate * 100:.1f}%** ({res.flood_gate.false_negatives}/{res.flood_gate.actual_positives} missed) | {gate_badge} |")
-    lines.append(f"| Traffic Macro F1 | ≥ 0.70 | **{res.traffic_macro_f1:.3f}** | {'✅' if res.traffic_macro_f1 >= 0.7 else '⚠️'} |")
-    lines.append(f"| Flood Macro F1 | ≥ 0.80 | **{res.flood_macro_f1:.3f}** | {'✅' if res.flood_macro_f1 >= 0.8 else '⚠️'} |")
+    lines.append(f"| Traffic Macro F1 | ≥ 0.70 | **{res.traffic_macro_f1:.3f}** | {traffic_badge} |")
+    lines.append(f"| Flood Macro F1 | ≥ 0.80 | **{res.flood_macro_f1:.3f}** | {flood_badge} |")
     lines.append("")
     lines.append(f"> **Safety Gate Rule (ADR-004 §D6)**: A flood false-negative (failing to detect standing water or deep floods) directs drivers into hazardous corridors. Until the flood FNR is rigorously ≤ {res.flood_gate.max_fnr_threshold * 100:.1f}% across ≥60 rain/flood frames, route verdicts cannot show an unrestricted 'clear' state.")
     lines.append("")
@@ -783,8 +931,8 @@ def generate_markdown_report(res: BenchmarkResult) -> str:
     lines.append("|---|---|---|---|---|")
     for cp in res.composition_progress:
         bar_len = min(10, int(cp["percentage"] / 10))
-        bar = "█" * bar_len + "░" * (10 - bar_len)
-        lines.append(f"| {cp['category']} | {cp['target']} | {cp['current']} | `{bar}` {cp['percentage']:.0f}% | {cp['status']} |")
+        bar = "=" * bar_len + "." * (10 - bar_len)
+        lines.append(f"| {cp['category']} | {cp['target']} | {cp['current']} | `[{bar}]` {cp['percentage']:.0f}% | {cp['status']} |")
     lines.append("")
 
     # Traffic Classification
@@ -843,14 +991,14 @@ def generate_markdown_report(res: BenchmarkResult) -> str:
     lines.append("## 5. Flood False-Negative Diagnostic (Missed Floods)")
     lines.append("")
     if res.flood_gate.missed_frames:
-        lines.append(f"⚠️ **{len(res.flood_gate.missed_frames)} flood instances were missed by the analyzer!**")
+        lines.append(f"[WARN] **{len(res.flood_gate.missed_frames)} flood instances were missed by the analyzer.**")
         lines.append("")
         lines.append("| Frame ID | Camera ID | Actual Flood | Predicted | Confidence | Weather | Time of Day | Notes |")
         lines.append("|---|---|---|---|---|---|---|---|")
         for mf in res.flood_gate.missed_frames:
             lines.append(f"| `{mf['frame_id']}` | `{mf['camera_id']}` | **{mf['actual_flood']}** | `{mf['predicted_flood']}` | {mf['confidence']:.2f} | {mf['weather']} | {mf['time_of_day']} | {mf['notes']} |")
     else:
-        lines.append("🎉 **Zero false-negative flood events detected!** All flooded conditions were recognized as hazardous.")
+        lines.append("**Zero false-negative flood events detected in evaluated frames.**")
     lines.append("")
 
     # Environmental Slices
@@ -900,10 +1048,13 @@ def main():
     parser.add_argument("--labels-dir", default="tools/eval/labels", help="Directory with label JSON files")
     parser.add_argument("--fixtures-dir", default=None, help="Optional fixture directory with frames and labels")
     parser.add_argument("--schema", default="tools/eval/label_schema.json", help="Path to label schema JSON")
-    parser.add_argument("--analyzer", choices=["mock", "vlm", "predictions"], default="mock", help="Analyzer backend to benchmark")
+    parser.add_argument("--analyzer", choices=["mock", "vlm", "predictions", "cv-engine", "openvino"], default="mock", help="Analyzer backend to benchmark")
     parser.add_argument("--model", default="gemini-3.5-flash-lite", help="Gemini VLM model name (for --analyzer vlm)")
     parser.add_argument("--api-key", default=None, help="Gemini API key (or set CLOUD_VISION_API_KEY env var)")
     parser.add_argument("--predictions-file", default=None, help="JSON file with predictions (for --analyzer predictions)")
+    parser.add_argument("--cv-engine-url", default="http://localhost:8000", help="Base URL of cv-engine service (for --analyzer cv-engine / openvino)")
+    parser.add_argument("--no-pcu", dest="use_pcu", action="store_false", help="Disable PCU saturation calculation and use raw cv-engine severity")
+    parser.set_defaults(use_pcu=True)
     parser.add_argument("--output-report", default=None, help="File path to write markdown report")
     parser.add_argument("--output-json", default=None, help="File path to write JSON metrics")
     parser.add_argument("--gate-max-fnr", type=float, default=0.05, help="Maximum allowed flood false-negative rate (default 0.05 = 5%%)")
@@ -934,6 +1085,11 @@ def main():
     # Instantiate analyzer
     if args.analyzer == "mock":
         analyzer = MockAnalyzer(simulate_flood_miss=args.simulate_flood_miss)
+    elif args.analyzer in ("cv-engine", "openvino"):
+        analyzer = CVEngineAnalyzer(
+            base_url=args.cv_engine_url,
+            use_pcu=args.use_pcu,
+        )
     elif args.analyzer == "predictions":
         if not args.predictions_file:
             print("[ERROR] --predictions-file is required when --analyzer=predictions", file=sys.stderr)
@@ -989,6 +1145,7 @@ def main():
             "flood_metrics": {k: asdict(v) for k, v in result.flood_metrics.items()},
             "weather_slices": result.weather_slices,
             "time_of_day_slices": result.time_of_day_slices,
+            "predictions": result.predictions,
         }
         json_path.write_text(json.dumps(export_data, indent=2) + "\n", encoding="utf-8")
         print(f"[INFO] Wrote JSON metrics to: {json_path}")
