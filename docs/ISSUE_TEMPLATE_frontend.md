@@ -54,4 +54,5 @@ no backend changes from a frontend issue.
 - [ ] Manually verified against the real backend endpoint (not just a
       mocked response), or against `cvclient`'s mock analyzer if the
       real backend isn't deployed yet
+- [ ] Real production verification evidence attached to PR before merge: For any task claiming to display real/live data (not mock), attach visual or network proof from the live deployment (screenshot of live UI or live network response). Local mock testing alone is strictly insufficient.
 - [ ] Feature branch pushed, PR opened against `dev` per `AGENTS.md` workflow
