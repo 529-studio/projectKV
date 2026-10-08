@@ -1,0 +1,248 @@
+{
+  "version": "1.0.0",
+  "description": "Curated smoke-test camera set with deterministic baseline traffic states for model verification (Sprint 4 T7 / ADR-005 Finding B).",
+  "created_at": "2026-10-08T09:00:00Z",
+  "summary": {
+    "total_cameras": 10,
+    "clear_baseline_cameras": 5,
+    "congested_baseline_cameras": 5,
+    "corridors_covered": [
+      "vo_van_kiet",
+      "mai_chi_tho",
+      "dien_bien_phu",
+      "cong_hoa"
+    ]
+  },
+  "cameras": [
+    {
+      "camera_id": "5822b5ededeb6c0012a2d66a",
+      "camera_name": "Mai Chí Thọ - Nguyễn Cơ Thạch 1",
+      "title": "TTH 5.1",
+      "corridor": "mai_chi_tho",
+      "road_keys": [
+        "mai_chi_tho",
+        "nguyen_co_thach"
+      ],
+      "coordinates": {
+        "latitude": 10.7732144077704,
+        "longitude": 106.722586154938
+      },
+      "expected_baseline_traffic": "CLEAR",
+      "expected_si_threshold": "<0.35",
+      "validation_time_window": {
+        "type": "off_peak",
+        "local_time_range": "13:00-15:00",
+        "utc_time_range": "06:00-08:00",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "rationale": "Wide 12-lane boulevard across the Thủ Thiêm urban axis. Off-peak volume is low with wide continuous lanes, clear line-of-sight, and minimal cross-traffic friction. Consistently produces low PCU count (SI < 0.35)."
+    },
+    {
+      "camera_id": "5a10c79f02eb490011a0b0dd",
+      "camera_name": "Mai Chí Thọ - Tố Hữu (C6)",
+      "title": "TTH 59.1",
+      "corridor": "mai_chi_tho",
+      "road_keys": [
+        "mai_chi_tho",
+        "to_huu"
+      ],
+      "coordinates": {
+        "latitude": 10.7713172490313,
+        "longitude": 106.716717481613
+      },
+      "expected_baseline_traffic": "CLEAR",
+      "expected_si_threshold": "<0.35",
+      "validation_time_window": {
+        "type": "off_peak",
+        "local_time_range": "13:00-15:00",
+        "utc_time_range": "06:00-08:00",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "rationale": "Wide arterial roadway section with open multi-lane profile and low roadside commercial density. Off-peak traffic runs smoothly with negligible queuing (SI < 0.35)."
+    },
+    {
+      "camera_id": "56de42f611f398ec0c48129c",
+      "camera_name": "Võ Văn Kiệt - Quốc Lộ 1",
+      "title": "TTH 20.1",
+      "corridor": "vo_van_kiet",
+      "road_keys": [
+        "vo_van_kiet",
+        "quoc_lo_1"
+      ],
+      "coordinates": {
+        "latitude": 10.7170534584198,
+        "longitude": 106.600942611694
+      },
+      "expected_baseline_traffic": "CLEAR",
+      "expected_si_threshold": "<0.35",
+      "validation_time_window": {
+        "type": "off_peak",
+        "local_time_range": "13:00-15:00",
+        "utc_time_range": "06:00-08:00",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "rationale": "High-capacity grade-separated highway junction at the southwest edge of the city. Outside peak holiday or rush hours, traffic disperses freely across wide grade-separated ramps (SI < 0.35)."
+    },
+    {
+      "camera_id": "56de42f611f398ec0c481287",
+      "camera_name": "Võ Văn Kiệt - Ký Con",
+      "title": "TTH 6.1",
+      "corridor": "vo_van_kiet",
+      "road_keys": [
+        "vo_van_kiet",
+        "ky_con"
+      ],
+      "coordinates": {
+        "latitude": 10.7654781410386,
+        "longitude": 106.700146794319
+      },
+      "expected_baseline_traffic": "CLEAR",
+      "expected_si_threshold": "<0.35",
+      "validation_time_window": {
+        "type": "off_peak",
+        "local_time_range": "13:00-15:00",
+        "utc_time_range": "06:00-08:00",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "rationale": "Wide canal-side boulevard directly approaching the Saigon River Tunnel entrance. Unobstructed flow and high travel speed during off-peak windows with zero intersection stacking (SI < 0.35)."
+    },
+    {
+      "camera_id": "5deb576d1dc17d7c5515ad02",
+      "camera_name": "Điện Biên Phủ - Pasteur",
+      "title": "ITS 3.4",
+      "corridor": "dien_bien_phu",
+      "road_keys": [
+        "dien_bien_phu",
+        "pasteur"
+      ],
+      "coordinates": {
+        "latitude": 10.7843441648872,
+        "longitude": 106.691552996635
+      },
+      "expected_baseline_traffic": "CLEAR",
+      "expected_si_threshold": "<0.35",
+      "validation_time_window": {
+        "type": "off_peak",
+        "local_time_range": "13:00-15:00",
+        "utc_time_range": "06:00-08:00",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "rationale": "Multi-lane one-way arterial stretch in District 3. Off-peak coordinated green signals allow free-flowing vehicle platoons with low localized congestion (SI < 0.35)."
+    },
+    {
+      "camera_id": "5deb576d1dc17d7c5515ad08",
+      "camera_name": "Cộng Hòa - Tân Kỳ Tân Quý",
+      "title": "ITS 6.2",
+      "corridor": "cong_hoa",
+      "road_keys": [
+        "cong_hoa",
+        "tan_ky_tan_quy"
+      ],
+      "coordinates": {
+        "latitude": 10.8041364085074,
+        "longitude": 106.637651324272
+      },
+      "expected_baseline_traffic": "CONGESTED",
+      "expected_si_threshold": ">=0.90",
+      "validation_time_window": {
+        "type": "peak",
+        "local_time_range": "07:30-08:30, 17:30-18:30",
+        "utc_time_range": "00:30-01:30, 10:30-11:30",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "rationale": "Severe chronic bottleneck intersection connecting Northwest suburban districts (Tân Phú, Bình Tân) towards the airport and city center. Over-saturated signal cycles cause multi-hundred-meter tailbacks (SI >= 0.90)."
+    },
+    {
+      "camera_id": "586e1f18f9fab7001111b0a5",
+      "camera_name": "Cộng Hòa - Trường Chinh",
+      "title": "TTH 38.1",
+      "corridor": "cong_hoa",
+      "road_keys": [
+        "cong_hoa",
+        "truong_chinh"
+      ],
+      "coordinates": {
+        "latitude": 10.8070661399436,
+        "longitude": 106.634953022003
+      },
+      "expected_baseline_traffic": "CONGESTED",
+      "expected_si_threshold": ">=0.90",
+      "validation_time_window": {
+        "type": "peak",
+        "local_time_range": "07:30-08:30, 17:30-18:30",
+        "utc_time_range": "00:30-01:30, 10:30-11:30",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "rationale": "Critical convergence node of two major commuter arteries (Trường Chinh and Cộng Hòa). High volumes of buses and motorcycles merging from An Sương create persistent peak-hour gridlock (SI >= 0.90)."
+    },
+    {
+      "camera_id": "66b1c426779f74001867415e",
+      "camera_name": "Điện Biên Phủ - Nguyễn Gia Trí",
+      "title": "TTH 419",
+      "corridor": "dien_bien_phu",
+      "road_keys": [
+        "dien_bien_phu",
+        "nguyen_gia_tri"
+      ],
+      "coordinates": {
+        "latitude": 10.8010801833774,
+        "longitude": 106.715161800385
+      },
+      "expected_baseline_traffic": "CONGESTED",
+      "expected_si_threshold": ">=0.90",
+      "validation_time_window": {
+        "type": "peak",
+        "local_time_range": "17:30-18:30",
+        "utc_time_range": "10:30-11:30",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "rationale": "Gateway chokepoint between Hàng Xanh intersection and Saigon Bridge. Dense university traffic and side-street merging cause dense queue spillbacks during evening rush hours (SI >= 0.90)."
+    },
+    {
+      "camera_id": "5deb576d1dc17d7c5515acf2",
+      "camera_name": "Điện Biên Phủ - Cách Mạng Tháng Tám",
+      "title": "ITS 1.1",
+      "corridor": "dien_bien_phu",
+      "road_keys": [
+        "dien_bien_phu",
+        "cach_mang_thang_tam"
+      ],
+      "coordinates": {
+        "latitude": 10.7765712954739,
+        "longitude": 106.683694124222
+      },
+      "expected_baseline_traffic": "CONGESTED",
+      "expected_si_threshold": ">=0.90",
+      "validation_time_window": {
+        "type": "peak",
+        "local_time_range": "17:30-18:30",
+        "utc_time_range": "10:30-11:30",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "rationale": "Dense urban cross-intersection linking District 3 and District 10. Long signal cycles and high cross-traffic volume lead to chronic peak-hour queue accumulation (SI >= 0.90)."
+    },
+    {
+      "camera_id": "56de42f611f398ec0c481282",
+      "camera_name": "Mai Chí Thọ - Đồng Văn Cống 2",
+      "title": "TTH 3.2",
+      "corridor": "mai_chi_tho",
+      "road_keys": [
+        "mai_chi_tho",
+        "dong_van_cong"
+      ],
+      "coordinates": {
+        "latitude": 10.7876851195878,
+        "longitude": 106.74994468689
+      },
+      "expected_baseline_traffic": "CONGESTED",
+      "expected_si_threshold": ">=0.90",
+      "validation_time_window": {
+        "type": "peak",
+        "local_time_range": "16:30-18:30",
+        "utc_time_range": "09:30-11:30",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "rationale": "Primary heavy freight junction leading to Cát Lái container port. During afternoon/evening container gate-in hours, multi-lane truck and container queues form dense, persistent congestion (SI >= 0.90)."
+    }
+  ]
+}
