@@ -152,6 +152,47 @@ class TestFloodSafetyGate(unittest.TestCase):
         self.assertEqual(len(gate.missed_frames), 1)
         self.assertEqual(gate.missed_frames[0]["frame_id"], "f1")
 
+    def test_flood_safety_gate_zero_positives_incomplete(self):
+        frames = [
+            benchmark.LabeledFrame("f1", "c1", Path("p1"), "CLEAR", "NONE", "day", "dry"),
+        ]
+        preds = [
+            benchmark.Prediction("f1", "CLEAR", "NONE", 0.95),
+        ]
+        gate = benchmark.evaluate_flood_safety_gate(frames, preds, max_fnr=0.05)
+        self.assertEqual(gate.actual_positives, 0)
+        self.assertFalse(gate.passed)
+        self.assertIn("INCOMPLETE", gate.status_label)
+
+
+class TestCVEngineAnalyzer(unittest.TestCase):
+    def test_pcu_calculation_formula(self):
+        analyzer = benchmark.CVEngineAnalyzer(base_url="http://localhost:8000", capacity_floor=25.0)
+
+        # 10 motorcycles (2.0 PCU) + 2 cars (2.0 PCU) + 1 truck (2.0 PCU) = 6.0 PCU
+        # SI = 6.0 / 25.0 = 0.24 < 0.35 => CLEAR
+        counts = {"motorcycle": 10, "car": 2, "bus": 0, "truck": 1, "container": 0}
+        sev, pcu, si = analyzer._calculate_pcu("cam_test", counts, 13)
+        self.assertEqual(sev, "CLEAR")
+        self.assertAlmostEqual(pcu, 6.0)
+        self.assertAlmostEqual(si, 0.24)
+
+        # 30 cars = 30.0 PCU. Historical capacity updates to 30.0!
+        # SI = 30.0 / 30.0 = 1.00 >= 0.90 => CONGESTED
+        counts2 = {"motorcycle": 0, "car": 30, "bus": 0, "truck": 0, "container": 0}
+        sev2, pcu2, si2 = analyzer._calculate_pcu("cam_test", counts2, 30)
+        self.assertEqual(sev2, "CONGESTED")
+        self.assertAlmostEqual(pcu2, 30.0)
+        self.assertAlmostEqual(si2, 1.0)
+
+    def test_fallback_vehicle_total(self):
+        analyzer = benchmark.CVEngineAnalyzer(base_url="http://localhost:8000", capacity_floor=20.0)
+        sev, pcu, si = analyzer._calculate_pcu("cam_fallback", {}, 10)
+        self.assertEqual(sev, "MODERATE")
+        self.assertAlmostEqual(pcu, 10.0)
+        self.assertAlmostEqual(si, 0.5)
+
+
 
 class TestEndToEndBenchmark(unittest.TestCase):
     def setUp(self):
