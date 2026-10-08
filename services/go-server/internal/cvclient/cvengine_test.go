@@ -1,6 +1,7 @@
 package cvclient
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -81,6 +82,10 @@ func TestCVEngineAnalyzer_Analyze_Success(t *testing.T) {
 	}
 	if v.Timestamp.IsZero() {
 		t.Error("expected non-zero timestamp")
+	}
+	expectedFrame := []byte("\xff\xd8\xff\xe0minimal-jpeg")
+	if !bytes.Equal(v.RawFrame, expectedFrame) {
+		t.Errorf("expected RawFrame %q, got %q", expectedFrame, v.RawFrame)
 	}
 }
 
