@@ -5,104 +5,98 @@
 
 ---
 
-## 1. Bản đồ Sprint 4 Backlog & Trạng thái Khởi tạo
+## 1. Bản đồ Sprint 4 Backlog & Trạng thái Thực tế
 
 | Wave | ID | GitHub Issue | Tiêu đề | Phụ thuộc | Trạng thái hiện tại |
 |:---:|:---:|:---:|---|---|:---:|
-| **Wave 0** | **T8** | [#188](https://github.com/529-studio/projectKV/issues/188) | `[docs] add mandatory live-production-check to Definition of Done templates` | None | **Sẵn sàng chạy ngay** |
-| **Wave 0** | **T6** | [#186](https://github.com/529-studio/projectKV/issues/186) | `[go-server + cv-engine] resolve container-class detection gap` | T1 (Done) | **Sẵn sàng chạy ngay** |
-| **Wave 0** | **T7** | [#187](https://github.com/529-studio/projectKV/issues/187) | `[spike] build known-state camera smoke-test set for model verification` | T2 (Done) | **Sẵn sàng chạy ngay** |
-| **Gate T2b** | **T2b** | [#182](https://github.com/529-studio/projectKV/issues/182) / [PR #185](https://github.com/529-studio/projectKV/pull/185) | `[go-server] T2b — archiver saves the actual analyzed frame, not a coincidental proxy-cache hit` | T2 (Done) | **Đã merge `dev`, ĐANG CHỜ BẰNG CHỨNG STAGING (30 phút)** |
-| **Wave 1** | **T3** | *(Chờ mở khóa)* | `[tooling] label real flood + traffic dataset via S6 labeler` | T2b (Cần bằng chứng tích lũy) | **BỊ KHÓA bởi Gate T2b** |
-| **Wave 2** | **T4** | *(Chờ mở khóa)* | `[tooling] run real D6 accuracy gate, report precision/recall/FNR` | T3, T7 | **BỊ KHÓA bởi T3** |
-| **Wave 3** | **T5** | *(Chờ mở khóa)* | `[go-server] calibrate PCU weights against labeled traffic data` | T3, T4 | **BỊ KHÓA bởi T4** |
-| **Wave 3** | **T9** | *(Chờ mở khóa)* | `[decision] keep self-hosted OpenVINO or revert to VLM for traffic` | T4 | **BỊ KHÓA bởi T4** |
+| **Wave 0** | **T8** | [#188](https://github.com/529-studio/projectKV/issues/188) / [PR #190](https://github.com/529-studio/projectKV/pull/190) | `[docs] add mandatory live-production-check to Definition of Done templates` | None | **MERGED (`dev`)** |
+| **Wave 0** | **T6** | [#186](https://github.com/529-studio/projectKV/issues/186) / [PR #192](https://github.com/529-studio/projectKV/pull/192) | `[go-server + cv-engine] resolve container-class detection gap` | T1 (Done) | **MERGED (`dev`)** |
+| **Wave 0** | **T7** | [#187](https://github.com/529-studio/projectKV/issues/187) / [PR #193](https://github.com/529-studio/projectKV/pull/193) | `[spike] build known-state camera smoke-test set for model verification` | T2 (Done) | **ĐÃ HOÀN TẤT (PR #193 Passing CI)** |
+| **Gate T2b** | **T2b** | [#182](https://github.com/529-studio/projectKV/issues/182) / [PR #185](https://github.com/529-studio/projectKV/pull/185) | `[go-server] T2b — archiver saves the actual analyzed frame, not a coincidental proxy-cache hit` | T2 (Done) | **MERGED & XÁC NHẬN BẰNG CHỨNG STAGING (ĐÃ MỞ KHÓA)** |
+| **Wave 1** | **T3** | [#194](https://github.com/529-studio/projectKV/issues/194) | `[tooling] label real flood + traffic dataset via S6 labeler` | T2b (Đã mở khóa) | **SẴN SÀNG THỰC THI (ĐANG TÍCH LŨY DỮ LIỆU)** |
+| **Wave 2** | **T4** | [#195](https://github.com/529-studio/projectKV/issues/195) | `[tooling] run real D6 accuracy gate, report precision/recall/FNR` | T3, T7 | **Đã khởi tạo (Chờ tập nhãn T3)** |
+| **Wave 3** | **T5** | [#196](https://github.com/529-studio/projectKV/issues/196) | `[go-server] calibrate PCU weights against labeled traffic data` | T3, T4 | **Đã khởi tạo (Chờ số liệu T4)** |
+| **Wave 3** | **T9** | [#197](https://github.com/529-studio/projectKV/issues/197) | `[decision] keep self-hosted OpenVINO or revert to VLM for traffic` | T4 | **Đã khởi tạo (Chờ số liệu T4)** |
 
 ---
 
-## 2. Gate T2b: Thủ tục Xác nhận Bằng chứng Staging Thực tế
+## 2. Gate T2b: Kết quả Nghiệm thu Thực tế trên Staging
 
-Trước khi tạo và kích hoạt **T3**, đội ngũ phải thực hiện xác nhận thực tế trên máy chủ Staging (`local-homesrv` / Portainer Stack 14) theo đúng quy định tại ADR-005 §5 và Issue #182.
+Căn cứ comment nghiệm thu tại [PR #185](https://github.com/529-studio/projectKV/pull/185#issuecomment-6056548912) trên máy chủ Staging (`local-homesrv` / Portainer Stack 14), **Gate T2b đã chính thức ĐẠT và MỞ KHÓA hoàn toàn**:
 
-### Các bước kiểm tra trên Staging
-
-1. **Kiểm tra Container đã nhận Image mới chứa PR #185**:
-   ```bash
-   # Kiểm tra commit hash hoặc thời gian container start
-   docker inspect warded-backend --format '{{.State.StartedAt}}'
-   ```
-
-2. **Đo đạc tốc độ tích lũy frame trong `/app/data/proofs` trong 30 phút**:
-   - Với 57 camera trong Hot Set, chu kỳ lấy mẫu 30s (`ARCHIVE_SAMPLE_INTERVAL_SECONDS=300` tương đương mỗi camera được lưu 1 frame mỗi 5 phút = 12 frame/giờ/camera):
-   - Dự kiến tối thiểu trong 30 phút: $57 \times 6 = 342$ frames mới (cộng thêm các frame do `state_change`).
-   ```bash
-   # Lần đo T0 (bắt đầu):
-   BEFORE_COUNT=$(docker exec warded-backend find /app/data/proofs -type f -name "*.jpg" | wc -l)
-   echo "Count at T0: $BEFORE_COUNT"
-
-   # Đợi 30 phút quan sát thụ động (không cần mở web client)...
-   sleep 1800
-
-   # Lần đo T30:
-   AFTER_COUNT=$(docker exec warded-backend find /app/data/proofs -type f -name "*.jpg" | wc -l)
-   DIFF=$((AFTER_COUNT - BEFORE_COUNT))
-   echo "Count at T30: $AFTER_COUNT (Growth: +$DIFF frames)"
-   ```
-
-3. **Kiểm tra kích thước file ảnh thật**:
-   ```bash
-   docker exec warded-backend ls -lh /app/data/proofs/$(date +%Y-%m-%d)/*/*.jpg | head -n 10
-   # Đảm bảo dung lượng > 30KB - 200KB (không phải 107 bytes mock)
-   ```
-
-4. **Đính kèm bằng chứng vào Issue #182 / PR #185**:
-   - Chụp lại output hoặc copy log growth đính kèm vào comment để đóng hoàn toàn DoD của T2b.
+1. **Tốc độ tích lũy frame thực tế**:
+   - Tích lũy trong ngày 2026-10-08: **1.600+ frames** và tăng liên tục theo chu kỳ Hot Set ~30s.
+   - Cửa sổ đo 30 phút (`-mmin -30`): **240+ frames**.
+   - Cửa sổ đo 60 phút (`-mmin -60`): **733+ frames**.
+   - Chu kỳ lấy mẫu định kỳ 5 phút (`_sample.jpg`) và lưu ảnh theo biến động trạng thái (`_state_change.jpg`) hoạt động hoàn toàn độc lập với việc có người mở web hay không.
+2. **Kích thước và tính toàn vẹn của file ảnh**:
+   - Dung lượng: **36 KB – 65 KB** (trung bình ~55 KB/frame). Toàn bộ mock placeholder 107 bytes đã bị triệt tiêu hoàn toàn.
+   - Magic bytes: Xác nhận chuẩn **JFIF** hợp lệ (`FF D8 FF E0 00 10 4A 46 49 46`).
+3. **Bằng chứng lưu trữ máy chủ**:
+   - Ảnh chụp volume browser Termix tại thư mục `/var/lib/docker/volumes/warded-stg_warded-stg-data/_data/proofs/2026-10-08/` xác nhận ảnh thật đổ về liên tục từ 12:46 đến 15:59.
 
 ---
 
-## 3. Hướng dẫn Thực thi Wave 0 (Chạy ngay, không phụ thuộc T2b)
+## 3. Hướng dẫn Thực thi Wave 1: Issue T3 (#194)
 
-### 3.1. Issue T8 (#188) — Cập nhật DoD Templates
-- **Nhiệm vụ**: Thêm dòng bắt buộc đính kèm bằng chứng production/staging thật vào `docs/ISSUE_TEMPLATE_go_backend.md` và `docs/ISSUE_TEMPLATE_frontend.md`.
-- **Thực thi**:
-  ```bash
-  git checkout -b docs/188-dod-live-production-check
-  # Chỉnh sửa 2 file template
-  git add docs/ISSUE_TEMPLATE_*.md
-  git commit -m "docs: add mandatory live-production-check to Definition of Done templates (#188)"
-  git push -u origin docs/188-dod-live-production-check
-  gh pr create --base dev --head docs/188-dod-live-production-check ...
-  ```
+### 3.1. Mục tiêu & Nguyên tắc Bắt buộc
+- **Mục tiêu**: Xây dựng tập nhãn ground-truth $\ge 300$ frames thật, trong đó $\ge 60$ frames ngập (shallow + deep) và $\ge 30$ frames ban đêm, theo đúng tiêu chuẩn ADR-004 §D6.
+- **Kỷ luật dữ liệu**: **Tuyệt đối không dùng** bất kỳ file ảnh nào trước ngày 2026-10-08 (đã xác nhận là mock frame 107 bytes). Chỉ lấy ảnh thực tế từ `data/proofs/2026-10-08/` trở đi.
+- **Lưu ý thời gian thụ động**: 
+  - Gán nhãn các trạng thái giao thông (`CLEAR`, `MODERATE`, `HEAVY`, `CONGESTED`, `night`, `day`) có thể tiến hành ngay trên các frame đã tích lũy trong ngày (đã có >1.600 frame).
+  - Riêng $\ge 60$ frame ngập nước (`SHALLOW`, `DEEP`) cần thời gian chờ thụ động qua các cơn mưa thực tế tại TP.HCM trong các ngày tiếp theo. Không tự ý bịa đặt nhãn ngập trên ảnh đường khô ráo.
 
-### 3.2. Issue T6 (#186) — Xử lý Container-Class Gap
-- **Nhiệm vụ**: Giải quyết dead code `Container = 3.0` ở `pcu.go`.
-- **Trình tự bắt buộc**:
-  1. Thảo luận và chọn 1 trong 3 phương án:
-     - (a) Bỏ `Container`, gộp vào `Truck` (PCU = 2.0).
-     - (b) Thêm bước detect heuristic/aspect-ratio riêng cho xe container ở các camera cảng Cát Lái.
-     - (c) Dùng model chuyên dụng cho nhóm camera đó.
-  2. Ghi văn bản quyết định vào `docs/` trước khi code.
-  3. Sửa `pcu.go`, `pcu_calculator.go`, hoặc `server.py` theo đúng quyết định.
-  4. Chạy `make test-pcu` và `make test-go`.
-
-### 3.3. Issue T7 (#187) — Bộ Camera Smoke-Test Trạng thái Đã biết
-- **Nhiệm vụ**: Xây dựng danh sách 6–10 camera có baseline chắc chắn (`CLEAR` giờ thấp điểm, `CONGESTED` giờ cao điểm) vào `tools/eval/fixtures/smoke_test_cameras.json` và script `tools/eval/verify_smoke_set.py`.
-- **Mục tiêu**: Chuẩn bị sẵn harness kiểm tra khách quan cho T4.
+### 3.2. Quy trình Gán nhãn bằng `labeler.html`
+1. **Lấy ảnh từ Staging về máy local**:
+   ```bash
+   # Tải kho ảnh ngày 2026-10-08 từ staging về thư mục data/proofs/
+   # Hoặc đồng bộ qua rsync / scp từ máy chủ local-homesrv
+   mkdir -p data/proofs/2026-10-08
+   ```
+2. **Mở công cụ gán nhãn**:
+   ```bash
+   open tools/eval/labeler.html        # macOS
+   xdg-open tools/eval/labeler.html   # Linux
+   ```
+3. **Thao tác gán nhãn bằng phím tắt**:
+   - Nhấn **Open Folder** ➔ Chọn thư mục frame (`data/proofs/2026-10-08/` hoặc thư mục con theo camera).
+   - Phím ngập nước (bắt buộc): **1** (NONE), **2** (SHALLOW), **3** (DEEP).
+   - Phím giao thông: **Q** (CLEAR), **W** (MODERATE), **E** (HEAVY), **R** (CONGESTED).
+   - Phím thời tiết: **A** (dry), **S** (rain), **D** (heavy_rain).
+   - Phím thời gian: **Z** (day), **X** (night), **C** (dawn_dusk).
+   - Phím **Enter**: Lưu nhãn và tự động chuyển sang frame tiếp theo.
+4. **Đồng bộ nhãn vào repository**:
+   - Sao chép các file JSON sinh ra vào `tools/eval/labels/<frame_id>.json`.
+   - Kiểm tra tính hợp lệ của nhãn:
+     ```bash
+     python3 -m unittest discover -s tools/eval -p "*_test.py"
+     ```
 
 ---
 
-## 4. Kế hoạch Mở khóa Wave 1, 2, 3 (Sau khi Gate T2b Đạt)
+## 4. Hướng dẫn Thực thi Wave 2: Issue T4 (#195)
 
-Ngay sau khi Gate T2b có bằng chứng thật về tốc độ lưu ảnh:
-1. **Khởi tạo Issue T3, T4, T5, T9** bằng `gh issue create`.
-2. **Thực thi T3**:
-   - Chạy `tools/eval/labeler.html`.
-   - Gán nhãn các frame thực tế tích lũy trong `data/proofs/` sau ngày 2026-10-08.
-   - **Tuyệt đối loại bỏ** toàn bộ kho ảnh trước ngày 2026-10-06 (đã chứng minh là mock frame).
-   - Mục tiêu: $\ge 300$ frames giao thông, $\ge 60$ frames ngập (yêu cầu chờ tích lũy qua các đợt mưa thực tế).
-3. **Thực thi T4**:
-   - Chạy `benchmark.py` trên tập nhãn T3 kết hợp smoke set T7.
-   - Lập báo cáo D6 đầu tiên trong lịch sử dự án có số liệu FNR/Precision/Recall thật.
-4. **Thực thi T5 & T9**:
-   - Hiệu chỉnh PCU từ số liệu T4 (T5).
-   - Ra quyết định chính thức: Giữ OpenVINO hay chuyển về VLM (T9).
+Ngay sau khi T3 hoàn thành đủ $\ge 300$ frames thật:
+1. **Chạy benchmark D6 chính thức**:
+   ```bash
+   python3 tools/eval/benchmark.py --analyzer onnx --labels-dir tools/eval/labels --output-report docs/reports/eval_report_d6_real.md
+   ```
+2. **Đối chiếu với bộ Smoke-Test T7**:
+   ```bash
+   python3 tools/eval/verify_smoke_set.py --verdicts predictions_real.json --strict
+   ```
+3. **Công bố kết quả Gate D6**:
+   - Ghi nhận con số thực tế: Precision, Recall, F1, và đặc biệt là **Flood False-Negative Rate (FNR)**.
+   - Tiêu chuẩn an toàn: Nếu $FNR \le 5.0\%$, Gate D6 chính thức **PASS**.
+
+---
+
+## 5. Hướng dẫn Thực thi Wave 3: T5 (#196) & T9 (#197)
+
+1. **Issue T5 — Hiệu chỉnh trọng số PCU**:
+   - Phân tích phân phối thực tế từ T3/T4 để hiệu chỉnh các trọng số trong `services/go-server/internal/cvclient/pcu.go`.
+   - Lập tài liệu so sánh trọng số cũ vs mới và công thức hiệu chuẩn toán học.
+   - Chạy `make test-pcu` và `make test-go` xác nhận toàn vẹn.
+2. **Issue T9 — Quyết định Giữ OpenVINO hay Revert VLM**:
+   - Dựa trên con số thật từ T4, lập biên bản quyết định kiến trúc tại `docs/decision-openvino-vs-vlm.md`.
+   - Cập nhật [ADR-005](ADR-005-sprint3-audit-and-sprint4-plan.md) và lộ trình Sprint 5.
