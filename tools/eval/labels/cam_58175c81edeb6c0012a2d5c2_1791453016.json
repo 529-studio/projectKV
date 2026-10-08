@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58175c81edeb6c0012a2d5c2_1791453016",
+  "camera_id": "58175c81edeb6c0012a2d5c2",
+  "image_path": "data/proofs/2026-10-08/58175c81edeb6c0012a2d5c2/1791453016_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
+  "notes": "Corridor mai_chi_tho evening peak observation for Mai Chí Thọ - Trần Não 2"
+}

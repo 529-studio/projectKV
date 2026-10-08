@@ -25,8 +25,8 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **113 Pull Requests** processed across repository history:
-  - **105 Merged** to `dev`
+- **Lifetime PR History**: Exactly **115 Pull Requests** processed across repository history:
+  - **107 Merged** to `dev`
   - **8 Closed** without merging
   - **0 Open** PRs pending
 - **Staging Infrastructure Configuration (Stack 14)**:
@@ -47,10 +47,15 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - `tools/crawler/sync_catalog_from_audit.js` re-synchronizes `cameras_all.json` / `cameras_enriched.json` from the probe report (deterministic outcomes only; transient errors leave entries untouched). This replaced the former hardcoded `KnownGhostCameras` map, which had drifted out of sync, making the JSON catalog the single source of truth for static liveness.
   - `.github/workflows/camera-health-audit.yml` runs the audit daily (01:00 UTC) and opens a resync Pull Request against `dev` when drift is detected (never auto-merges).
   - The web client promotes a `503 GHOST_CAMERA` snapshot response into shared state (`useCameras.markCameraGhost`), immediately reflecting field signal loss across the map, sidebar, dock and modal.
-- **Known-State Smoke-Test Camera Set (Sprint 4 T7, Issue #187)**:
+- **Known-State Smoke-Test Camera Set (Sprint 4 T7, Issue #187, PR #193)**:
   - Curated 10 high-confidence ground-truth cameras in `tools/eval/fixtures/smoke_test_cameras.json` (5 `CLEAR` off-peak baselines, 5 `CONGESTED` peak rush-hour baselines) across 4 priority corridors (`vo_van_kiet`, `mai_chi_tho`, `dien_bien_phu`, `cong_hoa`).
   - Implemented automated verification script `tools/eval/verify_smoke_set.py` and unit test suite `tools/eval/verify_smoke_set_test.py` to objectively gate model predictions without relying on anecdotal staging UI spot-checks.
   - Detailed physical and operational rationale documented in `tools/eval/smoke_test_cameras.md`.
+- **Evaluation Dataset & Progress Tracking (Sprint 4 T3, Issue #194)**:
+  - Strictly excluded all pre-10-06 mock frames (107 bytes) from ground-truth dataset.
+  - Implemented `tools/eval/collect_real_frames.py` and `tools/eval/dataset_progress.py` to fetch, validate, and audit real frames against ADR-004 §D6 targets.
+  - Ingested initial batch of 70 real labeled frames from 2026-10-08 evening peak (40 rain target satisfied, 14 moderate, 14 heavy/congested).
+  - Active passive accumulation window maintained for remaining flood frames (≥60 required by D6 safety gate).
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5822adbbedeb6c0012a2d65f_1791453023",
+  "camera_id": "5822adbbedeb6c0012a2d65f",
+  "image_path": "data/proofs/2026-10-08/5822adbbedeb6c0012a2d65f/1791453023_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
+  "notes": "Corridor vo_van_kiet evening peak observation for Võ Văn Kiệt - Cầu Chữ Y 1"
+}

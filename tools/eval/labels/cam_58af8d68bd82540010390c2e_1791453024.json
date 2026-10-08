@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58af8d68bd82540010390c2e_1791453024",
+  "camera_id": "58af8d68bd82540010390c2e",
+  "image_path": "data/proofs/2026-10-08/58af8d68bd82540010390c2e/1791453024_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
+  "notes": "Corridor dien_bien_phu evening peak observation for Nam Kỳ Khởi Nghĩa - Điện Biên Phủ 2"
+}
