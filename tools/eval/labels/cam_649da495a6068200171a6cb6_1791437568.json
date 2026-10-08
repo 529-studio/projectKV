@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_649da495a6068200171a6cb6_1791437568",
+  "camera_id": "649da495a6068200171a6cb6",
+  "image_path": "data/proofs/2026-10-08/649da495a6068200171a6cb6/1791437568_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Midday open multi-lane flow on expressway corridor for Mai Chí Thọ - Trần Quý Kiên (3)"
+}

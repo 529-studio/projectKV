@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662a881a1afb9c00172d2559_1791467403",
+  "camera_id": "662a881a1afb9c00172d2559",
+  "image_path": "data/proofs/2026-10-08/662a881a1afb9c00172d2559/1791467403_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Shallow standing water restricting lanes and slowing traffic on Kinh Dương Vương - Tên Lửa"
+}

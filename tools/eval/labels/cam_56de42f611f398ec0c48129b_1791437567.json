@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_56de42f611f398ec0c48129b_1791437567",
+  "camera_id": "56de42f611f398ec0c48129b",
+  "image_path": "data/proofs/2026-10-08/56de42f611f398ec0c48129b/1791437567_state_change.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Midday open multi-lane flow on expressway corridor for Võ Văn Kiệt - Hồ Học Lãm 2"
+}

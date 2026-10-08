@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5b5995a3fd4edb0019c7d9ab_1791437599",
+  "camera_id": "5b5995a3fd4edb0019c7d9ab",
+  "image_path": "data/proofs/2026-10-08/5b5995a3fd4edb0019c7d9ab/1791437599_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Midday open multi-lane flow on expressway corridor for Võ Văn Kiệt - Cầu Chà Và 2 (trên cầu)"
+}

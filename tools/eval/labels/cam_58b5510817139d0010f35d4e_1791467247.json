@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58b5510817139d0010f35d4e_1791467247",
+  "camera_id": "58b5510817139d0010f35d4e",
+  "image_path": "data/proofs/2026-10-08/58b5510817139d0010f35d4e/1791467247_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Off-peak night rain multi-lane flow on expressway corridor for Phạm Văn Đồng - Quốc Lộ 13 (2)"
+}

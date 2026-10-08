@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a8256315058170011f6eac9_1791467235",
+  "camera_id": "5a8256315058170011f6eac9",
+  "image_path": "data/proofs/2026-10-08/5a8256315058170011f6eac9/1791467235_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "DEEP",
+    "time_of_day": "night",
+    "weather": "heavy_rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Deep flood inundation bottleneck causing stalled traffic and tailbacks on Đinh Bộ Lĩnh - Nguyễn Xí"
+}

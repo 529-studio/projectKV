@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_63b65f8dbfd3d90017eaa434_1791467256",
+  "camera_id": "63b65f8dbfd3d90017eaa434",
+  "image_path": "data/proofs/2026-10-08/63b65f8dbfd3d90017eaa434/1791467256_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "SHALLOW",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Shallow standing water combined with chronic corridor choke on Xô Viết Nghệ Tĩnh - Phan Văn Hân (Cầu Thị Nghè)"
+}

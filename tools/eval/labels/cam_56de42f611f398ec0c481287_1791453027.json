@@ -6,9 +6,9 @@
     "traffic": "CLEAR",
     "flood": "NONE",
     "time_of_day": "day",
-    "weather": "rain"
+    "weather": "dry"
   },
   "annotator": "sprint4_t3_curator",
-  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
-  "notes": "Smoke set baseline (vo_van_kiet): Wide canal-side boulevard directly approaching the Saigon River Tunnel entrance. Unobstructed flow and high travel speed during off-peak windows with zero intersection stacking (SI < 0.35)."
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Smoke set peak baseline (vo_van_kiet): Wide canal-side boulevard directly approaching the Saigon River Tunnel entrance. Unobstructed flow and high travel speed during off-peak windows with zero intersection stacking (SI < 0.35)."
 }

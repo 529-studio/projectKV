@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a6069238576340017d0661c_1791467234",
+  "camera_id": "5a6069238576340017d0661c",
+  "image_path": "data/proofs/2026-10-08/5a6069238576340017d0661c/1791467234_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Shallow standing water restricting lanes and slowing traffic on Bạch Đằng - Lê Quang Định"
+}

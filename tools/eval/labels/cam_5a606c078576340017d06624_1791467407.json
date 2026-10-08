@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a606c078576340017d06624_1791467407",
+  "camera_id": "5a606c078576340017d06624",
+  "image_path": "data/proofs/2026-10-08/5a606c078576340017d06624/1791467407_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Standard urban traffic observation for Quốc lộ 13 - Hiệp Bình"
+}

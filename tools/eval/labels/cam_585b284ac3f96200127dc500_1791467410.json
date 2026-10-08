@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_585b284ac3f96200127dc500_1791467410",
+  "camera_id": "585b284ac3f96200127dc500",
+  "image_path": "data/proofs/2026-10-08/585b284ac3f96200127dc500/1791467410_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Shallow standing water restricting lanes and slowing traffic on Huỳnh Tấn Phát - Lưu Trọng Lư 1"
+}

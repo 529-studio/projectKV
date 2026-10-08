@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_587c8661b807da0011e33d43_1791467407",
+  "camera_id": "587c8661b807da0011e33d43",
+  "image_path": "data/proofs/2026-10-08/587c8661b807da0011e33d43/1791467407_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Night rain moderate platoon flow on urban arterial for Lê Văn Sỹ - Hoàng Văn Thụ"
+}

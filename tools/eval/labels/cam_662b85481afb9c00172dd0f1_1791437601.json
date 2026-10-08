@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b85481afb9c00172dd0f1_1791437601",
+  "camera_id": "662b85481afb9c00172dd0f1",
+  "image_path": "data/proofs/2026-10-08/662b85481afb9c00172dd0f1/1791437601_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Midday open multi-lane flow on expressway corridor for Võ Văn Kiệt - Pasteur"
+}

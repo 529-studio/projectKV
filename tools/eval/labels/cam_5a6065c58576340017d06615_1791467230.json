@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a6065c58576340017d06615_1791467230",
+  "camera_id": "5a6065c58576340017d06615",
+  "image_path": "data/proofs/2026-10-08/5a6065c58576340017d06615/1791467230_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Shallow standing water restricting lanes and slowing traffic on Tô Ngọc Vân - TX25"
+}
