@@ -25,13 +25,13 @@ func (v VehicleCounts) Total() int {
 // PCUWeights defines the passenger car equivalent units for each vehicle class.
 //
 // ==============================================================================
-// CALIBRATION NOTE (ADR-004 §9 D15 / Issue #138):
-// These weights are a starting baseline and MUST NOT be treated as fixed or final.
-// Motorcycle PCU values in published Vietnamese and Southeast Asian urban traffic
-// engineering studies vary significantly depending on lane discipline, lateral
-// friction, and average speed (ranging from 0.20 to 0.35+). These values are fully
-// configurable via environment variables and must be calibrated against the B4
-// evaluation dataset once real human-labeled frames exist.
+// CALIBRATION & RESOLUTION NOTE (ADR-004 §9 D15 / ADR-005 T6 / Issue #186):
+// The active self-hosted detector is stock COCO-pretrained YOLOv8n, which detects
+// vehicles across 4 classes: Motorcycle, Car, Bus, and Truck.
+// Heavy freight and container trucks are detected under Truck. Per the architectural
+// decision in docs/decision-container-class-gap.md, Container is folded into the
+// heavy commercial vehicle weight (Truck = 2.0) to eliminate dead code while
+// maintaining backward compatibility for API payloads that include the Container field.
 // ==============================================================================
 type PCUWeights struct {
 	Motorcycle float64 `json:"motorcycle"`
@@ -41,14 +41,15 @@ type PCUWeights struct {
 	Container  float64 `json:"container"`
 }
 
-// DefaultPCUWeights returns the starting calibratable baseline weights from ADR-004 §9 D15.
+// DefaultPCUWeights returns the baseline weights per decision-container-class-gap.md.
+// Container is folded into Truck (2.0) to align with COCO 4-class vehicle detection.
 func DefaultPCUWeights() PCUWeights {
 	return PCUWeights{
 		Motorcycle: 0.2,
 		Car:        1.0,
 		Bus:        2.0,
 		Truck:      2.0,
-		Container:  3.0,
+		Container:  2.0,
 	}
 }
 
@@ -132,12 +133,17 @@ func NewPCUCalculator(cfg PCUConfig) *PCUCalculator {
 // until a higher peak is observed, guaranteeing that effective capacity is strictly positive.
 func (c *PCUCalculator) Calculate(cameraID string, counts VehicleCounts, fallbackTotal int) (severity string, pcuTotal float64, saturationIndex float64) {
 	// Step 1: Compute total PCU.
+	// Container count is weighted using c.weights.Container (defaults to c.weights.Truck = 2.0).
 	if counts.Total() > 0 {
+		containerWeight := c.weights.Container
+		if containerWeight <= 0 {
+			containerWeight = c.weights.Truck
+		}
 		pcuTotal = float64(counts.Motorcycle)*c.weights.Motorcycle +
 			float64(counts.Car)*c.weights.Car +
 			float64(counts.Bus)*c.weights.Bus +
 			float64(counts.Truck)*c.weights.Truck +
-			float64(counts.Container)*c.weights.Container
+			float64(counts.Container)*containerWeight
 	} else if fallbackTotal > 0 {
 		// Fallback for detectors without class separation: treat each vehicle as a standard car.
 		pcuTotal = float64(fallbackTotal) * c.weights.Car
