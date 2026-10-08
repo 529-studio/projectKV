@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5874769eb807da0011e33cec_1791453023",
+  "camera_id": "5874769eb807da0011e33cec",
+  "image_path": "data/proofs/2026-10-08/5874769eb807da0011e33cec/1791453023_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
+  "notes": "Corridor cong_hoa evening peak observation for Cộng Hòa - Út Tịch 2"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5deb576d1dc17d7c5515ad02_1791453023",
+  "camera_id": "5deb576d1dc17d7c5515ad02",
+  "image_path": "data/proofs/2026-10-08/5deb576d1dc17d7c5515ad02/1791453023_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
+  "notes": "Smoke set baseline (dien_bien_phu): Multi-lane one-way arterial stretch in District 3. Off-peak coordinated green signals allow free-flowing vehicle platoons with low localized congestion (SI < 0.35)."
+}
