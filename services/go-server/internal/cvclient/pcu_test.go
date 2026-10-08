@@ -15,7 +15,7 @@ func defaultTestConfig() PCUConfig {
 			Car:        1.0,
 			Bus:        2.0,
 			Truck:      2.0,
-			Container:  3.0,
+			Container:  2.0,
 		},
 		Thresholds: PCUBucketThresholds{
 			Moderate:  0.35,
@@ -71,16 +71,16 @@ func TestPCUCalculator_SingleClassDominance(t *testing.T) {
 		t.Errorf("expected HEAVY for 20 cars, got %q", sev)
 	}
 
-	// 10 containers * 3.0 = 30.0 PCU. On cold start, max updates to 30.0 -> capacity = 30.0, SI = 30/30 = 1.00 -> CONGESTED
+	// 10 containers * 2.0 = 20.0 PCU (folded into heavy vehicle weight). With floor 25.0, SI = 20/25 = 0.80 -> HEAVY
 	sev, pcu, si = calc.Calculate("cam-container", VehicleCounts{Container: 10}, 0)
-	if math.Abs(pcu-30.0) > 1e-6 {
-		t.Errorf("expected PCU=30.0, got %f", pcu)
+	if math.Abs(pcu-20.0) > 1e-6 {
+		t.Errorf("expected PCU=20.0, got %f", pcu)
 	}
-	if math.Abs(si-1.00) > 1e-6 {
-		t.Errorf("expected SI=1.00, got %f", si)
+	if math.Abs(si-0.80) > 1e-6 {
+		t.Errorf("expected SI=0.80, got %f", si)
 	}
-	if sev != hotset.SeverityCongested {
-		t.Errorf("expected CONGESTED for 10 containers, got %q", sev)
+	if sev != hotset.SeverityHeavy {
+		t.Errorf("expected HEAVY for 10 containers, got %q", sev)
 	}
 }
 
@@ -246,4 +246,35 @@ func TestPCUCalculator_ThreadSafety(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+// TestPCUCalculator_ContainerFoldedIntoTruck verifies the architectural resolution of
+// Issue #186 (ADR-005 T6 / decision-container-class-gap.md):
+// 1. Containers and Trucks are weighted equally under baseline configuration (weight = 2.0).
+// 2. A custom Container weight override in PCUConfig is still respected if explicitly provided.
+func TestPCUCalculator_ContainerFoldedIntoTruck(t *testing.T) {
+	// Baseline config: both Truck and Container default to 2.0
+	calc := NewPCUCalculator(DefaultPCUConfig())
+
+	// 5 trucks + 5 containers = (5*2.0) + (5*2.0) = 20.0 PCU
+	_, pcuMixed, _ := calc.Calculate("cam-mixed", VehicleCounts{Truck: 5, Container: 5}, 0)
+	// 10 trucks = 10*2.0 = 20.0 PCU
+	_, pcuTruckOnly, _ := calc.Calculate("cam-truck", VehicleCounts{Truck: 10}, 0)
+
+	if math.Abs(pcuMixed-pcuTruckOnly) > 1e-6 {
+		t.Errorf("expected mixed trucks and containers (%f) to match all-truck count (%f)", pcuMixed, pcuTruckOnly)
+	}
+	if math.Abs(pcuMixed-20.0) > 1e-6 {
+		t.Errorf("expected 20.0 PCU, got %f", pcuMixed)
+	}
+
+	// Explicit override: if an operator explicitly overrides Container weight to 3.5, it is respected
+	customCfg := DefaultPCUConfig()
+	customCfg.Weights.Container = 3.5
+	customCalc := NewPCUCalculator(customCfg)
+
+	_, pcuCustom, _ := customCalc.Calculate("cam-custom", VehicleCounts{Container: 10}, 0)
+	if math.Abs(pcuCustom-35.0) > 1e-6 {
+		t.Errorf("expected custom container weight 3.5 to yield 35.0 PCU, got %f", pcuCustom)
+	}
 }

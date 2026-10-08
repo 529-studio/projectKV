@@ -345,8 +345,8 @@ func TestLoadConfig_PCU_Defaults(t *testing.T) {
 	if cfg.PCUWeightTruck != 2.0 {
 		t.Errorf("expected default PCUWeightTruck=2.0, got %f", cfg.PCUWeightTruck)
 	}
-	if cfg.PCUWeightContainer != 3.0 {
-		t.Errorf("expected default PCUWeightContainer=3.0, got %f", cfg.PCUWeightContainer)
+	if cfg.PCUWeightContainer != 2.0 {
+		t.Errorf("expected default PCUWeightContainer=2.0, got %f", cfg.PCUWeightContainer)
 	}
 	if cfg.PCUCapacityFloor != 25.0 {
 		t.Errorf("expected default PCUCapacityFloor=25.0, got %f", cfg.PCUCapacityFloor)

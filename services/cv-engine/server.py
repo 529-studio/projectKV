@@ -179,14 +179,17 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                     if output_data is not None and hasattr(output_data, "shape"):
                         data = output_data[0] if output_data.ndim == 3 else output_data
                         if data.ndim == 2 and data.shape[0] >= 12:
-                            # COCO vehicle classes: 2: car (row 6), 3: motorcycle (row 7), 5: bus (row 9), 7: truck (row 11)
+                            # Standard COCO 80-class model (YOLOv8n default):
+                            # Vehicle classes: 2: car (row 6), 3: motorcycle (row 7), 5: bus (row 9), 7: truck (row 11).
+                            # Note: Heavy freight / container trucks are detected under class 'truck' (ADR-005 T6 / decision-container-class-gap.md).
                             vehicle_counts["motorcycle"] = int(np.sum(data[7, :] > 0.45))
                             vehicle_counts["car"] = int(np.sum(data[6, :] > 0.45))
                             vehicle_counts["bus"] = int(np.sum(data[9, :] > 0.45))
                             vehicle_counts["truck"] = int(np.sum(data[11, :] > 0.45))
+                            vehicle_counts["container"] = 0  # Folded into 'truck' in COCO ground truth and PCU formula
                             vehicles = sum(vehicle_counts.values())
                         elif data.ndim == 2 and data.shape[0] == 9:
-                            # DatapolisX 5-class model: 0: motorcycle, 1: car, 2: bus, 3: truck, 4: container
+                            # Legacy DatapolisX 5-class model: 0: motorcycle, 1: car, 2: bus, 3: truck, 4: container
                             vehicle_counts["motorcycle"] = int(np.sum(data[4, :] > 0.45))
                             vehicle_counts["car"] = int(np.sum(data[5, :] > 0.45))
                             vehicle_counts["bus"] = int(np.sum(data[6, :] > 0.45))
