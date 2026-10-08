@@ -26,10 +26,23 @@ var mockFloodSeverities = []string{
 }
 
 type MockAnalyzer struct {
-	counter atomic.Uint64
+	counter   atomic.Uint64
+	mockFrame []byte
 }
 
-func NewMockAnalyzer() *MockAnalyzer { return &MockAnalyzer{} }
+func NewMockAnalyzer(mockFrame ...[]byte) *MockAnalyzer {
+	m := &MockAnalyzer{}
+	if len(mockFrame) > 0 {
+		m.mockFrame = mockFrame[0]
+	}
+	return m
+}
+
+// SetMockFrame configures mock JPEG frame bytes returned in Verdict.RawFrame.
+func (m *MockAnalyzer) SetMockFrame(frame []byte) {
+	m.mockFrame = frame
+}
+
 func (m *MockAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hotset.Verdict, error) {
 	idx := m.counter.Add(1) - 1
 	severity := mockSeverities[idx%uint64(len(mockSeverities))]
@@ -41,5 +54,6 @@ func (m *MockAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hotset.V
 		Confidence:    0.99,
 		Source:        "mock",
 		Timestamp:     time.Now(),
+		RawFrame:      m.mockFrame,
 	}, nil
 }
