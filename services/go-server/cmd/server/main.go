@@ -472,10 +472,14 @@ func main() {
 				}
 			}
 
-			// Fan-out 3: event-driven snapshot archiver with retention policy (Issue #62).
+			// Fan-out 3: event-driven snapshot archiver with retention policy (Issue #62, #182).
 			if arch != nil {
 				var frameReader io.Reader
-				if cachedData, ok := proxyCache.Get(v.CameraID); ok && len(cachedData) > 0 {
+				if len(v.RawFrame) > 0 {
+					// Direct frame delivery from analysis pipeline (T2b / Issue #182)
+					frameReader = bytes.NewReader(v.RawFrame)
+				} else if cachedData, ok := proxyCache.Get(v.CameraID); ok && len(cachedData) > 0 {
+					// Preserved fallback for non-HotSet or viewer-touched flows
 					frameReader = bytes.NewReader(cachedData)
 				} else if cfg.Analyzer == "mock" {
 					// In mock analysis mode without pre-fetched proxy cache, provide a minimal mock JPEG

@@ -167,5 +167,6 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 		Source:        "onnx",
 		Timestamp:     now,
 		ObservedAt:    now,
+		RawFrame:      jpegBytes,
 	}, nil
 }

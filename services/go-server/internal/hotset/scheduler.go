@@ -48,6 +48,7 @@ type Verdict struct {
 	ObservedAt    time.Time `json:"observed_at"`
 	Stale         bool      `json:"stale"`
 	Timestamp     time.Time `json:"timestamp"`
+	RawFrame      []byte    `json:"-"` // Direct analyzed frame bytes (unexported from JSON)
 }
 
 // OnVerdict is called for every successful analysis result. The caller

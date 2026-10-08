@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -89,6 +90,10 @@ func (a *Archiver) OnVerdict(v hotset.Verdict, frameReader io.Reader) error {
 	shouldArchive, reason := a.policy.ShouldArchive(v, now)
 	if !shouldArchive {
 		return nil
+	}
+
+	if frameReader == nil && len(v.RawFrame) > 0 {
+		frameReader = bytes.NewReader(v.RawFrame)
 	}
 
 	if frameReader == nil {
