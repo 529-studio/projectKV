@@ -56,7 +56,7 @@ func makeCVEngineTestServer(t *testing.T, snapshotStatus int, predictStatus int,
 }
 
 func TestCVEngineAnalyzer_Analyze_Success(t *testing.T) {
-	predictBody := `{"traffic_severity":"MODERATE","confidence":0.88,"vehicles_detected":12,"latency_ms":44.1,"model":"yolov8n_openvino_320"}`
+	predictBody := `{"traffic_severity":"MODERATE","confidence":0.88,"vehicles_detected":6,"latency_ms":44.1,"model":"yolov8n_openvino_320"}`
 	srv, analyzer := makeCVEngineTestServer(t, http.StatusOK, http.StatusOK, predictBody)
 
 	cam := hotset.Camera{
@@ -90,9 +90,9 @@ func TestCVEngineAnalyzer_Analyze_Success(t *testing.T) {
 }
 
 func TestCVEngineAnalyzer_Analyze_PCUCalculation(t *testing.T) {
-	// 50 motorcycles * 0.2 = 10.0 PCU. With default floor 25.0, SI = 0.40 -> MODERATE.
+	// 20 motorcycles * 0.3 = 6.0 PCU. With default floor 15.0, SI = 6.0 / 15.0 = 0.40 -> MODERATE.
 	// Even if server sends raw traffic_severity="CLEAR", Go PCU business logic re-maps to MODERATE.
-	predictBody := `{"traffic_severity":"CLEAR","confidence":0.92,"vehicles_detected":50,"vehicle_counts":{"motorcycle":50,"car":0,"bus":0,"truck":0,"container":0}}`
+	predictBody := `{"traffic_severity":"CLEAR","confidence":0.92,"vehicles_detected":20,"vehicle_counts":{"motorcycle":20,"car":0,"bus":0,"truck":0,"container":0}}`
 	srv, analyzer := makeCVEngineTestServer(t, http.StatusOK, http.StatusOK, predictBody)
 
 	cam := hotset.Camera{

@@ -11,18 +11,18 @@ import (
 func defaultTestConfig() PCUConfig {
 	return PCUConfig{
 		Weights: PCUWeights{
-			Motorcycle: 0.2,
+			Motorcycle: 0.3,
 			Car:        1.0,
-			Bus:        2.0,
+			Bus:        2.5,
 			Truck:      2.0,
 			Container:  2.0,
 		},
 		Thresholds: PCUBucketThresholds{
-			Moderate:  0.35,
-			Heavy:     0.70,
-			Congested: 0.90,
+			Moderate:  0.30,
+			Heavy:     0.60,
+			Congested: 0.80,
 		},
-		CapacityFloor: 25.0,
+		CapacityFloor: 15.0,
 	}
 }
 
@@ -47,40 +47,52 @@ func TestPCUCalculator_ZeroCounts(t *testing.T) {
 func TestPCUCalculator_SingleClassDominance(t *testing.T) {
 	calc := NewPCUCalculator(defaultTestConfig())
 
-	// 50 motorcycles * 0.2 = 10.0 PCU. With floor 25.0, SI = 10/25 = 0.40 -> MODERATE
-	sev, pcu, si := calc.Calculate("cam-moto", VehicleCounts{Motorcycle: 50}, 0)
-	if math.Abs(pcu-10.0) > 1e-6 {
-		t.Errorf("expected PCU=10.0, got %f", pcu)
+	// 20 motorcycles * 0.3 = 6.0 PCU. With floor 15.0, SI = 6/15 = 0.40 -> MODERATE
+	sev, pcu, si := calc.Calculate("cam-moto", VehicleCounts{Motorcycle: 20}, 0)
+	if math.Abs(pcu-6.0) > 1e-6 {
+		t.Errorf("expected PCU=6.0, got %f", pcu)
 	}
 	if math.Abs(si-0.40) > 1e-6 {
 		t.Errorf("expected SI=0.40, got %f", si)
 	}
 	if sev != hotset.SeverityModerate {
-		t.Errorf("expected MODERATE for 50 motorcycles, got %q", sev)
+		t.Errorf("expected MODERATE for 20 motorcycles, got %q", sev)
 	}
 
-	// 20 cars * 1.0 = 20.0 PCU. With floor 25.0, SI = 20/25 = 0.80 -> HEAVY
-	sev, pcu, si = calc.Calculate("cam-car", VehicleCounts{Car: 20}, 0)
-	if math.Abs(pcu-20.0) > 1e-6 {
-		t.Errorf("expected PCU=20.0, got %f", pcu)
+	// 10 cars * 1.0 = 10.0 PCU. With floor 15.0, SI = 10/15 = 0.6667 -> HEAVY
+	sev, pcu, si = calc.Calculate("cam-car", VehicleCounts{Car: 10}, 0)
+	if math.Abs(pcu-10.0) > 1e-6 {
+		t.Errorf("expected PCU=10.0, got %f", pcu)
 	}
-	if math.Abs(si-0.80) > 1e-6 {
-		t.Errorf("expected SI=0.80, got %f", si)
+	if math.Abs(si-(10.0/15.0)) > 1e-6 {
+		t.Errorf("expected SI=0.6667, got %f", si)
 	}
 	if sev != hotset.SeverityHeavy {
-		t.Errorf("expected HEAVY for 20 cars, got %q", sev)
+		t.Errorf("expected HEAVY for 10 cars, got %q", sev)
 	}
 
-	// 10 containers * 2.0 = 20.0 PCU (folded into heavy vehicle weight). With floor 25.0, SI = 20/25 = 0.80 -> HEAVY
-	sev, pcu, si = calc.Calculate("cam-container", VehicleCounts{Container: 10}, 0)
-	if math.Abs(pcu-20.0) > 1e-6 {
-		t.Errorf("expected PCU=20.0, got %f", pcu)
+	// 4 buses * 2.5 = 10.0 PCU. With floor 15.0, SI = 10/15 = 0.6667 -> HEAVY
+	sev, pcu, si = calc.Calculate("cam-bus", VehicleCounts{Bus: 4}, 0)
+	if math.Abs(pcu-10.0) > 1e-6 {
+		t.Errorf("expected PCU=10.0, got %f", pcu)
 	}
-	if math.Abs(si-0.80) > 1e-6 {
-		t.Errorf("expected SI=0.80, got %f", si)
+	if math.Abs(si-(10.0/15.0)) > 1e-6 {
+		t.Errorf("expected SI=0.6667, got %f", si)
 	}
 	if sev != hotset.SeverityHeavy {
-		t.Errorf("expected HEAVY for 10 containers, got %q", sev)
+		t.Errorf("expected HEAVY for 4 buses, got %q", sev)
+	}
+
+	// 5 containers * 2.0 = 10.0 PCU (folded into heavy vehicle weight). With floor 15.0, SI = 10/15 = 0.6667 -> HEAVY
+	sev, pcu, si = calc.Calculate("cam-container", VehicleCounts{Container: 5}, 0)
+	if math.Abs(pcu-10.0) > 1e-6 {
+		t.Errorf("expected PCU=10.0, got %f", pcu)
+	}
+	if math.Abs(si-(10.0/15.0)) > 1e-6 {
+		t.Errorf("expected SI=0.6667, got %f", si)
+	}
+	if sev != hotset.SeverityHeavy {
+		t.Errorf("expected HEAVY for 5 containers, got %q", sev)
 	}
 }
 
@@ -97,44 +109,44 @@ func TestPCUCalculator_BucketBoundaries(t *testing.T) {
 		expected   string
 	}{
 		{
-			name:       "Just below MODERATE (SI = 0.349)",
-			counts:     VehicleCounts{Motorcycle: 1, Car: 34}, // 1*0.2 + 34 = 34.2 (0.342)
-			expectedSI: 0.342,
+			name:       "Just below MODERATE (SI = 0.298)",
+			counts:     VehicleCounts{Motorcycle: 6, Car: 28}, // 6*0.3 + 28 = 29.8 (0.298)
+			expectedSI: 0.298,
 			expected:   hotset.SeverityClear,
 		},
 		{
-			name:       "Exactly at MODERATE threshold (SI = 0.35)",
-			counts:     VehicleCounts{Car: 35}, // 35 * 1.0 = 35.0 (0.350)
-			expectedSI: 0.350,
+			name:       "Exactly at MODERATE threshold (SI = 0.30)",
+			counts:     VehicleCounts{Car: 30}, // 30 * 1.0 = 30.0 (0.300)
+			expectedSI: 0.300,
 			expected:   hotset.SeverityModerate,
 		},
 		{
-			name:       "Just below HEAVY threshold (SI = 0.698)",
-			counts:     VehicleCounts{Motorcycle: 4, Car: 69}, // 4*0.2 + 69 = 69.8 (0.698)
-			expectedSI: 0.698,
+			name:       "Just below HEAVY threshold (SI = 0.598)",
+			counts:     VehicleCounts{Motorcycle: 6, Car: 58}, // 6*0.3 + 58 = 59.8 (0.598)
+			expectedSI: 0.598,
 			expected:   hotset.SeverityModerate,
 		},
 		{
-			name:       "Exactly at HEAVY threshold (SI = 0.70)",
-			counts:     VehicleCounts{Car: 70}, // 70 * 1.0 = 70.0 (0.700)
-			expectedSI: 0.700,
+			name:       "Exactly at HEAVY threshold (SI = 0.60)",
+			counts:     VehicleCounts{Car: 60}, // 60 * 1.0 = 60.0 (0.600)
+			expectedSI: 0.600,
 			expected:   hotset.SeverityHeavy,
 		},
 		{
-			name:       "Just below CONGESTED threshold (SI = 0.898)",
-			counts:     VehicleCounts{Motorcycle: 4, Car: 89}, // 4*0.2 + 89 = 89.8 (0.898)
-			expectedSI: 0.898,
+			name:       "Just below CONGESTED threshold (SI = 0.798)",
+			counts:     VehicleCounts{Motorcycle: 6, Car: 78}, // 6*0.3 + 78 = 79.8 (0.798)
+			expectedSI: 0.798,
 			expected:   hotset.SeverityHeavy,
 		},
 		{
-			name:       "Exactly at CONGESTED threshold (SI = 0.90)",
-			counts:     VehicleCounts{Car: 90}, // 90 * 1.0 = 90.0 (0.900)
-			expectedSI: 0.900,
+			name:       "Exactly at CONGESTED threshold (SI = 0.80)",
+			counts:     VehicleCounts{Car: 80}, // 80 * 1.0 = 80.0 (0.800)
+			expectedSI: 0.800,
 			expected:   hotset.SeverityCongested,
 		},
 		{
 			name:       "Exceeding capacity (SI = 1.20)",
-			counts:     VehicleCounts{Car: 120}, // 120 * 1.0 = 120.0 (capacity updates to 120, SI = 1.00 >= 0.90)
+			counts:     VehicleCounts{Car: 120}, // 120 * 1.0 = 120.0 (capacity updates to 120, SI = 1.00 >= 0.80)
 			expectedSI: 1.000,
 			expected:   hotset.SeverityCongested,
 		},
@@ -177,10 +189,10 @@ func TestPCUCalculator_ColdStartAndFloorGuards(t *testing.T) {
 // TestPCUCalculator_HistoricalCapacityTracking verifies that capacity expands
 // when a higher PCU is observed, preventing false saturation spikes on busy wide corridors.
 func TestPCUCalculator_HistoricalCapacityTracking(t *testing.T) {
-	calc := NewPCUCalculator(defaultTestConfig()) // floor = 25.0
+	calc := NewPCUCalculator(defaultTestConfig()) // floor = 15.0
 
 	// Frame 1: Peak rush hour observed with 50 cars = 50 PCU.
-	// Capacity adapts from 25.0 floor -> 50.0.
+	// Capacity adapts from 15.0 floor -> 50.0.
 	_, pcu1, _ := calc.Calculate("cam-corridor-1", VehicleCounts{Car: 50}, 0)
 	if pcu1 != 50.0 {
 		t.Fatalf("expected PCU=50, got %f", pcu1)
@@ -208,11 +220,11 @@ func TestPCUCalculator_HistoricalCapacityTracking(t *testing.T) {
 func TestPCUCalculator_FallbackWhenPerClassMissing(t *testing.T) {
 	calc := NewPCUCalculator(defaultTestConfig())
 
-	// Fallback count = 10, empty VehicleCounts -> treats as 10 * weightCar(1.0) = 10.0 PCU.
-	// With floor 25.0, SI = 10 / 25 = 0.40 -> MODERATE.
-	sev, pcu, si := calc.Calculate("cam-fallback", VehicleCounts{}, 10)
-	if pcu != 10.0 {
-		t.Errorf("expected PCU=10.0, got %f", pcu)
+	// Fallback count = 6, empty VehicleCounts -> treats as 6 * weightCar(1.0) = 6.0 PCU.
+	// With floor 15.0, SI = 6.0 / 15.0 = 0.40 -> MODERATE.
+	sev, pcu, si := calc.Calculate("cam-fallback", VehicleCounts{}, 6)
+	if pcu != 6.0 {
+		t.Errorf("expected PCU=6.0, got %f", pcu)
 	}
 	if math.Abs(si-0.40) > 1e-6 {
 		t.Errorf("expected SI=0.40, got %f", si)

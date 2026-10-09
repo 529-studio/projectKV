@@ -243,15 +243,15 @@ type ServerConfig struct {
 	HexResolution                 int           // default: 7 (HEX_RESOLUTION)
 	HexMinCameras                 int           // default: 3 (HEX_MIN_CAMERAS)
 	HexPolygonFilePath            string        // default: resolvePath("h3_hex_polygons.json")
-	PCUWeightMotorcycle           float64       // default: 0.2 (PCU_WEIGHT_MOTORCYCLE)
+	PCUWeightMotorcycle           float64       // default: 0.3 (PCU_WEIGHT_MOTORCYCLE)
 	PCUWeightCar                  float64       // default: 1.0 (PCU_WEIGHT_CAR)
-	PCUWeightBus                  float64       // default: 2.0 (PCU_WEIGHT_BUS)
+	PCUWeightBus                  float64       // default: 2.5 (PCU_WEIGHT_BUS)
 	PCUWeightTruck                float64       // default: 2.0 (PCU_WEIGHT_TRUCK)
 	PCUWeightContainer            float64       // default: 2.0 (PCU_WEIGHT_CONTAINER, folded into Truck per ADR-005 T6)
-	PCUCapacityFloor              float64       // default: 25.0 (PCU_CAPACITY_FLOOR)
-	PCUThresholdModerate          float64       // default: 0.35 (PCU_THRESHOLD_MODERATE)
-	PCUThresholdHeavy             float64       // default: 0.70 (PCU_THRESHOLD_HEAVY)
-	PCUThresholdCongested         float64       // default: 0.90 (PCU_THRESHOLD_CONGESTED)
+	PCUCapacityFloor              float64       // default: 15.0 (PCU_CAPACITY_FLOOR)
+	PCUThresholdModerate          float64       // default: 0.30 (PCU_THRESHOLD_MODERATE)
+	PCUThresholdHeavy             float64       // default: 0.60 (PCU_THRESHOLD_HEAVY)
+	PCUThresholdCongested         float64       // default: 0.80 (PCU_THRESHOLD_CONGESTED)
 }
 
 // resolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -461,7 +461,7 @@ func LoadConfig() *ServerConfig {
 		hexPolygonFilePath = resolvePath("h3_hex_polygons.json")
 	}
 
-	pcuWeightMotorcycle := 0.2
+	pcuWeightMotorcycle := 0.3
 	if val := os.Getenv("PCU_WEIGHT_MOTORCYCLE"); val != "" {
 		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
 			pcuWeightMotorcycle = v
@@ -475,7 +475,7 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
-	pcuWeightBus := 2.0
+	pcuWeightBus := 2.5
 	if val := os.Getenv("PCU_WEIGHT_BUS"); val != "" {
 		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
 			pcuWeightBus = v
@@ -497,28 +497,28 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
-	pcuCapacityFloor := 25.0
+	pcuCapacityFloor := 15.0
 	if val := os.Getenv("PCU_CAPACITY_FLOOR"); val != "" {
 		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
 			pcuCapacityFloor = v
 		}
 	}
 
-	pcuThresholdModerate := 0.35
+	pcuThresholdModerate := 0.30
 	if val := os.Getenv("PCU_THRESHOLD_MODERATE"); val != "" {
 		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
 			pcuThresholdModerate = v
 		}
 	}
 
-	pcuThresholdHeavy := 0.70
+	pcuThresholdHeavy := 0.60
 	if val := os.Getenv("PCU_THRESHOLD_HEAVY"); val != "" {
 		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
 			pcuThresholdHeavy = v
 		}
 	}
 
-	pcuThresholdCongested := 0.90
+	pcuThresholdCongested := 0.80
 	if val := os.Getenv("PCU_THRESHOLD_CONGESTED"); val != "" {
 		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
 			pcuThresholdCongested = v

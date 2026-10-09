@@ -500,7 +500,7 @@ class CVEngineAnalyzer(BaseAnalyzer):
         self,
         base_url: str = "http://localhost:8000",
         use_pcu: bool = True,
-        capacity_floor: float = 25.0,
+        capacity_floor: float = 15.0,
         request_timeout: float = 10.0,
     ):
         self.base_url = base_url.rstrip("/")
@@ -509,19 +509,19 @@ class CVEngineAnalyzer(BaseAnalyzer):
         self.request_timeout = request_timeout
         self.capacities: Dict[str, float] = {}
 
-        # PCU weights conforming to cvclient/pcu.go and ADR-005 T6
+        # PCU weights conforming to cvclient/pcu.go (calibrated per Issue #196) and ADR-005 T6
         self.pcu_weights = {
-            "motorcycle": 0.2,
+            "motorcycle": 0.3,
             "car": 1.0,
-            "bus": 2.0,
+            "bus": 2.5,
             "truck": 2.0,
             "container": 2.0,
         }
-        # Thresholds conforming to cvclient/pcu.go
+        # Thresholds conforming to cvclient/pcu.go (calibrated per Issue #196)
         self.pcu_thresholds = {
-            "moderate": 0.35,
-            "heavy": 0.70,
-            "congested": 0.90,
+            "moderate": 0.30,
+            "heavy": 0.60,
+            "congested": 0.80,
         }
 
     def _calculate_pcu(self, camera_id: str, counts: Dict[str, int], fallback_total: int) -> Tuple[str, float, float]:

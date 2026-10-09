@@ -41,45 +41,47 @@ type PCUWeights struct {
 	Container  float64 `json:"container"`
 }
 
-// DefaultPCUWeights returns the baseline weights per decision-container-class-gap.md.
-// Container is folded into Truck (2.0) to align with COCO 4-class vehicle detection.
+// DefaultPCUWeights returns the calibrated weights per empirical HCMC traffic analysis
+// and Vietnamese urban transport standards (TCVN 4054:2005 / TCVN 13592:2022).
+// Container is folded into Truck (2.0) to align with COCO 4-class vehicle detection
+// per decision-container-class-gap.md (Issue #186 / ADR-005 T6).
 func DefaultPCUWeights() PCUWeights {
 	return PCUWeights{
-		Motorcycle: 0.2,
-		Car:        1.0,
-		Bus:        2.0,
-		Truck:      2.0,
-		Container:  2.0,
+		Motorcycle: 0.3, // Calibrated from 0.2: accounts for HCMC mixed-traffic filtering, swerving, and dynamic lane occupancy
+		Car:        1.0, // Standard passenger car baseline
+		Bus:        2.5, // Calibrated from 2.0: TCVN urban bus standard accounting for frequent boarding stops and lane blockage
+		Truck:      2.0, // Standard medium/heavy commercial vehicle
+		Container:  2.0, // Folded into Truck (2.0) per ADR-005 T6
 	}
 }
 
 // PCUBucketThresholds defines the Saturation Index (SI) cutoffs for traffic severity.
 //
-// RATIONALE & BUCKET BOUNDARIES:
-//   - CLEAR (SI < Moderate, default < 0.35):
+// RATIONALE & BUCKET BOUNDARIES (Calibrated for Issue #196):
+//   - CLEAR (SI < Moderate, default < 0.30):
 //     Corresponds to Level of Service (LOS) A/B. Vehicle flow is unimpeded, road is
 //     operating at low density, and travel speeds are near free-flow velocity.
-//   - MODERATE (Moderate <= SI < Heavy, default 0.35 <= SI < 0.70):
+//   - MODERATE (Moderate <= SI < Heavy, default 0.30 <= SI < 0.60):
 //     Corresponds to LOS C/D. Stable flow with noticeable vehicle density. Minor
 //     queues form at signalized intersections but clear within a single green cycle.
-//   - HEAVY (Heavy <= SI < Congested, default 0.70 <= SI < 0.90):
+//   - HEAVY (Heavy <= SI < Congested, default 0.60 <= SI < 0.80):
 //     Corresponds to LOS E. Unstable flow approaching physical roadway capacity.
 //     Speed is significantly restricted; stop-and-go waves begin to propagate.
-//   - CONGESTED (SI >= Congested, default SI >= 0.90):
+//   - CONGESTED (SI >= Congested, default SI >= 0.80):
 //     Corresponds to LOS F (Breakdown / Gridlock). Traffic demand meets or exceeds
 //     effective roadway capacity. Multi-cycle clearance delays and intersection blockages occur.
 type PCUBucketThresholds struct {
-	Moderate  float64 `json:"moderate"`  // default: 0.35
-	Heavy     float64 `json:"heavy"`     // default: 0.70
-	Congested float64 `json:"congested"` // default: 0.90
+	Moderate  float64 `json:"moderate"`  // default: 0.30 (calibrated from 0.35)
+	Heavy     float64 `json:"heavy"`     // default: 0.60 (calibrated from 0.70)
+	Congested float64 `json:"congested"` // default: 0.80 (calibrated from 0.90)
 }
 
-// DefaultPCUBucketThresholds returns the baseline bucket boundaries.
+// DefaultPCUBucketThresholds returns the calibrated baseline bucket boundaries.
 func DefaultPCUBucketThresholds() PCUBucketThresholds {
 	return PCUBucketThresholds{
-		Moderate:  0.35,
-		Heavy:     0.70,
-		Congested: 0.90,
+		Moderate:  0.30,
+		Heavy:     0.60,
+		Congested: 0.80,
 	}
 }
 
@@ -87,15 +89,15 @@ func DefaultPCUBucketThresholds() PCUBucketThresholds {
 type PCUConfig struct {
 	Weights       PCUWeights
 	Thresholds    PCUBucketThresholds
-	CapacityFloor float64 // default: 25.0
+	CapacityFloor float64 // default: 15.0 (calibrated from 25.0)
 }
 
-// DefaultPCUConfig provides sensible defaults conforming to ADR-004 §9 D15.
+// DefaultPCUConfig provides sensible defaults conforming to ADR-004 §9 D15 and calibrated under Issue #196.
 func DefaultPCUConfig() PCUConfig {
 	return PCUConfig{
 		Weights:       DefaultPCUWeights(),
 		Thresholds:    DefaultPCUBucketThresholds(),
-		CapacityFloor: 25.0,
+		CapacityFloor: 15.0,
 	}
 }
 

@@ -63,6 +63,12 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Flood Safety Gate: **FAIL (100.0% FNR > 5.0%)**, properly measuring that the stock vehicle-only COCO model does not detect standing water on the 120 flood frames (informing Sprint 4 T9 multimodal flood pipeline).
   - Known-state smoke-test validation: **2/10 PASS (20.0%)** on curated baselines (`docs/reports/smoke_eval_d6_real.md`).
   - Full empirical findings committed to `docs/reports/eval_report_d6_real.md` and `docs/reports/dataset_progress.md`.
+- **PCU Calibration & Saturation Index Realignment (Sprint 4 T5, Issue #196)**:
+  - Calibrated default Passenger Car Unit (PCU) weights against empirical HCMC traffic data and Vietnamese urban transport standards (**TCVN 4054:2005** / **TCVN 13592:2022**): `Motorcycle = 0.30` (from 0.20), `Car = 1.00`, `Bus = 2.50` (from 2.00), `Truck = 2.00`, `Container = 2.00` (folded into Truck per ADR-005 T6).
+  - Realigned cold-start `CapacityFloor` from `25.0` down to `15.0` PCU matching the physical queue geometry of a 20–30m CCTV viewport (3 lanes x 4–5 queue vehicles).
+  - Recalibrated Saturation Index Level of Service (LOS) cutoffs: `Moderate = 0.30` (from 0.35), `Heavy = 0.60` (from 0.70), `Congested = 0.80` (from 0.90).
+  - Preserved backward compatibility with custom environment variable overrides (`PCU_WEIGHT_*`, `PCU_CAPACITY_FLOOR`, `PCU_THRESHOLD_*`).
+  - Full rationale, empirical distribution findings, and comparison tables documented in `docs/pcu-calibration-report.md`.
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).
