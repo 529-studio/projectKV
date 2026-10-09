@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress
 
 help:
 	@echo "========================================================"
@@ -13,6 +13,7 @@ help:
 	@echo "  make build-go        - Compile standalone Go backend binary"
 	@echo "  make test-go         - Run Go test suite"
 	@echo "  make test-pcu        - Run PCU Saturation Index unit tests (verbose)"
+	@echo "  make test-model      - Run CV Engine Python unit test suite"
 	@echo "  make dev-cv          - Run Python cv-engine inference server (port 8000)"
 	@echo "  make dev-model       - Run OpenVINO model via local Docker Compose (port 8000)"
 	@echo "  make lint-go         - Run Go linter"
@@ -52,6 +53,9 @@ test-go:
 
 test-pcu:
 	cd services/go-server && go test ./internal/cvclient/... -run TestPCU -v
+
+test-model:
+	cd services/cv-engine && python3 -m unittest discover -s . -p "test_*.py"
 
 dev-cv:
 	cd services/cv-engine && CV_PORT=8000 PORT=8000 python3 server.py
