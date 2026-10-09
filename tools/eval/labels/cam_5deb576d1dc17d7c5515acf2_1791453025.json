@@ -6,9 +6,9 @@
     "traffic": "CONGESTED",
     "flood": "NONE",
     "time_of_day": "day",
-    "weather": "rain"
+    "weather": "dry"
   },
   "annotator": "sprint4_t3_curator",
-  "annotated_at": "2026-10-08T10:14:32.990134+00:00",
-  "notes": "Smoke set baseline (dien_bien_phu): Dense urban cross-intersection linking District 3 and District 10. Long signal cycles and high cross-traffic volume lead to chronic peak-hour queue accumulation (SI >= 0.90)."
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Smoke set peak baseline (dien_bien_phu): Dense urban cross-intersection linking District 3 and District 10. Long signal cycles and high cross-traffic volume lead to chronic peak-hour queue accumulation (SI >= 0.90)."
 }

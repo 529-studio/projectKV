@@ -54,14 +54,15 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 - **Evaluation Dataset & Progress Tracking (Sprint 4 T3, Issue #194, PR #199)**:
   - Strictly excluded all pre-10-06 mock frames (107 bytes) from ground-truth dataset.
   - Implemented `tools/eval/collect_real_frames.py` and `tools/eval/dataset_progress.py` to fetch, validate, and audit real frames against ADR-004 §D6 targets.
-  - Ingested initial batch of 70 real labeled frames from 2026-10-08 evening peak (40 rain target satisfied, 14 moderate, 14 heavy/congested).
-  - Active passive accumulation window maintained for remaining flood frames (≥60 required by D6 safety gate).
+  - Completed ground-truth dataset via live passive environmental collection during the 2026-10-08 HCMC rainstorm: **764 real labeled frames** across 206 unique cameras, including **120 flood-positive frames** (98 shallow, 22 deep) and 468 night rain frames.
+  - All ADR-004 §D6 composition quotas satisfied: Real frames 764/300 (254.7%), Flood 120/60 (200.0%), Clear/dry/day 145/100, Moderate 199/50, Heavy/congested 181/50, Rain 468/40, Night 468/30.
+  - Dataset status: **READY FOR D6 ACCURACY GATE (T4)**.
 - **Real D6 Accuracy Gate & OpenVINO Benchmark (Sprint 4 T4, Issue #195)**:
-  - Executed `tools/eval/benchmark.py` against live self-hosted OpenVINO container across the 70 real frames.
-  - Traffic Macro F1: **0.224** (below 0.70 target), demonstrating that uncalibrated cold-start capacity floors (25.0 PCU) and occlusion under congestion degrade accuracy, providing direct empirical requirement for T5 PCU calibration.
-  - Flood Safety Gate: **INCOMPLETE** (0 flood frames evaluated; passive environmental accumulation window remains open per Lesson 14).
+  - Executed `tools/eval/benchmark.py` against live self-hosted OpenVINO container across the full 764 real frames.
+  - Traffic Macro F1: **0.209** (Weighted 0.364), highlighting uncalibrated cold-start capacity floors and dense occlusion under congestion (informing Sprint 4 T5 PCU calibration).
+  - Flood Safety Gate: **FAIL (100.0% FNR > 5.0%)**, properly measuring that the stock vehicle-only COCO model does not detect standing water on the 120 flood frames (informing Sprint 4 T9 multimodal flood pipeline).
   - Known-state smoke-test validation: **2/10 PASS (20.0%)** on curated baselines (`docs/reports/smoke_eval_d6_real.md`).
-  - Full empirical findings committed to `docs/reports/eval_report_d6_real.md`.
+  - Full empirical findings committed to `docs/reports/eval_report_d6_real.md` and `docs/reports/dataset_progress.md`.
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a8253615058170011f6eabf_1791467411",
+  "camera_id": "5a8253615058170011f6eabf",
+  "image_path": "data/proofs/2026-10-08/5a8253615058170011f6eabf/1791467411_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "SHALLOW",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Shallow standing water combined with chronic corridor choke on Đinh Bộ Lĩnh - Bạch Đằng 1"
+}

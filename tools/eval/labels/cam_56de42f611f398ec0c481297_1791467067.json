@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_56de42f611f398ec0c481297_1791467067",
+  "camera_id": "56de42f611f398ec0c481297",
+  "image_path": "data/proofs/2026-10-08/56de42f611f398ec0c481297/1791467067_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Off-peak night rain multi-lane flow on expressway corridor for Võ Văn Kiệt - Nguyễn Tri Phương 2"
+}

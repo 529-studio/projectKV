@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595f8f0b3dcfc400106f28f4_1791467405",
+  "camera_id": "595f8f0b3dcfc400106f28f4",
+  "image_path": "data/proofs/2026-10-08/595f8f0b3dcfc400106f28f4/1791467405_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Off-peak night rain multi-lane flow on expressway corridor for Quốc lộ 1 - BQB Cầu vượt Quang Trung B (hướng Ngã 4 Ga)"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5deb576d1dc17d7c5515acfc_1791467069",
+  "camera_id": "5deb576d1dc17d7c5515acfc",
+  "image_path": "data/proofs/2026-10-08/5deb576d1dc17d7c5515acfc/1791467069_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Night rain moderate platoon flow on urban arterial for Điện Biên Phủ - Trương Định"
+}

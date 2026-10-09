@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_66b1c3fa779f740018674146_1791467404",
+  "camera_id": "66b1c3fa779f740018674146",
+  "image_path": "data/proofs/2026-10-08/66b1c3fa779f740018674146/1791467404_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "DEEP",
+    "time_of_day": "night",
+    "weather": "heavy_rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Deep flood inundation bottleneck causing stalled traffic and tailbacks on Nguyễn Hữu Cảnh - Ung Văn Khiêm"
+}

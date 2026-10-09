@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58af8b69bd82540010390c28_1791437472",
+  "camera_id": "58af8b69bd82540010390c28",
+  "image_path": "data/proofs/2026-10-08/58af8b69bd82540010390c28/1791437472_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Midday signalized arterial flow for Nam Kỳ Khởi Nghĩa - Điện Biên Phủ 1"
+}

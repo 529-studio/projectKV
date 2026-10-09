@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6623f36e6f998a001b252878_1791467231",
+  "camera_id": "6623f36e6f998a001b252878",
+  "image_path": "data/proofs/2026-10-08/6623f36e6f998a001b252878/1791467231_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Shallow standing water restricting lanes and slowing traffic on Phạm Văn Đồng - Kha Vạn Cân 2"
+}

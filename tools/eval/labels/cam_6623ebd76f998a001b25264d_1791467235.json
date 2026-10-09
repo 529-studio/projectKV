@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6623ebd76f998a001b25264d_1791467235",
+  "camera_id": "6623ebd76f998a001b25264d",
+  "image_path": "data/proofs/2026-10-08/6623ebd76f998a001b25264d/1791467235_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Off-peak night rain multi-lane flow on expressway corridor for Quốc Lộ 1 - Tô Ký"
+}
