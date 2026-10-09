@@ -169,13 +169,13 @@ class TestCVEngineAnalyzer(unittest.TestCase):
     def test_pcu_calculation_formula(self):
         analyzer = benchmark.CVEngineAnalyzer(base_url="http://localhost:8000", capacity_floor=25.0)
 
-        # 10 motorcycles (2.0 PCU) + 2 cars (2.0 PCU) + 1 truck (2.0 PCU) = 6.0 PCU
-        # SI = 6.0 / 25.0 = 0.24 < 0.35 => CLEAR
+        # 10 motorcycles (3.0 PCU) + 2 cars (2.0 PCU) + 1 truck (2.0 PCU) = 7.0 PCU
+        # SI = 7.0 / 25.0 = 0.28 < 0.30 => CLEAR
         counts = {"motorcycle": 10, "car": 2, "bus": 0, "truck": 1, "container": 0}
         sev, pcu, si = analyzer._calculate_pcu("cam_test", counts, 13)
         self.assertEqual(sev, "CLEAR")
-        self.assertAlmostEqual(pcu, 6.0)
-        self.assertAlmostEqual(si, 0.24)
+        self.assertAlmostEqual(pcu, 7.0)
+        self.assertAlmostEqual(si, 0.28)
 
         # 30 cars = 30.0 PCU. Historical capacity updates to 30.0!
         # SI = 30.0 / 30.0 = 1.00 >= 0.90 => CONGESTED
