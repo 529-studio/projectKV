@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595f8d233dcfc400106f28f0_1791467256",
+  "camera_id": "595f8d233dcfc400106f28f0",
+  "image_path": "data/proofs/2026-10-08/595f8d233dcfc400106f28f0/1791467256_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Off-peak night rain multi-lane flow on expressway corridor for Quốc lộ 1 - Quang Trung 1 (hướng đi Bình Phước)"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a606cd08576340017d06628_1791467404",
+  "camera_id": "5a606cd08576340017d06628",
+  "image_path": "data/proofs/2026-10-08/5a606cd08576340017d06628/1791467404_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "SHALLOW",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Shallow standing water combined with chronic corridor choke on BX Miền Đông - Đinh Bộ Lĩnh 2"
+}

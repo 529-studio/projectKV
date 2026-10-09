@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_692293c644912200174bc83b_1791467239",
+  "camera_id": "692293c644912200174bc83b",
+  "image_path": "data/proofs/2026-10-08/692293c644912200174bc83b/1791467239_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "SHALLOW",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Shallow standing water combined with chronic corridor choke on Quốc Lộ 51 - Xô Viết Nghệ Tĩnh"
+}

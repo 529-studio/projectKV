@@ -269,7 +269,9 @@
 <div id="topbar">
   <h1>Flood Frame Labeler</h1>
   <span id="progress">No frames loaded</span>
+  <button id="autoload-btn" onclick="tryAutoLoadManifest(true)">Auto Load (764 Frames)</button>
   <button id="open-btn" onclick="openFolder()">Open Folder</button>
+  <input type="file" id="folder-input" webkitdirectory directory multiple style="display:none" onchange="handleFolderSelect(event)" />
   <button id="export-btn" onclick="exportAll()" style="display:none">Export All JSON</button>
 </div>
 
@@ -414,39 +416,108 @@ const HOTKEYS = {
   'c': ['time_of_day', 'dawn_dusk'],
 };
 
-// ── Open folder ───────────────────────────────────────────────────────────────
-async function openFolder() {
+// ── Auto-load Manifest (Live Server / HTTP mode) ──────────────────────────────
+async function tryAutoLoadManifest(explicit = false) {
   try {
-    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-    state.dirHandle = handle;
-    const files = [];
-    for await (const [name, fh] of handle.entries()) {
-      if (fh.kind === 'file' && /\.(jpe?g|png|webp)$/i.test(name)) {
-        files.push({ name, handle: fh });
-      }
+    const res = await fetch('manifest.json');
+    if (!res.ok) {
+      if (explicit) toast('manifest.json not found in server directory');
+      return;
     }
-    // Recurse one level (date sub-folders in data/proofs/YYYY-MM-DD/)
-    if (files.length === 0) {
-      for await (const [, subHandle] of handle.entries()) {
-        if (subHandle.kind !== 'directory') continue;
-        for await (const [name, fh] of subHandle.entries()) {
-          if (fh.kind === 'file' && /\.(jpe?g|png|webp)$/i.test(name)) {
-            files.push({ name, handle: fh, parent: subHandle });
-          }
-        }
-      }
+    const items = await res.json();
+    if (!Array.isArray(items) || items.length === 0) {
+      if (explicit) toast('manifest.json contains no items');
+      return;
     }
-    files.sort((a, b) => a.name.localeCompare(b.name));
-    state.frames = files;
-    state.index = -1;
+
+    state.frames = items.map(item => ({
+      name: (item.frame_id || 'frame') + '.jpg',
+      imageUrl: item.image_url,
+      relUrl: item.rel_url || ('../../' + (item.image_url || '').replace(/^\/+/, '')),
+      frameId: item.frame_id,
+      cameraId: item.camera_id,
+      notes: item.notes,
+    }));
+
     state.labels = {};
+    items.forEach((item, idx) => {
+      state.labels[idx] = {
+        ...item.labels,
+        notes: item.notes,
+        annotator: item.annotator || 'sprint4_t3_curator',
+      };
+    });
+
+    state.index = -1;
     renderThumbList();
     document.getElementById('export-btn').style.display = '';
     navigate(1);
-    toast(`Loaded ${files.length} frames from "${handle.name}"`);
+    toast(`Loaded ${items.length} frames from manifest.json`);
   } catch (err) {
-    if (err.name !== 'AbortError') toast('Error: ' + err.message);
+    if (explicit) toast('Error loading manifest: ' + err.message);
   }
+}
+
+// ── Open folder ───────────────────────────────────────────────────────────────
+async function openFolder() {
+  if (window.showDirectoryPicker) {
+    try {
+      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      state.dirHandle = handle;
+      const files = [];
+      for await (const [name, fh] of handle.entries()) {
+        if (fh.kind === 'file' && /\.(jpe?g|png|webp)$/i.test(name)) {
+          files.push({ name, handle: fh });
+        }
+      }
+      // Recurse up to 2 levels (data/proofs/YYYY-MM-DD/<cam_id>/)
+      if (files.length === 0) {
+        for await (const [, subHandle] of handle.entries()) {
+          if (subHandle.kind !== 'directory') continue;
+          for await (const [name, fh] of subHandle.entries()) {
+            if (fh.kind === 'file' && /\.(jpe?g|png|webp)$/i.test(name)) {
+              files.push({ name, handle: fh, parent: subHandle });
+            } else if (fh.kind === 'directory') {
+              for await (const [leafName, leafFh] of fh.entries()) {
+                if (leafFh.kind === 'file' && /\.(jpe?g|png|webp)$/i.test(leafName)) {
+                  files.push({ name: leafName, handle: leafFh, parent: fh });
+                }
+              }
+            }
+          }
+        }
+      }
+      files.sort((a, b) => a.name.localeCompare(b.name));
+      state.frames = files;
+      state.index = -1;
+      state.labels = {};
+      renderThumbList();
+      document.getElementById('export-btn').style.display = '';
+      navigate(1);
+      toast(`Loaded ${files.length} frames from "${handle.name}"`);
+    } catch (err) {
+      if (err.name !== 'AbortError') toast('Error: ' + err.message);
+    }
+  } else {
+    // Safari / Firefox fallback: trigger file input
+    document.getElementById('folder-input').click();
+  }
+}
+
+function handleFolderSelect(event) {
+  const fileList = Array.from(event.target.files).filter(f => /\.(jpe?g|png|webp)$/i.test(f.name));
+  if (fileList.length === 0) {
+    toast('No JPEG/PNG frames found in selected folder');
+    return;
+  }
+  fileList.sort((a, b) => a.name.localeCompare(b.name));
+  state.frames = fileList.map(f => ({ name: f.name, file: f }));
+  state.index = -1;
+  state.labels = {};
+  renderThumbList();
+  document.getElementById('export-btn').style.display = '';
+  navigate(1);
+  toast(`Loaded ${fileList.length} frames via folder picker`);
 }
 
 // ── Navigate ──────────────────────────────────────────────────────────────────
@@ -461,15 +532,29 @@ async function loadFrame(idx) {
   const frame = state.frames[idx];
   if (!frame) return;
 
-  const file = await frame.handle.getFile();
-  const url  = URL.createObjectURL(file);
-
   const img = document.getElementById('frame-img');
-  img.onload = () => URL.revokeObjectURL(url);
-  img.src = url;
+
+  if (frame.imageUrl) {
+    img.src = frame.imageUrl;
+    img.onerror = () => {
+      if (frame.relUrl && img.src !== frame.relUrl) {
+        img.src = frame.relUrl;
+      }
+    };
+  } else if (frame.file) {
+    const url = URL.createObjectURL(frame.file);
+    img.onload = () => URL.revokeObjectURL(url);
+    img.src = url;
+  } else if (frame.handle) {
+    const file = await frame.handle.getFile();
+    const url  = URL.createObjectURL(file);
+    img.onload = () => URL.revokeObjectURL(url);
+    img.src = url;
+  }
+
   img.style.display = 'block';
   document.getElementById('placeholder').style.display = 'none';
-  document.getElementById('frame-name').textContent = frame.name;
+  document.getElementById('frame-name').textContent = frame.notes ? `${frame.name} — ${frame.notes}` : frame.name;
 
   // Restore saved labels for this frame
   const saved = state.labels[idx] || {};
@@ -661,6 +746,15 @@ if (stored) document.getElementById('annotator-input').value = stored;
 document.getElementById('annotator-input').addEventListener('change', (e) => {
   localStorage.setItem('kv_labeler_annotator', e.target.value);
 });
+
+// ── Auto-load if served via HTTP server (Live Server) ─────────────────────────
+if (window.location.protocol.startsWith('http')) {
+  window.addEventListener('DOMContentLoaded', () => {
+    tryAutoLoadManifest(false);
+  });
+  // Also invoke directly in case DOM is already ready
+  tryAutoLoadManifest(false);
+}
 </script>
 </body>
 </html>

@@ -1,0 +1,70 @@
+{
+  "total_label_files": 764,
+  "real_valid_labels": 764,
+  "mock_labels_excluded": 0,
+  "invalid_labels": 0,
+  "overall_total_target": 300,
+  "overall_percentage": 254.66666666666669,
+  "flood_positive_count": 120,
+  "flood_positive_target": 60,
+  "flood_positive_percentage": 200.0,
+  "is_d6_gate_ready": true,
+  "categories": [
+    {
+      "key": "clear_dry_day",
+      "label": "Clear / dry / day",
+      "count": 145,
+      "target": 100,
+      "percentage": 100.0,
+      "is_satisfied": true
+    },
+    {
+      "key": "moderate_traffic",
+      "label": "Moderate traffic",
+      "count": 199,
+      "target": 50,
+      "percentage": 100.0,
+      "is_satisfied": true
+    },
+    {
+      "key": "heavy_congested",
+      "label": "Heavy / congested",
+      "count": 181,
+      "target": 50,
+      "percentage": 100.0,
+      "is_satisfied": true
+    },
+    {
+      "key": "rain",
+      "label": "Rain (any traffic)",
+      "count": 468,
+      "target": 40,
+      "percentage": 100.0,
+      "is_satisfied": true
+    },
+    {
+      "key": "flood_shallow",
+      "label": "Flood shallow",
+      "count": 98,
+      "target": 20,
+      "percentage": 100.0,
+      "is_satisfied": true
+    },
+    {
+      "key": "flood_deep",
+      "label": "Flood deep",
+      "count": 22,
+      "target": 10,
+      "percentage": 100.0,
+      "is_satisfied": true
+    },
+    {
+      "key": "night",
+      "label": "Night (any condition)",
+      "count": 468,
+      "target": 30,
+      "percentage": 100.0,
+      "is_satisfied": true
+    }
+  ]
+}

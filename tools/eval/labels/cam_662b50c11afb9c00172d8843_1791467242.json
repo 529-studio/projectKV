@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b50c11afb9c00172d8843_1791467242",
+  "camera_id": "662b50c11afb9c00172d8843",
+  "image_path": "data/proofs/2026-10-08/662b50c11afb9c00172d8843/1791467242_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "night",
+    "weather": "rain"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Shallow standing water restricting lanes and slowing traffic on An Dương Vương - Đường số 7"
+}

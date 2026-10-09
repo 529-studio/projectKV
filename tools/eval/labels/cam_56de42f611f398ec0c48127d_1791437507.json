@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_56de42f611f398ec0c48127d_1791437507",
+  "camera_id": "56de42f611f398ec0c48127d",
+  "image_path": "data/proofs/2026-10-08/56de42f611f398ec0c48127d/1791437507_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "dry"
+  },
+  "annotator": "sprint4_t3_curator",
+  "annotated_at": "2026-10-08T14:01:32.964914+00:00",
+  "notes": "Midday open multi-lane flow on expressway corridor for Mai Chí Thọ - Võ Nguyên Giáp (Cát Lái cầu A)"
+}

@@ -37,23 +37,44 @@ def is_valid_jpeg(data: bytes) -> bool:
     return True
 
 
-def load_hotset_cameras(catalog_path: Path) -> List[Dict[str, Any]]:
-    """Loads 57 curated hotset intersection cameras from enriched catalog."""
+FLOOD_PRONE_CORRIDORS = {
+    "ung_van_khiem", "quoc_lo_13", "huynh_tan_phat", "tran_xuan_soan",
+    "nguyen_xi", "nguyen_huu_canh", "kha_van_can", "le_van_luong",
+    "an_duong_vuong", "kinh_duong_vuong", "vo_van_kiet", "dong_den",
+    "phan_huy_ich", "quoc_lo_1", "xo_viet_nghe_tinh", "dinh_bo_linh",
+    "to_ngoc_van", "bach_dang", "le_duc_tho", "pham_van_dong",
+    "hoang_van_thu", "cong_hoa", "mai_chi_tho", "dien_bien_phu",
+}
+
+
+def load_cameras(catalog_path: Path, scope: str = "hotset") -> List[Dict[str, Any]]:
+    """Loads cameras based on specified scope (hotset, flood-prone, all)."""
     if not catalog_path.exists():
         raise FileNotFoundError(f"Catalog file not found: {catalog_path}")
 
     with open(catalog_path, "r", encoding="utf-8") as f:
         cameras = json.load(f)
 
-    hotset = []
+    selected = []
     for c in cameras:
         if not c.get("isOnline") or c.get("isGhost") or c.get("duplicateOf"):
             continue
         road_keys = c.get("road_keys") or []
-        if len(road_keys) == 2 and any(rk in PRIORITY_CORRIDORS for rk in road_keys):
-            hotset.append(c)
+        if scope == "all":
+            selected.append(c)
+        elif scope == "flood-prone":
+            if any(rk in FLOOD_PRONE_CORRIDORS for rk in road_keys):
+                selected.append(c)
+        elif scope == "hotset":
+            if len(road_keys) == 2 and any(rk in PRIORITY_CORRIDORS for rk in road_keys):
+                selected.append(c)
 
-    return hotset
+    return selected
+
+
+def load_hotset_cameras(catalog_path: Path) -> List[Dict[str, Any]]:
+    """Loads 57 curated hotset intersection cameras from enriched catalog."""
+    return load_cameras(catalog_path, scope="hotset")
 
 
 def fetch_single_frame(
@@ -123,6 +144,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Limit collection to a single priority corridor",
     )
     parser.add_argument(
+        "--scope",
+        type=str,
+        choices=["hotset", "flood-prone", "all"],
+        default="hotset",
+        help="Camera selection scope: hotset (57 cams), flood-prone (184 cams), all (702 cams)",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Optional limit on number of cameras to fetch",
+    )
+    parser.add_argument(
         "--concurrency",
         type=int,
         default=10,
@@ -138,13 +172,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        cameras = load_hotset_cameras(args.catalog)
+        cameras = load_cameras(args.catalog, scope=args.scope)
     except Exception as e:
         sys.stderr.write(f"Error loading catalog: {e}\n")
         return 1
 
     if args.corridor:
         cameras = [c for c in cameras if args.corridor in (c.get("road_keys") or [])]
+
+    if args.limit and len(cameras) > args.limit:
+        cameras = cameras[:args.limit]
 
     target_date_dir = args.out_dir / args.date
     target_date_dir.mkdir(parents=True, exist_ok=True)
