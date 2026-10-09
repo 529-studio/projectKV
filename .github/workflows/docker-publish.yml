@@ -68,7 +68,7 @@ jobs:
               - '.github/workflows/docker-publish.yml'
             model:
               - 'services/cv-engine/**'
-              - 'docker-compose.stg.yml'
+              - 'docker-compose.cv.yml'
               - '.github/workflows/docker-publish.yml'
 
   # ────────────────────────────────────────────────────────────────────────────
@@ -250,32 +250,90 @@ jobs:
             echo "PORTAINER_API_KEY is not set — skipping deploy trigger."
             exit 0
           fi
-          echo "Triggering Portainer stack redeploy..."
-          STACK_ID="14"
-          STACK_RES=$(curl -sS -f -X GET "https://portainer.529studio.site/api/stacks/${STACK_ID}" \
-            -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
-            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
-            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
-            -H "User-Agent: Mozilla/5.0")
+          PORTAINER_URL="https://portainer.529studio.site"
+          PORTAINER_KEY="${{ secrets.PORTAINER_API_KEY }}"
+          CF_CLIENT_ID="${{ secrets.CF_ACCESS_CLIENT_ID }}"
+          CF_CLIENT_SECRET="${{ secrets.CF_ACCESS_CLIENT_SECRET }}"
 
-          STACK_FILE=$(cat docker-compose.stg.yml)
+          # Step A: Redeploy App Stack 14 on homesrv (Endpoint 3)
+          if [ "${{ needs.detect-changes.outputs.backend }}" = "true" ] || [ "${{ needs.detect-changes.outputs.frontend }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Triggering Portainer Stack 14 (App on homesrv, endpoint 3)..."
+            STACK_RES=$(curl -sS -f -X GET "${PORTAINER_URL}/api/stacks/14" \
+              -H "X-API-Key: ${PORTAINER_KEY}" \
+              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+              -H "User-Agent: Mozilla/5.0")
 
-          ENV_JSON=$(echo "$STACK_RES" | jq .Env)
+            STACK_FILE=$(cat docker-compose.stg.yml)
+            ENV_JSON=$(echo "$STACK_RES" | jq 'if .Env then (.Env | map(if .name == "CV_ENGINE_URL" then .value = "http://100.118.7.57:8000" else . end)) else [] end')
 
-          PAYLOAD=$(jq -n \
-            --arg file "$STACK_FILE" \
-            --argjson env "$ENV_JSON" \
-            '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
+            PAYLOAD=$(jq -n \
+              --arg file "$STACK_FILE" \
+              --argjson env "$ENV_JSON" \
+              '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
 
-          curl -sS -f -o /dev/null -X PUT "https://portainer.529studio.site/api/stacks/${STACK_ID}?endpointId=3" \
-            -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
-            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
-            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
-            -H "Content-Type: application/json" \
-            -H "User-Agent: Mozilla/5.0" \
-            -d "$PAYLOAD"
+            curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/14?endpointId=3" \
+              -H "X-API-Key: ${PORTAINER_KEY}" \
+              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+              -H "Content-Type: application/json" \
+              -H "User-Agent: Mozilla/5.0" \
+              -d "$PAYLOAD"
 
-          echo "Portainer deploy completed successfully."
+            echo "Stack 14 (App on homesrv) redeployed successfully."
+          fi
+
+          # Step B: Redeploy CV Model Stack 17 on dev-box (Endpoint 4)
+          if [ "${{ needs.detect-changes.outputs.model }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Triggering Portainer Stack 17 (CV Engine on dev-box, endpoint 4)..."
+            STACK_RES=$(curl -sS -f -X GET "${PORTAINER_URL}/api/stacks/17" \
+              -H "X-API-Key: ${PORTAINER_KEY}" \
+              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+              -H "User-Agent: Mozilla/5.0")
+
+            STACK_FILE=$(cat docker-compose.cv.yml)
+            ENV_JSON=$(echo "$STACK_RES" | jq '.Env // []')
+
+            PAYLOAD=$(jq -n \
+              --arg file "$STACK_FILE" \
+              --argjson env "$ENV_JSON" \
+              '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
+
+            curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/17?endpointId=4" \
+              -H "X-API-Key: ${PORTAINER_KEY}" \
+              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+              -H "Content-Type: application/json" \
+              -H "User-Agent: Mozilla/5.0" \
+              -d "$PAYLOAD"
+
+            echo "Stack 17 (CV Engine on dev-box) redeployed successfully."
+          fi
+
+      - name: Verify Post-Deploy Health
+        run: |
+          echo "Verifying health after redeployment..."
+          sleep 10
+          curl -sS -f -m 15 https://warded-stg.529studio.site/health || {
+            echo "Staging backend health check failed!"
+            exit 1
+          }
+          echo "Staging backend health check passed."
+
+          if [ -n "${{ secrets.PORTAINER_API_KEY }}" ] && ([ "${{ needs.detect-changes.outputs.model }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]); then
+            CONTAINER_HEALTH=$(curl -sS -m 15 "https://portainer.529studio.site/api/endpoints/4/docker/containers/json" \
+              -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
+              -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+              -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+              -H "User-Agent: Mozilla/5.0" | jq -r '.[] | select(.Names[] == "/warded-cv-engine") | .State')
+            echo "dev-box CV container state: ${CONTAINER_HEALTH}"
+            if [ "${CONTAINER_HEALTH}" != "running" ]; then
+              echo "CV engine container is not running on dev-box!"
+              exit 1
+            fi
+            echo "dev-box CV engine verification passed."
+          fi
 
   # ────────────────────────────────────────────────────────────────────────────
   # JOB 3: Notify Alert Gateway (Failure & Deploy Success)
@@ -305,7 +363,7 @@ jobs:
           elif [ "$DP_RES" = "success" ]; then
             SEVERITY="SUCCESS"
             TITLE="Deploy Success: ${{ github.repository }}"
-            MESSAGE="Đã build và triển khai thành công Camera View lên Warded STG (Portainer Stack 14) - Commit: $COMMIT_MSG"
+            MESSAGE="Đã build và triển khai thành công Camera View lên Warded STG (Portainer Stacks 14 & 17) - Commit: $COMMIT_MSG"
           else
             exit 0
           fi

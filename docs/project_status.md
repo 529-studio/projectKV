@@ -2,8 +2,8 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.0.4  
-**Last Updated:** 2026-10-08  
+**Document Version:** 1.0.5  
+**Last Updated:** 2026-10-09  
 
 ---
 
@@ -15,11 +15,11 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 2. Microservice Architecture & Port Allocations
 
-| Service | Technology | Port | Primary Responsibilities |
-|---|---|:---:|---|
-| **Web Client** (`apps/web`) | Next.js 15 (App Router), React 19, Tailwind CSS, Leaflet | `3001` | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal drag-to-scroll pinned camera dock, bilingual UI (`vi` default with full diacritics, `en` secondary). |
-| **Backend API** (`services/go-server`) | Go 1.24, Gin, SQLite (WAL mode) | `3000` | Snapshot proxy cache with 15s in-memory TTL, camera catalog, hotset scheduler (30s cycle), PCU Saturation Index calculator, SSE (`/api/live/stream`), WebSockets (`/ws/live`), Weather forecast (`/api/weather`, 48h Open-Meteo buffer with hour alignment), Swagger docs. |
-| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR runtime, YOLOv8n FP16 | `8000` | Automated vehicle detection (`POST /predict`), class counting (motorcycle, car, bus, truck), `GET /healthz` healthchecks, multi-threaded request processing. |
+| Service | Technology | Port | Host & Node Role | Primary Responsibilities |
+|---|---|:---:|---|---|
+| **Web Client** (`apps/web`) | Next.js 15 (App Router), React 19, Tailwind CSS, Leaflet | `3001` | `homesrv` (Portainer Endpoint 3) | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal drag-to-scroll pinned camera dock, bilingual UI (`vi` default with full diacritics, `en` secondary). |
+| **Backend API** (`services/go-server`) | Go 1.24, Gin, SQLite (WAL mode) | `3000` | `homesrv` (Portainer Endpoint 3) | Snapshot proxy cache with 15s in-memory TTL, camera catalog, hotset scheduler (30s cycle), PCU Saturation Index calculator, SSE (`/api/live/stream`), WebSockets (`/ws/live`), Weather forecast (`/api/weather`), Swagger docs. |
+| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR runtime, YOLOv8n FP16 | `8000` | `dev-box` worker (Portainer Endpoint 4) | Automated vehicle detection (`POST /predict`), class counting (motorcycle, car, bus, truck), `GET /healthz` healthchecks, multi-threaded request processing, 2 vCPU / 2 GB RAM capped. |
 
 ---
 
@@ -77,9 +77,19 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Independent layer toggles: Ground-truth camera-verified flood hexes (`HexOverlay.tsx`) are completely separated from Doppler weather radar reflectivity (`RainRadarLayer.tsx`).
 - **GitHub Actions Compute (Oct 2026 Audit, #173)**:
   - Consolidated the standalone `go-ci.yml` into the `ci.yml` `verify-backend` job, removing duplicate Go verification on every backend PR.
-  - `ci.yml` now triggers on `pull_request` only; the redundant post-merge `push` re-verification was removed (build/deploy remains covered by `docker-publish.yml`).
-  - Added `concurrency` with `cancel-in-progress: true` to `ci.yml`, `branch-guard.yml`, and `auto-request-reviewers.yml` (`docker-publish.yml` already had it) to cancel superseded runs on rapid pushes.
-  - Removed the informational `ci-gate` aggregation job: `dev` and `main` have no native branch protection on the Free-tier private repo, so it gated nothing.
+- **Distributed Worker Architecture (`dev-box` on Endpoint 4)**:
+  - Offloaded heavy OpenVINO YOLOv8n inference from edge server `homesrv` (Intel Celeron N2930, 4 cores, no AVX2) to dedicated worker VM `dev-box` (`100.118.7.57` via Tailscale, AMD Ryzen 7 6800HS, 8 vCPU, 8 GB RAM, strictly quota-capped at 20 GB disk).
+  - Deployed container `warded-cv-engine` via Portainer Stack 17 (`docker-compose.cv.yml`) on Endpoint 4 with strict cgroup limits (`cpus: "2.00"`, `memory: "2048M"`).
+  - Automated Disk Guard daemon (`/usr/local/bin/docker-disk-guard.sh`) installed via root cron, purging build cache and untagged images whenever root disk usage exceeds 80% (16 GB ceiling).
+  - Comprehensive empirical stress tests:
+    - Hot Set (50 cameras): Completed batch in 2.24s (22.29 FPS, 44.8ms/camera), 0 errors.
+    - Citywide (708 cameras): Completed batch in 30.77s (23.01 FPS, 43.4ms/camera), 0 errors, container memory stabilized at 131 MB RAM (6.4% of 2 GB limit).
+- **Decoupled CI/CD Pipeline (PR feat/distributed-cv-cicd-pipeline)**:
+  - `ci.yml`: Added path filter `model` (`services/cv-engine/**`) and automated Python test job `verify-model` (`make test-model`).
+  - `docker-publish.yml`: Independent build and deployment targeting:
+    - Stack 14 on Portainer Endpoint 3 (`homesrv`) for backend/frontend changes.
+    - Stack 17 on Portainer Endpoint 4 (`dev-box`) for CV engine changes.
+    - Post-deploy verification checking both public web health (`https://warded-stg.529studio.site/health`) and remote Portainer container runtime state (`warded-cv-engine` healthy).
 
 ---
 
