@@ -2,8 +2,8 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.0.6  
-**Last Updated:** 2026-10-09  
+**Document Version:** 1.0.7  
+**Last Updated:** 2026-10-10  
 
 ---
 
@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **121 Pull Requests** processed across repository history:
+- **Lifetime PR History**: Exactly **122 Pull Requests** processed across repository history:
   - **113 Merged** to `dev`
   - **8 Closed** without merging
-  - **0 Open** PRs pending
+  - **1 Open** PR pending: PR #206 (`docs/sprint4-report` targeting `dev`)
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
@@ -69,12 +69,24 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Recalibrated Saturation Index Level of Service (LOS) cutoffs: `Moderate = 0.30` (from 0.35), `Heavy = 0.60` (from 0.70), `Congested = 0.80` (from 0.90).
   - Preserved backward compatibility with custom environment variable overrides (`PCU_WEIGHT_*`, `PCU_CAPACITY_FLOOR`, `PCU_THRESHOLD_*`).
   - Full rationale, empirical distribution findings, and comparison tables documented in `docs/pcu-calibration-report.md`.
-- **Architectural Decision: OpenVINO vs. VLM for Traffic (Sprint 4 T9, Issue #197)**:
+- **Architectural Decision: OpenVINO vs. VLM for Traffic (Sprint 4 T9, Issue #197, PR #205)**:
   - Evaluated self-hosted OpenVINO vs. cloud VLM (Gemini Flash-Lite) across throughput, hardware utilization, latency, and economics following Sprint 4 T4 real-world benchmarks.
   - Adopted **Option C: Decoupled Hybrid Architecture**: Retained self-hosted OpenVINO as the core continuous 30-second traffic telemetry engine ($0 API cost, 24.01 FPS on `dev-box`, 18.2ms P50 latency, 0.00% failure rate across 3,383 requests, vs. VLM's ~$111/mo cost and 228s latency for 57 cameras).
   - Outlined resolution scaling ($320 \times 320 \rightarrow 416 \times 416$) on `dev-box` to address motorcycle recall while reserving cloud VLM strictly for low-frequency on-demand modal checks and rain-triggered flood audits.
   - Formal Architectural Decision Record committed in `docs/decision-openvino-vs-vlm.md`.
   - All Sprint 4 backlog items (T1–T9) are now completed or decided, unblocking Sprint 5 long-term routing work (`route.Engine`).
+- **Sprint 4 Completion & Reality-Check Audit Report**:
+  - Full audit of all 9 Sprint 4 backlog tickets (T1–T9), empirical evaluation findings, staging self-hosting readiness audit, and Sprint 5 recommendations compiled in [`docs/sprint4_report.md`](sprint4_report.md).
+  - Technical audit Q&A resolving all 13 critical verification inquiries from reviewers across 4 thematic groups with line-by-line codebase citations committed in [`docs/sprint4_audit_qa.md`](sprint4_audit_qa.md).
+  - Ground-truth reality check and authoritative Sprint 5 execution roadmap adopted in [`docs/ADR-006-sprint4-audit-and-sprint5-plan.md`](ADR-006-sprint4-audit-and-sprint5-plan.md) (PR #206), establishing mandatory empirical gating (S5-T1) before feature expansion, upgrading detector resolution to $416\times 416$ (S5-T3), centralizing blob storage for team web labeling (S5-T4), and hardening network resilience (S5-T6).
+- **Sprint 5 Backlog & Execution Guide**:
+  - Four active GitHub issues created on `529-studio/projectKV`:
+    - [#207](https://github.com/529-studio/projectKV/issues/207): S5-T1 — `[tooling] re-run D6 benchmark and smoke test with post-T5 weights` (Hard Gate)
+    - [#208](https://github.com/529-studio/projectKV/issues/208): S5-T2 — `[cv-engine] object detection audit for false-positive/missed detections`
+    - [#209](https://github.com/529-studio/projectKV/issues/209): S5-T3 — `[go-server + web] decoupled hybrid flood pipeline`
+    - [#210](https://github.com/529-studio/projectKV/issues/210): S5-T4 — `[infra] physical Tailscale disconnection test for dev-box failover`
+  - Operational wave guide and `agy` CLI instructions compiled in [`docs/sprint5_execution_guide.md`](sprint5_execution_guide.md).
+
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).
