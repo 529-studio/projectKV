@@ -2,7 +2,7 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.0.5  
+**Document Version:** 1.0.6  
 **Last Updated:** 2026-10-09  
 
 ---
@@ -25,8 +25,8 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **116 Pull Requests** processed across repository history:
-  - **108 Merged** to `dev`
+- **Lifetime PR History**: Exactly **121 Pull Requests** processed across repository history:
+  - **113 Merged** to `dev`
   - **8 Closed** without merging
   - **0 Open** PRs pending
 - **Staging Infrastructure Configuration (Stack 14)**:
@@ -63,12 +63,18 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Flood Safety Gate: **FAIL (100.0% FNR > 5.0%)**, properly measuring that the stock vehicle-only COCO model does not detect standing water on the 120 flood frames (informing Sprint 4 T9 multimodal flood pipeline).
   - Known-state smoke-test validation: **2/10 PASS (20.0%)** on curated baselines (`docs/reports/smoke_eval_d6_real.md`).
   - Full empirical findings committed to `docs/reports/eval_report_d6_real.md` and `docs/reports/dataset_progress.md`.
-- **PCU Calibration & Saturation Index Realignment (Sprint 4 T5, Issue #196)**:
+- **PCU Calibration & Saturation Index Realignment (Sprint 4 T5, Issue #196, PR #202)**:
   - Calibrated default Passenger Car Unit (PCU) weights against empirical HCMC traffic data and Vietnamese urban transport standards (**TCVN 4054:2005** / **TCVN 13592:2022**): `Motorcycle = 0.30` (from 0.20), `Car = 1.00`, `Bus = 2.50` (from 2.00), `Truck = 2.00`, `Container = 2.00` (folded into Truck per ADR-005 T6).
   - Realigned cold-start `CapacityFloor` from `25.0` down to `15.0` PCU matching the physical queue geometry of a 20–30m CCTV viewport (3 lanes x 4–5 queue vehicles).
   - Recalibrated Saturation Index Level of Service (LOS) cutoffs: `Moderate = 0.30` (from 0.35), `Heavy = 0.60` (from 0.70), `Congested = 0.80` (from 0.90).
   - Preserved backward compatibility with custom environment variable overrides (`PCU_WEIGHT_*`, `PCU_CAPACITY_FLOOR`, `PCU_THRESHOLD_*`).
   - Full rationale, empirical distribution findings, and comparison tables documented in `docs/pcu-calibration-report.md`.
+- **Architectural Decision: OpenVINO vs. VLM for Traffic (Sprint 4 T9, Issue #197)**:
+  - Evaluated self-hosted OpenVINO vs. cloud VLM (Gemini Flash-Lite) across throughput, hardware utilization, latency, and economics following Sprint 4 T4 real-world benchmarks.
+  - Adopted **Option C: Decoupled Hybrid Architecture**: Retained self-hosted OpenVINO as the core continuous 30-second traffic telemetry engine ($0 API cost, 24.01 FPS on `dev-box`, 18.2ms P50 latency, 0.00% failure rate across 3,383 requests, vs. VLM's ~$111/mo cost and 228s latency for 57 cameras).
+  - Outlined resolution scaling ($320 \times 320 \rightarrow 416 \times 416$) on `dev-box` to address motorcycle recall while reserving cloud VLM strictly for low-frequency on-demand modal checks and rain-triggered flood audits.
+  - Formal Architectural Decision Record committed in `docs/decision-openvino-vs-vlm.md`.
+  - All Sprint 4 backlog items (T1–T9) are now completed or decided, unblocking Sprint 5 long-term routing work (`route.Engine`).
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).
