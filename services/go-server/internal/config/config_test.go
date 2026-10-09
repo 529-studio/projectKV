@@ -333,14 +333,14 @@ func TestLoadConfig_PCU_Defaults(t *testing.T) {
 	_ = os.Unsetenv("PCU_THRESHOLD_CONGESTED")
 
 	cfg := config.LoadConfig()
-	if cfg.PCUWeightMotorcycle != 0.2 {
-		t.Errorf("expected default PCUWeightMotorcycle=0.2, got %f", cfg.PCUWeightMotorcycle)
+	if cfg.PCUWeightMotorcycle != 0.3 {
+		t.Errorf("expected default PCUWeightMotorcycle=0.3, got %f", cfg.PCUWeightMotorcycle)
 	}
 	if cfg.PCUWeightCar != 1.0 {
 		t.Errorf("expected default PCUWeightCar=1.0, got %f", cfg.PCUWeightCar)
 	}
-	if cfg.PCUWeightBus != 2.0 {
-		t.Errorf("expected default PCUWeightBus=2.0, got %f", cfg.PCUWeightBus)
+	if cfg.PCUWeightBus != 2.5 {
+		t.Errorf("expected default PCUWeightBus=2.5, got %f", cfg.PCUWeightBus)
 	}
 	if cfg.PCUWeightTruck != 2.0 {
 		t.Errorf("expected default PCUWeightTruck=2.0, got %f", cfg.PCUWeightTruck)
@@ -348,17 +348,17 @@ func TestLoadConfig_PCU_Defaults(t *testing.T) {
 	if cfg.PCUWeightContainer != 2.0 {
 		t.Errorf("expected default PCUWeightContainer=2.0, got %f", cfg.PCUWeightContainer)
 	}
-	if cfg.PCUCapacityFloor != 25.0 {
-		t.Errorf("expected default PCUCapacityFloor=25.0, got %f", cfg.PCUCapacityFloor)
+	if cfg.PCUCapacityFloor != 15.0 {
+		t.Errorf("expected default PCUCapacityFloor=15.0, got %f", cfg.PCUCapacityFloor)
 	}
-	if cfg.PCUThresholdModerate != 0.35 {
-		t.Errorf("expected default PCUThresholdModerate=0.35, got %f", cfg.PCUThresholdModerate)
+	if cfg.PCUThresholdModerate != 0.30 {
+		t.Errorf("expected default PCUThresholdModerate=0.30, got %f", cfg.PCUThresholdModerate)
 	}
-	if cfg.PCUThresholdHeavy != 0.70 {
-		t.Errorf("expected default PCUThresholdHeavy=0.70, got %f", cfg.PCUThresholdHeavy)
+	if cfg.PCUThresholdHeavy != 0.60 {
+		t.Errorf("expected default PCUThresholdHeavy=0.60, got %f", cfg.PCUThresholdHeavy)
 	}
-	if cfg.PCUThresholdCongested != 0.90 {
-		t.Errorf("expected default PCUThresholdCongested=0.90, got %f", cfg.PCUThresholdCongested)
+	if cfg.PCUThresholdCongested != 0.80 {
+		t.Errorf("expected default PCUThresholdCongested=0.80, got %f", cfg.PCUThresholdCongested)
 	}
 }
 
