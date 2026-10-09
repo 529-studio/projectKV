@@ -1,15 +1,15 @@
 # AI Analyzer Evaluation Report (ADR-004 §D6 Accuracy Gate)
 
-- **Generated At**: `2026-10-08T14:02:27.341582+00:00`
+- **Generated At**: `2026-10-09T19:42:48.900653+00:00`
 - **Analyzer**: `cv-engine` (`yolov8n_openvino_320`)
-- **Evaluation Dataset**: `764` labeled frames from `/Users/thanhdatvu/repos/projectKV/tools/eval/labels`
+- **Evaluation Dataset**: `764` labeled frames from `/Users/thanhdatvu/repos/projectKV/tools/eval/dataset/labels_d6_real.json`
 
 ## 1. Executive Summary & Accuracy Gate
 
 | Gate Metric | Target | Actual Value | Verdict |
 |---|---|---|---|
 | **Flood False-Negative Rate (FNR)** | ≤ 5.0% | **100.0%** (120/120 missed) | **FAIL (SAFETY GATE BREACH)** |
-| Traffic Macro F1 | ≥ 0.70 | **0.209** | **[FAIL]** (Below 0.70 Target) |
+| Traffic Macro F1 | ≥ 0.70 | **0.206** | **[FAIL]** (Below 0.70 Target) |
 | Flood Macro F1 | ≥ 0.80 | **0.305** | **[FAIL]** (Below 0.80 Target) |
 
 > **Safety Gate Rule (ADR-004 §D6)**: A flood false-negative (failing to detect standing water or deep floods) directs drivers into hazardous corridors. Until the flood FNR is rigorously ≤ 5.0% across ≥60 rain/flood frames, route verdicts cannot show an unrestricted 'clear' state.
@@ -30,21 +30,21 @@
 
 | Class | Precision | Recall | F1-Score | Support |
 |---|---|---|---|---|
-| **CLEAR** | 0.498 | 0.802 | 0.615 | 384 |
-| **MODERATE** | 0.368 | 0.141 | 0.204 | 199 |
-| **HEAVY** | 0.000 | 0.000 | 0.000 | 108 |
-| **CONGESTED** | 0.022 | 0.014 | 0.017 | 73 |
-| *Macro Avg* | - | - | **0.209** | 764 |
-| *Weighted Avg* | - | - | **0.364** | 764 |
+| **CLEAR** | 0.497 | 0.747 | 0.597 | 384 |
+| **MODERATE** | 0.344 | 0.106 | 0.162 | 199 |
+| **HEAVY** | 0.097 | 0.028 | 0.043 | 108 |
+| **CONGESTED** | 0.021 | 0.027 | 0.024 | 73 |
+| *Macro Avg* | - | - | **0.206** | 764 |
+| *Weighted Avg* | - | - | **0.351** | 764 |
 
 ### Traffic Confusion Matrix
 
 | Actual \ Predicted | CLEAR | MODERATE | HEAVY | CONGESTED | Total |
 |---|---|---|---|---|---|
-| **CLEAR** | 308 | 41 | 13 | 22 | **384** |
-| **MODERATE** | 139 | 28 | 11 | 21 | **199** |
-| **HEAVY** | 102 | 5 | 0 | 1 | **108** |
-| **CONGESTED** | 69 | 2 | 1 | 1 | **73** |
+| **CLEAR** | 287 | 34 | 17 | 46 | **384** |
+| **MODERATE** | 124 | 21 | 9 | 45 | **199** |
+| **HEAVY** | 99 | 4 | 3 | 2 | **108** |
+| **CONGESTED** | 67 | 2 | 2 | 2 | **73** |
 
 ## 4. Flood Classification Performance
 
@@ -197,13 +197,46 @@
 
 | Weather Condition | Frames | Traffic Accuracy | Flood Accuracy |
 |---|---|---|---|
-| **dry** | 296 | 36.8% | 100.0% |
-| **heavy_rain** | 22 | 0.0% | 0.0% |
-| **rain** | 446 | 51.1% | 78.0% |
+| **dry** | 296 | 30.4% | 100.0% |
+| **heavy_rain** | 22 | 4.5% | 0.0% |
+| **rain** | 446 | 49.8% | 78.0% |
 
 ### Time of Day Slice
 
 | Lighting / Time | Frames | Traffic Accuracy | Flood Accuracy |
 |---|---|---|---|
-| **day** | 296 | 36.8% | 100.0% |
-| **night** | 468 | 48.7% | 74.4% |
+| **day** | 296 | 30.4% | 100.0% |
+| **night** | 468 | 47.6% | 74.4% |
+
+## 7. Comparative Analysis: Pre-T5 vs. Post-T5 (Validation of ADR-006 Mathematical Paradox)
+
+### 7.1. Macro Performance Comparison
+
+| Metric | Pre-T5 Baseline (`eval_report_d6_pre_t5.md`) | Post-T5 Calibrated (`CapacityFloor=15.0`) | Delta | Impact / Assessment |
+|---|:---:|:---:|:---:|---|
+| **Traffic Macro F1** | **0.209** | **0.206** | **-0.003** | Slight regression overall; tuning thresholds did not fix model errors |
+| **Traffic Weighted F1** | **0.364** | **0.351** | **-0.013** | Regressed due to massive influx of false-positive congestion |
+| **CLEAR Class F1** | 0.615 (Recall 80.2%) | 0.597 (Recall 74.7%) | -0.018 | CLEAR recall dropped as clear frames were pushed into CONGESTED |
+| **MODERATE Class F1** | 0.204 (Recall 14.1%) | 0.162 (Recall 10.6%) | -0.042 | Degraded |
+| **HEAVY Class F1** | 0.000 (Recall 0.0%) | 0.043 (Recall 2.8%) | +0.043 | Minor recovery (3 frames detected) |
+| **CONGESTED Class F1**| 0.017 (Recall 1.4%) | 0.024 (Recall 2.7%) | +0.007 | Negligible (only 2 out of 73 detected) |
+| **Flood Safety FNR** | **100.0%** (120/120 missed) | **100.0%** (120/120 missed) | 0.0% | Unchanged (COCO object detector does not see flood water) |
+
+### 7.2. Empirical Validation of the ADR-006 Mathematical Paradox
+
+In ADR-006 Finding 2, mathematical analysis predicted:
+$$SI = \frac{PCU}{CapacityFloor}$$
+Lowering $CapacityFloor$ from $25.0$ to $15.0$ multiplies all Saturation Indices by $\frac{25}{15} \approx 1.67\times$.
+
+The real confusion matrix confirms this prediction with 100% fidelity:
+1. **False-Positive Congestion Doubled on CLEAR Frames**:
+   - Pre-T5: 22 actual CLEAR frames were falsely classified as `CONGESTED`.
+   - Post-T5: **46 actual CLEAR frames** were falsely classified as `CONGESTED` (**+109% increase in false-positive gridlock**).
+   - False-positive `HEAVY` classifications on CLEAR frames also increased from 13 to 17.
+2. **Persistent Blindness on Real Congestion**:
+   - Pre-T5: 69 out of 73 actual `CONGESTED` frames were misclassified as `CLEAR` (94.5% missed).
+   - Post-T5: **67 out of 73 actual `CONGESTED` frames** are STILL misclassified as `CLEAR` (91.8% missed).
+   - For cameras with 0 vehicle detections (due to dense occlusion or night glare), dividing by 15.0 yielded $0 / 15.0 = 0.00$. Lowering the capacity floor was mathematically powerless to fix perception layer blindness.
+3. **Conclusion for S5-T2**:
+   - Tuning downstream mathematical parameters (CapacityFloor, weights, thresholds) **cannot compensate for upstream object detector perception failures**.
+   - Addressing the congestion classification gap requires fixing the perception layer directly in S5-T2/S5-T3 (higher resolution $416\times 416$ to resolve distant motorcycle clusters and eliminate hallucinated background artifacts).

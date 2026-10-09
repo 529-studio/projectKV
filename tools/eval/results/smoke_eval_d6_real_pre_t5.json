@@ -1,0 +1,113 @@
+{
+  "stats": {
+    "total_cameras": 10,
+    "evaluated_cameras": 10,
+    "passed": 2,
+    "failed": 8,
+    "missing": 0,
+    "pass_rate": 20.0,
+    "is_all_passed": false
+  },
+  "results": [
+    {
+      "camera_id": "5822b5ededeb6c0012a2d66a",
+      "camera_name": "Mai Chí Thọ - Nguyễn Cơ Thạch 1",
+      "corridor": "mai_chi_tho",
+      "expected_traffic": "CLEAR",
+      "actual_traffic": "HEAVY",
+      "actual_si": 0.7037037037037037,
+      "status": "FAIL",
+      "discrepancy_details": "Expected CLEAR but got HEAVY (potential false-positive congestion); SI 0.70 >= 0.35 clear ceiling"
+    },
+    {
+      "camera_id": "5a10c79f02eb490011a0b0dd",
+      "camera_name": "Mai Chí Thọ - Tố Hữu (C6)",
+      "corridor": "mai_chi_tho",
+      "expected_traffic": "CLEAR",
+      "actual_traffic": "MODERATE",
+      "actual_si": 0.50625,
+      "status": "FAIL",
+      "discrepancy_details": "Expected CLEAR but got MODERATE (potential false-positive congestion); SI 0.51 >= 0.35 clear ceiling"
+    },
+    {
+      "camera_id": "56de42f611f398ec0c48129c",
+      "camera_name": "Võ Văn Kiệt - Quốc Lộ 1",
+      "corridor": "vo_van_kiet",
+      "expected_traffic": "CLEAR",
+      "actual_traffic": "CLEAR",
+      "actual_si": 0.0,
+      "status": "PASS",
+      "discrepancy_details": null
+    },
+    {
+      "camera_id": "56de42f611f398ec0c481287",
+      "camera_name": "Võ Văn Kiệt - Ký Con",
+      "corridor": "vo_van_kiet",
+      "expected_traffic": "CLEAR",
+      "actual_traffic": "HEAVY",
+      "actual_si": 0.84,
+      "status": "FAIL",
+      "discrepancy_details": "Expected CLEAR but got HEAVY (potential false-positive congestion); SI 0.84 >= 0.35 clear ceiling"
+    },
+    {
+      "camera_id": "5deb576d1dc17d7c5515ad02",
+      "camera_name": "Điện Biên Phủ - Pasteur",
+      "corridor": "dien_bien_phu",
+      "expected_traffic": "CLEAR",
+      "actual_traffic": "CONGESTED",
+      "actual_si": 1.0,
+      "status": "FAIL",
+      "discrepancy_details": "Expected CLEAR but got CONGESTED (potential false-positive congestion); SI 1.00 >= 0.35 clear ceiling"
+    },
+    {
+      "camera_id": "5deb576d1dc17d7c5515ad08",
+      "camera_name": "Cộng Hòa - Tân Kỳ Tân Quý",
+      "corridor": "cong_hoa",
+      "expected_traffic": "CONGESTED",
+      "actual_traffic": "MODERATE",
+      "actual_si": 0.4,
+      "status": "FAIL",
+      "discrepancy_details": "Expected CONGESTED but got MODERATE (false-negative bottleneck detection); SI 0.40 < 0.70 congestion floor"
+    },
+    {
+      "camera_id": "586e1f18f9fab7001111b0a5",
+      "camera_name": "Cộng Hòa - Trường Chinh",
+      "corridor": "cong_hoa",
+      "expected_traffic": "CONGESTED",
+      "actual_traffic": "CLEAR",
+      "actual_si": 0.0,
+      "status": "FAIL",
+      "discrepancy_details": "Expected CONGESTED but got CLEAR (false-negative bottleneck detection); SI 0.00 < 0.70 congestion floor"
+    },
+    {
+      "camera_id": "66b1c426779f74001867415e",
+      "camera_name": "Điện Biên Phủ - Nguyễn Gia Trí",
+      "corridor": "dien_bien_phu",
+      "expected_traffic": "CONGESTED",
+      "actual_traffic": "CONGESTED",
+      "actual_si": 1.0,
+      "status": "PASS",
+      "discrepancy_details": null
+    },
+    {
+      "camera_id": "5deb576d1dc17d7c5515acf2",
+      "camera_name": "Điện Biên Phủ - Cách Mạng Tháng Tám",
+      "corridor": "dien_bien_phu",
+      "expected_traffic": "CONGESTED",
+      "actual_traffic": "CLEAR",
+      "actual_si": 0.32,
+      "status": "FAIL",
+      "discrepancy_details": "Expected CONGESTED but got CLEAR (false-negative bottleneck detection); SI 0.32 < 0.70 congestion floor"
+    },
+    {
+      "camera_id": "56de42f611f398ec0c481282",
+      "camera_name": "Mai Chí Thọ - Đồng Văn Cống 2",
+      "corridor": "mai_chi_tho",
+      "expected_traffic": "CONGESTED",
+      "actual_traffic": "CLEAR",
+      "actual_si": 0.0,
+      "status": "FAIL",
+      "discrepancy_details": "Expected CONGESTED but got CLEAR (false-negative bottleneck detection); SI 0.00 < 0.70 congestion floor"
+    }
+  ]
+}
