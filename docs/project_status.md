@@ -69,12 +69,14 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Recalibrated Saturation Index Level of Service (LOS) cutoffs: `Moderate = 0.30` (from 0.35), `Heavy = 0.60` (from 0.70), `Congested = 0.80` (from 0.90).
   - Preserved backward compatibility with custom environment variable overrides (`PCU_WEIGHT_*`, `PCU_CAPACITY_FLOOR`, `PCU_THRESHOLD_*`).
   - Full rationale, empirical distribution findings, and comparison tables documented in `docs/pcu-calibration-report.md`.
-- **Architectural Decision: OpenVINO vs. VLM for Traffic (Sprint 4 T9, Issue #197)**:
+- **Architectural Decision: OpenVINO vs. VLM for Traffic (Sprint 4 T9, Issue #197, PR #205)**:
   - Evaluated self-hosted OpenVINO vs. cloud VLM (Gemini Flash-Lite) across throughput, hardware utilization, latency, and economics following Sprint 4 T4 real-world benchmarks.
   - Adopted **Option C: Decoupled Hybrid Architecture**: Retained self-hosted OpenVINO as the core continuous 30-second traffic telemetry engine ($0 API cost, 24.01 FPS on `dev-box`, 18.2ms P50 latency, 0.00% failure rate across 3,383 requests, vs. VLM's ~$111/mo cost and 228s latency for 57 cameras).
   - Outlined resolution scaling ($320 \times 320 \rightarrow 416 \times 416$) on `dev-box` to address motorcycle recall while reserving cloud VLM strictly for low-frequency on-demand modal checks and rain-triggered flood audits.
   - Formal Architectural Decision Record committed in `docs/decision-openvino-vs-vlm.md`.
   - All Sprint 4 backlog items (T1–T9) are now completed or decided, unblocking Sprint 5 long-term routing work (`route.Engine`).
+- **Sprint 4 Completion & Reality-Check Audit Report**:
+  - Full audit of all 9 Sprint 4 backlog tickets (T1–T9), empirical evaluation findings, staging self-hosting readiness audit, and Sprint 5 recommendations compiled in [`docs/sprint4_report.md`](sprint4_report.md).
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).
