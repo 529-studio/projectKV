@@ -1,0 +1,339 @@
+{
+  "timestamp": "2026-10-09 04:19:23",
+  "hardware_limits": {
+    "cpus": "2.00 vCPU",
+    "memory": "2048 MB",
+    "host": "AMD Ryzen 7 6800HS Creator Edition (8 vCPU on inference worker VM)"
+  },
+  "resource_monitoring": {
+    "initial": {
+      "cpu_percent": "0.04%",
+      "mem_usage": "84.87MiB / 2GiB",
+      "mem_percent": "4.14%"
+    },
+    "after_case1_hotset": {
+      "cpu_percent": "0.01%",
+      "mem_usage": "84.8MiB / 2GiB",
+      "mem_percent": "4.14%"
+    },
+    "midway_case2_350cams": {
+      "cpu_percent": "199.31%",
+      "mem_usage": "97.9MiB / 2GiB",
+      "mem_percent": "4.78%"
+    },
+    "final_case2_end": {
+      "cpu_percent": "2.81%",
+      "mem_usage": "84.93MiB / 2GiB",
+      "mem_percent": "4.15%"
+    }
+  },
+  "case1_hotset_50_cameras": {
+    "summary": {
+      "total_images": 50,
+      "successful": 50,
+      "failed": 0,
+      "wall_clock_seconds": 2.24,
+      "throughput_fps": 22.29,
+      "http_latency_ms": {
+        "p50": 192.42,
+        "p90": 211.61,
+        "p95": 214.88,
+        "p99": 285.09,
+        "min": 103.55,
+        "max": 285.09,
+        "avg": 176.46
+      },
+      "model_pure_latency_ms": {
+        "p50": 187.02,
+        "p90": 208.54,
+        "avg": 162.57
+      },
+      "traffic_analysis": {
+        "total_vehicles_detected": 539,
+        "avg_vehicles_per_camera": 10.78,
+        "by_category": {
+          "motorcycle": 11,
+          "car": 411,
+          "bus": 60,
+          "truck": 57,
+          "container": 0
+        },
+        "category_percentages": {
+          "motorcycle": 2.0,
+          "car": 76.3,
+          "bus": 11.1,
+          "truck": 10.6,
+          "container": 0.0
+        },
+        "severity_distribution": {
+          "CLEAR": 28,
+          "MODERATE": 13,
+          "HEAVY": 7,
+          "CONGESTED": 2,
+          "ERROR": 0
+        },
+        "severity_percentages": {
+          "CLEAR": 56.0,
+          "MODERATE": 26.0,
+          "HEAVY": 14.0,
+          "CONGESTED": 4.0,
+          "ERROR": 0.0
+        }
+      }
+    },
+    "smoke_cameras_validation": [
+      {
+        "camera_id": "5822b5ededeb6c0012a2d66a",
+        "camera_name": "Mai Ch\u00ed Th\u1ecd - Nguy\u1ec5n C\u01a1 Th\u1ea1ch 1",
+        "expected": "CLEAR",
+        "predicted_severity": "CONGESTED",
+        "vehicles_detected": 59,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 54,
+          "bus": 0,
+          "truck": 5,
+          "container": 0
+        },
+        "latency_ms": 53.78
+      },
+      {
+        "camera_id": "5a10c79f02eb490011a0b0dd",
+        "camera_name": "Mai Ch\u00ed Th\u1ecd - T\u1ed1 H\u1eefu (C6)",
+        "expected": "CLEAR",
+        "predicted_severity": "CLEAR",
+        "vehicles_detected": 4,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 4,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "latency_ms": 117.46
+      },
+      {
+        "camera_id": "56de42f611f398ec0c48129c",
+        "camera_name": "V\u00f5 V\u0103n Ki\u1ec7t - Qu\u1ed1c L\u1ed9 1",
+        "expected": "CLEAR",
+        "predicted_severity": "CLEAR",
+        "vehicles_detected": 3,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 3,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "latency_ms": 26.96
+      },
+      {
+        "camera_id": "56de42f611f398ec0c481287",
+        "camera_name": "V\u00f5 V\u0103n Ki\u1ec7t - K\u00fd Con",
+        "expected": "CLEAR",
+        "predicted_severity": "HEAVY",
+        "vehicles_detected": 32,
+        "vehicle_counts": {
+          "motorcycle": 4,
+          "car": 28,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "latency_ms": 17.21
+      },
+      {
+        "camera_id": "5deb576d1dc17d7c5515ad08",
+        "camera_name": "C\u1ed9ng H\u00f2a - T\u00e2n K\u1ef3 T\u00e2n Qu\u00fd",
+        "expected": "CONGESTED",
+        "predicted_severity": "CLEAR",
+        "vehicles_detected": 4,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 4,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "latency_ms": 182.5
+      },
+      {
+        "camera_id": "586e1f18f9fab7001111b0a5",
+        "camera_name": "C\u1ed9ng H\u00f2a - Tr\u01b0\u1eddng Chinh",
+        "expected": "CONGESTED",
+        "predicted_severity": "HEAVY",
+        "vehicles_detected": 34,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 26,
+          "bus": 8,
+          "truck": 0,
+          "container": 0
+        },
+        "latency_ms": 116.22
+      },
+      {
+        "camera_id": "66b1c426779f74001867415e",
+        "camera_name": "\u0110i\u1ec7n Bi\u00ean Ph\u1ee7 - Nguy\u1ec5n Gia Tr\u00ed",
+        "expected": "CONGESTED",
+        "predicted_severity": "CLEAR",
+        "vehicles_detected": 1,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 1,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "latency_ms": 115.72
+      },
+      {
+        "camera_id": "5deb576d1dc17d7c5515acf2",
+        "camera_name": "\u0110i\u1ec7n Bi\u00ean Ph\u1ee7 - C\u00e1ch M\u1ea1ng Th\u00e1ng T\u00e1m",
+        "expected": "CONGESTED",
+        "predicted_severity": "CLEAR",
+        "vehicles_detected": 0,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 0,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "latency_ms": 185.55
+      },
+      {
+        "camera_id": "56de42f611f398ec0c481282",
+        "camera_name": "Mai Ch\u00ed Th\u1ecd - \u0110\u1ed3ng V\u0103n C\u1ed1ng 2",
+        "expected": "CONGESTED",
+        "predicted_severity": "CLEAR",
+        "vehicles_detected": 0,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 0,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "latency_ms": 40.39
+      }
+    ]
+  },
+  "case2_all_710_cameras": {
+    "summary": {
+      "total_images": 708,
+      "successful": 708,
+      "failed": 0,
+      "wall_clock_seconds": 30.77,
+      "throughput_fps": 23.01,
+      "http_latency_ms": {
+        "p50": 190.26,
+        "p90": 208.31,
+        "p95": 281.98,
+        "p99": 294.05,
+        "min": 19.46,
+        "max": 381.95,
+        "avg": 173.61
+      },
+      "model_pure_latency_ms": {
+        "p50": 186.19,
+        "p90": 204.99,
+        "avg": 161.89
+      },
+      "traffic_analysis": {
+        "total_vehicles_detected": 5375,
+        "avg_vehicles_per_camera": 7.59,
+        "by_category": {
+          "motorcycle": 131,
+          "car": 4106,
+          "bus": 817,
+          "truck": 321,
+          "container": 0
+        },
+        "category_percentages": {
+          "motorcycle": 2.4,
+          "car": 76.4,
+          "bus": 15.2,
+          "truck": 6.0,
+          "container": 0.0
+        },
+        "severity_distribution": {
+          "CLEAR": 467,
+          "MODERATE": 171,
+          "HEAVY": 55,
+          "CONGESTED": 15,
+          "ERROR": 0
+        },
+        "severity_percentages": {
+          "CLEAR": 66.0,
+          "MODERATE": 24.2,
+          "HEAVY": 7.8,
+          "CONGESTED": 2.1,
+          "ERROR": 0.0
+        }
+      }
+    },
+    "top_5_crowded_cameras": [
+      {
+        "camera_id": "5d9ddd49766c880017188c94",
+        "vehicles": 96,
+        "counts": {
+          "motorcycle": 3,
+          "car": 93,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "severity": "CONGESTED"
+      },
+      {
+        "camera_id": "58ad6961bd82540010390be5",
+        "vehicles": 79,
+        "counts": {
+          "motorcycle": 12,
+          "car": 67,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "severity": "CONGESTED"
+      },
+      {
+        "camera_id": "5822b5ededeb6c0012a2d66a",
+        "vehicles": 59,
+        "counts": {
+          "motorcycle": 0,
+          "car": 54,
+          "bus": 0,
+          "truck": 5,
+          "container": 0
+        },
+        "severity": "CONGESTED"
+      },
+      {
+        "camera_id": "5deb576d1dc17d7c5515ad23",
+        "vehicles": 50,
+        "counts": {
+          "motorcycle": 4,
+          "car": 46,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "severity": "CONGESTED"
+      },
+      {
+        "camera_id": "56de42f611f398ec0c481288",
+        "vehicles": 49,
+        "counts": {
+          "motorcycle": 0,
+          "car": 43,
+          "bus": 6,
+          "truck": 0,
+          "container": 0
+        },
+        "severity": "CONGESTED"
+      }
+    ]
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "timestamp": "2026-10-09 09:05:40",
+  "service": "projectkv-cv-engine",
+  "runtime": "Python 3.11 + OpenVINO IR 2026",
+  "model": "yolov8n_openvino_320 (FP16)",
+  "endpoint": "http://localhost:8005",
+  "sequential_baseline": {
+    "total": 50,
+    "success": 50,
+    "error_rate_pct": 0.0,
+    "p50_ms": 10.232624990749173,
+    "p90_ms": 12.024791998555884,
+    "p95_ms": 12.600542002473958,
+    "p99_ms": 30.68958299991209,
+    "min_ms": 8.086292000371031,
+    "max_ms": 30.68958299991209,
+    "avg_ms": 10.741125839413144,
+    "avg_model_latency_ms": 9.7176
+  },
+  "concurrency_sweep": {
+    "1": {
+      "concurrency": 1,
+      "total_requests": 490,
+      "successful_requests": 490,
+      "duration_sec": 5.0,
+      "throughput_rps": 97.95,
+      "p50_ms": 9.59,
+      "p90_ms": 12.04,
+      "p99_ms": 21.5,
+      "error_rate_pct": 0.0
+    },
+    "2": {
+      "concurrency": 2,
+      "total_requests": 561,
+      "successful_requests": 561,
+      "duration_sec": 5.02,
+      "throughput_rps": 111.86,
+      "p50_ms": 16.78,
+      "p90_ms": 20.14,
+      "p99_ms": 36.6,
+      "error_rate_pct": 0.0
+    },
+    "5": {
+      "concurrency": 5,
+      "total_requests": 570,
+      "successful_requests": 570,
+      "duration_sec": 5.04,
+      "throughput_rps": 113.18,
+      "p50_ms": 43.11,
+      "p90_ms": 57.64,
+      "p99_ms": 76.44,
+      "error_rate_pct": 0.0
+    },
+    "10": {
+      "concurrency": 10,
+      "total_requests": 573,
+      "successful_requests": 573,
+      "duration_sec": 5.08,
+      "throughput_rps": 112.89,
+      "p50_ms": 85.2,
+      "p90_ms": 131.29,
+      "p99_ms": 158.67,
+      "error_rate_pct": 0.0
+    },
+    "15": {
+      "concurrency": 15,
+      "total_requests": 562,
+      "successful_requests": 562,
+      "duration_sec": 5.13,
+      "throughput_rps": 109.54,
+      "p50_ms": 135.02,
+      "p90_ms": 193.83,
+      "p99_ms": 227.63,
+      "error_rate_pct": 0.0
+    },
+    "20": {
+      "concurrency": 20,
+      "total_requests": 577,
+      "successful_requests": 577,
+      "duration_sec": 5.16,
+      "throughput_rps": 111.87,
+      "p50_ms": 175.6,
+      "p90_ms": 265.25,
+      "p99_ms": 327.36,
+      "error_rate_pct": 0.0
+    }
+  }
+}
