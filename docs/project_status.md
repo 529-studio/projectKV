@@ -2,8 +2,8 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.0.6  
-**Last Updated:** 2026-10-09  
+**Document Version:** 1.0.7  
+**Last Updated:** 2026-10-10  
 
 ---
 
@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **121 Pull Requests** processed across repository history:
+- **Lifetime PR History**: Exactly **122 Pull Requests** processed across repository history:
   - **113 Merged** to `dev`
   - **8 Closed** without merging
-  - **0 Open** PRs pending
+  - **1 Open** PR pending: PR #206 (`docs/sprint4-report` targeting `dev`)
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
@@ -77,6 +77,9 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - All Sprint 4 backlog items (T1–T9) are now completed or decided, unblocking Sprint 5 long-term routing work (`route.Engine`).
 - **Sprint 4 Completion & Reality-Check Audit Report**:
   - Full audit of all 9 Sprint 4 backlog tickets (T1–T9), empirical evaluation findings, staging self-hosting readiness audit, and Sprint 5 recommendations compiled in [`docs/sprint4_report.md`](sprint4_report.md).
+  - Technical audit Q&A resolving all 13 critical verification inquiries from reviewers across 4 thematic groups with line-by-line codebase citations committed in [`docs/sprint4_audit_qa.md`](sprint4_audit_qa.md).
+  - Ground-truth reality check and authoritative Sprint 5 execution roadmap adopted in [`docs/ADR-006-sprint4-audit-and-sprint5-plan.md`](ADR-006-sprint4-audit-and-sprint5-plan.md) (PR #206), establishing mandatory empirical gating (S5-T1) before feature expansion, upgrading detector resolution to $416\times 416$ (S5-T3), centralizing blob storage for team web labeling (S5-T4), and hardening network resilience (S5-T6).
+
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
   - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).
