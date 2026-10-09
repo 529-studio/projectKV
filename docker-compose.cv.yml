@@ -1,0 +1,25 @@
+# Dedicated Docker Compose configuration for CV Engine on inference worker worker
+# Deployed via Portainer on Endpoint ID 4 (inference worker)
+
+services:
+  warded-cv-engine:
+    image: ${MODEL_IMAGE_NAME:-ghcr.io/529-studio/projectkv-model}:${MODEL_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
+    container_name: ${MODEL_CONTAINER_NAME:-warded-cv-engine}
+    restart: unless-stopped
+    pull_policy: always
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - MODEL_DIR=/app/models/yolov8n_openvino_320
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - /home/ubuntu/cv-engine/models:/app/models:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "${MODEL_CPU_LIMIT:-2.00}"
+          memory: "${MODEL_MEMORY_LIMIT:-2048M}"
+        reservations:
+          cpus: "${MODEL_CPU_RESERVATION:-1.00}"
+          memory: "${MODEL_MEMORY_RESERVATION:-512M}"

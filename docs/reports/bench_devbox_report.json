@@ -1,0 +1,139 @@
+{
+  "timestamp": "2026-10-09 04:11:30",
+  "hardware": {
+    "host_cpu": "AMD Ryzen 7 6800HS Creator Edition (8 vCPUs on VM)",
+    "vm_ram": "8 GB RAM",
+    "container_limits": {
+      "cpus": "2.00 vCPU",
+      "memory": "2048 MB (2 GB)"
+    }
+  },
+  "initial_container_stats": {
+    "cpu_percent": "0.02%",
+    "mem_usage": "72.64MiB / 2GiB",
+    "mem_percent": "3.55%"
+  },
+  "peak_load_container_stats": {
+    "cpu_percent": "200.08%",
+    "mem_usage": "86.35MiB / 2GiB",
+    "mem_percent": "4.22%"
+  },
+  "sequential_baseline_100_reqs": {
+    "total_requests": 100,
+    "successful_requests": 100,
+    "error_rate_pct": 0.0,
+    "http_latency": {
+      "p50_ms": 18.22,
+      "p90_ms": 79.27,
+      "p95_ms": 80.2,
+      "p99_ms": 81.18,
+      "min_ms": 14.33,
+      "max_ms": 81.18,
+      "avg_ms": 39.58
+    },
+    "model_pure_latency": {
+      "p50_ms": 16.17,
+      "p90_ms": 77.26,
+      "p95_ms": 78.31,
+      "p99_ms": 79.4,
+      "min_ms": 12.44,
+      "max_ms": 79.4,
+      "avg_ms": 35.73
+    }
+  },
+  "concurrency_sweep": {
+    "1": {
+      "concurrency": 1,
+      "total_requests": 190,
+      "successful_requests": 190,
+      "duration_sec": 8.01,
+      "throughput_rps": 23.72,
+      "p50_ms": 18.35,
+      "p90_ms": 79.99,
+      "p99_ms": 82.22,
+      "error_rate_pct": 0.0
+    },
+    "2": {
+      "concurrency": 2,
+      "total_requests": 194,
+      "successful_requests": 194,
+      "duration_sec": 8.08,
+      "throughput_rps": 24.01,
+      "p50_ms": 94.82,
+      "p90_ms": 99.41,
+      "p99_ms": 106.4,
+      "error_rate_pct": 0.0
+    },
+    "4": {
+      "concurrency": 4,
+      "total_requests": 190,
+      "successful_requests": 190,
+      "duration_sec": 8.1,
+      "throughput_rps": 23.45,
+      "p50_ms": 189.35,
+      "p90_ms": 204.58,
+      "p99_ms": 297.81,
+      "error_rate_pct": 0.0
+    },
+    "8": {
+      "concurrency": 8,
+      "total_requests": 195,
+      "successful_requests": 195,
+      "duration_sec": 8.3,
+      "throughput_rps": 23.49,
+      "p50_ms": 313.85,
+      "p90_ms": 421.96,
+      "p99_ms": 518.34,
+      "error_rate_pct": 0.0
+    },
+    "12": {
+      "concurrency": 12,
+      "total_requests": 198,
+      "successful_requests": 198,
+      "duration_sec": 8.49,
+      "throughput_rps": 23.32,
+      "p50_ms": 503.25,
+      "p90_ms": 614.67,
+      "p99_ms": 798.44,
+      "error_rate_pct": 0.0
+    },
+    "16": {
+      "concurrency": 16,
+      "total_requests": 196,
+      "successful_requests": 196,
+      "duration_sec": 8.6,
+      "throughput_rps": 22.8,
+      "p50_ms": 699.35,
+      "p90_ms": 883.1,
+      "p99_ms": 1708.61,
+      "error_rate_pct": 0.0
+    }
+  },
+  "endurance_memory_samples": {
+    "1": {
+      "cpu_percent": "0.02%",
+      "mem_usage": "83.99MiB / 2GiB",
+      "mem_percent": "4.10%"
+    },
+    "50": {
+      "cpu_percent": "0.01%",
+      "mem_usage": "84.23MiB / 2GiB",
+      "mem_percent": "4.11%"
+    },
+    "100": {
+      "cpu_percent": "0.02%",
+      "mem_usage": "84.27MiB / 2GiB",
+      "mem_percent": "4.11%"
+    },
+    "150": {
+      "cpu_percent": "0.02%",
+      "mem_usage": "84.24MiB / 2GiB",
+      "mem_percent": "4.11%"
+    },
+    "200": {
+      "cpu_percent": "0.02%",
+      "mem_usage": "83.73MiB / 2GiB",
+      "mem_percent": "4.09%"
+    }
+  }
+}
