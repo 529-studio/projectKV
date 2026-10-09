@@ -79,6 +79,13 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Full audit of all 9 Sprint 4 backlog tickets (T1–T9), empirical evaluation findings, staging self-hosting readiness audit, and Sprint 5 recommendations compiled in [`docs/sprint4_report.md`](sprint4_report.md).
   - Technical audit Q&A resolving all 13 critical verification inquiries from reviewers across 4 thematic groups with line-by-line codebase citations committed in [`docs/sprint4_audit_qa.md`](sprint4_audit_qa.md).
   - Ground-truth reality check and authoritative Sprint 5 execution roadmap adopted in [`docs/ADR-006-sprint4-audit-and-sprint5-plan.md`](ADR-006-sprint4-audit-and-sprint5-plan.md) (PR #206), establishing mandatory empirical gating (S5-T1) before feature expansion, upgrading detector resolution to $416\times 416$ (S5-T3), centralizing blob storage for team web labeling (S5-T4), and hardening network resilience (S5-T6).
+- **Sprint 5 Backlog & Execution Guide**:
+  - Four active GitHub issues created on `529-studio/projectKV`:
+    - [#207](https://github.com/529-studio/projectKV/issues/207): S5-T1 — `[tooling] re-run D6 benchmark and smoke test with post-T5 weights` (Hard Gate)
+    - [#208](https://github.com/529-studio/projectKV/issues/208): S5-T2 — `[cv-engine] object detection audit for false-positive/missed detections`
+    - [#209](https://github.com/529-studio/projectKV/issues/209): S5-T3 — `[go-server + web] decoupled hybrid flood pipeline`
+    - [#210](https://github.com/529-studio/projectKV/issues/210): S5-T4 — `[infra] physical Tailscale disconnection test for dev-box failover`
+  - Operational wave guide and `agy` CLI instructions compiled in [`docs/sprint5_execution_guide.md`](sprint5_execution_guide.md).
 
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
