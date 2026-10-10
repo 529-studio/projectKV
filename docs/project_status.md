@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **123 Pull Requests** processed across repository history:
-  - **114 Merged** to `dev` (including PR #206 docs/sprint4-report)
+- **Lifetime PR History**: Exactly **126 Pull Requests** processed across repository history:
+  - **116 Merged** to `dev` (including PR #206 `docs/sprint4-report` and PR #211 `tooling/s5-t1-rerun-d6-benchmark`)
   - **8 Closed** without merging
-  - **1 Open** PR pending: `tooling/s5-t1-rerun-d6-benchmark` targeting `dev`
+  - **2 Open** PRs pending: PR #212 (`feat/r2-storage-integration`) and PR #213 (`infra/s5-t4-tailscale-failover-drill`) targeting `dev`
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
