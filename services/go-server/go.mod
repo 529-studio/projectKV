@@ -9,6 +9,7 @@ require (
 	github.com/swaggo/swag v1.16.4
 	golang.org/x/sync v0.23.0
 	modernc.org/sqlite v1.59.0
+	nhooyr.io/websocket v1.8.17
 )
 
 require (
@@ -59,5 +60,4 @@ require (
 	modernc.org/libc v1.75.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	nhooyr.io/websocket v1.8.17 // indirect
 )
