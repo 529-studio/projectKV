@@ -17,6 +17,7 @@
   <a href="docs/ADR-001-flood-alert-architecture.md#adr-003-sprint-1-scope--live-updates-sse-hot-set-scoped-congestion-colors-phường-based-filter"><img src="https://img.shields.io/badge/SSE-Live_Stream-FFA500?logo=html5&logoColor=white" alt="SSE"></a>
   <a href="https://open-meteo.com/"><img src="https://img.shields.io/badge/Open--Meteo-Weather_API-FF8C00?logo=weatherdotcom&logoColor=white" alt="Open-Meteo"></a>
   <a href="https://www.rainviewer.com/api.html"><img src="https://img.shields.io/badge/RainViewer-Radar_API-0284C7?logo=radar&logoColor=white" alt="RainViewer"></a>
+  <a href="https://www.cloudflare.com/developer-platform/r2/"><img src="https://img.shields.io/badge/Cloudflare_R2-Object_Storage-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare R2"></a>
   <a href="https://python.org/"><img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Proprietary-yellow" alt="License"></a>
 </p>
@@ -68,22 +69,28 @@ hcm-traffic-cameras/
 │       └── package.json
 │
 ├── services/
-│   ├── go-server/                     # [BACKEND — Go] Single static binary (Gin + SQLite)
-│   │   ├── cmd/server/main.go         # Composition root, routing, graceful shutdown
+│   ├── go-server/                     # [BACKEND — Go] Single static binary (Gin + SQLite + R2 Storage)
+│   │   ├── cmd/
+│   │   │   ├── server/main.go         # Composition root, routing, graceful shutdown
+│   │   │   └── verify-r2/main.go      # Cloudflare R2 connectivity verification tool
 │   │   └── internal/
 │   │       ├── live/                  # Server-Sent Events (SSE) hub & live stream endpoint
 │   │       ├── camera/                # Camera catalog, Phường indexing, query endpoints
 │   │       ├── proxycache/            # Snapshot reverse-proxy + in-memory TTL cache
 │   │       ├── hotset/                # Hot Set Pool scheduler (see ADR-001 §2)
+│   │       ├── storage/               # Pluggable object storage (LocalStorage & Cloudflare R2)
+│   │       ├── archiver/              # Snapshot proof archiver with ICT (UTC+7) timezone standard
 │   │       ├── notify/                # Notification Adapter: Telegram / Zalo / WebPush / SMS
 │   │       ├── store/                 # SQLite (pure Go, no cgo) — subscriptions, dedupe, verdicts
 │   │       └── tilecache/             # Offline/local map tile proxy and caching
 │   │
-│   └── cv-engine/                     # [ML PLANE — Python] Model inference only
-│       ├── models/                    # YOLO / ONNX weights (Phase 2, self-hosted)
-│       └── api.py                     # Analysis endpoint called by the Go scheduler
+│   └── cv-engine/                     # [ML PLANE — Python] Model inference on inference worker worker
+│       ├── models/                    # YOLO / ONNX / OpenVINO IR FP16 weights
+│       └── api.py                     # Multi-threaded OpenVINO detection endpoint (:8000)
 │
 ├── tools/
+│   ├── storage/                       # [OBJECT STORAGE] Cloudflare R2 verification tooling
+│   │   └── verify_r2.py               # Boto3 / R2 connectivity verification script
 │   ├── geo-enrich/                    # [GEO ENRICHMENT] Batch Phường point-in-polygon tool
 │   │   ├── enrich.py                  # CLI enrichment script (Ray casting / Shapely)
 │   │   └── data/                      # GeoJSON boundary polygons
@@ -136,6 +143,16 @@ make crawl
 *   **Multi-Camera Corridor Tracking Dock**: Pin cameras into the bottom tracking dock with synchronized snapshot refresh.
 *   **Responsive Layout (100dvh)**: Desktop, tablet, and smartphone friendly with collapsible legend and mobile bottom-sheet drawer.
 *   **Go Backend**: Single static binary, no runtime dependency install, in-memory + SQLite state, goroutine-based Hot Set scheduler.
+*   **Cloudflare R2 Object Storage**: S3-compatible cloud storage (`warded-proofs`) for snapshot proofs, distributed via edge CDN (`https://file.529studio.site`) for centralized team labeling workflows.
+
+### Microservice Architecture & Host Topology
+
+| Service | Technology | Port | Host & Node Role | Primary Responsibilities |
+|---|---|:---:|---|---|
+| **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `edge host` (Portainer Endpoint 3) | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal corridor dock, bilingual UI (`vi` / `en`). |
+| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` (Portainer Endpoint 3) | Snapshot proxy cache (15s TTL), camera catalog, hotset scheduler (30s cycle), PCU Saturation Index, SSE stream, Cloudflare R2 storage integration. |
+| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n FP16 | `8000` | `inference worker` (Portainer Endpoint 4) | High-throughput vehicle detection (`POST /predict`), class counting (motorcycle, car, bus, truck), `GET /healthz` healthchecks (24 FPS, ~18.2ms latency). |
+| **Storage & Edge CDN** | Cloudflare R2, AWS Signature V4 | `443` | Cloudflare Edge (`file.529studio.site`) | S3-compatible snapshot proof repository (`warded-proofs`), Vietnam ICT (`UTC+7`) key hierarchy (`YYYY-MM-DD/<camera_id>/<unix_ts>_<reason>.jpg`). |
 
 ### Tech Stack & Core Libraries
 
@@ -143,9 +160,39 @@ make crawl
 |---|---|---|
 | **Frontend** | [![Next.js](https://img.shields.io/badge/Next.js-14.2+-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/) [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4+-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/) [![Framer Motion](https://img.shields.io/badge/Framer_Motion-11+-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion/) [![Leaflet](https://img.shields.io/badge/Leaflet-1.9+-199900?logo=leaflet&logoColor=white)](https://leafletjs.com/) | Next.js App Router, TypeScript, Tailwind CSS, Framer Motion animations, Leaflet interactive mapping |
 | **Backend** | [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![Gin](https://img.shields.io/badge/Gin-1.10+-008ECF?logo=go&logoColor=white)](https://gin-gonic.com/) [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/) [![SSE](https://img.shields.io/badge/SSE-Live_Stream-FFA500?logo=html5&logoColor=white)](docs/ADR-001-flood-alert-architecture.md#adr-003-sprint-1-scope--live-updates-sse-hot-set-scoped-congestion-colors-phường-based-filter) | Single static binary, Gin HTTP router, SQLite state persistence, in-memory TTL proxy caching, Server-Sent Events (SSE) live streaming |
-| **Computer Vision** | [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/) [![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/) | Python 3.11+, YOLO / ONNX model inference, pluggable traffic congestion and flood alert analyzers |
+| **Cloud Storage & CDN** | [![Cloudflare R2](https://img.shields.io/badge/Cloudflare_R2-Object_Storage-F38020?logo=cloudflare&logoColor=white)](https://www.cloudflare.com/developer-platform/r2/) [![AWS SDK v2](https://img.shields.io/badge/AWS_SDK_v2-Go-FF9900?logo=amazonwebservices&logoColor=white)](https://github.com/aws/aws-sdk-go-v2) | Cloudflare R2 S3-compatible object storage (`warded-proofs`), public edge delivery (`file.529studio.site`), centralized proof snapshots repository |
+| **Computer Vision** | [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/) [![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/) [![OpenVINO](https://img.shields.io/badge/Intel_OpenVINO-Runtime-0071C5?logo=intel&logoColor=white)](https://openvino.ai/) | Python 3.11+, OpenVINO IR YOLOv8n FP16 inference, pluggable traffic congestion and flood alert analyzers |
 | **Weather & Radar APIs** | [![Open-Meteo](https://img.shields.io/badge/Open--Meteo-Weather_API-FF8C00?logo=weatherdotcom&logoColor=white)](https://open-meteo.com/) [![RainViewer](https://img.shields.io/badge/RainViewer-Radar_API-0284C7?logo=radar&logoColor=white)](https://www.rainviewer.com/api.html) | Real-time weather, temperature, humidity, rainfall metrics (Open-Meteo) and live composite weather radar precipitation tiles (RainViewer) |
 | **DevOps & Tooling** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-Proprietary-yellow)](LICENSE) [![Geo-Enrich](https://img.shields.io/badge/Geo--Enrich-Point--in--Polygon-708090?logo=python&logoColor=white)](tools/geo-enrich) | GitHub Actions CI/CD workflows, golangci-lint, ESLint, unified Makefile, batch Phường point-in-polygon enrichment |
+
+### Configuration Reference
+
+#### Backend Service (`services/go-server`)
+
+| Variable | Default Value | Description |
+|---|---|---|
+| `PORT` | `3000` | HTTP service port |
+| `STORAGE_DRIVER` | `local` | Storage driver (`local` for disk or `r2` / `s3` for Cloudflare R2) |
+| `STORAGE_LOCAL_ROOT` | `./data/proofs` | Root directory for local snapshot archiving |
+| `R2_ACCOUNT_ID` | `REDACTED_R2_ACCOUNT_ID` | Cloudflare Account Identifier |
+| `R2_ENDPOINT` | `https://<account_id>.r2.cloudflarestorage.com` | Base S3 API endpoint for Cloudflare R2 |
+| `R2_BUCKET_NAME` | `warded-proofs` | Object storage bucket name |
+| `R2_REGION` | `auto` | R2 signing region |
+| `R2_PUBLIC_URL` | `https://file.529studio.site` | Cloudflare Edge CDN custom domain |
+| `CV_ENGINE_URL` | `http://localhost:8000` | URL of self-hosted CV inference worker |
+| `ANALYZER` | `none` | Traffic analyzer (`none`, `mock`, `vlm`, `onnx`) |
+| `SNAPSHOT_UPSTREAM_BASE_URL` | *(required)* | DOT upstream image snapshot endpoint |
+
+#### CV Model Service (`services/cv-engine`)
+
+| Parameter | Configuration | Description |
+|---|---|---|
+| **Host Worker** | `inference worker` (Portainer Endpoint 4) | Dedicated multi-core host with Tailscale mesh networking |
+| **Model Runtime** | Intel OpenVINO 2024.4 IR | Optimized FP16 vehicle detection engine (~6.3 MB) |
+| **Input Resolution** | 320x320 (scaling to 416x416 in Sprint 5) | Low-latency inference geometry (~18.2ms P50 latency) |
+| **Resource Caps** | 2 vCPU / 2 GB RAM | Resource limits configured via Docker Compose stack |
+| **API Endpoints** | `POST /predict`, `GET /healthz` | Prediction endpoint accepting JPEG bytes and returning vehicle counts |
+
 
 ## 4. Next Evolution Steps
 
@@ -168,19 +215,58 @@ Hệ thống được tổ chức theo mô hình monorepo, tách biệt Web Clie
 - Khởi chạy toàn bộ: `make dev-all`
 - Truy cập trình duyệt: `http://localhost:3000` (Backend + Web) hoặc `http://localhost:3001` (Frontend Dev).
 
+## Hạ tầng & Phân bổ Microservices
+
+| Dịch vụ | Công nghệ | Cổng | Node & Máy chủ | Vai trò chính |
+|---|---|:---:|---|---|
+| **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `edge host` (Portainer Endpoint 3) | Trực quan hóa bản đồ, điểm tròn camera, H3 hex overlay, dock ghim camera, giao diện song ngữ (`vi` / `en`). |
+| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` (Portainer Endpoint 3) | Proxy cache snapshot (15s TTL), điều phối Hot Set (chu kỳ 30s), tính chỉ số bão hòa PCU, luồng SSE, tích hợp lưu trữ Cloudflare R2. |
+| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n FP16 | `8000` | `inference worker` (Portainer Endpoint 4) | Nhận diện phương tiện thông lượng cao (`POST /predict`), phân loại đếm xe, kiểm tra sức khỏe `GET /healthz` (24 FPS, ~18.2ms latency). |
+| **Lưu trữ & Edge CDN** | Cloudflare R2, AWS Signature V4 | `443` | Cloudflare Edge (`file.529studio.site`) | Lưu trữ ảnh chụp bằng chứng giao thông (`warded-proofs`), phân cấp ngày theo giờ Việt Nam ICT (`UTC+7`, `YYYY-MM-DD/<camera_id>/<unix_ts>_<reason>.jpg`). |
+
 ## Công nghệ cốt lõi (Tech Stack)
 
 | Phân tầng | Công nghệ & Huy hiệu | Vai trò |
 |---|---|---|
 | **Frontend** | [![Next.js](https://img.shields.io/badge/Next.js-14.2+-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/) [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4+-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/) [![Framer Motion](https://img.shields.io/badge/Framer_Motion-11+-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion/) [![Leaflet](https://img.shields.io/badge/Leaflet-1.9+-199900?logo=leaflet&logoColor=white)](https://leafletjs.com/) | Next.js App Router, TypeScript, Tailwind CSS, animation Framer Motion, bản đồ tương tác Leaflet |
 | **Backend** | [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![Gin](https://img.shields.io/badge/Gin-1.10+-008ECF?logo=go&logoColor=white)](https://gin-gonic.com/) [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/) [![SSE](https://img.shields.io/badge/SSE-Live_Stream-FFA500?logo=html5&logoColor=white)](docs/ADR-001-flood-alert-architecture.md#adr-003-sprint-1-scope--live-updates-sse-hot-set-scoped-congestion-colors-phường-based-filter) | Single static binary (Go), Gin router, lưu trữ SQLite, in-memory TTL cache, phát luồng Server-Sent Events (SSE) trực tiếp |
-| **Thị giác máy tính** | [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/) [![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/) | Python 3.11+, suy luận mô hình YOLO / ONNX, phân tích kẹt xe và ngập úng |
+| **Lưu trữ đám mây & CDN** | [![Cloudflare R2](https://img.shields.io/badge/Cloudflare_R2-Object_Storage-F38020?logo=cloudflare&logoColor=white)](https://www.cloudflare.com/developer-platform/r2/) [![AWS SDK v2](https://img.shields.io/badge/AWS_SDK_v2-Go-FF9900?logo=amazonwebservices&logoColor=white)](https://github.com/aws/aws-sdk-go-v2) | Lưu trữ ảnh bằng chứng trên Cloudflare R2 (`warded-proofs`), phân phối qua Edge CDN (`file.529studio.site`), phục vụ dán nhãn tập trung cho toàn đội ngũ |
+| **Thị giác máy tính** | [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/) [![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/) [![OpenVINO](https://img.shields.io/badge/Intel_OpenVINO-Runtime-0071C5?logo=intel&logoColor=white)](https://openvino.ai/) | Python 3.11+, suy luận mô hình OpenVINO IR YOLOv8n FP16, phân tích kẹt xe và ngập úng |
 | **Dịch vụ Thời tiết & Radar** | [![Open-Meteo](https://img.shields.io/badge/Open--Meteo-Weather_API-FF8C00?logo=weatherdotcom&logoColor=white)](https://open-meteo.com/) [![RainViewer](https://img.shields.io/badge/RainViewer-Radar_API-0284C7?logo=radar&logoColor=white)](https://www.rainviewer.com/api.html) | Dữ liệu khí tượng, nhiệt độ, lượng mưa thời gian thực (Open-Meteo) và tile ảnh radar phản hồi mưa trực tiếp (RainViewer) |
 | **DevOps & Công cụ** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-Proprietary-yellow)](LICENSE) [![Geo-Enrich](https://img.shields.io/badge/Geo--Enrich-Point--in--Polygon-708090?logo=python&logoColor=white)](tools/geo-enrich) | CI/CD GitHub Actions, golangci-lint, ESLint, Makefile điều phối tập trung, công cụ gán Phường point-in-polygon |
+
+### Bảng Thông Số Cấu Hình Dịch Vụ
+
+#### Dịch vụ Backend (`services/go-server`)
+
+| Biến môi trường | Giá trị mặc định | Diễn giải |
+|---|---|---|
+| `PORT` | `3000` | Cổng dịch vụ HTTP |
+| `STORAGE_DRIVER` | `local` | Trình điều khiển lưu trữ (`local` cho ổ cứng máy chủ hoặc `r2` / `s3` cho Cloudflare R2) |
+| `STORAGE_LOCAL_ROOT` | `./data/proofs` | Thư mục lưu trữ bằng chứng cục bộ khi dùng driver `local` |
+| `R2_ACCOUNT_ID` | `REDACTED_R2_ACCOUNT_ID` | Định danh tài khoản Cloudflare |
+| `R2_ENDPOINT` | `https://<account_id>.r2.cloudflarestorage.com` | Base endpoint chuẩn S3 REST API cho Cloudflare R2 |
+| `R2_BUCKET_NAME` | `warded-proofs` | Tên bucket lưu trữ đối tượng ảnh |
+| `R2_REGION` | `auto` | Vùng ký xác thực AWS Signature V4 của R2 |
+| `R2_PUBLIC_URL` | `https://file.529studio.site` | Tên miền phân phối tĩnh Cloudflare Edge CDN |
+| `CV_ENGINE_URL` | `http://localhost:8000` | Địa chỉ mạng kết nối tới máy chủ suy luận mô hình CV |
+| `ANALYZER` | `none` | Trình phân tích giao thông (`none`, `mock`, `vlm`, `onnx`) |
+| `SNAPSHOT_UPSTREAM_BASE_URL` | *(bắt buộc)* | Cổng snapshot camera giao thông Sở GTVT TP.HCM |
+
+#### Dịch vụ Suy Luận Mô Hình (`services/cv-engine`)
+
+| Thông số | Giá trị triển khai | Diễn giải |
+|---|---|---|
+| **Máy chủ Host** | `inference worker` (Portainer Endpoint 4) | Máy chủ phần cứng độc lập, kết nối mạng nội bộ an toàn qua Tailscale mesh |
+| **Engine thực thi** | Intel OpenVINO 2024.4 IR | Runtime tối ưu hóa FP16 suy luận trên CPU cho kiến trúc YOLOv8n (~6.3 MB) |
+| **Kích thước ảnh** | 320x320 (nâng cấp lên 416x416 ở Sprint 5) | Cân bằng giữa độ trễ cực thấp (~18.2ms P50) và khả năng nhận diện xe máy |
+| **Giới hạn tài nguyên** | 2 vCPU / 2 GB RAM | Mức trần tài nguyên cấu hình qua Docker Compose stack |
+| **Endpoint API** | `POST /predict`, `GET /healthz` | Nhận ảnh JPEG nhị phân, phản hồi danh sách xe đếm được và nhịp tim sức khỏe |
 
 ## Tài liệu kiến trúc chuyên sâu
 - [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md) — thiết kế caching & roadmap CV gốc.
 - [`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md) — đánh giá khả thi cảnh báo ngập lụt, lựa chọn kênh thông báo (Telegram/Zalo/Web Push/SMS), và quyết định chuyển backend sang Go (ADR-002).
 
 ## Vì sao chuyển sang Go?
-Không phải vì lưu lượng hiện tại đã vượt ngưỡng (chưa vượt), mà vì các thành phần mới cần xây (Hot Set Scheduler, Notification Adapter, state store) hợp với goroutine/channel hơn, và rủi ro viết mới bằng Go thấp hơn nhiều so với việc viết lại `server.js` đang chạy ổn. Phần suy luận mô hình CV (YOLO/ONNX, xử lý ảnh nặng) vẫn giữ ở Python vì hệ sinh thái thư viện tốt hơn hẳn.
+Không phải vì lưu lượng hiện tại đã vượt ngưỡng (chưa vượt), mà vì các thành phần mới cần xây (Hot Set Scheduler, Notification Adapter, state store, R2 object storage) hợp với goroutine/channel hơn, và rủi ro viết mới bằng Go thấp hơn nhiều so với việc viết lại `server.js` đang chạy ổn. Phần suy luận mô hình CV (YOLO/ONNX/OpenVINO, xử lý ảnh nặng) được đưa lên node phần cứng `inference worker` riêng biệt để bảo toàn CPU cho máy chủ web và backend.
+
