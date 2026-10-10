@@ -155,3 +155,4 @@ cd apps/web && npm test  # Web client unit test suite (92 tests)
 5. **Git Flow**: Zero direct push to `main` or `dev`. Always branch (`feat/*`, `fix/*`, `docs/*`), push, and open PR against `dev`. AI agents must NEVER auto-merge PRs.
 6. **Zero-Emoji Compliance**: No Unicode emojis in UI controls, chips, modal headers, notifications, or backend Go log messages. Use monochromatic SVGs and uppercase structured log prefixes (`[INIT]`, `[INFO]`, `[WARN]`, `[ERROR]`, `[FATAL]`).
 7. **Documentation Synchronization**: Whenever a PR is created or merged, update `docs/project_status.md` and `docs/lesson_learn.md`.
+8. **Zero Hardcoded Secrets**: Never hardcode credentials, tokens, or API keys in code or scripts. All secrets must be resolved dynamically from `.env`. Fallback parameters in `os.getenv` or configuration loaders must strictly be `""` (empty string) with fail-fast validation. Documentation templates must strictly use `<placeholder>` syntax.
