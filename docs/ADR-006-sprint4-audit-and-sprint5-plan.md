@@ -1,163 +1,105 @@
-# ADR-006: Sprint 4 Reality-Check Audit & Sprint 5 Plan (The Ground-Truth Reckoning)
+# ADR-006: Sprint 5 Plan — Closing the T9 Empirical Gap
 
-**Status**: Proposed  
-**Date**: 2026-10-10  
-**Authors**: Warded Architecture Team & System Reviewers (Claude / Antigravity)  
-**Related**: 
-- [ADR-004](ADR-004-route-check-and-snapshot-archive.md) (Accuracy Gate §D6, Storage Interface §D7, Standby Guard Finding 1)
-- [ADR-005](ADR-005-sprint3-audit-and-sprint4-plan.md) (Sprint 3 Production Audit & Sprint 4 Plan)
-- [`docs/sprint4_report.md`](sprint4_report.md) (Sprint 4 Completion & Verification Audit)
-- [`docs/sprint4_audit_qa.md`](sprint4_audit_qa.md) (Sprint 4 Technical Audit & Ground-Truth Verification Q&A)
-- [`docs/reports/eval_report_d6_real.md`](reports/eval_report_d6_real.md) (T4 Benchmark: Macro F1 = 0.209, Flood FNR = 100%)
-- [`docs/reports/smoke_eval_d6_real.md`](reports/smoke_eval_d6_real.md) (T7 Smoke Test: 2/10 Pass Rate = 20.0%)
-- [`docs/pcu-calibration-report.md`](pcu-calibration-report.md) (T5 Parameter Realignment)
-- [`docs/decision-openvino-vs-vlm.md`](decision-openvino-vs-vlm.md) (T9 Decision: Decoupled Hybrid Architecture)
+**Status**: Proposed
+**Date**: 2026-10-10
+**Related**: ADR-004 (D6 accuracy gate, D7 storage trigger), ADR-005 (Sprint 3/4 audit), `docs/sprint4_audit_qa.md` (source of findings below)
 
----
+## 1. Context
 
-## 1. Context & Executive Summary
+Sprint 4 closed all 9 backlog items (T1-T9) and additionally shipped an
+unplanned infrastructure migration (CV inference moved from `local-homesrv`
+to a new worker, `dev-box`). A follow-up audit (`sprint4_audit_qa.md`)
+found that T9's "keep self-hosted OpenVINO" decision was reached from a
+theoretical diagnosis (uncalibrated `CapacityFloor`) that was never
+re-verified empirically after the fix (T5) was applied — violating the
+project's own stated rule that unit tests are not acceptable proof of
+correctness. Further analysis of the pre-T5 smoke-test data shows the T5
+fix may actively worsen one of the two failure modes it was meant to solve.
+This ADR scopes Sprint 5 to close that gap before any further feature work.
 
-Sprint 4 successfully accomplished its primary mission of **closing the physical reporting gap**:
-1. Synthetic mock frames (73,214 files of 107-byte placeholders) were completely eliminated from evaluation pipelines.
-2. The archiver was decoupled from coincidental viewer cache hits (Gate T2b / PR #185), unlocking authentic frame accumulation at **733+ real frames/hour**.
-3. Real ground-truth datasets were gathered during the severe HCMC rainstorm of 2026-10-08: **764 real labeled frames** across 206 cameras, including **120 flood-positive frames** (exceeding ADR-004 §D6 quotas by 254%).
-4. The first real D6 accuracy evaluation was executed (T4), and PCU parameters were calibrated against Vietnamese transport standards (T5 / PR #202).
-5. OpenVINO was retained as the continuous traffic telemetry foundation, supported by a dedicated worker node (`dev-box` AMD Ryzen 7 6800HS) achieving **24.01 FPS** (T9 / PR #205).
+## 2. Key Finding — T5's calibration may worsen false-positive congestion
 
-However, a rigorous technical audit conducted between the engineering team and system evaluation agents (Claude / Antigravity) revealed **three critical structural flaws and two operational blind spots** in Sprint 4's closing decisions. ADR-006 records these audit findings and defines the strict, evidence-first execution roadmap for Sprint 5.
+$SI = PCU_{current} / CapacityFloor$. Lowering `CapacityFloor` from 25.0 to
+15.0 multiplies every unchanged $SI$ by $25/15 \approx 1.67\times$. Applied to
+the 3 non-zero false-positive `CLEAR` cameras from the pre-T5 smoke test
+(reported $SI$ = 0.70, 0.51, 0.84), the post-T5 values would be approximately
+**1.17, 0.85, 1.40** — moving them from over-reporting `MODERATE`/`HEAVY` to
+over-reporting `CONGESTED`, strictly worse. The 2 zero-detection
+`CONGESTED` failures ($SI = 0.00$) are unaffected by any floor/weight change,
+since $0 / x = 0$ regardless — that failure mode is in the detection layer,
+not the scoring formula. **Real re-measurement (S5-T1) is the only way to
+know the actual post-T5 state; do not assume T5 was net-positive.**
 
----
+## 3. Sprint 5 Decision
 
-## 2. Audit Findings & Reality-Check Discoveries
+No new feature work starts before S5-T1 produces real, current numbers.
+Everything else in this backlog is sequenced around that result.
 
-### Finding 1 — The T9 Decision Premise Gap: T4 Was Never Re-Measured Post-T5 Calibration
-- **The Incident**: In Sprint 4 T4 ([Issue #195](https://github.com/529-studio/projectKV/issues/195)), the real D6 benchmark produced a **Macro F1 of 0.209** (nominal target $\ge 0.70$). T5 ([Issue #196](https://github.com/529-studio/projectKV/issues/196)) diagnosed this as an uncalibrated `CapacityFloor = 25.0` and unweighted motorcycle coefficients, adjusting them to `CapacityFloor = 15.0`, `Motorcycle = 0.30`, and `Bus = 2.50`.
-- **The Flaw**: Following PR #202 (T5), the team verified PCU calculation logic purely through mock unit tests (`services/go-server/internal/cvclient/pcu_test.go`). **The benchmark (`tools/eval/benchmark.py`) was NEVER re-run against the 764 labeled real frames.**
-- **The Violation**: T9 formally concluded to retain OpenVINO based on the assumption that T5 resolved the traffic classification issue. Deciding an architecture based on unmeasured parameter calibration violates the project's core rule: *"Unit tests passing in isolation is never acceptable proof of correctness."*
+## 3a. S5-T1 — Closed (2026-10-10), confirms the predicted regression
 
----
+Real re-run on the frozen 764-frame set (controlled, same images both times):
+Macro F1 0.209 → 0.206, Weighted F1 0.364 → 0.351 — flat to slightly worse,
+not improved. CLEAR frames misclassified as CONGESTED rose from 22 to 46
+(+109%), matching the §2 math prediction almost exactly. Flood FNR unchanged
+at 100% (expected — COCO has no flood class, T5 cannot touch this).
+**Confirms: parameter calibration alone does not fix the underlying detector
+problem — S5-T2 is the real next step, not optional.**
 
-### Finding 2 — The Mathematical Paradox of T5: Lowering Capacity Floor Exacerbates False Positives
-- **The Discovery**: A granular breakdown of the 2/10 (20.0%) smoke-test result in [`docs/reports/smoke_eval_d6_real.md`](reports/smoke_eval_d6_real.md) exposed an alarming mathematical contradiction:
-  - **4 out of 5 expected `CLEAR` cameras failed by falsely detecting congestion**:
-    - `Mai Chí Thọ - Nguyễn Cơ Thạch 1`: Expected CLEAR $\rightarrow$ Actual **HEAVY** ($SI = 0.70$)
-    - `Mai Chí Thọ - Tố Hữu`: Expected CLEAR $\rightarrow$ Actual **MODERATE** ($SI = 0.51$)
-    - `Võ Văn Kiệt - Ký Con`: Expected CLEAR $\rightarrow$ Actual **HEAVY** ($SI = 0.84$)
-    - `Điện Biên Phủ - Pasteur`: Expected CLEAR $\rightarrow$ Actual **CONGESTED** ($SI = 1.00$)
-  - **4 out of 5 expected `CONGESTED` cameras failed by missing congestion entirely**:
-    - `Cộng Hòa - Trường Chinh`: Expected CONGESTED $\rightarrow$ Actual **CLEAR** ($SI = 0.00$, zero vehicles detected)
-    - `Mai Chí Thọ - Đồng Văn Cống 2`: Expected CONGESTED $\rightarrow$ Actual **CLEAR** ($SI = 0.00$, zero vehicles detected)
-    - `Điện Biên Phủ - CMT8`: Expected CONGESTED $\rightarrow$ Actual **CLEAR** ($SI = 0.32$)
-    - `Cộng Hòa - Tân Kỳ Tân Quý`: Expected CONGESTED $\rightarrow$ Actual **MODERATE** ($SI = 0.40$)
-- **The Mathematical Reality**:
-  The Saturation Index formula is:
-  $$SI = \frac{PCU_{\text{current}}}{CapacityFloor}$$
-  By lowering `CapacityFloor` from $25.0$ down to $15.0$, every calculated Saturation Index is multiplied by $\frac{25}{15} \approx 1.67\times$.
-  - For the 4 CLEAR cameras that already produced high vehicle counts ($SI = 0.51, 0.70, 0.84, 1.00$), the new SIs become **$0.85, 1.17, 1.40, 1.67$**. Instead of fixing the error, **T5 escalates false-positive congestion into gridlock errors!**
-  - For the 2 CONGESTED cameras with $SI = 0.00$, no capacity floor adjustment can help: $\frac{0.00}{15.0} = 0.00$.
-- **The Root Cause**: The primary problem is **not a scoring formula defect**; it is rooted in the **object detection perception layer**:
-  1. *Vehicle Hallucination / Background False Positives*: Distant headlights, road markings, or roadside structures are falsely counted as vehicles during off-peak hours.
-  2. *Severe Congestion Occlusion*: In dense bumper-to-bumper queues, the model fails to detect overlapping vehicles, reporting zero or near-zero counts.
-  3. *Sampling Window Skew*: Smoke testing was executed at 20:19 (nighttime), violating the designated off-peak (13:00–15:00) and peak (17:00–18:30) validation windows.
+**Methodology flag on the smoke-test figure**: the reported smoke-test
+improvement (20% → 50% pass rate) is not fully trusted as a measurement of
+T5's effect. One camera (`66b1c426...`, Điện Biên Phủ) flipped from `SI=1.00
+PASS` to `SI=0.00 FAIL` between runs — a floor-value change (×1.67 multiplier
+on a nonzero SI) cannot produce an exact zero, so this delta must come from a
+different vehicle count between the two runs, not from the T5 parameter
+change itself. This suggests `verify_smoke_set.py` may re-fetch a live
+current snapshot each run rather than reusing a fixed reference image,
+making before/after smoke-test comparisons methodologically invalid (it
+conflates the calibration effect with real-world traffic differing between
+the two test moments). **Trust the 764-frame controlled result (flat/worse),
+not the smoke-test delta, as the basis for S5-T2.** Fix the smoke-test
+harness to use frozen reference images for any future before/after
+comparison — fold into S5-T2's scope.
 
----
+## 3b. Blob storage — accepted for Sprint 5, for a different reason than D7
 
-### Finding 3 — Documentation Discrepancies: Fictitious Flood Chokepoints & Rain Threshold Divergence
-- **The Discrepancies**:
-  1. *Fictitious 10 Flood Chokepoints*: `docs/decision-openvino-vs-vlm.md` repeatedly references "10 known flood chokepoints" to justify daily VLM API quota calculations ($10\text{ cams} \times \text{calls} < 500\text{ RPD}$). Audit confirms **no list or fixture of 10 flood chokepoints exists in the repository**. The author conflated the 10 traffic smoke-test cameras with hypothetical flood points.
-  2. *Rainfall Threshold Divergence*: The decision document specifies triggering VLM flood audits when precipitation exceeds $\ge 2.0\text{ mm/h}$. However, actual frontend code (`apps/web/src/utils/rainHexUtils.ts`) uses discrete thresholds: $1.0\text{ mm}$ (wet), $4.0\text{ mm}$ (moderate), and $15.0\text{ mm}$ (deep), while meteorological standards define moderate rain at $\ge 2.5\text{ mm/h}$. Furthermore, urban flooding in HCMC is dictated by 30–60 minute cumulative downpours ($\ge 30–50\text{ mm}$) and tidal river crests, not instantaneous hourly rates.
+The ADR-004 §D7 disk-volume trigger (>1M files / >200GB) has **not** been
+hit — real daily volume remains small (tens of files/day as of 2026-10-09).
+That specific justification still does not apply, and this document's
+earlier position on it was correct as stated.
 
----
+A **different, independent justification** was given and is accepted:
+centralizing snapshot storage enables **collaborative labeling** — currently
+each developer must copy frames to their own machine's
+`services/go-server/data/proofs/` to use `labeler.html`, with no shared
+ground-truth source. A team-accessible web labeler reading directly from
+object storage solves a real coordination problem, unrelated to disk
+pressure. **This is now S5-T4 (promoted from an open question to a real
+ticket), justified by this reason — not because the D7 threshold was met.**
 
-### Finding 4 — Infrastructure Trade-offs: `dev-box` Network Dependency & Operational Reality
-- **The Audit**:
-  - The offloading of CV inference to worker host `dev-box` (AMD Ryzen 7 6800HS, 8 vCPU, 8 GB RAM) via Tailscale (PR #203) delivered massive throughput gains (**24.01 FPS vs 2.27 FPS**, P50 dropped from 425ms to 18ms).
-  - *Trade-off*: Colocated inference on `homesrv` had 0ms network latency and zero external dependency. `dev-box` introduces a **Network Single-Point-of-Failure (VPN SPOF)**. If the Tailscale mesh or residential internet fails, traffic telemetry drops.
-  - *Code vs. Practice*: Go backend code implements graceful fallback (`callCtx` 10s timeout $\rightarrow$ `Verdict.SeverityUnknown` $\rightarrow$ `Source: "fallback"` $\rightarrow$ `CircuitBreaker`). However, **this failure mode has never been physically chaos-tested on live staging**.
-  - *Hardware Class*: `dev-box` is an isolated KVM hypervisor on a personal workstation/mini-PC APU, not an enterprise cloud instance with 99.99% uptime guarantees.
+**Mandatory first step, non-negotiable**: the R2 credentials shared in the
+integration guide were plaintext in a markdown document, not a `.env`
+template with placeholders. Treat them as compromised — rotate the Access
+Key/Secret in the Cloudflare R2 dashboard before any other S5-T4 work, and
+ensure the committed guide in `docs/` contains only the variable names and
+structure, never real key values. This is independent of and prerequisite to
+the rest of S5-T4.
 
----
+## 4. Sprint 5 Backlog
 
-### Finding 5 — Storage Evolution: Centralized Blob Storage (`file.529studio.site`) as Team Dataset Hub
-- **The Audit & Rationale**:
-  - In ADR-004 §D7, transitioning from local edge disk to remote blob storage was originally planned only when disk storage exceeded $>200\text{ GB}$ or $>1\text{M}$ files. Reviewers questioned whether introducing blob storage in Sprint 5 violates this deferral threshold given current low disk utilization.
-  - However, the team has already successfully self-hosted and verified the S3-compatible blob storage infrastructure: **Dufs File Storage at `https://file.529studio.site`** (protected by Cloudflare Access), actively accumulating daily proof partitions (`2026-10-06` to `2026-10-09`).
-  - *Strategic Paradigm Shift (Team Collaboration Over Pure Disk Savings)*: Offloading frames to blob storage is **not merely an emergency disk-saving tactic**—it removes the single biggest operational bottleneck in the model improvement cycle:
-    1. Currently, labeling frames via `tools/eval/labeler.html` requires each developer or annotator to manually rsync gigabytes of JPEGs into their local `services/go-server/data/proofs/` directory. Annotations and proofs become fragmented across developer machines.
-    2. By streaming all snapshots directly to `https://file.529studio.site`, the team can deploy a centralized, lightweight web labeling app / HTML viewer connected directly to the blob storage API.
-    3. The entire team can collaboratively sample, inspect, and label ground truth frames remotely from any browser, generating a single, unified, version-controlled ground-truth dataset for continuous model evaluation and benchmarking.
+| # | Title | Depends on | Est. | Notes |
+|---|---|---|---:|---|
+| **S5-T1** | Re-run `benchmark.py` (D6) and `verify_smoke_set.py` against the 764 labeled frames with current (post-T5) PCU weights; publish updated `eval_report_d6_real.md` and `smoke_eval_d6_real.md` | None | **0.5 day** | Execution only, no new code. Blocking everything else below. |
+| **S5-T2** | Object-detection audit: investigate false-positive vehicle hallucination (background/night reflections) and missed detections on occluded queues, using S5-T1's fresh per-camera breakdown | S5-T1 | **1-2 days** | Scope narrows based on what S5-T1 actually shows — don't pre-commit to a fix before seeing the new numbers. |
+| **S5-T3** | Decoupled Hybrid Flood pipeline: event-driven VLM dispatch on rain-radar trigger + on-demand dispatch on camera-modal click; curate a real `flood_chokepoint_cameras.json` from authentic municipal flood data (replacing the fabricated "10 chokepoints" reference); correct the rainfall-threshold mismatch between `decision-openvino-vs-vlm.md` (2.0mm/h, unverified) and the actual code thresholds (`rainHexUtils.ts`: 1.0/4.0/15.0mm) — pick one, document the real basis or mark it explicitly as a heuristic pending calibration | None (independent of T1/T2), but hold start until S5-T1 lands per project discipline | **2-3 days** | This is real feature work — the first since Sprint 2's H0 hotfix era. Scope it carefully; do not let it expand informally the way `dev-box` did in Sprint 4. |
+| **S5-T4** | Physical disconnection test: `tailscale down` on `dev-box` against live staging, confirm graceful degrade-to-`unknown` end-to-end (not just unit-tested); verify or fix the `profiles: ["model-local"]` fallback mentioned in the Sprint 4 audit but not confirmed working | None | **1 day** | Closes the one gap Q6/Q7 explicitly flagged as untested. |
+| **S5-T4** | Cloudflare R2 (S3-compatible) blob storage: upload archiver frames to `warded-proofs`; build a minimal shared web labeler reading from R2 so the team labels from one common source instead of per-machine local copies | None technically, but rotate R2 credentials FIRST (see §3b) before any other work | **1.5-2 days** | Justified by collaborative-labeling need (§3b), not the D7 disk-volume trigger, which has not been hit — note this distinction in the ticket itself so it isn't misread later as "D7 threshold reached." |
 
----
+## 5. Documentation corrections to make alongside S5-T3
 
-## 3. Sprint 5 Core Principles
-
-1. **Gate S5-T1 Blocks Everything**: Zero new feature implementation until the real D6 benchmark (T4) and smoke test (T7) are physically executed with calibrated PCU parameters on the 764 real frames.
-2. **Sound Perception Over Parameter Hacking**: Do not attempt to mask object detector failures by repeatedly hacking capacity floors. Solve the root perception cause: scale model resolution to $416 \times 416$ to resolve distant motorcycle clusters.
-3. **Decoupled Multimodal Integrity**: Implement the Option (c) Decoupled Hybrid Flood Analyzer with authentic HCMC municipal flood chokepoints (`flood_chokepoints.json`) and verified cumulative rain triggers.
-4. **Centralized Data Hub**: Implement `storage.BlobStorage` for `file.529studio.site` to unlock centralized, collaborative team-wide labeling and audit access.
-5. **Chaos-Tested Resilience**: Perform physical network partition drills on Staging (killing Tailscale on `dev-box`) to verify that the frontend and backend degrade gracefully without hangs.
-
----
-
-## 4. Sprint 5 Backlog & Execution Sequence
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                SPRINT 5 EXECUTION WAVES                                │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-
-  [WAVE 0: HARD GATE]
-  S5-T1: Re-run Real D6 Benchmark & Smoke Test with Calibrated PCU (The Reckoning)
-         │
-         ▼
-  [WAVE 1: PERCEPTION & DATASET FOUNDATIONS]
-  S5-T2: Deep Object Detection Error Audit (Hallucination vs Occlusion Analysis)
-  S5-T3: Upgrade Model Resolution to 416x416 OpenVINO IR on dev-box
-  S5-T4: Centralized Blob Storage Driver (file.529studio.site) & Shared Web Labeler
-         │
-         ▼
-  [WAVE 2: HYBRID MULTIMODAL & RESILIENCE]
-  S5-T5: Decoupled Hybrid Flood Pipeline with Curated Flood Chokepoints
-  S5-T6: Tailscale Network Partition Chaos Test & Staging ANALYZER=onnx Default
-         │
-         ▼
-  [WAVE 3: EXPLORATORY ROUTE ENGINE (GATED)]
-  S5-T7: Zero-Click Route Condition Explorer Spike (route.Engine Interface)
-```
-
-### Detailed Ticket Breakdown
-
-| # | Ticket Title | Scope & Technical Implementation | Dependencies | Est. (Active) | Delivery Gate / Verification |
-|---|---|---|---|:---:|---|
-| **S5-T1** | **Re-run Real D6 Benchmark & Smoke Test with Calibrated PCU** | Execute `python3 tools/eval/benchmark.py --analyzer cv-engine` against all 764 real frames using calibrated PCU defaults (`CapacityFloor=15.0`, `Motorcycle=0.30`, `Bus=2.50`). Re-run `tools/eval/verify_smoke_set.py` within proper time windows. Commit `docs/reports/eval_report_d6_post_calibration.md` and `docs/reports/smoke_eval_post_calibration.md`. | None (**Hard Gate**) | **0.5 day** | **MANDATORY GATE**: Report real Macro F1 and Smoke Pass Rate. Blocks S5-T5 and S5-T7. |
-| **S5-T2** | **Deep Object Detection Error Audit (CLEAR Hallucination vs CONGESTION Blindness)** | Analyze why 4/5 CLEAR cameras produced high vehicle counts in smoke testing. Inspect raw bounding boxes to determine if false detections stem from pavement markings, streetlights, or time-of-day mismatch. Analyze why CONGESTED cameras produced 0 vehicles. Document findings in `docs/reports/cv_detection_error_audit.md`. | S5-T1 | **0.5–1 day** | Root-cause diagnosis with visual bounding-box evidence across the 8 failed smoke cameras. |
-| **S5-T3** | **Upgrade Model Resolution to 416x416 OpenVINO IR on `dev-box`** | Export stock YOLOv8n to OpenVINO IR FP16 at $416 \times 416$ resolution. Deploy to `dev-box` Stack 17. Benchmark sequential and concurrent latency (verifying $\text{P50} \le 35\text{ms}$ and throughput $\ge 20\text{ FPS}$). Re-evaluate small-motorcycle recall improvement on the 764 real frames. | S5-T1, S5-T2 | **1 day** | Latency benchmark report on `dev-box` + comparative recall metrics ($320\text{px}$ vs $416\text{px}$). |
-| **S5-T4** | **Centralized Blob Storage Driver (`file.529studio.site`) & Collaborative Web Labeler** | Implement `storage.BlobStorage` implementing `storage.Storage` interface for `https://file.529studio.site` using Cloudflare Access Service Token authentication. Update `tools/eval/labeler.html` / build web viewer to fetch frames directly from blob storage, enabling team-wide remote labeling without local JPEG syncing. | None | **1 day** | Frames archived directly to remote blob storage; web labeler loads remote proofs seamlessly. |
-| **S5-T5** | **Decoupled Hybrid Flood Pipeline with Curated `flood_chokepoints.json`** | Curate authentic municipal flood chokepoint camera fixture (`tools/eval/fixtures/flood_chokepoints.json`). Wire Go backend hotset scheduler to trigger low-frequency Gemini VLM flood audits on these cameras when Open-Meteo precipitation reaches $\ge 4.0\text{ mm}$ (moderate rain) or radar reflectivity $\ge 140$. Guard with strict 10 RPM / 300 RPD daily quota limiter. | S5-T1 | **1–1.5 days** | Live staging simulation showing VLM triggered on flood chokepoints during rain while vehicle detector handles traffic. |
-| **S5-T6** | **Staging Infrastructure Hardening, Chaos Test & `ANALYZER=onnx` Git Default** | Update `docker-compose.stg.yml` to default `ANALYZER=${ANALYZER:-onnx}` in git. Execute physical network partition drill: take down Tailscale interface on `dev-box` and assert that staging backend degrades cleanly to `SeverityUnknown` within 10s without hanging or crashing. Add automated inference curl check in `docker-publish.yml`. | None | **0.5 day** | Video / terminal log proof of clean degrade during Tailscale drop attached to PR per Rule 4. |
-| **S5-T7** | **Zero-Click Route Condition Explorer Architecture Spike (`route.Engine`)** | *Gated behind S5-T1.* Design the `route.Engine` interface per ADR-004 §2b/2c. Define spatial Corridor/H3 polygon path matching algorithm that traverses user routes and aggregates real-time PCU saturation and flood hazards. | S5-T1 (Macro F1 acceptable) | **1 day** | Architectural spike document in `docs/spike-route-engine.md` with interface definitions and unit tests. |
-
----
-
-## 5. Quantitative Targets & Success Criteria for Sprint 5
-
-| Metric / Gate | Baseline (Sprint 4 Reality) | Target for Sprint 5 Closure |
-|---|:---:|:---:|
-| **Traffic Macro F1 (Real D6 Dataset)** | **0.209** (T4 real benchmark) | **$\ge 0.50$** (calibrated) / **$\ge 0.65$** ($416\text{px}$) |
-| **Known-State Smoke Test Pass Rate** | **20.0%** (2/10 pass) | **$\ge 70.0%$** ($\ge 7/10$ pass within valid time windows) |
-| **Flood Safety False-Negative Rate (FNR)** | **100.0%** (0/120 detected) | **$\le 5.0%$** on active rain events via Hybrid VLM |
-| **System Telemetry Throughput (`dev-box`)** | **24.01 FPS** (320px) | **$\ge 18.00\text{ FPS}$** ($416\text{px}$, under 2 vCPU limit) |
-| **Staging Tailscale Resilience** | Untested in production | **100% Graceful Degrade to `unknown`** under partition |
-| **Camera Proof Storage** | Local edge disk (`/data/proofs/`) | **Centralized Blob Storage** (`https://file.529studio.site`) |
-
----
-
-## 6. Process Fix & Audit Compliance
-
-1. **Mandatory Production Evidence**: Every pull request that claims model improvement or architectural resilience MUST attach real terminal logs or screenshots from Staging per Sprint 4 T8 rules. Passing unit tests alone will be rejected during review.
-2. **No Speculative Parameter Hacking**: All PCU weights and capacity thresholds must be accompanied by empirical confusion matrix evidence from `tools/eval/benchmark.py`.
-3. **Strict Zero Auto-Merge**: AI agents must never auto-merge pull requests targeting `dev` or `main`. All PRs require explicit peer code review.
-
----
-
-*Certified and adopted by the Warded Engineering & Architecture Team for Sprint 5 execution.*
+- `docs/decision-openvino-vs-vlm.md`: correct the "10 known flood chokepoints"
+  reference — it was a conflation with the unrelated 10-camera traffic
+  smoke-test set (`smoke_test_cameras.json`), not a real flood-chokepoint list.
+- Same file: the "$0 cost" framing for `dev-box` should be qualified as
+  API/SaaS cost only — physical hosting (power, bandwidth, hardware wear on
+  a team-owned homelab machine) is a real, non-zero cost not previously
+  disclosed in the decision record.

@@ -485,4 +485,3 @@ func TestLoadConfig_R2_Custom(t *testing.T) {
 		t.Errorf("expected R2PublicURL='https://cdn.example.com', got %q", cfg.R2PublicURL)
 	}
 }
-

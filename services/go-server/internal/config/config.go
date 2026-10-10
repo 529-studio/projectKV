@@ -264,11 +264,11 @@ type ServerConfig struct {
 	CacheMaxAge                   time.Duration
 	Analyzer                      string // "none" | "mock" | "vlm" | "onnx" (default: "none")
 	CloudVisionAPIKey             string
-	GeminiModel                   string        // default: "gemini-3.5-flash-lite"
-	CVEngineURL                   string        // default: "http://localhost:8000" or from CV_ENGINE_URL
-	AppEnv                        string        // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
-	StorageDriver                 string        // default: "local"
-	StorageLocalRoot              string        // default: "./data/proofs"
+	GeminiModel                   string // default: "gemini-3.5-flash-lite"
+	CVEngineURL                   string // default: "http://localhost:8000" or from CV_ENGINE_URL
+	AppEnv                        string // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
+	StorageDriver                 string // default: "local"
+	StorageLocalRoot              string // default: "./data/proofs"
 	R2AccountID                   string
 	R2Endpoint                    string
 	R2BucketName                  string
