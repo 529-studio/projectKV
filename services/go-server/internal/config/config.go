@@ -3,6 +3,7 @@ package config
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -25,6 +26,13 @@ type Config struct {
 	LogLevel                      string
 	StorageDriver                 string
 	StorageLocalRoot              string
+	R2AccountID                   string
+	R2Endpoint                    string
+	R2BucketName                  string
+	R2Region                      string
+	R2AccessKeyID                 string
+	R2SecretAccessKey             string
+	R2PublicURL                   string
 	ArchiveSampleIntervalSeconds  int
 	ArchiveRetentionDays          int
 	ArchiveMaxDiskMB              int64
@@ -80,6 +88,9 @@ func LoadFromEnv() (*Config, error) {
 		LogLevel:                      "info",
 		StorageDriver:                 "local",
 		StorageLocalRoot:              "./data/proofs",
+		R2BucketName:                  "warded-proofs",
+		R2Region:                      "auto",
+		R2PublicURL:                   "https://file.529studio.site",
 		ArchiveSampleIntervalSeconds:  300,
 		ArchiveRetentionDays:          14,
 		ArchiveMaxDiskMB:              20000,
@@ -157,6 +168,36 @@ func LoadFromEnv() (*Config, error) {
 		cfg.StorageLocalRoot = val
 	}
 
+	if val := os.Getenv("R2_ACCOUNT_ID"); val != "" {
+		cfg.R2AccountID = strings.TrimSpace(val)
+	}
+
+	if val := os.Getenv("R2_ENDPOINT"); val != "" {
+		cfg.R2Endpoint = strings.TrimSpace(val)
+	} else if cfg.R2AccountID != "" {
+		cfg.R2Endpoint = fmt.Sprintf("https://%s.r2.cloudflarestorage.com", cfg.R2AccountID)
+	}
+
+	if val := os.Getenv("R2_BUCKET_NAME"); val != "" {
+		cfg.R2BucketName = strings.TrimSpace(val)
+	}
+
+	if val := os.Getenv("R2_REGION"); val != "" {
+		cfg.R2Region = strings.TrimSpace(val)
+	}
+
+	if val := os.Getenv("R2_ACCESS_KEY_ID"); val != "" {
+		cfg.R2AccessKeyID = strings.TrimSpace(val)
+	}
+
+	if val := os.Getenv("R2_SECRET_ACCESS_KEY"); val != "" {
+		cfg.R2SecretAccessKey = strings.TrimSpace(val)
+	}
+
+	if val := os.Getenv("R2_PUBLIC_URL"); val != "" {
+		cfg.R2PublicURL = strings.TrimSpace(val)
+	}
+
 	if val := os.Getenv("ARCHIVE_SAMPLE_INTERVAL_SECONDS"); val != "" {
 		if v, err := strconv.Atoi(val); err == nil {
 			cfg.ArchiveSampleIntervalSeconds = v
@@ -228,6 +269,13 @@ type ServerConfig struct {
 	AppEnv                        string        // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
 	StorageDriver                 string        // default: "local"
 	StorageLocalRoot              string        // default: "./data/proofs"
+	R2AccountID                   string
+	R2Endpoint                    string
+	R2BucketName                  string
+	R2Region                      string
+	R2AccessKeyID                 string
+	R2SecretAccessKey             string
+	R2PublicURL                   string
 	RateLimitRPS                  int           // default: 10
 	RateLimitBurst                int           // default: 30
 	AnalyzerDailyBudget           int           // default: 5000
@@ -343,6 +391,30 @@ func LoadConfig() *ServerConfig {
 	storageLocalRoot := os.Getenv("STORAGE_LOCAL_ROOT")
 	if storageLocalRoot == "" {
 		storageLocalRoot = resolvePath("data/proofs")
+	}
+
+	r2AccountID := strings.TrimSpace(os.Getenv("R2_ACCOUNT_ID"))
+	r2Endpoint := strings.TrimSpace(os.Getenv("R2_ENDPOINT"))
+	if r2Endpoint == "" && r2AccountID != "" {
+		r2Endpoint = fmt.Sprintf("https://%s.r2.cloudflarestorage.com", r2AccountID)
+	}
+
+	r2BucketName := strings.TrimSpace(os.Getenv("R2_BUCKET_NAME"))
+	if r2BucketName == "" {
+		r2BucketName = "warded-proofs"
+	}
+
+	r2Region := strings.TrimSpace(os.Getenv("R2_REGION"))
+	if r2Region == "" {
+		r2Region = "auto"
+	}
+
+	r2AccessKeyID := strings.TrimSpace(os.Getenv("R2_ACCESS_KEY_ID"))
+	r2SecretAccessKey := strings.TrimSpace(os.Getenv("R2_SECRET_ACCESS_KEY"))
+
+	r2PublicURL := strings.TrimSpace(os.Getenv("R2_PUBLIC_URL"))
+	if r2PublicURL == "" {
+		r2PublicURL = "https://file.529studio.site"
 	}
 	sampleInterval := 300
 	if val := os.Getenv("ARCHIVE_SAMPLE_INTERVAL_SECONDS"); val != "" {
@@ -541,6 +613,13 @@ func LoadConfig() *ServerConfig {
 		AppEnv:                        appEnv,
 		StorageDriver:                 storageDriver,
 		StorageLocalRoot:              storageLocalRoot,
+		R2AccountID:                   r2AccountID,
+		R2Endpoint:                    r2Endpoint,
+		R2BucketName:                  r2BucketName,
+		R2Region:                      r2Region,
+		R2AccessKeyID:                 r2AccessKeyID,
+		R2SecretAccessKey:             r2SecretAccessKey,
+		R2PublicURL:                   r2PublicURL,
 		RateLimitRPS:                  rateLimitRPS,
 		RateLimitBurst:                rateLimitBurst,
 		AnalyzerDailyBudget:           analyzerDailyBudget,
