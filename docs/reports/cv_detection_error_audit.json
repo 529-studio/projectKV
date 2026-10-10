@@ -1,0 +1,500 @@
+[
+  {
+    "target": {
+      "id": "failure_a_cong_hoa",
+      "name": "C\u1ed9ng H\u00f2a - Tr\u01b0\u1eddng Chinh",
+      "corridor": "cong_hoa",
+      "camera_id": "586e1f18f9fab7001111b0a5",
+      "frame_id": "cam_586e1f18f9fab7001111b0a5_1791453029",
+      "image_path": "data/proofs/2026-10-08/586e1f18f9fab7001111b0a5/1791453029_sample.jpg",
+      "failure_mode": "Failure Mode (a): Missed Congestion Queue",
+      "expected_state": "CONGESTED"
+    },
+    "metrics": {
+      "config_1_prod_320_raw": {
+        "total_vehicles": 0,
+        "raw_anchors": 0,
+        "class_counts": {
+          "car": 0,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 0.0,
+        "si": 0.0,
+        "severity": "CLEAR",
+        "status": "FAIL"
+      },
+      "config_2_ov_320_stretch_nms": {
+        "total_vehicles": 5,
+        "class_counts": {
+          "car": 4,
+          "motorcycle": 0,
+          "bus": 1,
+          "truck": 0
+        },
+        "pcu": 6.0,
+        "si": 0.1463,
+        "severity": "CLEAR",
+        "status": "FAIL"
+      },
+      "config_3_ov_320_letterbox_nms": {
+        "total_vehicles": 5,
+        "class_counts": {
+          "car": 5,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 5.0,
+        "si": 0.122,
+        "severity": "CLEAR",
+        "status": "FAIL"
+      },
+      "config_4_yolo_416_letterbox_nms": {
+        "total_vehicles": 8,
+        "class_counts": {
+          "car": 8,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 8.0,
+        "si": 0.1951,
+        "severity": "CLEAR",
+        "status": "FAIL"
+      },
+      "config_5_yolo_640_letterbox_nms": {
+        "total_vehicles": 13,
+        "class_counts": {
+          "car": 12,
+          "motorcycle": 0,
+          "bus": 1,
+          "truck": 0
+        },
+        "pcu": 14.0,
+        "si": 0.3415,
+        "severity": "CLEAR",
+        "status": "FAIL"
+      },
+      "multi_anchor_duplication_ratio": 0.0
+    },
+    "overlay_prod": "docs/reports/audit_overlays/failure_a_cong_hoa_prod_320_raw.jpg",
+    "overlay_proposed": "docs/reports/audit_overlays/failure_a_cong_hoa_prop_416_nms.jpg"
+  },
+  {
+    "target": {
+      "id": "failure_a_mai_chi_tho_dvc2",
+      "name": "Mai Ch\u00ed Th\u1ecd - \u0110\u1ed3ng V\u0103n C\u1ed1ng 2",
+      "corridor": "mai_chi_tho",
+      "camera_id": "56de42f611f398ec0c481282",
+      "frame_id": "cam_56de42f611f398ec0c481282_1791453015",
+      "image_path": "data/proofs/2026-10-08/56de42f611f398ec0c481282/1791453015_sample.jpg",
+      "failure_mode": "Failure Mode (a): Smoke-Set Baseline Discrepancy",
+      "expected_state": "CONGESTED"
+    },
+    "metrics": {
+      "config_1_prod_320_raw": {
+        "total_vehicles": 0,
+        "raw_anchors": 0,
+        "class_counts": {
+          "car": 0,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 0.0,
+        "si": 0.0,
+        "severity": "CLEAR",
+        "status": "FAIL"
+      },
+      "config_2_ov_320_stretch_nms": {
+        "total_vehicles": 0,
+        "class_counts": {
+          "car": 0,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 0.0,
+        "si": 0.0,
+        "severity": "CLEAR",
+        "status": "FAIL"
+      },
+      "config_3_ov_320_letterbox_nms": {
+        "total_vehicles": 0,
+        "class_counts": {
+          "car": 0,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 0.0,
+        "si": 0.0,
+        "severity": "CLEAR",
+        "status": "FAIL"
+      },
+      "config_4_yolo_416_letterbox_nms": {
+        "total_vehicles": 1,
+        "class_counts": {
+          "car": 1,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 1.0,
+        "si": 0.0243,
+        "severity": "CLEAR",
+        "status": "FAIL"
+      },
+      "config_5_yolo_640_letterbox_nms": {
+        "total_vehicles": 1,
+        "class_counts": {
+          "car": 0,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 1
+        },
+        "pcu": 2.5,
+        "si": 0.0607,
+        "severity": "CLEAR",
+        "status": "FAIL"
+      },
+      "multi_anchor_duplication_ratio": 0.0
+    },
+    "overlay_prod": "docs/reports/audit_overlays/failure_a_mai_chi_tho_dvc2_prod_320_raw.jpg",
+    "overlay_proposed": "docs/reports/audit_overlays/failure_a_mai_chi_tho_dvc2_prop_416_nms.jpg"
+  },
+  {
+    "target": {
+      "id": "failure_b_mai_chi_tho_nct1",
+      "name": "Mai Ch\u00ed Th\u1ecd - Nguy\u1ec5n C\u01a1 Th\u1ea1ch 1",
+      "corridor": "mai_chi_tho",
+      "camera_id": "5822b5ededeb6c0012a2d66a",
+      "frame_id": "cam_5822b5ededeb6c0012a2d66a_1791437508",
+      "image_path": "data/proofs/2026-10-08/5822b5ededeb6c0012a2d66a/1791437508_state_change.jpg",
+      "failure_mode": "Failure Mode (b): Multi-Anchor Clear Saturation",
+      "expected_state": "CLEAR"
+    },
+    "metrics": {
+      "config_1_prod_320_raw": {
+        "total_vehicles": 37,
+        "raw_anchors": 37,
+        "class_counts": {
+          "car": 30,
+          "motorcycle": 1,
+          "bus": 0,
+          "truck": 6
+        },
+        "pcu": 45.2,
+        "si": 1.0,
+        "severity": "CONGESTED",
+        "status": "FAIL"
+      },
+      "config_2_ov_320_stretch_nms": {
+        "total_vehicles": 13,
+        "class_counts": {
+          "car": 10,
+          "motorcycle": 1,
+          "bus": 0,
+          "truck": 2
+        },
+        "pcu": 15.2,
+        "si": 0.3689,
+        "severity": "MODERATE",
+        "status": "FAIL"
+      },
+      "config_3_ov_320_letterbox_nms": {
+        "total_vehicles": 9,
+        "class_counts": {
+          "car": 8,
+          "motorcycle": 1,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 8.2,
+        "si": 0.199,
+        "severity": "CLEAR",
+        "status": "PASS"
+      },
+      "config_4_yolo_416_letterbox_nms": {
+        "total_vehicles": 14,
+        "class_counts": {
+          "car": 12,
+          "motorcycle": 1,
+          "bus": 0,
+          "truck": 1
+        },
+        "pcu": 14.7,
+        "si": 0.3568,
+        "severity": "MODERATE",
+        "status": "FAIL"
+      },
+      "config_5_yolo_640_letterbox_nms": {
+        "total_vehicles": 15,
+        "class_counts": {
+          "car": 12,
+          "motorcycle": 2,
+          "bus": 0,
+          "truck": 1
+        },
+        "pcu": 14.9,
+        "si": 0.3617,
+        "severity": "MODERATE",
+        "status": "FAIL"
+      },
+      "multi_anchor_duplication_ratio": 2.85
+    },
+    "overlay_prod": "docs/reports/audit_overlays/failure_b_mai_chi_tho_nct1_prod_320_raw.jpg",
+    "overlay_proposed": "docs/reports/audit_overlays/failure_b_mai_chi_tho_nct1_prop_416_nms.jpg"
+  },
+  {
+    "target": {
+      "id": "failure_b_mai_chi_tho_to_huu",
+      "name": "Mai Ch\u00ed Th\u1ecd - T\u1ed1 H\u1eefu (C6)",
+      "corridor": "mai_chi_tho",
+      "camera_id": "5a10c79f02eb490011a0b0dd",
+      "frame_id": "cam_5a10c79f02eb490011a0b0dd_1791437567",
+      "image_path": "data/proofs/2026-10-08/5a10c79f02eb490011a0b0dd/1791437567_state_change.jpg",
+      "failure_mode": "Failure Mode (b): Multi-Class / Multi-Anchor Saturation",
+      "expected_state": "CLEAR"
+    },
+    "metrics": {
+      "config_1_prod_320_raw": {
+        "total_vehicles": 19,
+        "raw_anchors": 19,
+        "class_counts": {
+          "car": 9,
+          "motorcycle": 0,
+          "bus": 7,
+          "truck": 3
+        },
+        "pcu": 30.5,
+        "si": 0.7403,
+        "severity": "HEAVY",
+        "status": "FAIL"
+      },
+      "config_2_ov_320_stretch_nms": {
+        "total_vehicles": 7,
+        "class_counts": {
+          "car": 3,
+          "motorcycle": 2,
+          "bus": 1,
+          "truck": 1
+        },
+        "pcu": 7.9,
+        "si": 0.1917,
+        "severity": "CLEAR",
+        "status": "PASS"
+      },
+      "config_3_ov_320_letterbox_nms": {
+        "total_vehicles": 7,
+        "class_counts": {
+          "car": 4,
+          "motorcycle": 1,
+          "bus": 1,
+          "truck": 1
+        },
+        "pcu": 8.7,
+        "si": 0.2112,
+        "severity": "CLEAR",
+        "status": "PASS"
+      },
+      "config_4_yolo_416_letterbox_nms": {
+        "total_vehicles": 9,
+        "class_counts": {
+          "car": 4,
+          "motorcycle": 4,
+          "bus": 0,
+          "truck": 1
+        },
+        "pcu": 7.3,
+        "si": 0.1772,
+        "severity": "CLEAR",
+        "status": "PASS"
+      },
+      "config_5_yolo_640_letterbox_nms": {
+        "total_vehicles": 16,
+        "class_counts": {
+          "car": 8,
+          "motorcycle": 5,
+          "bus": 1,
+          "truck": 2
+        },
+        "pcu": 16.0,
+        "si": 0.3883,
+        "severity": "MODERATE",
+        "status": "FAIL"
+      },
+      "multi_anchor_duplication_ratio": 2.71
+    },
+    "overlay_prod": "docs/reports/audit_overlays/failure_b_mai_chi_tho_to_huu_prod_320_raw.jpg",
+    "overlay_proposed": "docs/reports/audit_overlays/failure_b_mai_chi_tho_to_huu_prop_416_nms.jpg"
+  },
+  {
+    "target": {
+      "id": "failure_b_vo_van_kiet_ky_con",
+      "name": "V\u00f5 V\u0103n Ki\u1ec7t - K\u00fd Con",
+      "corridor": "vo_van_kiet",
+      "camera_id": "56de42f611f398ec0c481287",
+      "frame_id": "cam_56de42f611f398ec0c481287_1791437537",
+      "image_path": "data/proofs/2026-10-08/56de42f611f398ec0c481287/1791437537_state_change.jpg",
+      "failure_mode": "Failure Mode (b): Multi-Anchor Clear Saturation",
+      "expected_state": "CLEAR"
+    },
+    "metrics": {
+      "config_1_prod_320_raw": {
+        "total_vehicles": 39,
+        "raw_anchors": 39,
+        "class_counts": {
+          "car": 37,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 2
+        },
+        "pcu": 42.0,
+        "si": 1.0,
+        "severity": "CONGESTED",
+        "status": "FAIL"
+      },
+      "config_2_ov_320_stretch_nms": {
+        "total_vehicles": 13,
+        "class_counts": {
+          "car": 9,
+          "motorcycle": 0,
+          "bus": 1,
+          "truck": 3
+        },
+        "pcu": 18.5,
+        "si": 0.4512,
+        "severity": "MODERATE",
+        "status": "FAIL"
+      },
+      "config_3_ov_320_letterbox_nms": {
+        "total_vehicles": 8,
+        "class_counts": {
+          "car": 6,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 2
+        },
+        "pcu": 11.0,
+        "si": 0.2683,
+        "severity": "CLEAR",
+        "status": "PASS"
+      },
+      "config_4_yolo_416_letterbox_nms": {
+        "total_vehicles": 15,
+        "class_counts": {
+          "car": 8,
+          "motorcycle": 1,
+          "bus": 1,
+          "truck": 5
+        },
+        "pcu": 22.7,
+        "si": 0.5537,
+        "severity": "MODERATE",
+        "status": "FAIL"
+      },
+      "config_5_yolo_640_letterbox_nms": {
+        "total_vehicles": 18,
+        "class_counts": {
+          "car": 10,
+          "motorcycle": 3,
+          "bus": 2,
+          "truck": 3
+        },
+        "pcu": 22.1,
+        "si": 0.539,
+        "severity": "MODERATE",
+        "status": "FAIL"
+      },
+      "multi_anchor_duplication_ratio": 3.0
+    },
+    "overlay_prod": "docs/reports/audit_overlays/failure_b_vo_van_kiet_ky_con_prod_320_raw.jpg",
+    "overlay_proposed": "docs/reports/audit_overlays/failure_b_vo_van_kiet_ky_con_prop_416_nms.jpg"
+  },
+  {
+    "target": {
+      "id": "failure_b_dien_bien_phu_pasteur",
+      "name": "\u0110i\u1ec7n Bi\u00ean Ph\u1ee7 - Pasteur",
+      "corridor": "dien_bien_phu",
+      "camera_id": "5deb576d1dc17d7c5515ad02",
+      "frame_id": "cam_5deb576d1dc17d7c5515ad02_1791437567",
+      "image_path": "data/proofs/2026-10-08/5deb576d1dc17d7c5515ad02/1791437567_state_change.jpg",
+      "failure_mode": "Failure Mode (b): Multi-Anchor Clear Saturation",
+      "expected_state": "CLEAR"
+    },
+    "metrics": {
+      "config_1_prod_320_raw": {
+        "total_vehicles": 28,
+        "raw_anchors": 28,
+        "class_counts": {
+          "car": 28,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 28.0,
+        "si": 1.0,
+        "severity": "CONGESTED",
+        "status": "FAIL"
+      },
+      "config_2_ov_320_stretch_nms": {
+        "total_vehicles": 6,
+        "class_counts": {
+          "car": 4,
+          "motorcycle": 2,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 4.4,
+        "si": 0.176,
+        "severity": "CLEAR",
+        "status": "PASS"
+      },
+      "config_3_ov_320_letterbox_nms": {
+        "total_vehicles": 9,
+        "class_counts": {
+          "car": 9,
+          "motorcycle": 0,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 9.0,
+        "si": 0.36,
+        "severity": "MODERATE",
+        "status": "FAIL"
+      },
+      "config_4_yolo_416_letterbox_nms": {
+        "total_vehicles": 9,
+        "class_counts": {
+          "car": 8,
+          "motorcycle": 1,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 8.2,
+        "si": 0.328,
+        "severity": "CLEAR",
+        "status": "PASS"
+      },
+      "config_5_yolo_640_letterbox_nms": {
+        "total_vehicles": 11,
+        "class_counts": {
+          "car": 7,
+          "motorcycle": 4,
+          "bus": 0,
+          "truck": 0
+        },
+        "pcu": 7.8,
+        "si": 0.312,
+        "severity": "CLEAR",
+        "status": "PASS"
+      },
+      "multi_anchor_duplication_ratio": 4.67
+    },
+    "overlay_prod": "docs/reports/audit_overlays/failure_b_dien_bien_phu_pasteur_prod_320_raw.jpg",
+    "overlay_proposed": "docs/reports/audit_overlays/failure_b_dien_bien_phu_pasteur_prop_416_nms.jpg"
+  }
+]
