@@ -313,4 +313,34 @@
   3. **Auto-Recovery Over Human Intervention**: Verified that the Circuit Breaker automatically cooled down, probed `dev-box` upon restoration, and transitioned from `OPEN` $\rightarrow$ `HALF-OPEN` $\rightarrow$ `CLOSED`, resuming live ONNX telemetry within 1 cycle (< 30s).
   4. **Document Emergency Failover Routes**: Maintain a disaster recovery runbook ([`docs/runbook_dev_box_failover.md`](runbook_dev_box_failover.md)) documenting how to quickly switch `CV_ENGINE_URL` to standby container `warded-model:8000` (`model-local`) if the remote worker suffers prolonged hardware outage.
 
+---
+
+## Lesson 21: S3-Compatible Cloudflare R2 Integration (Path-Style Routing & Timezone Partitioning)
+
+- **Incident & Tracking:** Sprint 5 Plan / S5-T4, DevOps Guide integration (`feat/r2-storage-integration`).
+- **Symptom:**
+  When configuring third-party S3-compatible cloud object storage providers like Cloudflare R2, default AWS SDK settings attempt virtual-host addressing (`<bucket>.<endpoint>`), causing DNS resolution failures (`no such host`) and 404/403 routing errors. Furthermore, object keys partitioned with naive `.UTC()` dates generate day shifts across midnight in Vietnam (e.g., snapshots taken at 02:00 AM ICT on Oct 10th get filed under Oct 9th UTC).
+- **Root Cause:**
+  1. **Virtual-Host vs. Path-Style Addressing**: AWS S3 defaults to bucket-prefixed subdomains (`https://warded-proofs.bb67574163a065e4aad475fb3aa6bb92.r2.cloudflarestorage.com`), which Cloudflare R2 does not route without dedicated custom DNS setups. Cloudflare R2 requires S3 Path-Style addressing (`o.UsePathStyle = true` in Go AWS SDK v2, `addressing_style: path` in boto3).
+  2. **Timezone Partitioning Mismatch**: Vietnam commuters and DOT incident logs operate in Indochina Time (`Asia/Ho_Chi_Minh`, UTC+7). Filing proof snapshots under UTC dates diverges snapshot directories from municipal traffic logs and ground-truth storm timelines.
+- **Mandatory Takeaway:**
+  1. **Mandatory Path-Style Flag for R2**: Always explicitly set `UsePathStyle = true` in AWS SDK Go v2 (`s3.NewFromConfig(cfg, func(o *s3.Options) { o.UsePathStyle = true })`) and `s3={'addressing_style': 'path'}` in Python boto3.
+  2. **Timezone Normalization in Key Standards**: Standardize `StoragePath` date formatting to Vietnam ICT (`time.FixedZone("ICT", 7*3600)`) so snapshot folder partitions strictly match local calendar dates.
+  3. **Dual Storage Driver Abstraction**: Maintain unified `storage.Storage` interface with pluggable drivers (`STORAGE_DRIVER=local|r2`), guaranteeing that local development and offline mock pipelines run without cloud credentials while staging and production stream snapshots directly to Cloudflare R2.
+
+---
+
+## Lesson 22: Plaintext Credential Exposure Prevention & Benchmark Methodology Rigor
+
+- **Incident & Tracking:** Sprint 5 Plan / S5-T1 Audit & S5-T4 R2 Storage, Issues #207, #214, PR #212 (`feat/r2-storage-integration`).
+- **Symptom:**
+  1. **Credential Exposure in Tooling**: A verification script (`tools/storage/verify_r2.py`) included Cloudflare R2 API keys as default fallback strings in `os.getenv("R2_ACCESS_KEY_ID", "...")`. Even though documentation files in `docs/` remained free of credentials, committing fallback strings into git history compromised the token pair, necessitating immediate key revocation on Cloudflare dashboard.
+  2. **Smoke-Test Evaluation Flaw**: Re-running the smoke test post-T5 showed a nominal pass rate increase (20% -> 50%), but camera `66b1c426...` flipped from `SI=1.00 PASS` to `SI=0.00 FAIL`. Because scaling a non-zero Saturation Index by $1.67\times$ cannot mathematically produce zero, the discrepancy revealed that the smoke test pulled live snapshots rather than frozen reference images, conflating traffic fluctuations with parameter calibration.
+- **Root Cause:**
+  1. Using convenience defaults for API credentials in diagnostic scripts instead of failing fast when environment variables are omitted.
+  2. Conducting before/after benchmark comparisons on live, dynamic physical streams rather than anchored, versioned ground-truth image sets.
+- **Mandatory Takeaway:**
+  1. **Zero Secret Fallbacks in Code**: Never provide actual credentials as fallback arguments (`os.getenv("SECRET", "hardcoded_val")`). Verification scripts must strictly enforce `if not key: sys.exit(1)` and require `.env` or environment injection.
+  2. **Mandatory Key Rotation on Exposure**: Any key committed to git or shared across plain text channels must be immediately revoked on the provider dashboard and rotated.
+  3. **Frozen Image Anchors for Methodology Rigor**: When benchmarking model inference or scoring calibration, before/after evaluations are only valid when executed against identical, frozen image frames. Re-fetching live snapshots invalidates causal attribution. The 764-frame controlled benchmark is the authoritative baseline.
 

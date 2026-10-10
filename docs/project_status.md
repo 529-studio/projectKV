@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **123 Pull Requests** processed across repository history:
-  - **114 Merged** to `dev` (including PR #206 docs/sprint4-report)
+- **Lifetime PR History**: Exactly **126 Pull Requests** processed across repository history:
+  - **117 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, and PR #213 `infra/s5-t4-tailscale-failover-drill`)
   - **8 Closed** without merging
-  - **1 Open** PR pending: `tooling/s5-t1-rerun-d6-benchmark` targeting `dev`
+  - **1 Open** PR pending: PR #212 (`feat/r2-storage-integration`) targeting `dev`
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
@@ -114,6 +114,13 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
     - Stack 14 on Portainer Endpoint 3 (`homesrv`) for backend/frontend changes.
     - Stack 17 on Portainer Endpoint 4 (`dev-box`) for CV engine changes.
     - Post-deploy verification checking both public web health (`https://warded-stg.529studio.site/health`) and remote Portainer container runtime state (`warded-cv-engine` healthy).
+- **Cloudflare R2 Object Storage Integration (`warded-proofs`, PR `feat/r2-storage-integration`)**:
+  - Implemented `R2Storage` satisfying `storage.Storage` interface using official AWS SDK for Go v2 (`s3.NewFromConfig`).
+  - Mandatory S3 Path-Style addressing enabled (`UsePathStyle = true`) for compatibility with Cloudflare R2 (`https://bb67574163a065e4aad475fb3aa6bb92.r2.cloudflarestorage.com`).
+  - Configurable storage driver via `STORAGE_DRIVER` (`local` default for local dev, `r2` / `s3` for staging and production).
+  - Standardized snapshot object key path to Vietnam ICT (`Asia/Ho_Chi_Minh`, UTC+7): `YYYY-MM-DD/<camera_id>/<unix_timestamp>_<reason>.jpg`.
+  - Public Edge CDN delivery integration via `https://file.529studio.site`, unblocking collaborative web labeling workflows for the entire engineering team.
+  - Implemented and verified standalone CLI verification commands in Go (`services/go-server/cmd/verify-r2`) and Python (`tools/storage/verify_r2.py`), confirming 100% upload, head, get, edge CDN (HTTP 200), and cleanup success against live Cloudflare R2.
 
 ---
 
@@ -148,3 +155,4 @@ cd apps/web && npm test  # Web client unit test suite (92 tests)
 5. **Git Flow**: Zero direct push to `main` or `dev`. Always branch (`feat/*`, `fix/*`, `docs/*`), push, and open PR against `dev`. AI agents must NEVER auto-merge PRs.
 6. **Zero-Emoji Compliance**: No Unicode emojis in UI controls, chips, modal headers, notifications, or backend Go log messages. Use monochromatic SVGs and uppercase structured log prefixes (`[INIT]`, `[INFO]`, `[WARN]`, `[ERROR]`, `[FATAL]`).
 7. **Documentation Synchronization**: Whenever a PR is created or merged, update `docs/project_status.md` and `docs/lesson_learn.md`.
+8. **Zero Hardcoded Secrets**: Never hardcode credentials, tokens, or API keys in code or scripts. All secrets must be resolved dynamically from `.env`. Fallback parameters in `os.getenv` or configuration loaders must strictly be `""` (empty string) with fail-fast validation. Documentation templates must strictly use `<placeholder>` syntax.

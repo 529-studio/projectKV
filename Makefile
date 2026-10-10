@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size
 
 help:
 	@echo "========================================================"
@@ -32,6 +32,9 @@ help:
 	@echo "  make smoke-eval      - Run known-state smoke camera verification (mock dry-run)"
 	@echo "  make collect-frames  - Fetch real camera frames from Hot Set into data/proofs"
 	@echo "  make dataset-progress - Audit evaluation dataset composition progress (T3 / D6)"
+	@echo "  make r2-setup        - Configure ~/.config/rclone/rclone.conf from .env"
+	@echo "  make r2-ls           - List Cloudflare R2 bucket partitions via rclone"
+	@echo "  make r2-size         - Measure total object count and size on Cloudflare R2"
 
 install:
 	cd services/go-server && go mod download
@@ -122,4 +125,14 @@ docker-build:
 
 docker-run:
 	docker run --rm -p 3000:3000 -v $(shell pwd)/data:/app/data warded-stg:latest
+
+r2-setup:
+	python3 tools/storage/setup_rclone.py
+
+r2-ls:
+	rclone lsd R2:warded-proofs/
+
+r2-size:
+	rclone size R2:warded-proofs/
+
 

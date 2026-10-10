@@ -53,12 +53,16 @@ func IsJamOrDeep(severity string) bool {
 	}
 }
 
+// ICT defines the Vietnam Standard Timezone (Asia/Ho_Chi_Minh / UTC+7) per DevOps object key standard.
+var ICT = time.FixedZone("ICT", 7*3600)
+
 // StoragePath generates the standard storage path: {date}/{camera_id}/{timestamp}_{reason}.jpg
+// The date directory is strictly formatted according to Vietnam ICT (Asia/Ho_Chi_Minh).
 func StoragePath(t time.Time, cameraID string, timestamp int64, reason ArchiveReason) string {
 	if t.IsZero() {
-		t = time.Unix(timestamp, 0).UTC()
+		t = time.Unix(timestamp, 0).In(ICT)
 	} else {
-		t = t.UTC()
+		t = t.In(ICT)
 	}
 	if timestamp == 0 {
 		timestamp = t.Unix()
