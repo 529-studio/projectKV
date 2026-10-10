@@ -413,3 +413,76 @@ func TestLoadConfig_PCU_Custom(t *testing.T) {
 		t.Errorf("expected PCUThresholdCongested=0.95, got %f", cfg.PCUThresholdCongested)
 	}
 }
+
+func TestLoadConfig_R2_Defaults(t *testing.T) {
+	_ = os.Unsetenv("STORAGE_DRIVER")
+	_ = os.Unsetenv("R2_ACCOUNT_ID")
+	_ = os.Unsetenv("R2_ENDPOINT")
+	_ = os.Unsetenv("R2_BUCKET_NAME")
+	_ = os.Unsetenv("R2_REGION")
+	_ = os.Unsetenv("R2_ACCESS_KEY_ID")
+	_ = os.Unsetenv("R2_SECRET_ACCESS_KEY")
+	_ = os.Unsetenv("R2_PUBLIC_URL")
+
+	cfg := config.LoadConfig()
+	if cfg.StorageDriver != "local" {
+		t.Errorf("expected default StorageDriver='local', got %q", cfg.StorageDriver)
+	}
+	if cfg.R2BucketName != "warded-proofs" {
+		t.Errorf("expected default R2BucketName='warded-proofs', got %q", cfg.R2BucketName)
+	}
+	if cfg.R2Region != "auto" {
+		t.Errorf("expected default R2Region='auto', got %q", cfg.R2Region)
+	}
+	if cfg.R2PublicURL != "https://file.529studio.site" {
+		t.Errorf("expected default R2PublicURL='https://file.529studio.site', got %q", cfg.R2PublicURL)
+	}
+}
+
+func TestLoadConfig_R2_Custom(t *testing.T) {
+	_ = os.Setenv("STORAGE_DRIVER", "r2")
+	_ = os.Setenv("R2_ACCOUNT_ID", "acc123")
+	_ = os.Setenv("R2_ENDPOINT", "https://custom.r2.endpoint")
+	_ = os.Setenv("R2_BUCKET_NAME", "my-bucket")
+	_ = os.Setenv("R2_REGION", "apac")
+	_ = os.Setenv("R2_ACCESS_KEY_ID", "key123")
+	_ = os.Setenv("R2_SECRET_ACCESS_KEY", "sec123")
+	_ = os.Setenv("R2_PUBLIC_URL", "https://cdn.example.com")
+	defer func() {
+		_ = os.Unsetenv("STORAGE_DRIVER")
+		_ = os.Unsetenv("R2_ACCOUNT_ID")
+		_ = os.Unsetenv("R2_ENDPOINT")
+		_ = os.Unsetenv("R2_BUCKET_NAME")
+		_ = os.Unsetenv("R2_REGION")
+		_ = os.Unsetenv("R2_ACCESS_KEY_ID")
+		_ = os.Unsetenv("R2_SECRET_ACCESS_KEY")
+		_ = os.Unsetenv("R2_PUBLIC_URL")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.StorageDriver != "r2" {
+		t.Errorf("expected StorageDriver='r2', got %q", cfg.StorageDriver)
+	}
+	if cfg.R2AccountID != "acc123" {
+		t.Errorf("expected R2AccountID='acc123', got %q", cfg.R2AccountID)
+	}
+	if cfg.R2Endpoint != "https://custom.r2.endpoint" {
+		t.Errorf("expected R2Endpoint='https://custom.r2.endpoint', got %q", cfg.R2Endpoint)
+	}
+	if cfg.R2BucketName != "my-bucket" {
+		t.Errorf("expected R2BucketName='my-bucket', got %q", cfg.R2BucketName)
+	}
+	if cfg.R2Region != "apac" {
+		t.Errorf("expected R2Region='apac', got %q", cfg.R2Region)
+	}
+	if cfg.R2AccessKeyID != "key123" {
+		t.Errorf("expected R2AccessKeyID='key123', got %q", cfg.R2AccessKeyID)
+	}
+	if cfg.R2SecretAccessKey != "sec123" {
+		t.Errorf("expected R2SecretAccessKey='sec123', got %q", cfg.R2SecretAccessKey)
+	}
+	if cfg.R2PublicURL != "https://cdn.example.com" {
+		t.Errorf("expected R2PublicURL='https://cdn.example.com', got %q", cfg.R2PublicURL)
+	}
+}
+
