@@ -37,9 +37,13 @@ load_dotenv()
 
 ENDPOINT = os.getenv("R2_ENDPOINT", "https://bb67574163a065e4aad475fb3aa6bb92.r2.cloudflarestorage.com")
 BUCKET = os.getenv("R2_BUCKET_NAME", "warded-proofs")
-ACCESS_KEY = os.getenv("R2_ACCESS_KEY_ID", "3e3f2217000f9ab7a9f2c673dedc46f1")
-SECRET_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "f97a21db1fb09f79cdc1b7ec9cc797eb157133fa03b09b365d89bbc7ce8fb651")
+ACCESS_KEY = os.getenv("R2_ACCESS_KEY_ID", "")
+SECRET_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "")
 PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "https://file.529studio.site")
+
+if not ACCESS_KEY or not SECRET_KEY:
+    print("[ERROR] R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be set in environment or .env file.")
+    sys.exit(1)
 
 def main():
     print(f"[INFO] Connecting to Cloudflare R2 bucket '{BUCKET}' at {ENDPOINT}...")
