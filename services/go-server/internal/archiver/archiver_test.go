@@ -15,11 +15,20 @@ import (
 )
 
 func TestStoragePath(t *testing.T) {
-	ts := time.Date(2026, 9, 29, 15, 0, 0, 0, time.UTC)
-	path := archiver.StoragePath(ts, "cam123", ts.Unix(), archiver.ReasonStateChange)
-	expected := "2026-09-29/cam123/1790694000_state_change.jpg"
-	if path != expected {
-		t.Errorf("expected %q, got %q", expected, path)
+	// Case 1: 15:00 UTC = 22:00 ICT (same date 2026-09-29)
+	ts1 := time.Date(2026, 9, 29, 15, 0, 0, 0, time.UTC)
+	path1 := archiver.StoragePath(ts1, "cam123", ts1.Unix(), archiver.ReasonStateChange)
+	expected1 := "2026-09-29/cam123/1790694000_state_change.jpg"
+	if path1 != expected1 {
+		t.Errorf("expected %q, got %q", expected1, path1)
+	}
+
+	// Case 2: 18:00 UTC on 2026-09-29 = 01:00 ICT on 2026-09-30 (midnight crossover in Vietnam ICT)
+	ts2 := time.Date(2026, 9, 29, 18, 0, 0, 0, time.UTC)
+	path2 := archiver.StoragePath(ts2, "cam123", ts2.Unix(), archiver.ReasonSample)
+	expected2 := "2026-09-30/cam123/1790704800_sample.jpg"
+	if path2 != expected2 {
+		t.Errorf("expected %q, got %q", expected2, path2)
 	}
 }
 
