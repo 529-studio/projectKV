@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **122 Pull Requests** processed across repository history:
-  - **113 Merged** to `dev`
+- **Lifetime PR History**: Exactly **123 Pull Requests** processed across repository history:
+  - **114 Merged** to `dev` (including PR #206 docs/sprint4-report)
   - **8 Closed** without merging
-  - **1 Open** PR pending: PR #206 (`docs/sprint4-report` targeting `dev`)
+  - **1 Open** PR pending: `tooling/s5-t1-rerun-d6-benchmark` targeting `dev`
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
@@ -81,8 +81,8 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Ground-truth reality check and authoritative Sprint 5 execution roadmap adopted in [`docs/ADR-006-sprint4-audit-and-sprint5-plan.md`](ADR-006-sprint4-audit-and-sprint5-plan.md) (PR #206), establishing mandatory empirical gating (S5-T1) before feature expansion, upgrading detector resolution to $416\times 416$ (S5-T3), centralizing blob storage for team web labeling (S5-T4), and hardening network resilience (S5-T6).
 - **Sprint 5 Backlog & Execution Guide**:
   - Four active GitHub issues created on `529-studio/projectKV`:
-    - [#207](https://github.com/529-studio/projectKV/issues/207): S5-T1 — `[tooling] re-run D6 benchmark and smoke test with post-T5 weights` (Hard Gate)
-    - [#208](https://github.com/529-studio/projectKV/issues/208): S5-T2 — `[cv-engine] object detection audit for false-positive/missed detections`
+    - [#207](https://github.com/529-studio/projectKV/issues/207): S5-T1 — `[tooling] re-run D6 benchmark and smoke test with post-T5 weights` (**Completed / Verified**): Re-ran real D6 benchmark across all 764 frames with post-T5 weights (`CapacityFloor=15.0`). Traffic Macro F1 resulted in **0.206** (Weighted 0.351), confirming the ADR-006 Finding 2 mathematical paradox: lowering CapacityFloor doubled false-positive CONGESTED classifications on actual CLEAR frames (from 22 to 46 frames, +109%) without resolving missed bottlenecks (67/73 CONGESTED frames missed as CLEAR). Flood Safety Gate remained at 100.0% FNR. Smoke pass rate reached 50.0% (5/10), unblocking S5-T2 object detection audit.
+    - [#208](https://github.com/529-studio/projectKV/issues/208): S5-T2 — `[cv-engine] object detection audit for false-positive/missed detections` (Unblocked by S5-T1)
     - [#209](https://github.com/529-studio/projectKV/issues/209): S5-T3 — `[go-server + web] decoupled hybrid flood pipeline`
     - [#210](https://github.com/529-studio/projectKV/issues/210): S5-T4 — `[infra] physical Tailscale disconnection test for dev-box failover`
   - Operational wave guide and `agy` CLI instructions compiled in [`docs/sprint5_execution_guide.md`](sprint5_execution_guide.md).
