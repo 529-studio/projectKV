@@ -2,7 +2,7 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.0.7  
+**Document Version:** 1.0.8  
 **Last Updated:** 2026-10-10  
 
 ---
@@ -84,7 +84,7 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
     - [#207](https://github.com/529-studio/projectKV/issues/207): S5-T1 — `[tooling] re-run D6 benchmark and smoke test with post-T5 weights` (**Completed / Verified**): Re-ran real D6 benchmark across all 764 frames with post-T5 weights (`CapacityFloor=15.0`). Traffic Macro F1 resulted in **0.206** (Weighted 0.351), confirming the ADR-006 Finding 2 mathematical paradox: lowering CapacityFloor doubled false-positive CONGESTED classifications on actual CLEAR frames (from 22 to 46 frames, +109%) without resolving missed bottlenecks (67/73 CONGESTED frames missed as CLEAR). Flood Safety Gate remained at 100.0% FNR. Smoke pass rate reached 50.0% (5/10), unblocking S5-T2 object detection audit.
     - [#208](https://github.com/529-studio/projectKV/issues/208): S5-T2 — `[cv-engine] object detection audit for false-positive/missed detections` (Unblocked by S5-T1)
     - [#209](https://github.com/529-studio/projectKV/issues/209): S5-T3 — `[go-server + web] decoupled hybrid flood pipeline`
-    - [#210](https://github.com/529-studio/projectKV/issues/210): S5-T4 — `[infra] physical Tailscale disconnection test for dev-box failover`
+    - [#210](https://github.com/529-studio/projectKV/issues/210): S5-T4 — `[infra] physical Tailscale disconnection test for dev-box failover` (**Completed / Verified**): Executed live physical network partition and worker outage chaos drill on Staging (`homesrv` Stack 14 $\leftrightarrow$ `dev-box` Stack 17). Demonstrated 100% clean graceful degradation to `SeverityUnknown` (`source: "fallback"` then `source: "circuit_breaker"`) with 0 panics, 0 memory leaks (RAM bounded at 37.8 MB, 14.8%), and zero frozen stale states. Verified standby container `warded-model` reachability within `core-network`. Verified automated Circuit Breaker reset and live telemetry recovery upon worker restoration. Runbook documented in `docs/runbook_dev_box_failover.md` and empirical proof in `docs/reports/tailscale_failover_drill_report.md`.
   - Operational wave guide and `agy` CLI instructions compiled in [`docs/sprint5_execution_guide.md`](sprint5_execution_guide.md).
 
 - **Inference Runtime**:
