@@ -73,7 +73,7 @@ each developer must copy frames to their own machine's
 `services/go-server/data/proofs/` to use `labeler.html`, with no shared
 ground-truth source. A team-accessible web labeler reading directly from
 object storage solves a real coordination problem, unrelated to disk
-pressure. **This is now S5-T4 (promoted from an open question to a real
+pressure. **This is now S5-T4 (tracked in [#214](https://github.com/529-studio/projectKV/issues/214), promoted from an open question to a real
 ticket), justified by this reason — not because the D7 threshold was met.**
 
 **Mandatory first step, non-negotiable**: the R2 credentials shared in the
@@ -86,13 +86,13 @@ the rest of S5-T4.
 
 ## 4. Sprint 5 Backlog
 
-| # | Title | Depends on | Est. | Notes |
-|---|---|---|---:|---|
-| **S5-T1** | Re-run `benchmark.py` (D6) and `verify_smoke_set.py` against the 764 labeled frames with current (post-T5) PCU weights; publish updated `eval_report_d6_real.md` and `smoke_eval_d6_real.md` | None | **0.5 day** | Execution only, no new code. Blocking everything else below. |
-| **S5-T2** | Object-detection audit: investigate false-positive vehicle hallucination (background/night reflections) and missed detections on occluded queues, using S5-T1's fresh per-camera breakdown | S5-T1 | **1-2 days** | Scope narrows based on what S5-T1 actually shows — don't pre-commit to a fix before seeing the new numbers. |
-| **S5-T3** | Decoupled Hybrid Flood pipeline: event-driven VLM dispatch on rain-radar trigger + on-demand dispatch on camera-modal click; curate a real `flood_chokepoint_cameras.json` from authentic municipal flood data (replacing the fabricated "10 chokepoints" reference); correct the rainfall-threshold mismatch between `decision-openvino-vs-vlm.md` (2.0mm/h, unverified) and the actual code thresholds (`rainHexUtils.ts`: 1.0/4.0/15.0mm) — pick one, document the real basis or mark it explicitly as a heuristic pending calibration | None (independent of T1/T2), but hold start until S5-T1 lands per project discipline | **2-3 days** | This is real feature work — the first since Sprint 2's H0 hotfix era. Scope it carefully; do not let it expand informally the way `dev-box` did in Sprint 4. |
-| **S5-T4** | Physical disconnection test: `tailscale down` on `dev-box` against live staging, confirm graceful degrade-to-`unknown` end-to-end (not just unit-tested); verify or fix the `profiles: ["model-local"]` fallback mentioned in the Sprint 4 audit but not confirmed working | None | **1 day** | Closes the one gap Q6/Q7 explicitly flagged as untested. |
-| **S5-T4** | Cloudflare R2 (S3-compatible) blob storage: upload archiver frames to `warded-proofs`; build a minimal shared web labeler reading from R2 so the team labels from one common source instead of per-machine local copies | None technically, but rotate R2 credentials FIRST (see §3b) before any other work | **1.5-2 days** | Justified by collaborative-labeling need (§3b), not the D7 disk-volume trigger, which has not been hit — note this distinction in the ticket itself so it isn't misread later as "D7 threshold reached." |
+| # | Title | Depends on | Est. | Issue | Notes |
+|---|---|---|---:|---|---|
+| **S5-T1** | Re-run `benchmark.py` (D6) and `verify_smoke_set.py` against the 764 labeled frames with current (post-T5) PCU weights; publish updated `eval_report_d6_real.md` and `smoke_eval_d6_real.md` | None | **0.5 day** | [#207](https://github.com/529-studio/projectKV/issues/207) | Execution only, no new code. Closed on 2026-10-10. |
+| **S5-T2** | Object-detection audit: investigate false-positive vehicle hallucination (background/night reflections) and missed detections on occluded queues, using S5-T1's fresh per-camera breakdown | S5-T1 | **1-2 days** | [#208](https://github.com/529-studio/projectKV/issues/208) | Scope narrows based on what S5-T1 actually shows — don't pre-commit to a fix before seeing the new numbers. |
+| **S5-T3** | Decoupled Hybrid Flood pipeline: event-driven VLM dispatch on rain-radar trigger + on-demand dispatch on camera-modal click; curate a real `flood_chokepoint_cameras.json` from authentic municipal flood data (replacing the fabricated "10 chokepoints" reference); correct the rainfall-threshold mismatch between `decision-openvino-vs-vlm.md` (2.0mm/h, unverified) and the actual code thresholds (`rainHexUtils.ts`: 1.0/4.0/15.0mm) — pick one, document the real basis or mark it explicitly as a heuristic pending calibration | None (independent of T1/T2), but hold start until S5-T1 lands per project discipline | **2-3 days** | [#209](https://github.com/529-studio/projectKV/issues/209) | This is real feature work — the first since Sprint 2's H0 hotfix era. Scope it carefully; do not let it expand informally the way `dev-box` did in Sprint 4. |
+| **S5-T4 (Failover)** | Physical disconnection test: `tailscale down` on `dev-box` against live staging, confirm graceful degrade-to-`unknown` end-to-end (not just unit-tested); verify or fix the `profiles: ["model-local"]` fallback mentioned in the Sprint 4 audit but not confirmed working | None | **1 day** | [#210](https://github.com/529-studio/projectKV/issues/210) | Closes the one gap Q6/Q7 explicitly flagged as untested. |
+| **S5-T4 (R2 Storage)** | Cloudflare R2 (S3-compatible) blob storage: upload archiver frames to `warded-proofs`; build a minimal shared web labeler reading from R2 so the team labels from one common source instead of per-machine local copies | None technically, but rotate R2 credentials FIRST (see §3b) before any other work | **1.5-2 days** | [#214](https://github.com/529-studio/projectKV/issues/214) | Justified by collaborative-labeling need (§3b), not the D7 disk-volume trigger, which has not been hit — note this distinction in the ticket itself so it isn't misread later as "D7 threshold reached." |
 
 ## 5. Documentation corrections to make alongside S5-T3
 
