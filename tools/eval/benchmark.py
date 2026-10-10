@@ -171,13 +171,10 @@ def load_schema(schema_path: Optional[Path]) -> Dict[str, List[str]]:
     return DEFAULT_SCHEMA
 
 
-def parse_label_file(file_path: Path, schema: Dict[str, List[str]], repo_root: Optional[Path] = None) -> LabeledFrame:
-    """Parses a single label JSON file supporting both flat and nested schemas."""
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
+def parse_label_dict(data: Dict[str, Any], schema: Dict[str, List[str]], repo_root: Optional[Path] = None, fallback_id: str = "") -> LabeledFrame:
+    """Parses a dictionary representing a labeled frame."""
     if not isinstance(data, dict):
-        raise ValueError(f"{file_path}: Label JSON must be an object")
+        raise ValueError("Label JSON must be an object")
 
     # Extract labels (check nested labels object or top-level keys)
     labels = data.get("labels", {})
@@ -188,28 +185,23 @@ def parse_label_file(file_path: Path, schema: Dict[str, List[str]], repo_root: O
 
     # Validate against schema
     if traffic not in schema["traffic"]:
-        raise ValueError(f"{file_path}: Invalid traffic value '{traffic}'. Allowed: {schema['traffic']}")
+        raise ValueError(f"Invalid traffic value '{traffic}'. Allowed: {schema['traffic']}")
     if flood not in schema["flood"]:
-        raise ValueError(f"{file_path}: Invalid flood value '{flood}'. Allowed: {schema['flood']}")
+        raise ValueError(f"Invalid flood value '{flood}'. Allowed: {schema['flood']}")
     if time_of_day not in schema["time_of_day"]:
-        raise ValueError(f"{file_path}: Invalid time_of_day value '{time_of_day}'. Allowed: {schema['time_of_day']}")
+        raise ValueError(f"Invalid time_of_day value '{time_of_day}'. Allowed: {schema['time_of_day']}")
     if weather not in schema["weather"]:
-        raise ValueError(f"{file_path}: Invalid weather value '{weather}'. Allowed: {schema['weather']}")
+        raise ValueError(f"Invalid weather value '{weather}'. Allowed: {schema['weather']}")
 
-    frame_id = str(data.get("frame_id") or file_path.stem)
+    frame_id = str(data.get("frame_id") or fallback_id)
     camera_id = str(data.get("camera_id") or "")
     image_path_raw = str(data.get("image_path") or "")
 
-    # Resolve image path relative to repo_root or label file directory
+    # Resolve image path relative to repo_root
     image_path = Path(image_path_raw)
     if repo_root and not image_path.is_absolute():
         candidate_repo = repo_root / image_path
-        candidate_local = file_path.parent / image_path
         if candidate_repo.exists():
-            image_path = candidate_repo
-        elif candidate_local.exists():
-            image_path = candidate_local
-        else:
             image_path = candidate_repo
 
     return LabeledFrame(
@@ -227,23 +219,46 @@ def parse_label_file(file_path: Path, schema: Dict[str, List[str]], repo_root: O
     )
 
 
-def load_dataset(labels_dir: Path, schema: Dict[str, List[str]], repo_root: Optional[Path] = None) -> List[LabeledFrame]:
-    """Loads all label JSON files from directory recursively."""
-    if not labels_dir.is_dir():
-        raise FileNotFoundError(f"Labels directory not found: {labels_dir}")
+def parse_label_file(file_path: Path, schema: Dict[str, List[str]], repo_root: Optional[Path] = None) -> LabeledFrame:
+    """Parses a single label JSON file supporting both flat and nested schemas."""
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
+    frame = parse_label_dict(data, schema, repo_root, fallback_id=file_path.stem)
+    if not frame.image_path.is_file() and not frame.image_path.is_absolute():
+        candidate_local = file_path.parent / Path(data.get("image_path") or "")
+        if candidate_local.exists():
+            frame.image_path = candidate_local
+    return frame
+
+
+def load_dataset(target_path: Path, schema: Dict[str, List[str]], repo_root: Optional[Path] = None) -> List[LabeledFrame]:
+    """Loads all label JSON files from directory recursively or from a single JSON file."""
     frames: List[LabeledFrame] = []
     errors: List[str] = []
 
-    for path in sorted(labels_dir.glob("**/*.json")):
-        # Skip schema or metadata files
-        if path.name in ("label_schema.json", "schema.json", "package.json"):
-            continue
-        try:
-            frame = parse_label_file(path, schema, repo_root)
-            frames.append(frame)
-        except Exception as e:
-            errors.append(f"{path.name}: {e}")
+    if target_path.is_file():
+        with open(target_path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        items = raw if isinstance(raw, list) else raw.get("frames", [raw])
+        for idx, item in enumerate(items):
+            try:
+                frame = parse_label_dict(item, schema, repo_root, fallback_id=f"frame_{idx}")
+                frames.append(frame)
+            except Exception as e:
+                errors.append(f"item {idx}: {e}")
+    elif target_path.is_dir():
+        for path in sorted(target_path.glob("**/*.json")):
+            # Skip schema or metadata files
+            if path.name in ("label_schema.json", "schema.json", "package.json"):
+                continue
+            try:
+                frame = parse_label_file(path, schema, repo_root)
+                frames.append(frame)
+            except Exception as e:
+                errors.append(f"{path.name}: {e}")
+    else:
+        raise FileNotFoundError(f"Labels path not found: {target_path}")
 
     if errors:
         print(f"[WARN] Encountered {len(errors)} invalid label files:", file=sys.stderr)
@@ -1046,6 +1061,7 @@ def print_cli_summary(res: BenchmarkResult):
 def main():
     parser = argparse.ArgumentParser(description="Evaluate traffic & flood AI analyzer on labeled camera frames.")
     parser.add_argument("--labels-dir", default="tools/eval/labels", help="Directory with label JSON files")
+    parser.add_argument("--labels-file", default=None, help="Path to aggregated label JSON file")
     parser.add_argument("--fixtures-dir", default=None, help="Optional fixture directory with frames and labels")
     parser.add_argument("--schema", default="tools/eval/label_schema.json", help="Path to label schema JSON")
     parser.add_argument("--analyzer", choices=["mock", "vlm", "predictions", "cv-engine", "openvino"], default="mock", help="Analyzer backend to benchmark")
@@ -1066,18 +1082,20 @@ def main():
     schema_path = Path(args.schema) if Path(args.schema).is_absolute() else repo_root / args.schema
     schema = load_schema(schema_path if schema_path.exists() else None)
 
-    # Determine labels directory
-    if args.fixtures_dir:
-        labels_dir = Path(args.fixtures_dir)
-        if (labels_dir / "labels").is_dir():
-            labels_dir = labels_dir / "labels"
+    # Determine labels path
+    if args.labels_file:
+        labels_path = Path(args.labels_file) if Path(args.labels_file).is_absolute() else repo_root / args.labels_file
+    elif args.fixtures_dir:
+        labels_path = Path(args.fixtures_dir)
+        if (labels_path / "labels").is_dir():
+            labels_path = labels_path / "labels"
     else:
-        labels_dir = Path(args.labels_dir) if Path(args.labels_dir).is_absolute() else repo_root / args.labels_dir
+        labels_path = Path(args.labels_dir) if Path(args.labels_dir).is_absolute() else repo_root / args.labels_dir
 
-    print(f"[INFO] Loading dataset from: {labels_dir}")
-    frames = load_dataset(labels_dir, schema, repo_root)
+    print(f"[INFO] Loading dataset from: {labels_path}")
+    frames = load_dataset(labels_path, schema, repo_root)
     if not frames:
-        print(f"[ERROR] No valid labeled frames found in {labels_dir}", file=sys.stderr)
+        print(f"[ERROR] No valid labeled frames found in {labels_path}", file=sys.stderr)
         sys.exit(1)
 
     print(f"[INFO] Loaded {len(frames)} labeled frames")
@@ -1111,7 +1129,7 @@ def main():
         frames=frames,
         analyzer=analyzer,
         schema=schema,
-        labels_dir_str=str(labels_dir),
+        labels_dir_str=str(labels_path),
         max_flood_fnr=args.gate_max_fnr,
     )
 
@@ -1125,9 +1143,12 @@ def main():
         report_path.write_text(report_md, encoding="utf-8")
         print(f"[INFO] Wrote report to: {report_path}")
 
-    # Write JSON metrics if requested
-    if args.output_json:
-        json_path = Path(args.output_json) if Path(args.output_json).is_absolute() else repo_root / args.output_json
+    # Write JSON metrics if requested or when output_report is requested for real evaluation
+    json_path_target = args.output_json or (
+        (repo_root / "predictions_real.json") if (args.output_report and not args.fixtures_dir) else None
+    )
+    if json_path_target:
+        json_path = Path(json_path_target) if Path(json_path_target).is_absolute() else repo_root / json_path_target
         json_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Serialize result cleanly
@@ -1149,6 +1170,8 @@ def main():
         }
         json_path.write_text(json.dumps(export_data, indent=2) + "\n", encoding="utf-8")
         print(f"[INFO] Wrote JSON metrics to: {json_path}")
+        if json_path.name != "predictions_real.json" and not args.fixtures_dir:
+            (repo_root / "predictions_real.json").write_text(json.dumps(export_data, indent=2) + "\n", encoding="utf-8")
 
     if args.strict and not result.flood_gate.passed:
         print("[FAIL] Accuracy gate breached. Exiting with code 1.", file=sys.stderr)

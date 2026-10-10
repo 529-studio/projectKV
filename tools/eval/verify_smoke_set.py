@@ -420,6 +420,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument(
         "--output-markdown",
+        "--output",
         type=Path,
         help="Write Markdown report to specified file path",
     )
