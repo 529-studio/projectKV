@@ -113,8 +113,12 @@ export function mergeFloodHexCells<T extends FloodHexCellLike>(
 
 /**
  * Fallback mapping from Open-Meteo city rainfall when radar tiles are offline or empty.
+ * Unified rainfall threshold tiers (Issue #209 / ADR-006 Finding 3):
+ * - rain_mm >= 1.0: Active rain / wet pavement onset ('WET') - trigger threshold for hybrid flood pipeline
+ * - rain_mm >= 4.0: Moderate rain / water accumulation risk ('FLOODED_SHALLOW')
+ * - rain_mm >= 15.0: Heavy rain / deep inundation risk ('FLOODED_DEEP')
  * If Open-Meteo reports active precipitation (rain_mm >= 1.0 or active rain WMO code >= 61),
- * marks active monitored camera cells as WET / FLOODED_SHALLOW.
+ * marks active monitored camera cells accordingly.
  */
 export function generateOpenMeteoFallbackHexCells<T extends FloodHexCellLike = FloodHexCellLike>(
   weather: WeatherDataLike,
