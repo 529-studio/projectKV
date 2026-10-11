@@ -485,3 +485,28 @@ func TestLoadConfig_R2_Custom(t *testing.T) {
 		t.Errorf("expected R2PublicURL='https://cdn.example.com', got %q", cfg.R2PublicURL)
 	}
 }
+
+func TestLoadConfig_DevAccessToken(t *testing.T) {
+	_ = os.Setenv("DEV_ACCESS_TOKEN", "test-dev-token-999")
+	defer func() {
+		_ = os.Unsetenv("DEV_ACCESS_TOKEN")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.DevAccessToken != "test-dev-token-999" {
+		t.Errorf("expected DevAccessToken='test-dev-token-999', got %q", cfg.DevAccessToken)
+	}
+}
+
+func TestLoadConfig_LabelerSecretTokenFallback(t *testing.T) {
+	_ = os.Unsetenv("DEV_ACCESS_TOKEN")
+	_ = os.Setenv("LABELER_SECRET_TOKEN", "fallback-secret-888")
+	defer func() {
+		_ = os.Unsetenv("LABELER_SECRET_TOKEN")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.DevAccessToken != "fallback-secret-888" {
+		t.Errorf("expected DevAccessToken='fallback-secret-888', got %q", cfg.DevAccessToken)
+	}
+}

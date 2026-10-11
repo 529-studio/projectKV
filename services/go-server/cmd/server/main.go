@@ -689,7 +689,8 @@ func main() {
 		}
 		// Shared archiver snapshots and collaborative team labeler endpoints (Issue #214)
 		if archiverHandler != nil {
-			archiverHandler.RegisterRoutes(api)
+			devAuth := middleware.RequireDevAuth(cfg.DevAccessToken, cfg.AppEnv)
+			archiverHandler.RegisterRoutes(api, devAuth)
 		}
 		// Legacy alias kept for backward compat with existing FE constants.js
 		api.GET("/cameras/snapshot/:id", proxyHandler.GetSnapshot)

@@ -82,16 +82,18 @@ func NewHandler(store storage.Storage, camLookup CameraLookup) *Handler {
 	}
 }
 
-// RegisterRoutes mounts archiver routes onto the provided gin.RouterGroup.
-func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
-	rg.GET("/archiver/dates", h.ListDates)
-	rg.GET("/archiver/snapshots", h.ListSnapshots)
-	rg.GET("/archiver/snapshots/raw", h.GetSnapshotRaw)
-	rg.HEAD("/archiver/snapshots/raw", h.GetSnapshotRaw)
-	rg.GET("/archiver/labels", h.GetLabels)
-	rg.POST("/archiver/labels", h.SaveLabel)
+// RegisterRoutes mounts archiver routes onto the provided gin.RouterGroup with optional middlewares.
+func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, middlewares ...gin.HandlerFunc) {
+	archiverGroup := rg.Group("/archiver", middlewares...)
+	{
+		archiverGroup.GET("/dates", h.ListDates)
+		archiverGroup.GET("/snapshots", h.ListSnapshots)
+		archiverGroup.GET("/snapshots/raw", h.GetSnapshotRaw)
+		archiverGroup.HEAD("/snapshots/raw", h.GetSnapshotRaw)
+		archiverGroup.GET("/labels", h.GetLabels)
+		archiverGroup.POST("/labels", h.SaveLabel)
+	}
 }
-
 
 // ListDates godoc
 // @Summary List available partition dates
