@@ -36,9 +36,16 @@ export const API_ENDPOINTS = Object.freeze({
   FLOOD_QUOTA: '/api/flood/quota',
   SSE_LIVE: '/api/live/stream',
   WS_LIVE: '/ws/live',
+  ARCHIVER_DATES: '/api/archiver/dates',
+  ARCHIVER_SNAPSHOTS: '/api/archiver/snapshots',
+  ARCHIVER_LABELS: '/api/archiver/labels',
+  ARCHIVER_RAW: '/api/archiver/snapshots/raw',
 });
 
 export const getApiUrl = (endpoint: string): string => {
+  if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+    return endpoint;
+  }
   const base = process.env.NEXT_PUBLIC_API_URL || '';
   return `${base}${endpoint}`;
 };

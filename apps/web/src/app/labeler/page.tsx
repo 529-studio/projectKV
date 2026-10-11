@@ -19,6 +19,7 @@ import {
   type LabelPayload,
   type SnapshotItem,
 } from '@/utils/labelerUtils';
+import { getApiUrl } from '@/config/constants';
 
 export default function LabelerPage() {
   const [locale, setLocale] = useState<'vi' | 'en'>('vi');
@@ -73,7 +74,7 @@ export default function LabelerPage() {
 
     async function loadDates() {
       try {
-        const res = await fetch('/api/archiver/dates', {
+        const res = await fetch(getApiUrl('/api/archiver/dates'), {
           headers: buildAuthHeaders(devToken),
         });
         if (res.status === 401 || res.status === 403) {
@@ -107,10 +108,10 @@ export default function LabelerPage() {
     async function loadCatalog() {
       try {
         const [snapRes, labelRes] = await Promise.all([
-          fetch(`/api/archiver/snapshots?date=${selectedDate}&limit=200`, {
+          fetch(getApiUrl(`/api/archiver/snapshots?date=${selectedDate}&limit=200`), {
             headers: buildAuthHeaders(devToken),
           }),
-          fetch(`/api/archiver/labels?date=${selectedDate}`, {
+          fetch(getApiUrl(`/api/archiver/labels?date=${selectedDate}`), {
             headers: buildAuthHeaders(devToken),
           }),
         ]);
@@ -200,7 +201,7 @@ export default function LabelerPage() {
 
       setIsSaving(true);
       try {
-        const res = await fetch('/api/archiver/labels', {
+        const res = await fetch(getApiUrl('/api/archiver/labels'), {
           method: 'POST',
           headers: buildAuthHeaders(devToken, { 'Content-Type': 'application/json' }),
           body: JSON.stringify(payload),
@@ -298,7 +299,7 @@ export default function LabelerPage() {
     setIsUnlocking(true);
     setAuthError(null);
     try {
-      const res = await fetch('/api/archiver/dates', {
+      const res = await fetch(getApiUrl('/api/archiver/dates'), {
         headers: buildAuthHeaders(token),
       });
 
@@ -315,12 +316,24 @@ export default function LabelerPage() {
       } else if (res.status === 401 || res.status === 403) {
         setAuthError(t.devInvalidToken);
       } else if (res.status === 503) {
-        setAuthError('DEV_ACCESS_TOKEN is not configured on production');
+        setAuthError(
+          locale === 'vi'
+            ? 'Backend chưa cấu hình DEV_ACCESS_TOKEN trên production/staging (503)'
+            : 'Backend unconfigured: DEV_ACCESS_TOKEN is missing on production/staging (503)'
+        );
       } else {
-        setAuthError(t.devInvalidToken);
+        setAuthError(
+          locale === 'vi'
+            ? `Lỗi máy chủ (${res.status}): Không thể xác thực token`
+            : `Server error (${res.status}): Failed to verify token`
+        );
       }
     } catch {
-      setAuthError(t.devInvalidToken);
+      setAuthError(
+        locale === 'vi'
+          ? `Lỗi kết nối: Không thể kết nối tới Backend tại ${getApiUrl('/api/archiver/dates')}`
+          : `Connection error: Cannot reach Backend at ${getApiUrl('/api/archiver/dates')}`
+      );
     } finally {
       setIsUnlocking(false);
     }
@@ -548,8 +561,8 @@ export default function LabelerPage() {
                 <img
                   src={
                     devToken
-                      ? `${currentSnapshot.raw_url}&token=${encodeURIComponent(devToken)}`
-                      : currentSnapshot.raw_url
+                      ? `${getApiUrl(currentSnapshot.raw_url)}&token=${encodeURIComponent(devToken)}`
+                      : getApiUrl(currentSnapshot.raw_url)
                   }
                   alt={`Snapshot from camera ${currentSnapshot.camera_id}`}
                   className="max-h-full max-w-full object-contain"
