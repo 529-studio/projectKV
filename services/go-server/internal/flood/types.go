@@ -80,4 +80,3 @@ var (
 type WeatherProvider interface {
 	GetWeather(ctx context.Context) (*weather.WeatherData, error)
 }
-

@@ -136,7 +136,7 @@ func TestQuotaLimiter_ConcurrentSafety(t *testing.T) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	successCount := 0
-rejectCount := 0
+	rejectCount := 0
 
 	for i := 0; i < 50; i++ {
 		wg.Add(1)

@@ -490,6 +490,113 @@
                 }
             }
         },
+        "/flood/chokepoints": {
+            "get": {
+                "description": "Returns curated HCMC flood chokepoints and their latest verified statuses",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "flood"
+                ],
+                "summary": "List authentic municipal flood chokepoints",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/flood/quota": {
+            "get": {
+                "description": "Returns sliding-window RPM (10 max) and daily RPD (300 max) quota utilization",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "flood"
+                ],
+                "summary": "Get flood verification quota status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/flood.QuotaStatus"
+                        }
+                    }
+                }
+            }
+        },
+        "/flood/verify": {
+            "post": {
+                "description": "Triggers on-demand VLM multimodal flood verification for a camera, strictly guarded by 10 RPM and 300 RPD quotas",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "flood"
+                ],
+                "summary": "Verify flood status for a camera",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Camera ID to verify",
+                        "name": "camera_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/flood.FloodVerificationResult"
+                        }
+                    },
+                    "400": {
+                        "description": "camera_id is required",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "camera not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit or daily quota exceeded",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "503": {
+                        "description": "upstream VLM or snapshot failure",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "Liveness and readiness probe",
@@ -702,6 +809,61 @@
                 }
             }
         },
+        "flood.FloodVerificationResult": {
+            "type": "object",
+            "properties": {
+                "camera_id": {
+                    "type": "string"
+                },
+                "camera_name": {
+                    "type": "string"
+                },
+                "confidence": {
+                    "type": "number"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "flood_severity": {
+                    "type": "string"
+                },
+                "quota_remaining_day": {
+                    "type": "integer"
+                },
+                "quota_remaining_minute": {
+                    "type": "integer"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "verified_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "flood.QuotaStatus": {
+            "type": "object",
+            "properties": {
+                "current_day": {
+                    "type": "string"
+                },
+                "last_verified_at": {
+                    "type": "string"
+                },
+                "limit_rpd": {
+                    "type": "integer"
+                },
+                "limit_rpm": {
+                    "type": "integer"
+                },
+                "remaining_rpd": {
+                    "type": "integer"
+                },
+                "remaining_rpm": {
+                    "type": "integer"
+                }
+            }
+        },
         "hotset.FloodStatusResponse": {
             "type": "object",
             "properties": {
@@ -788,7 +950,8 @@
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
