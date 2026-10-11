@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 )
 
 var (
@@ -13,6 +14,13 @@ var (
 	// ErrInvalidPath is returned when a path is empty, malformed, or attempts directory traversal.
 	ErrInvalidPath = errors.New("storage: invalid path traversal")
 )
+
+// Item represents a stored object's metadata.
+type Item struct {
+	Key          string    `json:"key"`
+	Size         int64     `json:"size"`
+	LastModified time.Time `json:"last_modified,omitempty"`
+}
 
 // Storage defines the minimal abstraction for object storage.
 type Storage interface {
@@ -29,4 +37,9 @@ type Storage interface {
 
 	// Exists checks if an object exists at the specified path.
 	Exists(ctx context.Context, path string) (bool, error)
+
+	// List lists all objects matching the specified prefix.
+	// If prefix is empty, all objects are listed.
+	List(ctx context.Context, prefix string) ([]Item, error)
 }
+

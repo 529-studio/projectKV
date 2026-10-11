@@ -344,3 +344,88 @@ func TestLocalStorage_ConcurrentAccess(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestLocalStorage_List(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := NewLocalStorage(tmpDir)
+	if err != nil {
+		t.Fatalf("NewLocalStorage failed: %v", err)
+	}
+
+	ctx := context.Background()
+
+	files := map[string][]byte{
+		"2026-10-10/cam1/frame1.jpg": []byte("1234567890"),
+		"2026-10-10/cam1/frame2.jpg": []byte("12345678901234567890"),
+		"2026-10-10/cam2/frame3.jpg": []byte("123456789012345"),
+		"2026-10-11/cam1/frame4.jpg": []byte("123456789012345678901234567890"),
+	}
+
+	for p, data := range files {
+		if err := store.Put(ctx, p, bytes.NewReader(data)); err != nil {
+			t.Fatalf("Put %s failed: %v", p, err)
+		}
+	}
+
+	t.Run("List all with empty prefix", func(t *testing.T) {
+		items, err := store.List(ctx, "")
+		if err != nil {
+			t.Fatalf("List empty prefix failed: %v", err)
+		}
+		if len(items) != 4 {
+			t.Fatalf("expected 4 items, got %d", len(items))
+		}
+	})
+
+	t.Run("List prefix 2026-10-10", func(t *testing.T) {
+		items, err := store.List(ctx, "2026-10-10")
+		if err != nil {
+			t.Fatalf("List prefix failed: %v", err)
+		}
+		if len(items) != 3 {
+			t.Fatalf("expected 3 items, got %d", len(items))
+		}
+		for _, it := range items {
+			if !strings.HasPrefix(it.Key, "2026-10-10/") {
+				t.Errorf("expected key to start with 2026-10-10/, got %s", it.Key)
+			}
+			if it.Size <= 0 {
+				t.Errorf("expected positive size for %s, got %d", it.Key, it.Size)
+			}
+			if it.LastModified.IsZero() {
+				t.Errorf("expected non-zero LastModified for %s", it.Key)
+			}
+		}
+	})
+
+	t.Run("List prefix 2026-10-10/cam1", func(t *testing.T) {
+		items, err := store.List(ctx, "2026-10-10/cam1")
+		if err != nil {
+			t.Fatalf("List prefix failed: %v", err)
+		}
+		if len(items) != 2 {
+			t.Fatalf("expected 2 items, got %d", len(items))
+		}
+	})
+
+	t.Run("List nonexistent prefix returns empty slice", func(t *testing.T) {
+		items, err := store.List(ctx, "2026-01-01")
+		if err != nil {
+			t.Fatalf("List nonexistent prefix failed: %v", err)
+		}
+		if len(items) != 0 {
+			t.Fatalf("expected 0 items, got %d", len(items))
+		}
+	})
+
+	t.Run("List with path traversal returns ErrInvalidPath", func(t *testing.T) {
+		traversals := []string{"../", "../../etc", "/absolute/path"}
+		for _, p := range traversals {
+			_, err := store.List(ctx, p)
+			if !errors.Is(err, ErrInvalidPath) {
+				t.Errorf("expected ErrInvalidPath for %q, got %v", p, err)
+			}
+		}
+	})
+}
+
