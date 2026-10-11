@@ -465,11 +465,18 @@ async function loadFromAPI() {
   const defaultUrl = 'http://localhost:3000';
   const apiBase = prompt('Enter backend API Base URL (default: http://localhost:3000):', defaultUrl) || defaultUrl;
   const date = prompt('Enter partition date (YYYY-MM-DD) or leave empty for latest:', '') || '';
+  const devToken = (prompt('Enter Developer Access Token (leave empty if local dev without auth):', '') || '').trim();
   try {
     toast('Fetching snapshots from API...');
-    const query = date ? `?date=${encodeURIComponent(date)}&limit=200` : '?limit=200';
+    const queryParts = [];
+    if (date) queryParts.push(`date=${encodeURIComponent(date)}`);
+    queryParts.push('limit=200');
+    if (devToken) queryParts.push(`token=${encodeURIComponent(devToken)}`);
+    const query = `?${queryParts.join('&')}`;
+
     const url = `${apiBase.replace(/\/+$/, '')}/api/archiver/snapshots${query}`;
-    const res = await fetch(url);
+    const headers = devToken ? { 'X-Dev-Token': devToken } : {};
+    const res = await fetch(url, { headers });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     }
@@ -480,13 +487,19 @@ async function loadFromAPI() {
       return;
     }
 
-    state.frames = items.map(item => ({
-      name: item.key,
-      imageUrl: item.raw_url.startsWith('http') ? item.raw_url : `${apiBase.replace(/\/+$/, '')}${item.raw_url}`,
-      frameId: item.key,
-      cameraId: item.camera_id,
-      cameraName: item.camera_name,
-    }));
+    state.frames = items.map(item => {
+      let imgUrl = item.raw_url.startsWith('http') ? item.raw_url : `${apiBase.replace(/\/+$/, '')}${item.raw_url}`;
+      if (devToken) {
+        imgUrl += (imgUrl.includes('?') ? '&' : '?') + `token=${encodeURIComponent(devToken)}`;
+      }
+      return {
+        name: item.key,
+        imageUrl: imgUrl,
+        frameId: item.key,
+        cameraId: item.camera_id,
+        cameraName: item.camera_name,
+      };
+    });
 
     state.labels = {};
     state.index = -1;

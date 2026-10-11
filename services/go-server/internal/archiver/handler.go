@@ -293,7 +293,7 @@ func (h *Handler) GetSnapshotRaw(c *gin.Context) {
 	defer rc.Close()
 
 	c.Header("Content-Type", "image/jpeg")
-	c.Header("Cache-Control", "public, max-age=86400, immutable")
+	c.Header("Cache-Control", "private, max-age=86400, immutable")
 	_, _ = io.Copy(c.Writer, rc)
 }
 
