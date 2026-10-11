@@ -16,12 +16,13 @@ import (
 
 // Service coordinates dual-trigger flood monitoring and VLM verifications.
 type Service struct {
-	analyzer       hotset.Analyzer
-	weatherSvc     WeatherProvider
-	camReader      camera.Reader
-	limiter        *QuotaLimiter
-	chokepoints    []FloodChokepoint
-	log            *slog.Logger
+	analyzer    hotset.Analyzer
+	weatherSvc  WeatherProvider
+	camReader   camera.Reader
+	limiter     *QuotaLimiter
+	chokepoints []FloodChokepoint
+	log         *slog.Logger
+	onVerdict   func(hotset.Verdict)
 
 	mu             sync.RWMutex
 	latestVerdicts map[string]FloodVerificationResult
@@ -36,6 +37,13 @@ func WithLogger(log *slog.Logger) Option {
 		if log != nil {
 			s.log = log
 		}
+	}
+}
+
+// WithOnVerdict registers a callback triggered whenever a flood verdict is produced.
+func WithOnVerdict(cb func(hotset.Verdict)) Option {
+	return func(s *Service) {
+		s.onVerdict = cb
 	}
 }
 
@@ -170,11 +178,18 @@ func (s *Service) VerifyCamera(ctx context.Context, cameraID string) (*FloodVeri
 	s.latestVerdicts[cameraID] = res
 	s.mu.Unlock()
 
+	if s.onVerdict != nil {
+		s.onVerdict(verdict)
+	}
+
 	return &res, nil
 }
 
 // StartEnvironmentalTrigger starts a background loop polling flood chokepoints during rain events (Trigger 1).
 func (s *Service) StartEnvironmentalTrigger(ctx context.Context, pollInterval time.Duration, onVerdict func(hotset.Verdict)) {
+	if onVerdict == nil {
+		onVerdict = s.onVerdict
+	}
 	s.log.Info("flood: starting environmental trigger loop", "interval", pollInterval)
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()

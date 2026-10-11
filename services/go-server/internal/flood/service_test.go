@@ -15,8 +15,8 @@ import (
 
 // mockAnalyzer implements hotset.Analyzer for testing.
 type mockAnalyzer struct {
-	mu         sync.Mutex
-	calls      []string
+	mu              sync.Mutex
+	calls           []string
 	verdictToReturn hotset.Verdict
 	errToReturn     error
 }
@@ -82,9 +82,9 @@ func (m *mockCameraReader) ByID(id string) (*camera.Camera, bool) {
 	return c, ok
 }
 
-func (m *mockCameraReader) Zones() []string { return nil }
-func (m *mockCameraReader) Phuongs() []camera.Phuong { return nil }
-func (m *mockCameraReader) Filter(zone, corridor string) []camera.Camera { return nil }
+func (m *mockCameraReader) Zones() []string                                  { return nil }
+func (m *mockCameraReader) Phuongs() []camera.Phuong                         { return nil }
+func (m *mockCameraReader) Filter(zone, corridor string) []camera.Camera     { return nil }
 func (m *mockCameraReader) FilterByPhuong(phuongName string) []camera.Camera { return nil }
 
 func sampleChokepoints() []flood.FloodChokepoint {
