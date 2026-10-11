@@ -41,6 +41,7 @@ type Config struct {
 	FrozenFrameThreshold          int
 	HexResolution                 int
 	HexMinCameras                 int
+	DevAccessToken                string
 }
 
 func loadDotEnv() {
@@ -246,6 +247,12 @@ func LoadFromEnv() (*Config, error) {
 		}
 	}
 
+	if val := os.Getenv("DEV_ACCESS_TOKEN"); val != "" {
+		cfg.DevAccessToken = strings.TrimSpace(val)
+	} else if val := os.Getenv("LABELER_SECRET_TOKEN"); val != "" {
+		cfg.DevAccessToken = strings.TrimSpace(val)
+	}
+
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -267,6 +274,7 @@ type ServerConfig struct {
 	GeminiModel                   string // default: "gemini-3.5-flash-lite"
 	CVEngineURL                   string // default: "http://localhost:8000" or from CV_ENGINE_URL
 	AppEnv                        string // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
+	DevAccessToken                string // DEV_ACCESS_TOKEN or LABELER_SECRET_TOKEN
 	StorageDriver                 string // default: "local"
 	StorageLocalRoot              string // default: "./data/proofs"
 	R2AccountID                   string
@@ -385,6 +393,11 @@ func LoadConfig() *ServerConfig {
 		} else {
 			appEnv = "dev"
 		}
+	}
+
+	devAccessToken := strings.TrimSpace(os.Getenv("DEV_ACCESS_TOKEN"))
+	if devAccessToken == "" {
+		devAccessToken = strings.TrimSpace(os.Getenv("LABELER_SECRET_TOKEN"))
 	}
 
 	storageDriver := strings.ToLower(strings.TrimSpace(os.Getenv("STORAGE_DRIVER")))
@@ -615,6 +628,7 @@ func LoadConfig() *ServerConfig {
 		GeminiModel:                   geminiModel,
 		CVEngineURL:                   cvEngineURL,
 		AppEnv:                        appEnv,
+		DevAccessToken:                devAccessToken,
 		StorageDriver:                 storageDriver,
 		StorageLocalRoot:              storageLocalRoot,
 		R2AccountID:                   r2AccountID,

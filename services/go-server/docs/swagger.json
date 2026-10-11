@@ -8,6 +8,252 @@
     },
     "basePath": "/",
     "paths": {
+        "/api/archiver/dates": {
+            "get": {
+                "description": "Retrieve a list of dates that contain archived snapshot proof frames",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archiver"
+                ],
+                "summary": "List available partition dates",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/archiver/labels": {
+            "get": {
+                "description": "Retrieve saved human labels for a given partition date",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archiver"
+                ],
+                "summary": "List ground truth labels for date",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Partition date in YYYY-MM-DD format",
+                        "name": "date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by camera ID",
+                        "name": "camera_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/archiver.LabelListResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Record ground truth label for flood, traffic, weather, and time of day",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archiver"
+                ],
+                "summary": "Save human annotation label for a snapshot",
+                "parameters": [
+                    {
+                        "description": "Label annotation payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/archiver.LabelPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/archiver/snapshots": {
+            "get": {
+                "description": "Browse archived frames for a specific partition date with optional camera filter and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archiver"
+                ],
+                "summary": "List archived snapshot frames",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Partition date in YYYY-MM-DD format (defaults to today or latest)",
+                        "name": "date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by camera ID",
+                        "name": "camera_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of snapshots to return (1-200, default 50)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset for pagination (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/archiver.SnapshotListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/archiver/snapshots/raw": {
+            "get": {
+                "description": "Secure proxy stream of raw JPEG snapshot binary, protecting against path traversal and bypassing Zero Trust redirects",
+                "produces": [
+                    "image/jpeg"
+                ],
+                "tags": [
+                    "archiver"
+                ],
+                "summary": "Stream snapshot image binary",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Snapshot storage key",
+                        "name": "key",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/cameras": {
             "get": {
                 "description": "Retrieve full camera catalog with optional zone, corridor, and phuong filters",
@@ -645,6 +891,119 @@
         }
     },
     "definitions": {
+        "archiver.LabelListResponse": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/archiver.LabelPayload"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "archiver.LabelPayload": {
+            "type": "object",
+            "required": [
+                "camera_id",
+                "date",
+                "snapshot_key"
+            ],
+            "properties": {
+                "annotator": {
+                    "type": "string"
+                },
+                "camera_id": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "flood_level": {
+                    "description": "none, puddle, deep",
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "snapshot_key": {
+                    "type": "string"
+                },
+                "time_of_day": {
+                    "description": "day, dusk, night",
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                },
+                "traffic_level": {
+                    "description": "clear, moderate, heavy, gridlock",
+                    "type": "string"
+                },
+                "weather": {
+                    "description": "clear, rain, fog",
+                    "type": "string"
+                }
+            }
+        },
+        "archiver.SnapshotItem": {
+            "type": "object",
+            "properties": {
+                "camera_id": {
+                    "type": "string"
+                },
+                "camera_name": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "public_url": {
+                    "type": "string"
+                },
+                "raw_url": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "archiver.SnapshotListResponse": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "snapshots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/archiver.SnapshotItem"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "camera.Camera": {
             "type": "object",
             "properties": {
