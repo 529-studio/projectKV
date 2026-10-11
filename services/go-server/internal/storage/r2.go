@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -24,7 +25,9 @@ type S3API interface {
 	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
+	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
+
 
 // R2Config contains connection parameters for Cloudflare R2 storage.
 type R2Config struct {
@@ -286,3 +289,76 @@ func (s *R2Storage) PublicURL(relPath string) string {
 	}
 	return fmt.Sprintf("%s/%s", s.publicBaseURL, cleaned)
 }
+
+// List returns all stored items matching prefix from Cloudflare R2.
+func (s *R2Storage) List(ctx context.Context, prefix string) ([]Item, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	trimmed := strings.TrimSpace(prefix)
+	if strings.ContainsRune(trimmed, 0) || strings.Contains(trimmed, ":") || strings.Contains(trimmed, "\\") || strings.HasPrefix(trimmed, "/") {
+		return nil, ErrInvalidPath
+	}
+
+	var cleaned string
+	if trimmed != "" {
+		cleaned = path.Clean(trimmed)
+		if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+			return nil, ErrInvalidPath
+		}
+		if cleaned == "." {
+			cleaned = ""
+		} else if strings.HasSuffix(trimmed, "/") && !strings.HasSuffix(cleaned, "/") {
+			cleaned += "/"
+		}
+	}
+
+	var items []Item
+	var continuationToken *string
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		input := &s3.ListObjectsV2Input{
+			Bucket:            aws.String(s.bucketName),
+			ContinuationToken: continuationToken,
+		}
+		if cleaned != "" {
+			input.Prefix = aws.String(cleaned)
+		}
+
+		output, err := s.client.ListObjectsV2(ctx, input)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return nil, fmt.Errorf("storage: R2 ListObjectsV2 failed: %w", err)
+		}
+
+		for _, obj := range output.Contents {
+			key := aws.ToString(obj.Key)
+			var modTime time.Time
+			if obj.LastModified != nil {
+				modTime = *obj.LastModified
+			}
+			items = append(items, Item{
+				Key:          key,
+				Size:         aws.ToInt64(obj.Size),
+				LastModified: modTime,
+			})
+		}
+
+		if !aws.ToBool(output.IsTruncated) {
+			break
+		}
+		continuationToken = output.NextContinuationToken
+	}
+
+	if items == nil {
+		items = []Item{}
+	}
+	return items, nil
+}
+

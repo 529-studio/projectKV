@@ -196,3 +196,71 @@ func (s *LocalStorage) Exists(ctx context.Context, path string) (bool, error) {
 	}
 	return false, err
 }
+
+// List returns all stored items whose keys match the given prefix.
+func (s *LocalStorage) List(ctx context.Context, prefix string) ([]Item, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	trimmed := strings.TrimSpace(prefix)
+	if strings.ContainsRune(trimmed, 0) || filepath.IsAbs(trimmed) || strings.HasPrefix(trimmed, "/") || strings.HasPrefix(trimmed, "\\") || strings.Contains(trimmed, ":") {
+		return nil, ErrInvalidPath
+	}
+
+	cleaned := filepath.Clean(trimmed)
+	if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+		return nil, ErrInvalidPath
+	}
+
+	// Normalize prefix to forward slashes for matching
+	normalizedPrefix := filepath.ToSlash(trimmed)
+
+	var items []Item
+	err := filepath.WalkDir(s.root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), ".tmp.") {
+			return nil
+		}
+
+		rel, err := filepath.Rel(s.root, p)
+		if err != nil {
+			return err
+		}
+
+		key := filepath.ToSlash(rel)
+		if normalizedPrefix == "" || strings.HasPrefix(key, normalizedPrefix) {
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			items = append(items, Item{
+				Key:          key,
+				Size:         info.Size(),
+				LastModified: info.ModTime(),
+			})
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if items == nil {
+		items = []Item{}
+	}
+	return items, nil
+}
+
