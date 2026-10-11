@@ -31,6 +31,9 @@ export const API_ENDPOINTS = Object.freeze({
   ROAD_STATUS: (roadKey: string) => `/api/roads/${encodeURIComponent(roadKey)}/status`,
   WEATHER: '/api/weather',
   WEATHER_RADAR: '/api/weather/radar',
+  FLOOD_VERIFY: '/api/flood/verify',
+  FLOOD_CHOKEPOINTS: '/api/flood/chokepoints',
+  FLOOD_QUOTA: '/api/flood/quota',
   SSE_LIVE: '/api/live/stream',
   WS_LIVE: '/ws/live',
 });
@@ -322,6 +325,52 @@ export const PINNED_DOCK_I18N = Object.freeze({
     en: 'Drag to reorder',
   },
 });
+
+export const FLOOD_VERIFY_I18N = Object.freeze({
+  BUTTON_LABEL: {
+    vi: 'Xác minh ngập nước',
+    en: 'Verify flood status',
+  },
+  VERIFYING: {
+    vi: 'Đang xác minh VLM...',
+    en: 'Verifying with VLM...',
+  },
+  BADGE_PREFIX: {
+    vi: 'XÁC MINH VLM',
+    en: 'VLM VERIFIED',
+  },
+  RATE_LIMITED: {
+    vi: 'Đã đạt giới hạn yêu cầu (10 RPM / 300 RPD)',
+    en: 'Rate limit reached (10 RPM / 300 RPD)',
+  },
+  ERROR_GENERIC: {
+    vi: 'Xác minh thất bại. Vui lòng thử lại sau.',
+    en: 'Verification failed. Please try again later.',
+  },
+  SEVERITY: {
+    DRY: {
+      vi: 'Khô ráo',
+      en: 'Dry',
+    },
+    WET: {
+      vi: 'Đường ướt',
+      en: 'Wet road',
+    },
+    FLOODED_SHALLOW: {
+      vi: 'Ngập nông',
+      en: 'Shallow flood',
+    },
+    FLOODED_DEEP: {
+      vi: 'Ngập sâu',
+      en: 'Deep flood',
+    },
+    UNKNOWN: {
+      vi: 'Không rõ',
+      en: 'Unknown',
+    },
+  },
+});
+
 
 
 

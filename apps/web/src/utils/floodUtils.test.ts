@@ -11,6 +11,7 @@ import {
   FLOOD_I18N,
   type FloodHexCell,
 } from './floodUtils.ts';
+import { FLOOD_VERIFY_I18N } from '../config/constants.ts';
 
 describe('Flood Hex Overlay Utilities (Issue #106)', () => {
   const samplePoly: [number, number][] = [
@@ -203,5 +204,31 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     assert.equal(FLOOD_I18N.FILTER_CHIP.vi(3), 'Điểm ngập camera (3)');
     assert.equal(FLOOD_I18N.FILTER_CHIP.en(3), 'Camera flood spots (3)');
     assert.equal(FLOOD_I18N.ACTIVE_ALERT_BADGE.vi(2), 'Vùng có mưa • 2');
+  });
+
+  test('FLOOD_VERIFY_I18N has valid bilingual strings and zero emoji (Rule 1 / Issue #209)', () => {
+    assert.equal(FLOOD_VERIFY_I18N.BUTTON_LABEL.vi, 'Xác minh ngập nước');
+    assert.equal(FLOOD_VERIFY_I18N.BUTTON_LABEL.en, 'Verify flood status');
+    assert.equal(FLOOD_VERIFY_I18N.VERIFYING.vi, 'Đang xác minh VLM...');
+    assert.equal(FLOOD_VERIFY_I18N.VERIFYING.en, 'Verifying with VLM...');
+    assert.equal(FLOOD_VERIFY_I18N.BADGE_PREFIX.vi, 'XÁC MINH VLM');
+    assert.equal(FLOOD_VERIFY_I18N.BADGE_PREFIX.en, 'VLM VERIFIED');
+    assert.equal(FLOOD_VERIFY_I18N.SEVERITY.DRY.vi, 'Khô ráo');
+    assert.equal(FLOOD_VERIFY_I18N.SEVERITY.WET.vi, 'Đường ướt');
+    assert.equal(FLOOD_VERIFY_I18N.SEVERITY.FLOODED_SHALLOW.vi, 'Ngập nông');
+    assert.equal(FLOOD_VERIFY_I18N.SEVERITY.FLOODED_DEEP.vi, 'Ngập sâu');
+
+    // Emoji regex to enforce Rule 1
+    const emojiRegex = /\p{Extended_Pictographic}/u;
+    const checkNoEmoji = (obj: Record<string, unknown>) => {
+      for (const val of Object.values(obj)) {
+        if (typeof val === 'string') {
+          assert.ok(!emojiRegex.test(val), `Emoji detected in string: ${val}`);
+        } else if (typeof val === 'object' && val !== null) {
+          checkNoEmoji(val as Record<string, unknown>);
+        }
+      }
+    };
+    checkNoEmoji(FLOOD_VERIFY_I18N);
   });
 });
