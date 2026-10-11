@@ -31,12 +31,18 @@ func RequireDevAuth(devToken string, appEnv string) gin.HandlerFunc {
 			return
 		}
 
-		// Extract token from X-Dev-Token header or Authorization Bearer header
+		// Extract token from X-Dev-Token header, Authorization Bearer header, or token/dev_token query param
 		reqToken := strings.TrimSpace(c.GetHeader("X-Dev-Token"))
 		if reqToken == "" {
 			authHeader := c.GetHeader("Authorization")
 			if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
 				reqToken = strings.TrimSpace(authHeader[7:])
+			}
+		}
+		if reqToken == "" {
+			reqToken = strings.TrimSpace(c.Query("token"))
+			if reqToken == "" {
+				reqToken = strings.TrimSpace(c.Query("dev_token"))
 			}
 		}
 

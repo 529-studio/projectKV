@@ -7,6 +7,10 @@ import {
   isLabelComplete,
   formatSnapshotTimestamp,
   LABELER_I18N,
+  getStoredDevToken,
+  setStoredDevToken,
+  clearStoredDevToken,
+  buildAuthHeaders,
   type FloodLevel,
   type TrafficLevel,
   type Weather,
@@ -20,6 +24,12 @@ export default function LabelerPage() {
   const [locale, setLocale] = useState<'vi' | 'en'>('vi');
   const t = useMemo(() => LABELER_I18N[locale], [locale]);
 
+  const [devToken, setDevToken] = useState<string>('');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [inputToken, setInputToken] = useState<string>('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isUnlocking, setIsUnlocking] = useState<boolean>(false);
+
   const [dates, setDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [annotator, setAnnotator] = useState<string>('');
@@ -30,6 +40,15 @@ export default function LabelerPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Initialize dev auth token on mount
+  useEffect(() => {
+    const stored = getStoredDevToken();
+    if (stored) {
+      setDevToken(stored);
+      setIsAuthenticated(true);
+    }
+  }, []);
 
   // Load annotator nickname from localStorage
   useEffect(() => {
@@ -48,11 +67,22 @@ export default function LabelerPage() {
     }
   };
 
-  // Fetch available dates on mount
+  // Fetch available dates on mount (only when authenticated)
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     async function loadDates() {
       try {
-        const res = await fetch('/api/archiver/dates');
+        const res = await fetch('/api/archiver/dates', {
+          headers: buildAuthHeaders(devToken),
+        });
+        if (res.status === 401 || res.status === 403) {
+          clearStoredDevToken();
+          setIsAuthenticated(false);
+          setDevToken('');
+          setAuthError(t.devInvalidToken);
+          return;
+        }
         if (res.ok) {
           const data: string[] = await res.json();
           setDates(data);
@@ -65,11 +95,11 @@ export default function LabelerPage() {
       }
     }
     loadDates();
-  }, [selectedDate]);
+  }, [isAuthenticated, devToken, selectedDate, t.devInvalidToken]);
 
-  // Fetch snapshots and existing labels when selectedDate changes
+  // Fetch snapshots and existing labels when selectedDate changes (only when authenticated)
   useEffect(() => {
-    if (!selectedDate) return;
+    if (!isAuthenticated || !selectedDate) return;
 
     let isSubscribed = true;
     setIsLoading(true);
@@ -77,11 +107,23 @@ export default function LabelerPage() {
     async function loadCatalog() {
       try {
         const [snapRes, labelRes] = await Promise.all([
-          fetch(`/api/archiver/snapshots?date=${selectedDate}&limit=200`),
-          fetch(`/api/archiver/labels?date=${selectedDate}`),
+          fetch(`/api/archiver/snapshots?date=${selectedDate}&limit=200`, {
+            headers: buildAuthHeaders(devToken),
+          }),
+          fetch(`/api/archiver/labels?date=${selectedDate}`, {
+            headers: buildAuthHeaders(devToken),
+          }),
         ]);
 
         if (!isSubscribed) return;
+
+        if (snapRes.status === 401 || labelRes.status === 401 || snapRes.status === 403 || labelRes.status === 403) {
+          clearStoredDevToken();
+          setIsAuthenticated(false);
+          setDevToken('');
+          setAuthError(t.devInvalidToken);
+          return;
+        }
 
         if (snapRes.ok) {
           const snapData = await snapRes.json();
@@ -112,7 +154,7 @@ export default function LabelerPage() {
     return () => {
       isSubscribed = false;
     };
-  }, [selectedDate]);
+  }, [isAuthenticated, devToken, selectedDate, t.devInvalidToken]);
 
   const currentSnapshot: SnapshotItem | undefined = snapshots[currentIndex];
 
@@ -160,9 +202,17 @@ export default function LabelerPage() {
       try {
         const res = await fetch('/api/archiver/labels', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: buildAuthHeaders(devToken, { 'Content-Type': 'application/json' }),
           body: JSON.stringify(payload),
         });
+
+        if (res.status === 401 || res.status === 403) {
+          clearStoredDevToken();
+          setIsAuthenticated(false);
+          setDevToken('');
+          setAuthError(t.devInvalidToken);
+          return;
+        }
 
         if (res.ok) {
           setLabels((prev) => ({
@@ -183,7 +233,7 @@ export default function LabelerPage() {
         setIsSaving(false);
       }
     },
-    [currentSnapshot, selectedDate, annotator, currentDraft, currentIndex, snapshots.length]
+    [currentSnapshot, selectedDate, annotator, currentDraft, currentIndex, snapshots.length, devToken, t.devInvalidToken]
   );
 
   // Global keyboard shortcuts
@@ -240,9 +290,127 @@ export default function LabelerPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = inputToken.trim();
+    if (!token) return;
+
+    setIsUnlocking(true);
+    setAuthError(null);
+    try {
+      const res = await fetch('/api/archiver/dates', {
+        headers: buildAuthHeaders(token),
+      });
+
+      if (res.ok) {
+        setStoredDevToken(token);
+        setDevToken(token);
+        setIsAuthenticated(true);
+        setAuthError(null);
+        const data: string[] = await res.json();
+        setDates(data);
+        if (data.length > 0 && !selectedDate) {
+          setSelectedDate(data[0]);
+        }
+      } else if (res.status === 401 || res.status === 403) {
+        setAuthError(t.devInvalidToken);
+      } else if (res.status === 503) {
+        setAuthError('DEV_ACCESS_TOKEN is not configured on production');
+      } else {
+        setAuthError(t.devInvalidToken);
+      }
+    } catch {
+      setAuthError(t.devInvalidToken);
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  const handleLockSession = () => {
+    clearStoredDevToken();
+    setDevToken('');
+    setIsAuthenticated(false);
+    setInputToken('');
+    setAuthError(null);
+  };
+
   const labeledCount = useMemo(() => {
     return snapshots.filter((s) => labels[s.key]).length;
   }, [snapshots, labels]);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-black text-zinc-100 flex flex-col font-sans select-none">
+        <header className="border-b border-zinc-800 bg-zinc-950 px-4 py-3 flex items-center justify-between">
+          <Link
+            href="/"
+            className="text-xs uppercase tracking-wider px-2 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded transition"
+          >
+            ← {t.backToMap}
+          </Link>
+          <button
+            type="button"
+            onClick={() => setLocale((prev) => (prev === 'vi' ? 'en' : 'vi'))}
+            className="text-xs font-mono px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 hover:text-white hover:border-zinc-500 transition"
+          >
+            {locale.toUpperCase()}
+          </button>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-md border border-zinc-800 bg-zinc-950 p-6 rounded shadow-xl">
+            <div className="text-[10px] font-mono tracking-widest text-zinc-500 uppercase mb-2">
+              [TRUY CẬP NỘI BỘ | DEV ONLY]
+            </div>
+            <h2 className="text-base font-semibold uppercase tracking-wide text-zinc-100 mb-2">
+              {t.devAuthRequired}
+            </h2>
+            <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
+              {t.devAuthSubtitle}
+            </p>
+
+            <form onSubmit={handleUnlock} className="space-y-4">
+              <div>
+                <input
+                  type="password"
+                  value={inputToken}
+                  onChange={(e) => {
+                    setInputToken(e.target.value);
+                    if (authError) setAuthError(null);
+                  }}
+                  placeholder={t.devTokenPlaceholder}
+                  className="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-400 focus:outline-none px-3 py-2 text-xs rounded text-zinc-200 placeholder-zinc-500 font-mono transition"
+                  autoFocus
+                />
+              </div>
+
+              {authError && (
+                <div className="text-xs text-rose-400 bg-rose-950/40 border border-rose-900/60 px-3 py-2 rounded">
+                  {authError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Link
+                  href="/"
+                  className="text-xs text-zinc-400 hover:text-zinc-200 transition px-3 py-1.5"
+                >
+                  {t.backToMap}
+                </Link>
+                <button
+                  type="submit"
+                  disabled={isUnlocking || !inputToken.trim()}
+                  className="text-xs font-medium px-4 py-2 bg-zinc-100 text-black hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed rounded uppercase tracking-wider transition"
+                >
+                  {isUnlocking ? '...' : t.devUnlock}
+                </button>
+              </div>
+            </form>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 flex flex-col font-sans select-none">
@@ -280,6 +448,16 @@ export default function LabelerPage() {
             className="text-xs font-medium px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-zinc-200 transition"
           >
             {t.exportJson}
+          </button>
+
+          {/* Lock Session Button */}
+          <button
+            type="button"
+            onClick={handleLockSession}
+            title={t.devLockSession}
+            className="text-xs font-medium px-3 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded text-zinc-300 transition"
+          >
+            {t.devLockSession}
           </button>
         </div>
       </header>
@@ -368,7 +546,11 @@ export default function LabelerPage() {
               <div className="flex-1 relative flex items-center justify-center bg-black border border-zinc-800 rounded min-h-[360px] overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={currentSnapshot.raw_url}
+                  src={
+                    devToken
+                      ? `${currentSnapshot.raw_url}&token=${encodeURIComponent(devToken)}`
+                      : currentSnapshot.raw_url
+                  }
                   alt={`Snapshot from camera ${currentSnapshot.camera_id}`}
                   className="max-h-full max-w-full object-contain"
                 />
