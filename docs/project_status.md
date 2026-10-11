@@ -26,10 +26,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **128 Pull Requests** processed across repository history:
-  - **120 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, PR #215 `tooling/s5-t2-cv-detection-audit`, and PR #216 `feat/s5-t3-hybrid-flood-pipeline`)
+- **Lifetime PR History**: Exactly **130 Pull Requests** processed across repository history:
+  - **121 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, PR #215 `tooling/s5-t2-cv-detection-audit`, PR #216 `feat/s5-t3-hybrid-flood-pipeline`, and PR #217 `docs/pr-issue-linking-rule-and-template`)
   - **8 Closed** without merging
-  - **0 Open** PRs pending (PR #216 merged to `dev`)
+  - **1 Open** PR pending: PR #218 (`feat/s5-t4-r2-shared-team-labeler` for Issue #214)
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
@@ -143,8 +143,11 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
     - `POST /api/archiver/labels` and `GET /api/archiver/labels`: saves and aggregates ground-truth JSON annotations directly in storage (`labels/{date}/{camera}_{annotator}_{timestamp}.json`).
   - Built monochromatic collaborative Next.js web labeler at `apps/web/src/app/labeler/page.tsx` with high-contrast UI, bilingual support (`vi` default), zero emojis, and rapid-fire hotkeys (`1-3` flood, `Q-W-E-R` traffic, `A-S-D` weather, `Z-X-C` time of day, `Enter` save/next).
   - Enhanced standalone evaluator tool `tools/eval/labeler.html` with backend API synchronization bar (`Load from API`).
-  - Live R2 verification confirmed operational: successfully listed over 13,625 real snapshot items from partition `2026-10-11` via `verify-r2` CLI.
   - Adoption of R2 blob storage explicitly justified for collaborative team labeling friction elimination, **NOT** because system reached the ADR-004 §D7 disk capacity limit.
+  - Implemented multi-tier Developer Access Token gatekeeper (`middleware.RequireDevAuth`) protecting `/labeler` and `/api/archiver/*` against data poisoning and unauthorized access on production:
+    - Backend: Supports `X-Dev-Token`, `Authorization: Bearer`, and `?token=` / `?dev_token=` query params (for raw `<img>` binary streaming), validated via `crypto/subtle.ConstantTimeCompare`.
+    - Fail-Closed: Automatically returns `503 Service Unavailable` on production/staging if `DEV_ACCESS_TOKEN` is unset or blank.
+    - Frontend: In-place monochromatic lock screen at `/labeler`, session persistence via `sessionStorage`, and automatic token eviction upon receiving `401 Unauthorized`.
 
 ---
 
