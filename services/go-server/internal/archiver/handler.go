@@ -87,9 +87,11 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/archiver/dates", h.ListDates)
 	rg.GET("/archiver/snapshots", h.ListSnapshots)
 	rg.GET("/archiver/snapshots/raw", h.GetSnapshotRaw)
+	rg.HEAD("/archiver/snapshots/raw", h.GetSnapshotRaw)
 	rg.GET("/archiver/labels", h.GetLabels)
 	rg.POST("/archiver/labels", h.SaveLabel)
 }
+
 
 // ListDates godoc
 // @Summary List available partition dates
