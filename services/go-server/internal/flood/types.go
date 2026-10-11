@@ -1,6 +1,12 @@
 package flood
 
-import "time"
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/529-studio/projectKV/services/go-server/internal/weather"
+)
 
 // Canonical flood severity levels
 const (
@@ -62,3 +68,16 @@ type QuotaStatus struct {
 	CurrentDay     string    `json:"current_day"`
 	LastVerifiedAt time.Time `json:"last_verified_at,omitempty"`
 }
+
+// Sentinel errors for flood verification service
+var (
+	ErrRateLimited        = errors.New("rate limit exceeded (10 RPM)")
+	ErrDailyQuotaExceeded = errors.New("daily quota exceeded (300 RPD)")
+	ErrCameraNotFound     = errors.New("camera not found in catalog")
+)
+
+// WeatherProvider defines the contract for fetching weather observations.
+type WeatherProvider interface {
+	GetWeather(ctx context.Context) (*weather.WeatherData, error)
+}
+
