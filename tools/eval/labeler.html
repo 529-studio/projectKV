@@ -269,11 +269,13 @@
 <div id="topbar">
   <h1>Flood Frame Labeler</h1>
   <span id="progress">No frames loaded</span>
+  <button id="api-btn" onclick="loadFromAPI()" style="background:#1e1e1e;border:1px solid #3a3a3a;color:#fff;padding:4px 12px;border-radius:3px;cursor:pointer;font-size:12px;font-family:inherit;">Load from API</button>
   <button id="autoload-btn" onclick="tryAutoLoadManifest(true)">Auto Load (764 Frames)</button>
   <button id="open-btn" onclick="openFolder()">Open Folder</button>
   <input type="file" id="folder-input" webkitdirectory directory multiple style="display:none" onchange="handleFolderSelect(event)" />
   <button id="export-btn" onclick="exportAll()" style="display:none">Export All JSON</button>
 </div>
+
 
 <!-- Main area -->
 <div id="main">
@@ -458,8 +460,48 @@ async function tryAutoLoadManifest(explicit = false) {
   }
 }
 
+// ── Load from API ─────────────────────────────────────────────────────────────
+async function loadFromAPI() {
+  const defaultUrl = 'http://localhost:3000';
+  const apiBase = prompt('Enter backend API Base URL (default: http://localhost:3000):', defaultUrl) || defaultUrl;
+  const date = prompt('Enter partition date (YYYY-MM-DD) or leave empty for latest:', '') || '';
+  try {
+    toast('Fetching snapshots from API...');
+    const query = date ? `?date=${encodeURIComponent(date)}&limit=200` : '?limit=200';
+    const url = `${apiBase.replace(/\/+$/, '')}/api/archiver/snapshots${query}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    const data = await res.json();
+    const items = data.snapshots || [];
+    if (items.length === 0) {
+      toast(`No snapshots returned for date: ${data.date || date || 'latest'}`);
+      return;
+    }
+
+    state.frames = items.map(item => ({
+      name: item.key,
+      imageUrl: item.raw_url.startsWith('http') ? item.raw_url : `${apiBase.replace(/\/+$/, '')}${item.raw_url}`,
+      frameId: item.key,
+      cameraId: item.camera_id,
+      cameraName: item.camera_name,
+    }));
+
+    state.labels = {};
+    state.index = -1;
+    renderThumbList();
+    document.getElementById('export-btn').style.display = '';
+    navigate(1);
+    toast(`Loaded ${items.length} frames from API (${data.date || 'latest'})`);
+  } catch (err) {
+    toast('Error loading from API: ' + err.message);
+  }
+}
+
 // ── Open folder ───────────────────────────────────────────────────────────────
 async function openFolder() {
+
   if (window.showDirectoryPicker) {
     try {
       const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
