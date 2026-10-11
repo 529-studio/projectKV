@@ -302,8 +302,8 @@ type ServerConfig struct {
 	PCUThresholdCongested         float64       // default: 0.80 (PCU_THRESHOLD_CONGESTED)
 }
 
-// resolvePath checks common relative paths to support running either from root or from services/go-server.
-func resolvePath(rel string) string {
+// ResolvePath checks common relative paths to support running either from root or from services/go-server.
+func ResolvePath(rel string) string {
 	p1 := filepath.Clean(rel)
 	if _, err := os.Stat(p1); err == nil {
 		return p1
@@ -320,6 +320,10 @@ func resolvePath(rel string) string {
 	}
 
 	return rel
+}
+
+func resolvePath(rel string) string {
+	return ResolvePath(rel)
 }
 
 // LoadConfig reads configuration for the snapshot server from environment variables with sensible defaults.

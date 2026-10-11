@@ -21,6 +21,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
 	"github.com/529-studio/projectKV/services/go-server/internal/corridor"
 	"github.com/529-studio/projectKV/services/go-server/internal/cvclient"
+	"github.com/529-studio/projectKV/services/go-server/internal/flood"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
@@ -403,6 +404,66 @@ func main() {
 		}
 	}
 
+	// 6c-2. Initialize Decoupled Multimodal Flood Pipeline (Issue #209 / S5-T3).
+	// Strictly quota-guarded (10 RPM / 300 RPD) with dual triggers:
+	// Trigger 1: background environmental rain event polling on authentic municipal chokepoints.
+	// Trigger 2: on-demand commuter verification via POST /api/flood/verify.
+	var floodAnalyzer hotset.Analyzer
+	if cfg.CloudVisionAPIKey != "" {
+		floodAnalyzer = cvclient.NewCloudVisionAnalyzer(
+			cfg.CloudVisionAPIKey,
+			cvclient.WithModel(cfg.GeminiModel),
+		)
+		log.Printf("[INIT] Flood service initialized with Gemini Cloud Vision analyzer (model=%s)", cfg.GeminiModel)
+	} else if cfg.AppEnv == "dev" || cfg.Analyzer == "mock" {
+		floodAnalyzer = cvclient.NewMockAnalyzer()
+		log.Println("[INIT] Flood service initialized with Mock analyzer (dev mode)")
+	}
+
+	var floodHandler *flood.Handler
+	if floodAnalyzer != nil && camCatalog != nil {
+		floodChokepointsPath := config.ResolvePath("tools/eval/fixtures/flood_chokepoints.json")
+		chokepoints, err := flood.LoadChokepoints(floodChokepointsPath)
+		if err != nil {
+			log.Printf("[WARN] Failed to load authentic flood chokepoints from %s: %v", floodChokepointsPath, err)
+		} else {
+			log.Printf("[INIT] Loaded %d authentic municipal flood chokepoints from %s", len(chokepoints), floodChokepointsPath)
+		}
+		floodLimiter := flood.NewQuotaLimiter(10, 300)
+		onFloodVerdict := func(v hotset.Verdict) {
+			if verdictRepo != nil {
+				sv := store.Verdict{
+					CameraID:      v.CameraID,
+					Severity:      v.Severity,
+					FloodSeverity: v.FloodSeverity,
+					Confidence:    v.Confidence,
+					Source:        v.Source,
+					ObservedAt:    v.ObservedAt,
+					Timestamp:     v.Timestamp,
+				}
+				if err := verdictRepo.Save(context.Background(), sv); err != nil {
+					log.Printf("[WARN] Failed to persist flood verdict for %s: %v", v.CameraID, err)
+				}
+			}
+			floodHexAggregator.OnVerdict(v)
+			liveHub.Broadcast(v)
+		}
+		floodService := flood.NewService(
+			floodAnalyzer,
+			weatherService,
+			camCatalog,
+			chokepoints,
+			floodLimiter,
+			flood.WithOnVerdict(onFloodVerdict),
+		)
+		floodHandler = flood.NewHandler(floodService)
+
+		// Start background environmental rain polling (Trigger 1)
+		floodCtx, cancelFlood := context.WithCancel(context.Background())
+		defer cancelFlood()
+		go floodService.StartEnvironmentalTrigger(floodCtx, 60*time.Second, onFloodVerdict)
+	}
+
 	// 6d. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
 	var hotsetScheduler *hotset.Scheduler
 	if analysisEnabled && analyzer != nil {
@@ -600,6 +661,10 @@ func main() {
 		weatherHandler.RegisterRoutes(api)
 		// Map tile proxy and local disk cache
 		tileHandler.RegisterRoutes(api)
+		// Decoupled multimodal flood pipeline endpoints (Issue #209)
+		if floodHandler != nil {
+			floodHandler.RegisterRoutes(api)
+		}
 		// Legacy alias kept for backward compat with existing FE constants.js
 		api.GET("/cameras/snapshot/:id", proxyHandler.GetSnapshot)
 		api.HEAD("/cameras/snapshot/:id", proxyHandler.GetSnapshot)

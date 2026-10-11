@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
-import { API_ENDPOINTS, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
+import { API_ENDPOINTS, FLOOD_VERIFY_I18N, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
 import { getFloodSeverityLabel } from '../utils/floodUtils';
 
 interface CameraModalProps {
@@ -43,6 +43,17 @@ export default function CameraModal({
   const [fetchTimestamp, setFetchTimestamp] = useState<number>(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [osdTime, setOsdTime] = useState<string | null>(null);
+  const [isVerifyingFlood, setIsVerifyingFlood] = useState(false);
+  const [floodVerifyResult, setFloodVerifyResult] = useState<{
+    camera_id: string;
+    camera_name: string;
+    flood_severity: string;
+    confidence: number;
+    description?: string;
+    source: string;
+    verified_at: string;
+  } | null>(null);
+  const [floodVerifyError, setFloodVerifyError] = useState<string | null>(null);
   const mountTimeRef = useRef<number>(Date.now());
   // Camera id whose ghost probe is currently in flight (prevents duplicate probes).
   const probeInFlightRef = useRef<string | null>(null);
@@ -53,10 +64,41 @@ export default function CameraModal({
     setFetchTimestamp(Date.now());
     setElapsedSeconds(0);
     setOsdTime(null);
+    setIsVerifyingFlood(false);
+    setFloodVerifyResult(null);
+    setFloodVerifyError(null);
     if (typeof window !== 'undefined') {
       window.getSelection()?.removeAllRanges();
     }
   }, [camera?.id]);
+
+  const handleVerifyFlood = useCallback(async () => {
+    if (!camera?.id || isVerifyingFlood) return;
+    setIsVerifyingFlood(true);
+    setFloodVerifyError(null);
+
+    try {
+      const url = `${getApiUrl(API_ENDPOINTS.FLOOD_VERIFY)}?camera_id=${encodeURIComponent(camera.id)}`;
+      const res = await fetch(url, { method: 'POST' });
+      if (!res.ok) {
+        if (res.status === 429) {
+          setFloodVerifyError(lang === 'vi' ? FLOOD_VERIFY_I18N.RATE_LIMITED.vi : FLOOD_VERIFY_I18N.RATE_LIMITED.en);
+        } else {
+          const errJson = await res.json().catch(() => null);
+          setFloodVerifyError(
+            errJson?.error || (lang === 'vi' ? FLOOD_VERIFY_I18N.ERROR_GENERIC.vi : FLOOD_VERIFY_I18N.ERROR_GENERIC.en)
+          );
+        }
+        return;
+      }
+      const data = await res.json();
+      setFloodVerifyResult(data);
+    } catch {
+      setFloodVerifyError(lang === 'vi' ? FLOOD_VERIFY_I18N.ERROR_GENERIC.vi : FLOOD_VERIFY_I18N.ERROR_GENERIC.en);
+    } finally {
+      setIsVerifyingFlood(false);
+    }
+  }, [camera?.id, isVerifyingFlood, lang]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target !== e.currentTarget) return;
@@ -327,7 +369,65 @@ export default function CameraModal({
                   [{lang === 'vi' ? 'Chờ phân tích AI' : 'Awaiting AI analysis'}]
                 </span>
               )}
+
+              {/* On-Demand Flood Verification Trigger 2 (Issue #209 / S5-T3) */}
+              {isActuallyAvailable && (
+                <button
+                  type="button"
+                  onClick={handleVerifyFlood}
+                  disabled={isVerifyingFlood}
+                  className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-mono transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  title={lang === 'vi' ? 'Xác minh tình trạng ngập nước thực địa qua mô hình VLM' : 'Verify real-time flood status via VLM model'}
+                >
+                  {isVerifyingFlood
+                    ? `[${lang === 'vi' ? FLOOD_VERIFY_I18N.VERIFYING.vi : FLOOD_VERIFY_I18N.VERIFYING.en}]`
+                    : `[${lang === 'vi' ? FLOOD_VERIFY_I18N.BUTTON_LABEL.vi : FLOOD_VERIFY_I18N.BUTTON_LABEL.en}]`}
+                </button>
+              )}
+
+              {floodVerifyResult && (
+                <span
+                  className={`px-2 py-0.5 rounded border text-xs font-bold inline-flex items-center gap-1.5 ${
+                    floodVerifyResult.flood_severity === 'DRY'
+                      ? 'border-zinc-500/80 bg-zinc-900/60 text-zinc-200'
+                      : floodVerifyResult.flood_severity === 'WET'
+                      ? 'border-sky-500/80 bg-sky-950/60 text-sky-300'
+                      : floodVerifyResult.flood_severity === 'FLOODED_SHALLOW'
+                      ? 'border-amber-500/80 bg-amber-950/60 text-amber-300'
+                      : floodVerifyResult.flood_severity === 'FLOODED_DEEP'
+                      ? 'border-rose-500/80 bg-rose-950/60 text-rose-300'
+                      : 'border-zinc-700 bg-zinc-900 text-zinc-400'
+                  }`}
+                  title={
+                    floodVerifyResult.description
+                      ? `${floodVerifyResult.description} (${(floodVerifyResult.confidence * 100).toFixed(0)}%)`
+                      : undefined
+                  }
+                >
+                  <span>
+                    [{lang === 'vi' ? FLOOD_VERIFY_I18N.BADGE_PREFIX.vi : FLOOD_VERIFY_I18N.BADGE_PREFIX.en}:{' '}
+                    {FLOOD_VERIFY_I18N.SEVERITY[floodVerifyResult.flood_severity as keyof typeof FLOOD_VERIFY_I18N.SEVERITY]?.[lang] ||
+                      floodVerifyResult.flood_severity}]
+                  </span>
+                  {floodVerifyResult.confidence > 0 && (
+                    <span className="text-[10px] opacity-75 font-normal">
+                      {(floodVerifyResult.confidence * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </span>
+              )}
+
+              {floodVerifyError && (
+                <span className="px-2 py-0.5 rounded border border-rose-800 bg-rose-950/80 text-rose-300 text-xs font-mono">
+                  [{floodVerifyError}]
+                </span>
+              )}
             </div>
+            {floodVerifyResult?.description && (
+              <div className="mt-1.5 text-xs text-zinc-400 font-mono italic">
+                &ldquo;{floodVerifyResult.description}&rdquo;
+              </div>
+            )}
           </div>
           <button
             onClick={onClose}
