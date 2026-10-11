@@ -89,7 +89,7 @@ func main() {
 		}
 	}
 
-	log.Printf("[TEST 5/5] Cleaning up test artifact via DeleteObject...")
+	log.Printf("[TEST 5/6] Cleaning up test artifact via DeleteObject...")
 	if err := store.Delete(ctx, testKey); err != nil {
 		log.Fatalf("[FAIL] Delete failed: %v", err)
 	}
@@ -102,5 +102,12 @@ func main() {
 	}
 	log.Println("[PASS] Cleanup verified. Test object removed.")
 
-	log.Println("[SUCCESS] All Cloudflare R2 storage tests PASSED! Integration is fully operational.")
+	log.Printf("[TEST 6/6] Testing List operation on live R2 partition (prefix %q)...", now.Format("2006-01-02"))
+	items, err := store.List(ctx, now.Format("2006-01-02"))
+	if err != nil {
+		log.Fatalf("[FAIL] List failed on R2: %v", err)
+	}
+	log.Printf("[PASS] List returned %d items from live R2 partition %q.", len(items), now.Format("2006-01-02"))
+
+	log.Println("[SUCCESS] All Cloudflare R2 storage tests (including List) PASSED! Integration is fully operational.")
 }
