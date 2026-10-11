@@ -42,4 +42,3 @@ type Storage interface {
 	// If prefix is empty, all objects are listed.
 	List(ctx context.Context, prefix string) ([]Item, error)
 }
-

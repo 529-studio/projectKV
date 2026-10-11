@@ -28,7 +28,6 @@ type S3API interface {
 	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
 
-
 // R2Config contains connection parameters for Cloudflare R2 storage.
 type R2Config struct {
 	Endpoint        string
@@ -361,4 +360,3 @@ func (s *R2Storage) List(ctx context.Context, prefix string) ([]Item, error) {
 	}
 	return items, nil
 }
-
