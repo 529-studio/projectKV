@@ -517,7 +517,7 @@ export default function LabelerPage() {
           )}
           {saveStatus === 'error' && (
             <span className="text-red-400 bg-red-950/50 border border-red-900 px-2 py-0.5 rounded text-[11px]">
-              Lỗi Lưu
+              {t.saveError}
             </span>
           )}
         </div>

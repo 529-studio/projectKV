@@ -109,6 +109,7 @@ describe('Labeler Utilities & Hotkeys (Issue #214)', () => {
       assert.ok(strings.devUnlock);
       assert.ok(strings.devInvalidToken);
       assert.ok(strings.devLockSession);
+      assert.ok(strings.saveError);
     }
   });
 });
