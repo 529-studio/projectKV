@@ -1,0 +1,162 @@
+{
+  "version": "1.0.0",
+  "description": "Curated Ho Chi Minh City municipal flood hotspot cameras based on official Sở Xây dựng TP.HCM and UDI flood monitoring reports (Sprint 5 Task S5-T3 / Issue #209).",
+  "created_at": "2026-10-11T05:30:00Z",
+  "citation_sources": [
+    "Sở Xây dựng Thành phố Hồ Chí Minh (Department of Construction) — Báo cáo Công tác Thoát nước và Chống ngập đô thị",
+    "Trung tâm Quản lý Hạ tầng Kỹ thuật TP.HCM (UDI) — Danh mục các điểm ngập do mưa và triều cường",
+    "Ban Quản lý Dự án Đầu tư Xây dựng Hạ tầng Đô thị TP.HCM (UIP) — Kế hoạch tổng thể chống ngập lưu vực trung tâm"
+  ],
+  "chokepoints": [
+    {
+      "camera_id": "586e2995f9fab7001111b0b5",
+      "camera_name": "Ung Văn Khiêm - Nguyễn Gia Trí (D2)",
+      "district": "Bình Thạnh",
+      "flood_mechanism": "compound",
+      "typical_depth_cm": 35,
+      "coordinates": {
+        "latitude": 10.8075192972885,
+        "longitude": 106.716395616531
+      },
+      "h3_res7": "8765b5671ffffff",
+      "h3_res9": "8965b567157ffff",
+      "citation": "UDI HCMC Annual Flood Monitoring Register — Bình Thạnh low-lying tidal & torrential runoff convergence zone.",
+      "notes": "Severe tidal influx from Sài Gòn River combined with local heavy rainfall regularly submerges the roadway to wheel height."
+    },
+    {
+      "camera_id": "66b1c3fa779f740018674146",
+      "camera_name": "Nguyễn Hữu Cảnh - Ung Văn Khiêm",
+      "district": "Bình Thạnh",
+      "flood_mechanism": "rain",
+      "typical_depth_cm": 40,
+      "coordinates": {
+        "latitude": 10.7991305062692,
+        "longitude": 106.723707318306
+      },
+      "h3_res7": "8765b5675ffffff",
+      "h3_res9": "8965b56756bffff",
+      "citation": "Sở Xây dựng TP.HCM Flood Prevention Bulletin — Historic Văn Thánh basin depression.",
+      "notes": "Low-lying intersection receiving massive overland stormwater discharge towards the Văn Thánh canal gateway."
+    },
+    {
+      "camera_id": "5a8254b05058170011f6eac3",
+      "camera_name": "Xô Viết Nghệ Tĩnh - Nguyễn Xí 1 (Cầu Đỏ)",
+      "district": "Bình Thạnh",
+      "flood_mechanism": "compound",
+      "typical_depth_cm": 30,
+      "coordinates": {
+        "latitude": 10.809674419948,
+        "longitude": 106.712254285812
+      },
+      "h3_res7": "8765b5671ffffff",
+      "h3_res9": "8965b56710bffff",
+      "citation": "UDI HCMC Flood Monitoring Map — Cầu Đỏ / Nguyễn Xí tidal depression.",
+      "notes": "Chronic tidal spillback from Rạch Cầu Đỏ combined with narrow bottleneck geometry causes rapid standing water buildup."
+    },
+    {
+      "camera_id": "63bd1f21bfd3d90017ec3d04",
+      "camera_name": "Huỳnh Tấn Phát - Phạm Hữu Lầu",
+      "district": "District 7",
+      "flood_mechanism": "tidal",
+      "typical_depth_cm": 45,
+      "coordinates": {
+        "latitude": 10.7052043577961,
+        "longitude": 106.737660169601
+      },
+      "h3_res7": "8765b574effffff",
+      "h3_res9": "8965b574e37ffff",
+      "citation": "Sở Xây dựng TP.HCM Southern Flood Bulletin — Huỳnh Tấn Phát arterial tidal chokepoint.",
+      "notes": "Direct tidal backflow from Nhà Bè river system flooding multi-kilometer roadway during peak lunar tidal cycles."
+    },
+    {
+      "camera_id": "662a88521afb9c00172d2592",
+      "camera_name": "Kinh Dương Vương - Hồ Học Lãm",
+      "district": "Bình Tân",
+      "flood_mechanism": "compound",
+      "typical_depth_cm": 50,
+      "coordinates": {
+        "latitude": 10.7281852870275,
+        "longitude": 106.607261896133
+      },
+      "h3_res7": "8765b529affffff",
+      "h3_res9": "8965b529a97ffff",
+      "citation": "UDI Western Gateway Inundation Audit — Hồ Học Lãm arterial gateway.",
+      "notes": "Depression basin connecting southwestern industrial hubs; flood depth reaches knee-height during combined tide and heavy rain."
+    },
+    {
+      "camera_id": "6623f4df6f998a001b2528eb",
+      "camera_name": "Quốc Lộ 13 - Cầu Ông Dầu",
+      "district": "TP Thủ Đức",
+      "flood_mechanism": "rain",
+      "typical_depth_cm": 35,
+      "coordinates": {
+        "latitude": 10.8361932799182,
+        "longitude": 106.713809967041
+      },
+      "h3_res7": "8765b5673ffffff",
+      "h3_res9": "8965b567363ffff",
+      "citation": "Sở Xây dựng TP.HCM Northern Arterial Report — Cầu Ông Dầu culvert choke point.",
+      "notes": "Insufficient culvert capacity under QL13 causes fast-rising storm runoff accumulation across both directional carriageways."
+    },
+    {
+      "camera_id": "5d8cd98d766c88001718895a",
+      "camera_name": "Phạm Văn Đồng - Tô Ngọc Vân",
+      "district": "TP Thủ Đức",
+      "flood_mechanism": "rain",
+      "typical_depth_cm": 30,
+      "coordinates": {
+        "latitude": 10.8533952979021,
+        "longitude": 106.751462817192
+      },
+      "h3_res7": "8765b5609ffffff",
+      "h3_res9": "8965b560913ffff",
+      "citation": "Thủ Đức City Flood Management Register — Linh Đông / Tô Ngọc Vân depression.",
+      "notes": "Natural local depression on the northern flank of Phạm Văn Đồng expressway receiving sudden downhill stormwater."
+    },
+    {
+      "camera_id": "662b55111afb9c00172d8e2e",
+      "camera_name": "Quang Trung - Phạm Văn Chiêu",
+      "district": "Gò Vấp",
+      "flood_mechanism": "rain",
+      "typical_depth_cm": 40,
+      "coordinates": {
+        "latitude": 10.8446442571047,
+        "longitude": 106.640725135803
+      },
+      "h3_res7": "8765b565dffffff",
+      "h3_res9": "8965b565d8fffff",
+      "citation": "Gò Vấp District Drainage Infrastructure Report — Chợ Thạch Đà / Phạm Văn Chiêu basin.",
+      "notes": "Chronic storm runoff collector area in northern Gò Vấp where surface water stalls due to saturated drainage trunks."
+    },
+    {
+      "camera_id": "662b52a31afb9c00172d8b01",
+      "camera_name": "Lê Đức Thọ - Hẻm 688",
+      "district": "Gò Vấp",
+      "flood_mechanism": "rain",
+      "typical_depth_cm": 35,
+      "coordinates": {
+        "latitude": 10.846467192202,
+        "longitude": 106.670604944229
+      },
+      "h3_res7": "8765b5642ffffff",
+      "h3_res9": "8965b565c93ffff",
+      "citation": "UDI Gò Vấp Drainage Bulletin — Lê Đức Thọ low-elevation sag.",
+      "notes": "Drainage trunk congestion causing road inundation and vehicle stalling during convective rainfall over 50mm."
+    },
+    {
+      "camera_id": "587c782db807da0011e33d3b",
+      "camera_name": "Võ Nguyên Giáp - Thảo Điền",
+      "district": "TP Thủ Đức",
+      "flood_mechanism": "compound",
+      "typical_depth_cm": 30,
+      "coordinates": {
+        "latitude": 10.8010116814233,
+        "longitude": 106.738277077675
+      },
+      "h3_res7": "8765b5670ffffff",
+      "h3_res9": "8965b567083ffff",
+      "citation": "UDI Thảo Điền Urban Drainage Monitor — Rạch Thảo Điền overflow.",
+      "notes": "High river tide coupled with local runoff floods the service road and expressway feeder lanes."
+    }
+  ]
+}

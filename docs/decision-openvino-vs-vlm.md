@@ -49,7 +49,7 @@ To reach a sound engineering decision, four dimensions were evaluated using empi
 | **Citywide Sweep (708 Cameras)** | 312.0 seconds (needs scaling) | **30.77 seconds** (meets 30s SLA) | **2,832.0 seconds** (47.2 minutes) |
 | **Network Egress / Internet Dependency** | 0 KB (100% air-gapped local network) | 0 KB (100% air-gapped local network) | ~110 GB / month outbound bandwidth |
 
-**Empirical Takeaway**: Reverting continuous 30-second camera polling to a cloud VLM is **economically non-viable and architecturally impossible** on free-tier quotas. Even on paid tiers, Gemini's 15 RPM free cap and per-token pricing make continuous polling fragile, subject to network jitter, upstream 429 throttling, and recurring operational cost. In contrast, OpenVINO on `dev-box` delivers **24.01 FPS**, processing the entire Hot Set in **2.24 seconds** with **$0 API cost**.
+**Empirical Takeaway**: Reverting continuous 30-second camera polling to a cloud VLM is **economically non-viable and architecturally impossible** on free-tier quotas. Even on paid tiers, Gemini's 15 RPM free cap and per-token pricing make continuous polling fragile, subject to network jitter, upstream 429 throttling, and recurring operational cost. In contrast, OpenVINO on `dev-box` delivers **24.01 FPS**, processing the entire Hot Set in **2.24 seconds** with **$0 API/SaaS cost** (though physical self-hosting on homelab/`dev-box` incurs real, non-zero electricity, bandwidth, and hardware amortisation costs).
 
 ### 2.2 Criterion 2: Hardware Resource Consumption & Isolation
 
@@ -101,7 +101,7 @@ While OpenVINO excels at vehicle detection, the T4 evaluation proved it has two 
   2. **Upgrade OpenVINO model input resolution from $320 \times 320$ to $416 \times 416$ or $640 \times 640$ on `dev-box`**: Benchmarks confirm `dev-box` has $>90\%$ CPU idle headroom during 30s cycles, allowing higher resolution to resolve the motorcycle recall gap without exceeding hardware limits.
   3. **Decouple VLM into an On-Demand & Event-Triggered Analyzer**:
      - *On-Demand User Inspection*: When a commuter clicks a camera modal in the web app, trigger an optional VLM analysis for natural-language descriptions.
-     - *Targeted Flood Auditing*: When Open-Meteo rain radar detects active precipitation ($\ge 2.0\text{ mm/h}$) over known flood chokepoints, dispatch low-frequency VLM verification runs within the 500 RPD daily quota.
+     - *Targeted Flood Auditing*: When Open-Meteo rain radar detects active precipitation ($\ge 1.0\text{ mm}$, aligning with `apps/web/src/utils/rainHexUtils.ts` wet road onset threshold) over authentic municipal flood chokepoints (curated in `tools/eval/fixtures/flood_chokepoints.json`, distinct from traffic smoke cameras), dispatch low-frequency VLM verification runs strictly within the 10 RPM sliding window and 300 RPD daily quota guard.
 - **Verdict**: **ADOPTED**.
 
 ---
@@ -124,7 +124,7 @@ While OpenVINO excels at vehicle detection, the T4 evaluation proved it has two 
    - Flood detection is strictly decoupled from the vehicle object detector.
    - VLM inference (`ANALYZER=vlm`) is reserved for low-frequency targeted checks:
      - User-initiated modal inquiries.
-     - Rainstorm-triggered validation on the 10 known flood chokepoints during active rain radar events (strictly adhering to the 15 RPM / 500 RPD quota guard).
+     - Rainstorm-triggered validation on the 10 authentic municipal flood chokepoints (`tools/eval/fixtures/flood_chokepoints.json`) during active rain events ($\text{rain\_mm} \ge 1.0\text{ mm}$), strictly adhering to the 10 RPM sliding window / 300 RPD daily quota guard.
 
 4. **Safety Gate Compliance**:
    - Until a dedicated flood detector or decoupled VLM flood verifier satisfies the ADR-004 §D6 safety gate ($\text{FNR} \le 5.0\%$), the web UI flood banner will maintain honest labeling per ADR-005: displaying rain radar reflectivity and explicit ground-truth state rather than unverified model guesses.

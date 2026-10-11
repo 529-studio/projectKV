@@ -2,8 +2,8 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.0.8  
-**Last Updated:** 2026-10-10  
+**Document Version:** 1.1.0  
+**Last Updated:** 2026-10-11  
 
 ---
 
@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **126 Pull Requests** processed across repository history:
-  - **117 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, and PR #213 `infra/s5-t4-tailscale-failover-drill`)
+- **Lifetime PR History**: Exactly **128 Pull Requests** processed across repository history:
+  - **119 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, and PR #215 `tooling/s5-t2-cv-detection-audit`)
   - **8 Closed** without merging
-  - **1 Open** PR pending: PR #212 (`feat/r2-storage-integration`) targeting `dev`
+  - **1 Open** PR pending: PR #216 (`feat/s5-t3-hybrid-flood-pipeline`) targeting `dev` (CI hardened against remote schema timeouts and Go module cache path configured)
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
@@ -121,6 +121,16 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Standardized snapshot object key path to Vietnam ICT (`Asia/Ho_Chi_Minh`, UTC+7): `YYYY-MM-DD/<camera_id>/<unix_timestamp>_<reason>.jpg`.
   - Public Edge CDN delivery integration via `https://file.529studio.site`, unblocking collaborative web labeling workflows for the entire engineering team.
   - Implemented and verified standalone CLI verification commands in Go (`services/go-server/cmd/verify-r2`) and Python (`tools/storage/verify_r2.py`), confirming 100% upload, head, get, edge CDN (HTTP 200), and cleanup success against live Cloudflare R2.
+- **Decoupled Hybrid Flood Pipeline (Sprint 5 Task S5-T3, Issue #209)**:
+  - Curated 10 authentic municipal flood hotspots in `tools/eval/fixtures/flood_chokepoints.json` based on official Sở Xây dựng TP.HCM and UDI flood monitoring bulletins, with zero overlap with the 10 traffic smoke cameras.
+  - Reconciled rainfall threshold divergence across frontend (`rainHexUtils.ts`) and backend documentation at 1.0 mm (wet pavement onset), 4.0 mm (shallow flood risk), and 15.0 mm (deep flood risk). Corrected documentation discrepancies cited in ADR-006 Finding 3.
+  - Implemented dual-trigger VLM dispatch subsystem under leaf modulith package `services/go-server/internal/flood`:
+    1. *Trigger 1 (Environmental)*: Background polling loop inspecting flood chokepoints only during active rain events ($\text{rain\_mm} \ge 1.0\text{ mm}$ or active rain WMO codes), consuming exactly 0 VLM requests during dry weather.
+    2. *Trigger 2 (User On-Demand)*: Commuter-initiated verification via `POST /api/flood/verify?camera_id=...` action button in the camera modal.
+  - Enforced strict in-process rate limiting (10 RPM sliding window) and daily quota budgeting (300 RPD calendar day rollover) via thread-safe `QuotaLimiter`.
+  - Enhanced web client `CameraModal.tsx` with a monochromatic `[XÁC MINH NGẬP NƯỚC]` action button, loading spinner, and bilingual zero-emoji status badges (`[XÁC MINH VLM: KHÔ RÁO]`, `[XÁC MINH VLM: ĐƯỜNG ƯỚT]`, `[XÁC MINH VLM: NGẬP NÔNG]`, `[XÁC MINH VLM: NGẬP SÂU]`).
+  - Regenerated Swagger API documentation via `make swagger` (`/api/flood/verify`, `/api/flood/chokepoints`, `/api/flood/quota`).
+  - Verified 100% test coverage across Go backend (`./internal/flood/...`, `./...`) and web client (93 unit tests).
 
 ---
 
