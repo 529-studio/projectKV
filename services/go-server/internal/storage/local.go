@@ -263,4 +263,3 @@ func (s *LocalStorage) List(ctx context.Context, prefix string) ([]Item, error) 
 	}
 	return items, nil
 }
-

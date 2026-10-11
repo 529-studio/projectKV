@@ -186,6 +186,22 @@ func cameraToHotSet(c camera.Camera) hotset.Camera {
 	}
 }
 
+type cameraTitleAdapter struct {
+	catalog *camera.Catalog
+}
+
+func (a cameraTitleAdapter) GetCameraTitle(id string) string {
+	if a.catalog != nil {
+		if cam, ok := a.catalog.ByID(id); ok {
+			if cam.DisplayName != "" {
+				return cam.DisplayName
+			}
+			return cam.Title
+		}
+	}
+	return ""
+}
+
 func main() {
 	cfg := config.LoadConfig()
 
@@ -464,45 +480,50 @@ func main() {
 		go floodService.StartEnvironmentalTrigger(floodCtx, 60*time.Second, onFloodVerdict)
 	}
 
-	// 6d. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
+	// 6d. Initialize object storage driver and shared team archiver handler (Issue #62, #214)
+	var storeDriver storage.Storage
+	var retentionRootDir string
+
+	switch strings.ToLower(cfg.StorageDriver) {
+	case "r2", "s3":
+		r2Store, err := storage.NewR2Storage(context.Background(), storage.R2Config{
+			Endpoint:        cfg.R2Endpoint,
+			AccountID:       cfg.R2AccountID,
+			BucketName:      cfg.R2BucketName,
+			Region:          cfg.R2Region,
+			AccessKeyID:     cfg.R2AccessKeyID,
+			SecretAccessKey: cfg.R2SecretAccessKey,
+			PublicBaseURL:   cfg.R2PublicURL,
+		})
+		if err != nil {
+			log.Fatalf("[FATAL] Refusing to start: failed to initialize Cloudflare R2 storage driver: %v", err)
+		}
+		storeDriver = r2Store
+		retentionRootDir = ""
+		log.Printf("[INIT] Cloudflare R2 storage driver initialized (bucket=%s, endpoint=%s, publicURL=%s)",
+			cfg.R2BucketName, cfg.R2Endpoint, cfg.R2PublicURL)
+	case "local":
+		fallthrough
+	default:
+		localStore, err := storage.NewLocalStorage(cfg.StorageLocalRoot)
+		if err != nil {
+			log.Printf("[WARN] Failed to initialize storage driver (%s): %v", cfg.StorageLocalRoot, err)
+		} else {
+			storeDriver = localStore
+			retentionRootDir = cfg.StorageLocalRoot
+			log.Printf("[INIT] Local storage driver initialized (root=%s)", cfg.StorageLocalRoot)
+		}
+	}
+
+	var archiverHandler *archiver.Handler
+	if storeDriver != nil {
+		archiverHandler = archiver.NewHandler(storeDriver, cameraTitleAdapter{catalog: camCatalog})
+	}
+
+	// 6e. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
 	var hotsetScheduler *hotset.Scheduler
 	if analysisEnabled && analyzer != nil {
-		// Initialize object storage and snapshot archiver (Issue #62, Cloudflare R2 integration)
 		var arch *archiver.Archiver
-		var storeDriver storage.Storage
-		var retentionRootDir string
-
-		switch strings.ToLower(cfg.StorageDriver) {
-		case "r2", "s3":
-			r2Store, err := storage.NewR2Storage(context.Background(), storage.R2Config{
-				Endpoint:        cfg.R2Endpoint,
-				AccountID:       cfg.R2AccountID,
-				BucketName:      cfg.R2BucketName,
-				Region:          cfg.R2Region,
-				AccessKeyID:     cfg.R2AccessKeyID,
-				SecretAccessKey: cfg.R2SecretAccessKey,
-				PublicBaseURL:   cfg.R2PublicURL,
-			})
-			if err != nil {
-				log.Fatalf("[FATAL] Refusing to start: failed to initialize Cloudflare R2 storage driver: %v", err)
-			}
-			storeDriver = r2Store
-			retentionRootDir = ""
-			log.Printf("[INIT] Cloudflare R2 storage driver initialized (bucket=%s, endpoint=%s, publicURL=%s)",
-				cfg.R2BucketName, cfg.R2Endpoint, cfg.R2PublicURL)
-		case "local":
-			fallthrough
-		default:
-			localStore, err := storage.NewLocalStorage(cfg.StorageLocalRoot)
-			if err != nil {
-				log.Printf("[WARN] Failed to initialize storage driver (%s): %v", cfg.StorageLocalRoot, err)
-			} else {
-				storeDriver = localStore
-				retentionRootDir = cfg.StorageLocalRoot
-				log.Printf("[INIT] Local storage driver initialized (root=%s)", cfg.StorageLocalRoot)
-			}
-		}
-
 		if storeDriver != nil {
 			archCfg := archiver.Config{
 				SampleInterval: time.Duration(cfg.ArchiveSampleIntervalSeconds) * time.Second,
@@ -525,6 +546,7 @@ func main() {
 		}
 
 		onVerdict := func(v hotset.Verdict) {
+
 			now := time.Now()
 			if v.ObservedAt.IsZero() {
 				v.ObservedAt = now
@@ -664,6 +686,10 @@ func main() {
 		// Decoupled multimodal flood pipeline endpoints (Issue #209)
 		if floodHandler != nil {
 			floodHandler.RegisterRoutes(api)
+		}
+		// Shared archiver snapshots and collaborative team labeler endpoints (Issue #214)
+		if archiverHandler != nil {
+			archiverHandler.RegisterRoutes(api)
 		}
 		// Legacy alias kept for backward compat with existing FE constants.js
 		api.GET("/cameras/snapshot/:id", proxyHandler.GetSnapshot)

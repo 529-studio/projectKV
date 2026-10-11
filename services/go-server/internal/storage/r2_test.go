@@ -10,7 +10,6 @@ import (
 	"sync"
 	"testing"
 
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -128,7 +127,6 @@ func (m *mockS3Client) ListObjectsV2(ctx context.Context, params *s3.ListObjects
 		Contents: contents,
 	}, nil
 }
-
 
 func TestR2Storage_InterfaceCompliance(t *testing.T) {
 	store := NewR2StorageWithClient(newMockS3Client(), "test-bucket", "https://file.529studio.site")
@@ -356,4 +354,3 @@ func TestR2Storage_List(t *testing.T) {
 		}
 	})
 }
-
