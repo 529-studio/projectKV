@@ -2,8 +2,9 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.1.1  
+**Document Version:** 1.1.2  
 **Last Updated:** 2026-10-11  
+
 
 ---
 
@@ -83,9 +84,11 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Four active GitHub issues created on `529-studio/projectKV`:
     - [#207](https://github.com/529-studio/projectKV/issues/207): S5-T1 — `[tooling] re-run D6 benchmark and smoke test with post-T5 weights` (**Completed / Verified**): Re-ran real D6 benchmark across all 764 frames with post-T5 weights (`CapacityFloor=15.0`). Traffic Macro F1 resulted in **0.206** (Weighted 0.351), confirming the ADR-006 Finding 2 mathematical paradox: lowering CapacityFloor doubled false-positive CONGESTED classifications on actual CLEAR frames (from 22 to 46 frames, +109%) without resolving missed bottlenecks (67/73 CONGESTED frames missed as CLEAR). Flood Safety Gate remained at 100.0% FNR. Smoke pass rate reached 50.0% (5/10), unblocking S5-T2 object detection audit.
     - [#208](https://github.com/529-studio/projectKV/issues/208): S5-T2 — `[cv-engine] object detection audit for false-positive/missed detections` (**Completed / Verified**): Diagnosed root causes for both perception failure modes (a) missed congestion queues and (b) clear-road hallucinations. Proved that missing Non-Maximum Suppression (NMS) in `cv-engine/server.py` caused a 2.7x–4.7x anchor duplication multiplying 3–5 cars into 28–39 detections, and 1.78x non-uniform aspect ratio stretch crushed detection confidence by ~35% on real queues. Identified ground-truth annotation discrepancy on `Mai Chí Thọ - Đồng Văn Cống 2` (active construction zone with physically empty road). Formulated 5 concrete resolution proposals (NMS with IoU 0.45, letterboxing, 416x416 resolution upgrade, cross-class NMS, and ground-truth correction). Committed automated audit tooling (`tools/eval/audit_cv_detections.py`), visual overlays (`docs/reports/audit_overlays/`), structured findings (`docs/reports/cv_detection_error_audit.json`), and comprehensive audit report (`docs/reports/cv_detection_error_audit.md`).
-    - [#209](https://github.com/529-studio/projectKV/issues/209): S5-T3 — `[go-server + web] decoupled hybrid flood pipeline`
+    - [#209](https://github.com/529-studio/projectKV/issues/209): S5-T3 — `[go-server + web] decoupled hybrid flood pipeline` (**Completed / Merged in PR #216**).
     - [#210](https://github.com/529-studio/projectKV/issues/210): S5-T4 — `[infra] physical Tailscale disconnection test for dev-box failover` (**Completed / Verified**): Executed live physical network partition and worker outage chaos drill on Staging (`homesrv` Stack 14 $\leftrightarrow$ `dev-box` Stack 17). Demonstrated 100% clean graceful degradation to `SeverityUnknown` (`source: "fallback"` then `source: "circuit_breaker"`) with 0 panics, 0 memory leaks (RAM bounded at 37.8 MB, 14.8%), and zero frozen stale states. Verified standby container `warded-model` reachability within `core-network`. Verified automated Circuit Breaker reset and live telemetry recovery upon worker restoration. Runbook documented in `docs/runbook_dev_box_failover.md` and empirical proof in `docs/reports/tailscale_failover_drill_report.md`.
+    - [#214](https://github.com/529-studio/projectKV/issues/214): S5-T4 — `[infra + web] S5-T4 — R2 blob storage for archiver + shared team labeler` (**Completed / Verified**): Implemented storage `List` abstraction across Local and R2 drivers, backend archiver proxy streaming and label persistence endpoints, and built collaborative monochromatic Next.js team web labeler (`apps/web/src/app/labeler`).
   - Operational wave guide and `agy` CLI instructions compiled in [`docs/sprint5_execution_guide.md`](sprint5_execution_guide.md).
+
 
 - **Inference Runtime**:
   - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
@@ -131,8 +134,20 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Enhanced web client `CameraModal.tsx` with a monochromatic `[XÁC MINH NGẬP NƯỚC]` action button, loading spinner, and bilingual zero-emoji status badges (`[XÁC MINH VLM: KHÔ RÁO]`, `[XÁC MINH VLM: ĐƯỜNG ƯỚT]`, `[XÁC MINH VLM: NGẬP NÔNG]`, `[XÁC MINH VLM: NGẬP SÂU]`).
   - Regenerated Swagger API documentation via `make swagger` (`/api/flood/verify`, `/api/flood/chokepoints`, `/api/flood/quota`).
   - Verified 100% test coverage across Go backend (`./internal/flood/...`, `./...`) and web client (93 unit tests).
+- **R2 Blob Storage Archiver & Shared Team Labeler (Sprint 5 Task S5-T4, Issue #214)**:
+  - Extended core `storage.Storage` interface with object listing method `List(ctx, prefix) ([]Item, error)` implemented across both `LocalStorage` (filesystem walk) and `R2Storage` (`s3.ListObjectsV2` pagination).
+  - Implemented secure backend archiver HTTP routes in `services/go-server/internal/archiver`:
+    - `GET /api/archiver/dates`: returns sorted partition dates (e.g. `["2026-10-11", "2026-10-10"]`).
+    - `GET /api/archiver/snapshots`: browses snapshot items with metadata, pagination, and camera filtering.
+    - `GET /api/archiver/snapshots/raw`: streams raw JPEG binary with immutable cache headers and strict path traversal validation (`ErrInvalidPath`), bypassing Cloudflare Access Zero Trust redirects.
+    - `POST /api/archiver/labels` and `GET /api/archiver/labels`: saves and aggregates ground-truth JSON annotations directly in storage (`labels/{date}/{camera}_{annotator}_{timestamp}.json`).
+  - Built monochromatic collaborative Next.js web labeler at `apps/web/src/app/labeler/page.tsx` with high-contrast UI, bilingual support (`vi` default), zero emojis, and rapid-fire hotkeys (`1-3` flood, `Q-W-E-R` traffic, `A-S-D` weather, `Z-X-C` time of day, `Enter` save/next).
+  - Enhanced standalone evaluator tool `tools/eval/labeler.html` with backend API synchronization bar (`Load from API`).
+  - Live R2 verification confirmed operational: successfully listed over 13,625 real snapshot items from partition `2026-10-11` via `verify-r2` CLI.
+  - Adoption of R2 blob storage explicitly justified for collaborative team labeling friction elimination, **NOT** because system reached the ADR-004 §D7 disk capacity limit.
 
 ---
+
 
 ## 4. Local Development Quickstart
 
