@@ -2,7 +2,7 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.0.9  
+**Document Version:** 1.1.0  
 **Last Updated:** 2026-10-11  
 
 ---
@@ -25,10 +25,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **126 Pull Requests** processed across repository history:
-  - **117 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, and PR #213 `infra/s5-t4-tailscale-failover-drill`)
+- **Lifetime PR History**: Exactly **128 Pull Requests** processed across repository history:
+  - **119 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, and PR #215 `tooling/s5-t2-cv-detection-audit`)
   - **8 Closed** without merging
-  - **1 Open** PR pending: PR #212 (`feat/r2-storage-integration`) targeting `dev`
+  - **1 Open** PR pending: PR #216 (`feat/s5-t3-hybrid-flood-pipeline`) targeting `dev` (CI hardened against remote schema timeouts and Go module cache path configured)
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
