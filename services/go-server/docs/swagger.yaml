@@ -1,5 +1,81 @@
 basePath: /
 definitions:
+  archiver.LabelListResponse:
+    properties:
+      date:
+        type: string
+      labels:
+        items:
+          $ref: '#/definitions/archiver.LabelPayload'
+        type: array
+      total:
+        type: integer
+    type: object
+  archiver.LabelPayload:
+    properties:
+      annotator:
+        type: string
+      camera_id:
+        type: string
+      date:
+        type: string
+      flood_level:
+        description: none, puddle, deep
+        type: string
+      notes:
+        type: string
+      snapshot_key:
+        type: string
+      time_of_day:
+        description: day, dusk, night
+        type: string
+      timestamp:
+        type: integer
+      traffic_level:
+        description: clear, moderate, heavy, gridlock
+        type: string
+      weather:
+        description: clear, rain, fog
+        type: string
+    required:
+    - camera_id
+    - date
+    - snapshot_key
+    type: object
+  archiver.SnapshotItem:
+    properties:
+      camera_id:
+        type: string
+      camera_name:
+        type: string
+      key:
+        type: string
+      public_url:
+        type: string
+      raw_url:
+        type: string
+      reason:
+        type: string
+      size:
+        type: integer
+      timestamp:
+        type: integer
+    type: object
+  archiver.SnapshotListResponse:
+    properties:
+      date:
+        type: string
+      limit:
+        type: integer
+      offset:
+        type: integer
+      snapshots:
+        items:
+          $ref: '#/definitions/archiver.SnapshotItem'
+        type: array
+      total:
+        type: integer
+    type: object
   camera.Camera:
     properties:
       displayName:
@@ -298,6 +374,171 @@ info:
   title: Camera View API
   version: "1.0"
 paths:
+  /api/archiver/dates:
+    get:
+      description: Retrieve a list of dates that contain archived snapshot proof frames
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List available partition dates
+      tags:
+      - archiver
+  /api/archiver/labels:
+    get:
+      description: Retrieve saved human labels for a given partition date
+      parameters:
+      - description: Partition date in YYYY-MM-DD format
+        in: query
+        name: date
+        type: string
+      - description: Filter by camera ID
+        in: query
+        name: camera_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/archiver.LabelListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List ground truth labels for date
+      tags:
+      - archiver
+    post:
+      consumes:
+      - application/json
+      description: Record ground truth label for flood, traffic, weather, and time
+        of day
+      parameters:
+      - description: Label annotation payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/archiver.LabelPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Save human annotation label for a snapshot
+      tags:
+      - archiver
+  /api/archiver/snapshots:
+    get:
+      description: Browse archived frames for a specific partition date with optional
+        camera filter and pagination
+      parameters:
+      - description: Partition date in YYYY-MM-DD format (defaults to today or latest)
+        in: query
+        name: date
+        type: string
+      - description: Filter by camera ID
+        in: query
+        name: camera_id
+        type: string
+      - description: Maximum number of snapshots to return (1-200, default 50)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset for pagination (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/archiver.SnapshotListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List archived snapshot frames
+      tags:
+      - archiver
+  /api/archiver/snapshots/raw:
+    get:
+      description: Secure proxy stream of raw JPEG snapshot binary, protecting against
+        path traversal and bypassing Zero Trust redirects
+      parameters:
+      - description: Snapshot storage key
+        in: query
+        name: key
+        required: true
+        type: string
+      produces:
+      - image/jpeg
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Stream snapshot image binary
+      tags:
+      - archiver
   /api/cameras:
     get:
       description: Retrieve full camera catalog with optional zone, corridor, and
