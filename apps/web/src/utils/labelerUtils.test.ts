@@ -5,6 +5,7 @@ import {
   isLabelComplete,
   LABELER_I18N,
   formatSnapshotTimestamp,
+  buildAuthHeaders,
   type LabelState,
 } from './labelerUtils.ts';
 
@@ -88,4 +89,27 @@ describe('Labeler Utilities & Hotkeys (Issue #214)', () => {
     const formatted = formatSnapshotTimestamp(1728637200);
     assert.ok(formatted.includes('16:00') || formatted.includes('2024'));
   });
+
+  test('buildAuthHeaders constructs X-Dev-Token and Bearer authorization headers', () => {
+    const empty = buildAuthHeaders('');
+    assert.deepEqual(empty, {});
+
+    const withBase = buildAuthHeaders('my-secret-token', { 'Content-Type': 'application/json' });
+    assert.equal(withBase['Content-Type'], 'application/json');
+    assert.equal(withBase['X-Dev-Token'], 'my-secret-token');
+    assert.equal(withBase['Authorization'], 'Bearer my-secret-token');
+  });
+
+  test('LABELER_I18N contains developer auth gatekeeper strings', () => {
+    for (const locale of ['vi', 'en'] as const) {
+      const strings = LABELER_I18N[locale];
+      assert.ok(strings.devAuthRequired);
+      assert.ok(strings.devAuthSubtitle);
+      assert.ok(strings.devTokenPlaceholder);
+      assert.ok(strings.devUnlock);
+      assert.ok(strings.devInvalidToken);
+      assert.ok(strings.devLockSession);
+    }
+  });
 });
+

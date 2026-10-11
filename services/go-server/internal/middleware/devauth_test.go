@@ -130,3 +130,23 @@ func TestRequireDevAuth_ConfiguredSecret_Dev_Enforced(t *testing.T) {
 		t.Fatalf("expected 401 Unauthorized in dev when secret is configured, got %d", w.Code)
 	}
 }
+
+func TestRequireDevAuth_ValidQueryParamToken(t *testing.T) {
+	r := setupAuthRouter("secret-query-123", "production")
+
+	// Test ?token=...
+	req1, _ := http.NewRequest(http.MethodGet, "/protected?token=secret-query-123", nil)
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK with ?token=..., got %d", w1.Code)
+	}
+
+	// Test ?dev_token=...
+	req2, _ := http.NewRequest(http.MethodGet, "/protected?dev_token=secret-query-123", nil)
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK with ?dev_token=..., got %d", w2.Code)
+	}
+}

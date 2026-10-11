@@ -185,6 +185,12 @@ export const LABELER_I18N = {
     unsavedBadge: 'Chưa lưu',
     exportJson: 'Xuất Dữ Liệu JSON',
     backToMap: 'Về Bản Đồ',
+    devAuthRequired: 'Yêu Cầu Quyền Truy Cập Developer',
+    devAuthSubtitle: 'Khu vực gán nhãn dữ liệu nội bộ. Vui lòng nhập Developer Access Token để tiếp tục.',
+    devTokenPlaceholder: 'Nhập mã truy cập dev...',
+    devUnlock: 'Mở Khóa (Enter)',
+    devInvalidToken: 'Mã xác thực không hợp lệ hoặc chưa được cấp quyền',
+    devLockSession: 'Khóa Phiên',
   },
   en: {
     title: 'Snapshot Dataset Labeler',
@@ -221,5 +227,47 @@ export const LABELER_I18N = {
     unsavedBadge: 'Unsaved',
     exportJson: 'Export JSON',
     backToMap: 'Back to Map',
+    devAuthRequired: 'Developer Access Required',
+    devAuthSubtitle: 'Internal ground truth labeling workspace. Please enter Developer Access Token to continue.',
+    devTokenPlaceholder: 'Enter developer access token...',
+    devUnlock: 'Unlock (Enter)',
+    devInvalidToken: 'Invalid or unauthorized developer token',
+    devLockSession: 'Lock Session',
   },
 } as const;
+
+export const DEV_TOKEN_STORAGE_KEY = 'labeler_dev_token';
+
+export function getStoredDevToken(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return sessionStorage.getItem(DEV_TOKEN_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setStoredDevToken(token: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(DEV_TOKEN_STORAGE_KEY, token.trim());
+  } catch {}
+}
+
+export function clearStoredDevToken(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem(DEV_TOKEN_STORAGE_KEY);
+  } catch {}
+}
+
+export function buildAuthHeaders(token: string, baseHeaders?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...(baseHeaders || {}) };
+  const clean = token.trim();
+  if (clean) {
+    headers['X-Dev-Token'] = clean;
+    headers['Authorization'] = `Bearer ${clean}`;
+  }
+  return headers;
+}
+
