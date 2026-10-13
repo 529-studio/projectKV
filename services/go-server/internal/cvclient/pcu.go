@@ -89,17 +89,19 @@ func DefaultPCUBucketThresholds() PCUBucketThresholds {
 
 // PCUConfig packages all parameters required by the PCUCalculator.
 type PCUConfig struct {
-	Weights       PCUWeights
-	Thresholds    PCUBucketThresholds
-	CapacityFloor float64 // default: 15.0 (calibrated from 25.0)
+	Weights         PCUWeights
+	Thresholds      PCUBucketThresholds
+	CapacityFloor   float64 // default: 15.0 (calibrated from 25.0)
+	HysteresisDelta float64 // default: 0.05 (Schmitt trigger deadband preventing state chattering)
 }
 
 // DefaultPCUConfig provides sensible defaults conforming to ADR-004 §9 D15 and calibrated under Issue #196.
 func DefaultPCUConfig() PCUConfig {
 	return PCUConfig{
-		Weights:       DefaultPCUWeights(),
-		Thresholds:    DefaultPCUBucketThresholds(),
-		CapacityFloor: 15.0,
+		Weights:         DefaultPCUWeights(),
+		Thresholds:      DefaultPCUBucketThresholds(),
+		CapacityFloor:   15.0,
+		HysteresisDelta: 0.05,
 	}
 }
 
@@ -113,13 +115,15 @@ type CapacityStore interface {
 // and maps the result to traffic severity levels. It maintains thread-safe
 // historical peak observations per camera to establish realistic capacity baselines.
 type PCUCalculator struct {
-	weights       PCUWeights
-	thresholds    PCUBucketThresholds
-	capacityFloor float64
+	weights         PCUWeights
+	thresholds      PCUBucketThresholds
+	capacityFloor   float64
+	hysteresisDelta float64
 
 	mu             sync.RWMutex
 	capacities     map[string]float64
 	baseCapacities map[string]float64
+	lastSeverities map[string]string
 	store          CapacityStore
 	persistWG      sync.WaitGroup
 }
@@ -130,12 +134,18 @@ func NewPCUCalculator(cfg PCUConfig) *PCUCalculator {
 	if floor <= 0 {
 		floor = 1.0 // Strictly guard against divide-by-zero or zero floor
 	}
+	delta := cfg.HysteresisDelta
+	if delta <= 0 {
+		delta = 0.05
+	}
 	return &PCUCalculator{
-		weights:        cfg.Weights,
-		thresholds:     cfg.Thresholds,
-		capacityFloor:  floor,
-		capacities:     make(map[string]float64),
-		baseCapacities: make(map[string]float64),
+		weights:         cfg.Weights,
+		thresholds:      cfg.Thresholds,
+		capacityFloor:   floor,
+		hysteresisDelta: delta,
+		capacities:      make(map[string]float64),
+		baseCapacities:  make(map[string]float64),
+		lastSeverities:  make(map[string]string),
 	}
 }
 
@@ -227,7 +237,7 @@ func (c *PCUCalculator) Calculate(cameraID string, counts VehicleCounts, fallbac
 		return hotset.SeverityClear, 0.0, 0.0
 	}
 
-	// Step 2: Update historical peak capacity for this camera.
+	// Step 2: Update historical peak capacity for this camera and retrieve previous severity.
 	c.mu.Lock()
 	histMax := c.capacities[cameraID]
 	needsPersist := false
@@ -240,6 +250,7 @@ func (c *PCUCalculator) Calculate(cameraID string, counts VehicleCounts, fallbac
 	if base, ok := c.baseCapacities[cameraID]; ok && base > 0 {
 		baseFloor = base
 	}
+	prevSev := c.lastSeverities[cameraID]
 	store := c.store
 	c.mu.Unlock()
 
@@ -260,19 +271,83 @@ func (c *PCUCalculator) Calculate(cameraID string, counts VehicleCounts, fallbac
 	}
 	saturationIndex = pcuTotal / effectiveCapacity
 
-	// Step 4: Map Saturation Index into severity bucket.
-	switch {
-	case saturationIndex >= c.thresholds.Congested:
-		severity = hotset.SeverityCongested
-	case saturationIndex >= c.thresholds.Heavy:
-		severity = hotset.SeverityHeavy
-	case saturationIndex >= c.thresholds.Moderate:
-		severity = hotset.SeverityModerate
-	default:
-		severity = hotset.SeverityClear
-	}
+	// Step 4: Map Saturation Index into severity bucket with Hysteresis (Schmitt Trigger).
+	// Prevents rapid ping-pong / chattering around boundary thresholds.
+	severity = c.mapSeverityWithHysteresis(saturationIndex, prevSev)
+
+	c.mu.Lock()
+	c.lastSeverities[cameraID] = severity
+	c.mu.Unlock()
 
 	return severity, pcuTotal, saturationIndex
+}
+
+// mapSeverityWithHysteresis applies a Schmitt trigger deadband so that state transitions
+// do not flicker rapidly when traffic hovers right at threshold boundaries.
+func (c *PCUCalculator) mapSeverityWithHysteresis(si float64, prev string) string {
+	d := c.hysteresisDelta
+
+	switch prev {
+	case hotset.SeverityCongested:
+		// Falling from CONGESTED: requires dropping below Congested - d (e.g. 0.75)
+		if si < c.thresholds.Congested-d {
+			if si < c.thresholds.Heavy-d {
+				if si < c.thresholds.Moderate-d {
+					return hotset.SeverityClear
+				}
+				return hotset.SeverityModerate
+			}
+			return hotset.SeverityHeavy
+		}
+		return hotset.SeverityCongested
+
+	case hotset.SeverityHeavy:
+		// Rising to CONGESTED:
+		if si >= c.thresholds.Congested {
+			return hotset.SeverityCongested
+		}
+		// Falling from HEAVY: requires dropping below Heavy - d (e.g. 0.55)
+		if si < c.thresholds.Heavy-d {
+			if si < c.thresholds.Moderate-d {
+				return hotset.SeverityClear
+			}
+			return hotset.SeverityModerate
+		}
+		return hotset.SeverityHeavy
+
+	case hotset.SeverityModerate:
+		// Rising to CONGESTED or HEAVY:
+		if si >= c.thresholds.Congested {
+			return hotset.SeverityCongested
+		}
+		if si >= c.thresholds.Heavy {
+			return hotset.SeverityHeavy
+		}
+		// Falling from MODERATE: requires dropping below Moderate - d (e.g. 0.25)
+		if si < c.thresholds.Moderate-d {
+			return hotset.SeverityClear
+		}
+		return hotset.SeverityModerate
+
+	default: // SeverityClear or cold-start
+		switch {
+		case si >= c.thresholds.Congested:
+			return hotset.SeverityCongested
+		case si >= c.thresholds.Heavy:
+			return hotset.SeverityHeavy
+		case si >= c.thresholds.Moderate:
+			return hotset.SeverityModerate
+		default:
+			return hotset.SeverityClear
+		}
+	}
+}
+
+// GetLastSeverity returns the last observed severity for cameraID.
+func (c *PCUCalculator) GetLastSeverity(cameraID string) string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.lastSeverities[cameraID]
 }
 
 // GetCapacity returns the current effective capacity for cameraID.
