@@ -179,10 +179,11 @@ func cameraToHotSet(c camera.Camera) hotset.Camera {
 		name = strings.TrimSpace(c.Title)
 	}
 	return hotset.Camera{
-		ID:          c.ID,
-		Name:        name,
-		Zone:        c.Zone,
-		SnapshotURL: c.SnapshotURL,
+		ID:           c.ID,
+		Name:         name,
+		Zone:         c.Zone,
+		SnapshotURL:  c.SnapshotURL,
+		BaseCapacity: c.BaseCapacity,
 	}
 }
 
@@ -320,9 +321,25 @@ func main() {
 			CapacityFloor: cfg.PCUCapacityFloor,
 		}
 		pcuCalc := cvclient.NewPCUCalculator(pcuConfig)
+		if camCatalog != nil {
+			for _, cam := range camCatalog.All() {
+				if cam.BaseCapacity > 0 {
+					pcuCalc.SetBaseCapacity(cam.ID, cam.BaseCapacity)
+				}
+			}
+		}
+		if db != nil {
+			capacityRepo := store.NewCapacityRepo(db)
+			pcuCalc.SetCapacityStore(capacityRepo)
+			if err := pcuCalc.LoadLearnedCapacities(context.Background()); err != nil {
+				log.Printf("[WARN] Failed to load learned camera capacities from SQLite: %v", err)
+			} else {
+				log.Printf("[INIT] Loaded persistent learned camera capacities from SQLite")
+			}
+		}
 		analyzer = cvclient.NewCVEngineAnalyzer(cfg.CVEngineURL, nil, cvclient.WithPCUCalculator(pcuCalc))
 		analysisEnabled = true
-		log.Printf("[INIT] ANALYZER=onnx active (url=%s, interval=%ds, maxParallel=%d, fixedCameras=%d, pcuFloor=%.1f). Hot Set scheduler will run self-hosted OpenVINO inference with PCU-weighted Saturation Index.",
+		log.Printf("[INIT] ANALYZER=onnx active (url=%s, interval=%ds, maxParallel=%d, fixedCameras=%d, pcuFloor=%.1f). Hot Set scheduler will run self-hosted OpenVINO inference with corridor-specific PCU capacity.",
 			cfg.CVEngineURL, cfg.HotsetIntervalSeconds, cfg.HotsetMaxParallel, cfg.HotsetFixedMaxCameras, cfg.PCUCapacityFloor)
 	case "none", "":
 		log.Println("[INIT] ANALYZER=none: Analysis scheduler is disabled. No camera_verdicts will be recorded and no SSE camera_update will be emitted.")
