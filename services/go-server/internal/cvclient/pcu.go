@@ -1,8 +1,10 @@
 package cvclient
 
 import (
+	"context"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 )
@@ -101,6 +103,12 @@ func DefaultPCUConfig() PCUConfig {
 	}
 }
 
+// CapacityStore defines the persistence interface for learned camera capacities across restarts.
+type CapacityStore interface {
+	Save(ctx context.Context, cameraID string, learnedMax float64) error
+	GetAll(ctx context.Context) (map[string]float64, error)
+}
+
 // PCUCalculator computes the PCU-weighted Saturation Index for camera frames
 // and maps the result to traffic severity levels. It maintains thread-safe
 // historical peak observations per camera to establish realistic capacity baselines.
@@ -109,8 +117,11 @@ type PCUCalculator struct {
 	thresholds    PCUBucketThresholds
 	capacityFloor float64
 
-	mu         sync.RWMutex
-	capacities map[string]float64
+	mu             sync.RWMutex
+	capacities     map[string]float64
+	baseCapacities map[string]float64
+	store          CapacityStore
+	persistWG      sync.WaitGroup
 }
 
 // NewPCUCalculator constructs a PCUCalculator initialized with cfg.
@@ -120,19 +131,82 @@ func NewPCUCalculator(cfg PCUConfig) *PCUCalculator {
 		floor = 1.0 // Strictly guard against divide-by-zero or zero floor
 	}
 	return &PCUCalculator{
-		weights:       cfg.Weights,
-		thresholds:    cfg.Thresholds,
-		capacityFloor: floor,
-		capacities:    make(map[string]float64),
+		weights:        cfg.Weights,
+		thresholds:     cfg.Thresholds,
+		capacityFloor:  floor,
+		capacities:     make(map[string]float64),
+		baseCapacities: make(map[string]float64),
 	}
+}
+
+// SetBaseCapacity registers the physical corridor design capacity for cameraID
+// (e.g., 40.0 - 50.0 PCU for 10-12 lane expressways, 25.0 - 30.0 for 4-6 lane arterials).
+func (c *PCUCalculator) SetBaseCapacity(cameraID string, capacity float64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if capacity > 0 {
+		c.baseCapacities[cameraID] = capacity
+	}
+}
+
+// GetBaseCapacity returns the corridor base capacity for cameraID, falling back
+// to capacityFloor if no corridor-specific capacity is registered.
+func (c *PCUCalculator) GetBaseCapacity(cameraID string) float64 {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if cap, ok := c.baseCapacities[cameraID]; ok && cap > 0 {
+		return cap
+	}
+	return c.capacityFloor
+}
+
+// CapacityFloor returns the global fallback capacity floor.
+func (c *PCUCalculator) CapacityFloor() float64 {
+	return c.capacityFloor
+}
+
+// SetCapacityStore attaches a persistence store to save newly learned peak capacities.
+func (c *PCUCalculator) SetCapacityStore(store CapacityStore) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.store = store
+}
+
+// LoadLearnedCapacities seeds the calculator with historical peak capacities from store.
+func (c *PCUCalculator) LoadLearnedCapacities(ctx context.Context) error {
+	c.mu.RLock()
+	s := c.store
+	c.mu.RUnlock()
+	if s == nil {
+		return nil
+	}
+	caps, err := s.GetAll(ctx)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for id, val := range caps {
+		if val > c.capacities[id] {
+			c.capacities[id] = val
+		}
+	}
+	return nil
+}
+
+// WaitPersist blocks until all asynchronous capacity persistence writes finish.
+// Primarily used in unit tests and graceful shutdown.
+func (c *PCUCalculator) WaitPersist() {
+	c.persistWG.Wait()
 }
 
 // Calculate computes the total PCU score and Saturation Index (SI) for cameraID,
 // returning the corresponding traffic severity label (CLEAR, MODERATE, HEAVY, CONGESTED).
 //
 // Cold-Start & Divide-by-Zero Handling (ADR-004 §6 D12):
-// Brand-new cameras lack historical maximum counts. The calculator uses capacityFloor
-// until a higher peak is observed, guaranteeing that effective capacity is strictly positive.
+// Brand-new cameras lack historical maximum counts. The calculator uses the corridor-specific
+// base capacity (or capacityFloor fallback) until a higher peak is observed, guaranteeing that
+// effective capacity is strictly positive and proportional to physical lane geometry.
 func (c *PCUCalculator) Calculate(cameraID string, counts VehicleCounts, fallbackTotal int) (severity string, pcuTotal float64, saturationIndex float64) {
 	// Step 1: Compute total PCU.
 	// Container count is weighted using c.weights.Container (defaults to c.weights.Truck = 2.0).
@@ -156,14 +230,31 @@ func (c *PCUCalculator) Calculate(cameraID string, counts VehicleCounts, fallbac
 	// Step 2: Update historical peak capacity for this camera.
 	c.mu.Lock()
 	histMax := c.capacities[cameraID]
+	needsPersist := false
 	if pcuTotal > histMax {
 		histMax = pcuTotal
 		c.capacities[cameraID] = histMax
+		needsPersist = true
 	}
+	baseFloor := c.capacityFloor
+	if base, ok := c.baseCapacities[cameraID]; ok && base > 0 {
+		baseFloor = base
+	}
+	store := c.store
 	c.mu.Unlock()
 
+	if needsPersist && store != nil {
+		c.persistWG.Add(1)
+		go func(id string, learnedMax float64) {
+			defer c.persistWG.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = store.Save(ctx, id, learnedMax)
+		}(cameraID, histMax)
+	}
+
 	// Step 3: Compute Saturation Index (SI).
-	effectiveCapacity := math.Max(histMax, c.capacityFloor)
+	effectiveCapacity := math.Max(histMax, baseFloor)
 	if effectiveCapacity < 1.0 {
 		effectiveCapacity = 1.0
 	}
@@ -188,7 +279,11 @@ func (c *PCUCalculator) Calculate(cameraID string, counts VehicleCounts, fallbac
 func (c *PCUCalculator) GetCapacity(cameraID string) float64 {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return math.Max(c.capacities[cameraID], c.capacityFloor)
+	baseFloor := c.capacityFloor
+	if base, ok := c.baseCapacities[cameraID]; ok && base > 0 {
+		baseFloor = base
+	}
+	return math.Max(c.capacities[cameraID], baseFloor)
 }
 
 // SetCapacity overrides the learned capacity for cameraID (useful for testing or pre-calibration).
