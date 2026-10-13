@@ -70,7 +70,7 @@ func (h *Handler) VerifyCamera(c *gin.Context) {
 			})
 			return
 		}
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "verification service temporarily unavailable"})
 		return
 	}
 

@@ -17,7 +17,7 @@ import (
 
 // geminiEndpoint is the Gemini multimodal generateContent REST endpoint.
 // Model can be overridden at construction time via WithModel.
-const geminiEndpointTemplate = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
+const geminiEndpointTemplate = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent"
 
 // defaultGeminiModel is the production default.
 const defaultGeminiModel = "gemini-3.5-flash-lite"
@@ -258,12 +258,13 @@ func (a *CloudVisionAnalyzer) callGemini(ctx context.Context, imgBytes []byte, m
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	endpoint := fmt.Sprintf(geminiEndpointTemplate, a.model, a.apiKey)
+	endpoint := fmt.Sprintf(geminiEndpointTemplate, a.model)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("build gemini request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", a.apiKey)
 
 	resp, err := a.httpClient.Do(req)
 	if err != nil {
