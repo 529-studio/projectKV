@@ -3,6 +3,14 @@ import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
 import { API_ENDPOINTS, FLOOD_VERIFY_I18N, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
 import { getFloodSeverityLabel } from '../utils/floodUtils';
+import {
+  calculateCooldownRemaining,
+  getFloodVerifyButtonText,
+  isFloodVerifyDisabled,
+} from '../utils/cameraModalUtils';
+
+// Module-level timestamp tracking so 15s cooldown persists across modal closes and reopens (Issue #223)
+let lastFloodVerifyTimestamp = 0;
 
 interface CameraModalProps {
   camera: Camera | null;
@@ -44,6 +52,9 @@ export default function CameraModal({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [osdTime, setOsdTime] = useState<string | null>(null);
   const [isVerifyingFlood, setIsVerifyingFlood] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState<number>(() =>
+    calculateCooldownRemaining(lastFloodVerifyTimestamp)
+  );
   const [floodVerifyResult, setFloodVerifyResult] = useState<{
     camera_id: string;
     camera_name: string;
@@ -58,6 +69,21 @@ export default function CameraModal({
   // Camera id whose ghost probe is currently in flight (prevents duplicate probes).
   const probeInFlightRef = useRef<string | null>(null);
 
+  // Active 1-second interval countdown when cooldown is active
+  useEffect(() => {
+    if (cooldownRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownRemaining]);
+
   useEffect(() => {
     mountTimeRef.current = Date.now();
     setImgError(false);
@@ -67,13 +93,16 @@ export default function CameraModal({
     setIsVerifyingFlood(false);
     setFloodVerifyResult(null);
     setFloodVerifyError(null);
+    setCooldownRemaining(calculateCooldownRemaining(lastFloodVerifyTimestamp));
     if (typeof window !== 'undefined') {
       window.getSelection()?.removeAllRanges();
     }
   }, [camera?.id]);
 
   const handleVerifyFlood = useCallback(async () => {
-    if (!camera?.id || isVerifyingFlood) return;
+    if (!camera?.id || isVerifyingFlood || cooldownRemaining > 0) return;
+    lastFloodVerifyTimestamp = Date.now();
+    setCooldownRemaining(15);
     setIsVerifyingFlood(true);
     setFloodVerifyError(null);
 
@@ -98,7 +127,7 @@ export default function CameraModal({
     } finally {
       setIsVerifyingFlood(false);
     }
-  }, [camera?.id, isVerifyingFlood, lang]);
+  }, [camera?.id, isVerifyingFlood, cooldownRemaining, lang]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target !== e.currentTarget) return;
@@ -369,60 +398,98 @@ export default function CameraModal({
                   [{lang === 'vi' ? 'Chờ phân tích AI' : 'Awaiting AI analysis'}]
                 </span>
               )}
+            </div>
 
-              {/* On-Demand Flood Verification Trigger 2 (Issue #209 / S5-T3) */}
-              {isActuallyAvailable && (
+            {/* ROW 2: ACTION CONTROLS & VLM VERIFICATION (Issue #223 / S6-T3) */}
+            {isActuallyAvailable && (
+              <div className="flex flex-wrap gap-2 mt-2.5 items-center">
+                {/* Tactical Monochromatic Action Button (No brackets, high contrast, SVG reticle) */}
                 <button
                   type="button"
                   onClick={handleVerifyFlood}
-                  disabled={isVerifyingFlood}
-                  className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-mono transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  title={lang === 'vi' ? 'Xác minh tình trạng ngập nước thực địa qua mô hình VLM' : 'Verify real-time flood status via VLM model'}
-                >
-                  {isVerifyingFlood
-                    ? `[${lang === 'vi' ? FLOOD_VERIFY_I18N.VERIFYING.vi : FLOOD_VERIFY_I18N.VERIFYING.en}]`
-                    : `[${lang === 'vi' ? FLOOD_VERIFY_I18N.BUTTON_LABEL.vi : FLOOD_VERIFY_I18N.BUTTON_LABEL.en}]`}
-                </button>
-              )}
-
-              {floodVerifyResult && (
-                <span
-                  className={`px-2 py-0.5 rounded border text-xs font-bold inline-flex items-center gap-1.5 ${
-                    floodVerifyResult.flood_severity === 'DRY'
-                      ? 'border-zinc-500/80 bg-zinc-900/60 text-zinc-200'
-                      : floodVerifyResult.flood_severity === 'WET'
-                      ? 'border-sky-500/80 bg-sky-950/60 text-sky-300'
-                      : floodVerifyResult.flood_severity === 'FLOODED_SHALLOW'
-                      ? 'border-amber-500/80 bg-amber-950/60 text-amber-300'
-                      : floodVerifyResult.flood_severity === 'FLOODED_DEEP'
-                      ? 'border-rose-500/80 bg-rose-950/60 text-rose-300'
-                      : 'border-zinc-700 bg-zinc-900 text-zinc-400'
+                  disabled={isFloodVerifyDisabled({ isVerifying: isVerifyingFlood, cooldownRemaining })}
+                  className={`px-2.5 py-1 rounded text-xs font-mono font-semibold tracking-wide inline-flex items-center gap-1.5 border transition-all select-none shadow-sm ${
+                    isFloodVerifyDisabled({ isVerifying: isVerifyingFlood, cooldownRemaining })
+                      ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed opacity-70 shadow-none'
+                      : 'bg-zinc-100 hover:bg-white text-zinc-950 border-zinc-200 hover:border-white active:scale-[0.98] cursor-pointer'
                   }`}
                   title={
-                    floodVerifyResult.description
-                      ? `${floodVerifyResult.description} (${(floodVerifyResult.confidence * 100).toFixed(0)}%)`
-                      : undefined
+                    cooldownRemaining > 0
+                      ? (lang === 'vi'
+                          ? `Vui lòng đợi ${cooldownRemaining}s trước khi xác minh lại`
+                          : `Please wait ${cooldownRemaining}s before verifying again`)
+                      : (lang === 'vi'
+                          ? 'Xác minh tình trạng ngập nước thực địa qua mô hình VLM'
+                          : 'Verify real-time flood status via VLM model')
                   }
                 >
+                  {/* Crisp SVG reticle / radar scan glyph ('⌖') */}
+                  <svg
+                    className={`w-3.5 h-3.5 shrink-0 ${isVerifyingFlood ? 'animate-spin' : ''}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="7" />
+                    <line x1="12" y1="1" x2="12" y2="5" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="1" y1="12" x2="5" y2="12" />
+                    <line x1="19" y1="12" x2="23" y2="12" />
+                    <circle cx="12" cy="12" r="1.5" />
+                  </svg>
                   <span>
-                    [{lang === 'vi' ? FLOOD_VERIFY_I18N.BADGE_PREFIX.vi : FLOOD_VERIFY_I18N.BADGE_PREFIX.en}:{' '}
-                    {FLOOD_VERIFY_I18N.SEVERITY[floodVerifyResult.flood_severity as keyof typeof FLOOD_VERIFY_I18N.SEVERITY]?.[lang] ||
-                      floodVerifyResult.flood_severity}]
+                    {getFloodVerifyButtonText(
+                      { isVerifying: isVerifyingFlood, cooldownRemaining },
+                      lang
+                    )}
                   </span>
-                  {floodVerifyResult.confidence > 0 && (
-                    <span className="text-[10px] opacity-75 font-normal">
-                      {(floodVerifyResult.confidence * 100).toFixed(0)}%
-                    </span>
-                  )}
-                </span>
-              )}
+                </button>
 
-              {floodVerifyError && (
-                <span className="px-2 py-0.5 rounded border border-rose-800 bg-rose-950/80 text-rose-300 text-xs font-mono">
-                  [{floodVerifyError}]
-                </span>
-              )}
-            </div>
+                {/* PASSIVE VLM VERDICT BADGE */}
+                {floodVerifyResult && (
+                  <span
+                    className={`px-2 py-0.5 rounded border text-xs font-bold inline-flex items-center gap-1.5 ${
+                      floodVerifyResult.flood_severity === 'DRY'
+                        ? 'border-zinc-500/80 bg-zinc-900/60 text-zinc-200'
+                        : floodVerifyResult.flood_severity === 'WET'
+                        ? 'border-sky-500/80 bg-sky-950/60 text-sky-300'
+                        : floodVerifyResult.flood_severity === 'FLOODED_SHALLOW'
+                        ? 'border-amber-500/80 bg-amber-950/60 text-amber-300'
+                        : floodVerifyResult.flood_severity === 'FLOODED_DEEP'
+                        ? 'border-rose-500/80 bg-rose-950/60 text-rose-300'
+                        : 'border-zinc-700 bg-zinc-900 text-zinc-400'
+                    }`}
+                    title={
+                      floodVerifyResult.description
+                        ? `${floodVerifyResult.description} (${(floodVerifyResult.confidence * 100).toFixed(0)}%)`
+                        : undefined
+                    }
+                  >
+                    <span>
+                      [{lang === 'vi' ? FLOOD_VERIFY_I18N.BADGE_PREFIX.vi : FLOOD_VERIFY_I18N.BADGE_PREFIX.en}:{' '}
+                      {FLOOD_VERIFY_I18N.SEVERITY[floodVerifyResult.flood_severity as keyof typeof FLOOD_VERIFY_I18N.SEVERITY]?.[lang] ||
+                        floodVerifyResult.flood_severity}]
+                    </span>
+                    {floodVerifyResult.confidence > 0 && (
+                      <span className="text-[10px] opacity-75 font-normal">
+                        {(floodVerifyResult.confidence * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </span>
+                )}
+
+                {/* PASSIVE ERROR BADGE */}
+                {floodVerifyError && (
+                  <span className="px-2 py-0.5 rounded border border-rose-800 bg-rose-950/80 text-rose-300 text-xs font-mono">
+                    [{floodVerifyError}]
+                  </span>
+                )}
+              </div>
+            )}
             {floodVerifyResult?.description && (
               <div className="mt-1.5 text-xs text-zinc-400 font-mono italic">
                 &ldquo;{floodVerifyResult.description}&rdquo;
