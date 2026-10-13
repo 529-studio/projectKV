@@ -342,6 +342,10 @@ export const FLOOD_VERIFY_I18N = Object.freeze({
     vi: 'Đang xác minh VLM...',
     en: 'Verifying with VLM...',
   },
+  COOLDOWN: {
+    vi: (seconds: number) => `Chờ xác minh (${seconds}s)`,
+    en: (seconds: number) => `Cooldown (${seconds}s)`,
+  },
   BADGE_PREFIX: {
     vi: 'XÁC MINH VLM',
     en: 'VLM VERIFIED',
