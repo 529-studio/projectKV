@@ -88,6 +88,14 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
     - [#210](https://github.com/529-studio/projectKV/issues/210): S5-T4 — `[infra] physical Tailscale disconnection test for dev-box failover` (**Completed / Verified**): Executed live physical network partition and worker outage chaos drill on Staging (`homesrv` Stack 14 $\leftrightarrow$ `dev-box` Stack 17). Demonstrated 100% clean graceful degradation to `SeverityUnknown` (`source: "fallback"` then `source: "circuit_breaker"`) with 0 panics, 0 memory leaks (RAM bounded at 37.8 MB, 14.8%), and zero frozen stale states. Verified standby container `warded-model` reachability within `core-network`. Verified automated Circuit Breaker reset and live telemetry recovery upon worker restoration. Runbook documented in `docs/runbook_dev_box_failover.md` and empirical proof in `docs/reports/tailscale_failover_drill_report.md`.
     - [#214](https://github.com/529-studio/projectKV/issues/214): S5-T4 — `[infra + web] S5-T4 — R2 blob storage for archiver + shared team labeler` (**Completed / Verified**): Implemented storage `List` abstraction across Local and R2 drivers, backend archiver proxy streaming and label persistence endpoints, and built collaborative monochromatic Next.js team web labeler (`apps/web/src/app/labeler`).
   - Operational wave guide and `agy` CLI instructions compiled in [`docs/sprint5_execution_guide.md`](sprint5_execution_guide.md).
+- **Sprint 6 Backlog Roadmap & Perception Hard Gate (ADR-007)**:
+  - Formulated in [`docs/ADR-007-sprint5-audit-and-sprint6-plan.md`](ADR-007-sprint5-audit-and-sprint6-plan.md) with 5 tracked GitHub issues:
+    - [#221](https://github.com/529-studio/projectKV/issues/221): S6-T1 — `[cv-engine + tooling] Implement NMS, Letterbox, 416px Scaling & Re-run 764-Frame D6 Benchmark` (Hard Gate, Est: 1.5–2d)
+    - [#222](https://github.com/529-studio/projectKV/issues/222): S6-T2 — `[go-server] Corridor-Specific Visual Capacity Calibration & Persistent Peak Storage` (Est: 1d)
+    - [#223](https://github.com/529-studio/projectKV/issues/223): S6-T3 — `[web] CameraModal UI/UX Redesign (Tactile Affordance) & 15s Client-Side Cooldown` (Est: 1d)
+    - [#224](https://github.com/529-studio/projectKV/issues/224): S6-T4 — `[ci + ops] Automated Secret Scanning in GitHub Actions CI (Gitleaks)` (Est: 0.5d)
+    - [#225](https://github.com/529-studio/projectKV/issues/225): S6-T5 — `[go-server] Telegram Flood Alert Dispatcher (internal/notify, Subscription Store & Debounce)` (Est: 2–2.5d)
+  - Explicit architectural deferral: Route A→B deferred pending perception ground-truth verification and dedicated routing engine spike.
 
 
 - **Inference Runtime**:
