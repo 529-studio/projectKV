@@ -1,6 +1,7 @@
 package cvclient
 
 import (
+	"context"
 	"math"
 	"sync"
 	"testing"
@@ -289,4 +290,156 @@ func TestPCUCalculator_ContainerFoldedIntoTruck(t *testing.T) {
 	if math.Abs(pcuCustom-35.0) > 1e-6 {
 		t.Errorf("expected custom container weight 3.5 to yield 35.0 PCU, got %f", pcuCustom)
 	}
+}
+
+// TestPCUCalculator_CorridorBaseCapacity verifies that cameras on wide multi-lane
+// corridors (e.g. Võ Văn Kiệt - Ký Con, 10-12 lanes) receive calibrated base capacities
+// and correctly resolve moderate vehicle volumes as CLEAR instead of false-positive HEAVY.
+func TestPCUCalculator_CorridorBaseCapacity(t *testing.T) {
+	calc := NewPCUCalculator(defaultTestConfig()) // default floor = 15.0
+
+	const voVanKietID = "56de42f611f398ec0c481287"
+	const narrowStreetID = "cam-narrow-lane"
+
+	// 1. Verify default fallback capacity for unconfigured cameras is 15.0
+	if base := calc.GetBaseCapacity(narrowStreetID); base != 15.0 {
+		t.Fatalf("expected narrow street base capacity 15.0, got %f", base)
+	}
+
+	// 2. Register corridor-specific base capacity for Võ Văn Kiệt (45.0 PCU)
+	calc.SetBaseCapacity(voVanKietID, 45.0)
+	if base := calc.GetBaseCapacity(voVanKietID); base != 45.0 {
+		t.Fatalf("expected Vo Van Kiet base capacity 45.0, got %f", base)
+	}
+
+	// 3. Operational simulation (Bug Report from Staging / Issue #222):
+	// Võ Văn Kiệt - Ký Con frame contains: 6 cars, 14 motorcycles (~10.2 PCU).
+	// On a 10-12 lane expressway, 10.2 PCU is free-flowing traffic.
+	counts := VehicleCounts{Car: 6, Motorcycle: 14} // 6*1.0 + 14*0.3 = 10.2 PCU
+
+	// Calculate on Võ Văn Kiệt:
+	// SI = 10.2 / 45.0 = 0.2267 < 0.30 -> CLEAR
+	sevVVK, pcuVVK, siVVK := calc.Calculate(voVanKietID, counts, 0)
+	if math.Abs(pcuVVK-10.2) > 1e-4 {
+		t.Errorf("expected PCU=10.2, got %f", pcuVVK)
+	}
+	if math.Abs(siVVK-(10.2/45.0)) > 1e-4 {
+		t.Errorf("expected SI=%.4f, got %.4f", 10.2/45.0, siVVK)
+	}
+	if sevVVK != hotset.SeverityClear {
+		t.Errorf("expected CLEAR for Vo Van Kiet on 10.2 PCU, got %q (false positive regression!)", sevVVK)
+	}
+
+	// Calculate same counts on Narrow Street (15.0 floor):
+	// SI = 10.2 / 15.0 = 0.6800 >= 0.60 -> HEAVY
+	sevNarrow, pcuNarrow, siNarrow := calc.Calculate(narrowStreetID, counts, 0)
+	if math.Abs(pcuNarrow-10.2) > 1e-4 {
+		t.Errorf("expected PCU=10.2, got %f", pcuNarrow)
+	}
+	if math.Abs(siNarrow-(10.2/15.0)) > 1e-4 {
+		t.Errorf("expected SI=%.4f, got %.4f", 10.2/15.0, siNarrow)
+	}
+	if sevNarrow != hotset.SeverityHeavy {
+		t.Errorf("expected HEAVY for narrow street on 10.2 PCU, got %q", sevNarrow)
+	}
+}
+
+type mockCapacityStore struct {
+	mu   sync.Mutex
+	data map[string]float64
+}
+
+func newMockCapacityStore() *mockCapacityStore {
+	return &mockCapacityStore{data: make(map[string]float64)}
+}
+
+func (m *mockCapacityStore) Save(ctx context.Context, cameraID string, learnedMax float64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.data[cameraID] = learnedMax
+	return nil
+}
+
+func (m *mockCapacityStore) GetAll(ctx context.Context) (map[string]float64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	copied := make(map[string]float64, len(m.data))
+	for k, v := range m.data {
+		copied[k] = v
+	}
+	return copied, nil
+}
+
+// TestPCUCalculator_CapacityStorePersistence verifies that peak traffic observations
+// are saved to the persistent CapacityStore and successfully loaded on restart.
+func TestPCUCalculator_CapacityStorePersistence(t *testing.T) {
+	store := newMockCapacityStore()
+	store.data["cam-preloaded"] = 35.0
+
+	calc := NewPCUCalculator(defaultTestConfig())
+	calc.SetCapacityStore(store)
+
+	// Pre-load from store
+	if err := calc.LoadLearnedCapacities(context.Background()); err != nil {
+		t.Fatalf("failed to load learned capacities: %v", err)
+	}
+	if cap := calc.GetCapacity("cam-preloaded"); cap != 35.0 {
+		t.Fatalf("expected preloaded capacity 35.0, got %f", cap)
+	}
+
+	// Observe new peak exceeding capacity floor
+	calc.Calculate("cam-new-peak", VehicleCounts{Car: 55}, 0)
+	calc.WaitPersist()
+
+	store.mu.Lock()
+	savedVal, ok := store.data["cam-new-peak"]
+	store.mu.Unlock()
+
+	if !ok || savedVal != 55.0 {
+		t.Fatalf("expected store to record peak 55.0 for cam-new-peak, got %f (found=%v)", savedVal, ok)
+	}
+
+	// Verify next calculator instance boots with the learned peak
+	calc2 := NewPCUCalculator(defaultTestConfig())
+	calc2.SetCapacityStore(store)
+	if err := calc2.LoadLearnedCapacities(context.Background()); err != nil {
+		t.Fatalf("failed to load learned capacities in calc2: %v", err)
+	}
+	if cap := calc2.GetCapacity("cam-new-peak"); cap != 55.0 {
+		t.Fatalf("expected calc2 to retain persistent capacity 55.0 across restart, got %f", cap)
+	}
+}
+
+// TestPCUCalculator_ConcurrentBaseCapacityAndCalculations tests concurrent registrations
+// and calculations under Go race detector.
+func TestPCUCalculator_ConcurrentBaseCapacityAndCalculations(t *testing.T) {
+	store := newMockCapacityStore()
+	calc := NewPCUCalculator(defaultTestConfig())
+	calc.SetCapacityStore(store)
+
+	const workers = 15
+	const iterations = 50
+	var wg sync.WaitGroup
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func(workerID int) {
+			defer wg.Done()
+			camID := "cam-concurrent"
+			for j := 0; j < iterations; j++ {
+				if j%5 == 0 {
+					calc.SetBaseCapacity(camID, 30.0+float64(workerID))
+				}
+				calc.Calculate(camID, VehicleCounts{
+					Motorcycle: j,
+					Car:        workerID,
+				}, 0)
+				_ = calc.GetCapacity(camID)
+				_ = calc.GetBaseCapacity(camID)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	calc.WaitPersist()
 }

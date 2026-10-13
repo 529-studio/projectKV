@@ -22,7 +22,8 @@ type Camera struct {
 	SnapshotURL string
 	// Zone is used later by the notification layer to route alerts to
 	// subscribers of that geographic area (see internal/notify).
-	Zone string
+	Zone         string
+	BaseCapacity float64
 }
 
 // Analyzer is the pluggable adapter interface. Concrete implementations:
