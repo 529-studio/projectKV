@@ -33,7 +33,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 func (h *Handler) GetWeather(c *gin.Context) {
 	data, err := h.service.GetWeather(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "weather service temporarily unavailable"})
 		return
 	}
 	c.JSON(http.StatusOK, data)
@@ -50,7 +50,7 @@ func (h *Handler) GetWeather(c *gin.Context) {
 func (h *Handler) GetRadar(c *gin.Context) {
 	data, err := h.service.GetRadar(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "radar service temporarily unavailable"})
 		return
 	}
 	c.JSON(http.StatusOK, data)
