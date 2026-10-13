@@ -84,6 +84,15 @@ export default function CameraModal({
     return () => clearInterval(timer);
   }, [cooldownRemaining]);
 
+  // Auto-dismiss verification error after 4 seconds to maintain clean UI (Option A)
+  useEffect(() => {
+    if (!floodVerifyError) return;
+    const timer = setTimeout(() => {
+      setFloodVerifyError(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [floodVerifyError]);
+
   useEffect(() => {
     mountTimeRef.current = Date.now();
     setImgError(false);
@@ -113,16 +122,21 @@ export default function CameraModal({
         if (res.status === 429) {
           setFloodVerifyError(lang === 'vi' ? FLOOD_VERIFY_I18N.RATE_LIMITED.vi : FLOOD_VERIFY_I18N.RATE_LIMITED.en);
         } else {
-          const errJson = await res.json().catch(() => null);
-          setFloodVerifyError(
-            errJson?.error || (lang === 'vi' ? FLOOD_VERIFY_I18N.ERROR_GENERIC.vi : FLOOD_VERIFY_I18N.ERROR_GENERIC.en)
-          );
+          setFloodVerifyError(lang === 'vi' ? FLOOD_VERIFY_I18N.ERROR_GENERIC.vi : FLOOD_VERIFY_I18N.ERROR_GENERIC.en);
         }
+        res.json().then(errJson => {
+          if (errJson?.error && typeof window !== 'undefined') {
+            console.warn('[flood-verify] failed:', errJson.error);
+          }
+        }).catch(() => {});
         return;
       }
       const data = await res.json();
       setFloodVerifyResult(data);
-    } catch {
+    } catch (err) {
+      if (typeof window !== 'undefined') {
+        console.warn('[flood-verify] network error:', err);
+      }
       setFloodVerifyError(lang === 'vi' ? FLOOD_VERIFY_I18N.ERROR_GENERIC.vi : FLOOD_VERIFY_I18N.ERROR_GENERIC.en);
     } finally {
       setIsVerifyingFlood(false);
@@ -482,9 +496,9 @@ export default function CameraModal({
                   </span>
                 )}
 
-                {/* PASSIVE ERROR BADGE */}
+                {/* PASSIVE ERROR BADGE (Auto-dismisses in 4s, subtle monochromatic zinc) */}
                 {floodVerifyError && (
-                  <span className="px-2 py-0.5 rounded border border-rose-800 bg-rose-950/80 text-rose-300 text-xs font-mono">
+                  <span className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-900 text-zinc-400 text-xs font-mono select-none">
                     [{floodVerifyError}]
                   </span>
                 )}

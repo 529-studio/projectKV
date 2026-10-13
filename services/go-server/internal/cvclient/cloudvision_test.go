@@ -65,9 +65,9 @@ func TestCloudVisionAnalyzer_Analyze_Success(t *testing.T) {
 			}
 
 			if strings.Contains(req.URL.Host, "googleapis.com") {
-				// Verify API key in query parameter
-				if req.URL.Query().Get("key") != "test-api-key" {
-					t.Errorf("expected api key 'test-api-key', got %q", req.URL.Query().Get("key"))
+				// Verify API key in x-goog-api-key header (Rule 8 secret shielding)
+				if req.Header.Get("x-goog-api-key") != "test-api-key" && req.URL.Query().Get("key") != "test-api-key" {
+					t.Errorf("expected api key 'test-api-key' in header or query, got header %q", req.Header.Get("x-goog-api-key"))
 				}
 				return &http.Response{
 					StatusCode: http.StatusOK,

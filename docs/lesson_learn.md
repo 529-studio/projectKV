@@ -525,6 +525,10 @@
   1. **Strict Syntactic & Visual Affordance Separation**: Square brackets `[...]` are strictly reserved for passive status chips and metadata verdicts. Action triggers must never use brackets. Converted `[Xác minh ngập nước]` into an inverted, tactile monochromatic action button (`bg-zinc-100 text-zinc-950 hover:bg-white active:scale-[0.98]`) equipped with a crisp monochromatic SVG reticle scan glyph (`⌖`).
   2. **Dedicated Hierarchy Rows**: Visually separated the action control row from the passive verdict chip row, guaranteeing that status indicators remain passive while primary user actions stand out unambiguously.
   3. **Module-Persistent 15-Second Cooldown**: Implemented a 15-second client-side countdown timer (`Chờ xác minh (15s)` $\rightarrow$ `(1s)`) initialized and updated via module-scoped timestamp tracking (`lastFloodVerifyTimestamp`). Guarantees that users cannot circumvent the cooldown by closing and reopening the modal or switching cameras, completely eliminating duplicate network dispatch and protecting backend quotas.
+  4. **Defense-in-Depth Secret Shielding & Error Concealment (Option A)**:
+     - Eliminated API key leakage in Go HTTP client by migrating Gemini REST API authentication from URL query string (`?key=%s`) to `x-goog-api-key` HTTP header, preventing `url.Error` timeout messages from containing credentials.
+     - Sanitized backend HTTP 503 response in `flood.Handler.VerifyCamera` to emit generic `{"error": "verification service temporarily unavailable"}` rather than internal Go stack traces.
+     - Concealed technical exceptions from end users in `CameraModal.tsx`: replaced multi-line red error blocks with a subtle monochromatic zinc chip `[Tạm thời gián đoạn]` that automatically dismisses after 4 seconds, while logging debug traces strictly to `console.warn` for developers.
 
 
 

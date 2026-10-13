@@ -1014,6 +1014,9 @@ const docTemplate = `{
         "camera.Camera": {
             "type": "object",
             "properties": {
+                "base_capacity": {
+                    "type": "number"
+                },
                 "displayName": {
                     "type": "string"
                 },

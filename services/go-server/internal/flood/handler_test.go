@@ -2,6 +2,7 @@ package flood_test
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -156,5 +157,37 @@ func TestHandler_GetQuota(t *testing.T) {
 	}
 	if status.LimitRPM != 10 || status.RemainingRPM != 10 {
 		t.Errorf("unexpected status: %+v", status)
+	}
+}
+
+func TestHandler_VerifyCamera_UpstreamFailure_Sanitized(t *testing.T) {
+	analyzer := &mockAnalyzer{
+		errToReturn: errors.New("raw upstream timeout with secret key https://example.com?key=SECRET_TOKEN"),
+	}
+	camReader := newMockCameraReader(camera.Camera{
+		ID:          "cam-fail-1",
+		DisplayName: "Nguyễn Hữu Cảnh",
+		SnapshotURL: "https://example.com/snapshot.jpg",
+	})
+	limiter := flood.NewQuotaLimiter(10, 300)
+	svc := flood.NewService(analyzer, &mockWeather{}, camReader, sampleChokepoints(), limiter)
+
+	router := setupTestRouter(svc)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/api/flood/verify?camera_id=cam-fail-1", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 Service Unavailable, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var res map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if res["error"] != "verification service temporarily unavailable" {
+		t.Errorf("expected sanitized error, got %q", res["error"])
 	}
 }

@@ -355,8 +355,8 @@ export const FLOOD_VERIFY_I18N = Object.freeze({
     en: 'Rate limit reached (10 RPM / 300 RPD)',
   },
   ERROR_GENERIC: {
-    vi: 'Xác minh thất bại. Vui lòng thử lại sau.',
-    en: 'Verification failed. Please try again later.',
+    vi: 'Tạm thời gián đoạn',
+    en: 'Temporarily unavailable',
   },
   SEVERITY: {
     DRY: {
