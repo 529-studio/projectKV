@@ -29,26 +29,27 @@ type Reader interface {
 
 // Camera represents a single traffic camera entity.
 type Camera struct {
-	ID          string   `json:"id"`
-	Title       string   `json:"title"`
-	DisplayName string   `json:"displayName"`
-	Status      string   `json:"status"`
-	IsOnline    bool     `json:"isOnline"`
-	Latitude    float64  `json:"latitude"`
-	Longitude   float64  `json:"longitude"`
-	SnapshotURL string   `json:"snapshotUrl"`
-	Zone        string   `json:"zone,omitempty"`
-	DuplicateOf string   `json:"duplicateOf,omitempty"`
-	IsGhost     bool     `json:"isGhost,omitempty"`
-	PhuongID    *string  `json:"phuong_id,omitempty"`
-	PhuongType  string   `json:"phuong_type,omitempty"`
-	PhuongName  string   `json:"phuong_name,omitempty"`
-	RoadType    string   `json:"road_type,omitempty"`
-	RoadName    string   `json:"road_name,omitempty"`
-	H3Res7      string   `json:"h3_res7,omitempty"`
-	H3Res9      string   `json:"h3_res9,omitempty"`
-	RoadKey     string   `json:"road_key,omitempty"`
-	RoadKeys    []string `json:"road_keys,omitempty"`
+	ID           string   `json:"id"`
+	Title        string   `json:"title"`
+	DisplayName  string   `json:"displayName"`
+	Status       string   `json:"status"`
+	IsOnline     bool     `json:"isOnline"`
+	Latitude     float64  `json:"latitude"`
+	Longitude    float64  `json:"longitude"`
+	SnapshotURL  string   `json:"snapshotUrl"`
+	Zone         string   `json:"zone,omitempty"`
+	DuplicateOf  string   `json:"duplicateOf,omitempty"`
+	IsGhost      bool     `json:"isGhost,omitempty"`
+	PhuongID     *string  `json:"phuong_id,omitempty"`
+	PhuongType   string   `json:"phuong_type,omitempty"`
+	PhuongName   string   `json:"phuong_name,omitempty"`
+	RoadType     string   `json:"road_type,omitempty"`
+	RoadName     string   `json:"road_name,omitempty"`
+	H3Res7       string   `json:"h3_res7,omitempty"`
+	H3Res9       string   `json:"h3_res9,omitempty"`
+	RoadKey      string   `json:"road_key,omitempty"`
+	RoadKeys     []string `json:"road_keys,omitempty"`
+	BaseCapacity float64  `json:"base_capacity,omitempty"`
 }
 
 // KnownDuplicateStreams maps secondary camera IDs to their primary canonical camera ID.
