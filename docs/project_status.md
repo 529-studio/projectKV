@@ -26,10 +26,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **134 Pull Requests** processed across repository history:
-  - **126 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, PR #215 `tooling/s5-t2-cv-detection-audit`, PR #216 `feat/s5-t3-hybrid-flood-pipeline`, PR #217 `docs/pr-issue-linking-rule-and-template`, PR #218 `feat/s5-t4-r2-shared-team-labeler`, PR #220 `docs/sprint5-report`, PR #227 `docs/adr-007-sprint6-plan`, PR #229 `docs/sprint6-execution-guide`, and PR #231 `docs/readme-fullstack-dev-guide`)
+- **Lifetime PR History**: Exactly **140 Pull Requests** processed across repository history:
+  - **132 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, PR #215 `tooling/s5-t2-cv-detection-audit`, PR #216 `feat/s5-t3-hybrid-flood-pipeline`, PR #217 `docs/pr-issue-linking-rule-and-template`, PR #218 `feat/s5-t4-r2-shared-team-labeler`, PR #220 `docs/sprint5-report`, PR #227 `docs/adr-007-sprint6-plan`, PR #229 `docs/sprint6-execution-guide`, PR #231 `docs/readme-fullstack-dev-guide`, PR #232 S6-T1, PR #233 S6-T2, PR #235 Rain collection, PR #236 S6-T3, PR #237 Error Sanitization, and PR #238 Secret Sanitizer & Traffic Hysteresis)
   - **8 Closed** without merging
-  - **0 Open** PRs pending
+  - **1 Open** PR pending (PR #240)
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
