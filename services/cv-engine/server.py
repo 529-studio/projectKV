@@ -76,6 +76,59 @@ def load_model():
         logger.error("Failed to compile OpenVINO model: %s", exc)
 
 
+def letterbox(image, target_size=(416, 416), fill_color=(114, 114, 114)):
+    """Resizes image with aspect-ratio preserving padding (letterboxing)."""
+    w, h = image.size
+    target_w, target_h = target_size
+    scale = min(target_w / w, target_h / h)
+    nw, nh = int(round(w * scale)), int(round(h * scale))
+    resample_filter = getattr(Image, "Resampling", Image).BILINEAR
+    image_resized = image.resize((nw, nh), resample_filter)
+    new_image = Image.new("RGB", target_size, fill_color)
+    pad_x = (target_w - nw) // 2
+    pad_y = (target_h - nh) // 2
+    new_image.paste(image_resized, (pad_x, pad_y))
+    return new_image, scale, pad_x, pad_y
+
+
+def nms_cpu(boxes: np.ndarray, scores: np.ndarray, iou_thresh: float = 0.45):
+    """
+    Applies standard Non-Maximum Suppression on bounding boxes.
+    boxes: np.ndarray of shape (N, 4) in [cx, cy, w, h] format.
+    scores: np.ndarray of shape (N,) containing class confidences.
+    iou_thresh: float threshold above which overlapping boxes are suppressed.
+    """
+    if len(boxes) == 0:
+        return []
+
+    x1 = boxes[:, 0] - boxes[:, 2] / 2.0
+    y1 = boxes[:, 1] - boxes[:, 3] / 2.0
+    x2 = boxes[:, 0] + boxes[:, 2] / 2.0
+    y2 = boxes[:, 1] + boxes[:, 3] / 2.0
+    areas = np.maximum(0.0, x2 - x1) * np.maximum(0.0, y2 - y1)
+
+    order = scores.argsort()[::-1]
+    keep = []
+    while order.size > 0:
+        i = order[0]
+        keep.append(int(i))
+
+        xx1 = np.maximum(x1[i], x1[order[1:]])
+        yy1 = np.maximum(y1[i], y1[order[1:]])
+        xx2 = np.minimum(x2[i], x2[order[1:]])
+        yy2 = np.minimum(y2[i], y2[order[1:]])
+
+        w = np.maximum(0.0, xx2 - xx1)
+        h = np.maximum(0.0, yy2 - yy1)
+        inter = w * h
+        union = areas[i] + areas[order[1:]] - inter
+        iou = np.where(union > 0, inter / union, 0.0)
+
+        inds = np.where(iou <= iou_thresh)[0]
+        order = order[inds + 1]
+    return keep
+
+
 class CVServer(ThreadingHTTPServer):
     """Multi-threaded HTTP server with resilient socket disconnect handling."""
     daemon_threads = True
@@ -158,8 +211,18 @@ class CVRequestHandler(BaseHTTPRequestHandler):
             if compiled_model is not None and PIL_AVAILABLE:
                 try:
                     image = Image.open(BytesIO(post_data)).convert("RGB")
-                    image_resized = image.resize((320, 320))
-                    input_tensor = np.expand_dims(np.array(image_resized).transpose((2, 0, 1)), axis=0).astype(np.float32) / 255.0
+                    target_w, target_h = 416, 416
+                    if compiled_model is not None:
+                        try:
+                            in_shape = compiled_model.input(0).shape
+                            if len(in_shape) == 4:
+                                target_h = int(in_shape[2])
+                                target_w = int(in_shape[3])
+                        except Exception:
+                            pass
+
+                    image_letterboxed, scale, pad_x, pad_y = letterbox(image, target_size=(target_w, target_h))
+                    input_tensor = np.expand_dims(np.array(image_letterboxed).transpose((2, 0, 1)), axis=0).astype(np.float32) / 255.0
 
                     infer_request = compiled_model.create_infer_request()
                     results = infer_request.infer({0: input_tensor})
@@ -176,25 +239,66 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                         "container": 0,
                     }
 
+                    CONF_THRESH = 0.25
+                    IOU_THRESH = 0.45
+
                     if output_data is not None and hasattr(output_data, "shape"):
                         data = output_data[0] if output_data.ndim == 3 else output_data
                         if data.ndim == 2 and data.shape[0] >= 12:
                             # Standard COCO 80-class model (YOLOv8n default):
                             # Vehicle classes: 2: car (row 6), 3: motorcycle (row 7), 5: bus (row 9), 7: truck (row 11).
                             # Note: Heavy freight / container trucks are detected under class 'truck' (ADR-005 T6 / decision-container-class-gap.md).
-                            vehicle_counts["motorcycle"] = int(np.sum(data[7, :] > 0.45))
-                            vehicle_counts["car"] = int(np.sum(data[6, :] > 0.45))
-                            vehicle_counts["bus"] = int(np.sum(data[9, :] > 0.45))
-                            vehicle_counts["truck"] = int(np.sum(data[11, :] > 0.45))
+                            coco_vehicle_rows = {
+                                "car": 6,
+                                "motorcycle": 7,
+                                "bus": 9,
+                                "truck": 11,
+                            }
+                            for cls_name, row_idx in coco_vehicle_rows.items():
+                                scores = data[row_idx, :]
+                                valid_mask = scores > CONF_THRESH
+                                if np.any(valid_mask):
+                                    valid_indices = np.where(valid_mask)[0]
+                                    candidate_boxes = np.column_stack([
+                                        data[0, valid_indices],
+                                        data[1, valid_indices],
+                                        data[2, valid_indices],
+                                        data[3, valid_indices],
+                                    ])
+                                    candidate_scores = scores[valid_indices]
+                                    keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
+                                    vehicle_counts[cls_name] = len(keep)
+                                else:
+                                    vehicle_counts[cls_name] = 0
+
                             vehicle_counts["container"] = 0  # Folded into 'truck' in COCO ground truth and PCU formula
                             vehicles = sum(vehicle_counts.values())
                         elif data.ndim == 2 and data.shape[0] == 9:
                             # Legacy DatapolisX 5-class model: 0: motorcycle, 1: car, 2: bus, 3: truck, 4: container
-                            vehicle_counts["motorcycle"] = int(np.sum(data[4, :] > 0.45))
-                            vehicle_counts["car"] = int(np.sum(data[5, :] > 0.45))
-                            vehicle_counts["bus"] = int(np.sum(data[6, :] > 0.45))
-                            vehicle_counts["truck"] = int(np.sum(data[7, :] > 0.45))
-                            vehicle_counts["container"] = int(np.sum(data[8, :] > 0.45))
+                            legacy_vehicle_rows = {
+                                "motorcycle": 4,
+                                "car": 5,
+                                "bus": 6,
+                                "truck": 7,
+                                "container": 8,
+                            }
+                            for cls_name, row_idx in legacy_vehicle_rows.items():
+                                scores = data[row_idx, :]
+                                valid_mask = scores > CONF_THRESH
+                                if np.any(valid_mask):
+                                    valid_indices = np.where(valid_mask)[0]
+                                    candidate_boxes = np.column_stack([
+                                        data[0, valid_indices],
+                                        data[1, valid_indices],
+                                        data[2, valid_indices],
+                                        data[3, valid_indices],
+                                    ])
+                                    candidate_scores = scores[valid_indices]
+                                    keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
+                                    vehicle_counts[cls_name] = len(keep)
+                                else:
+                                    vehicle_counts[cls_name] = 0
+
                             vehicles = sum(vehicle_counts.values())
                         else:
                             vehicles = int(np.sum(output_data > 0.5))
@@ -216,7 +320,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                         "traffic_severity": severity,
                         "confidence": 0.88,
                         "latency_ms": round(latency, 2),
-                        "model": "yolov8n_openvino_320"
+                        "model": f"yolov8n_openvino_{target_w}"
                     })
                     return
                 except Exception as exc:
