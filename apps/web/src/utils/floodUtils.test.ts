@@ -211,6 +211,8 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     assert.equal(FLOOD_VERIFY_I18N.BUTTON_LABEL.en, 'Verify flood status');
     assert.equal(FLOOD_VERIFY_I18N.VERIFYING.vi, 'Đang xác minh VLM...');
     assert.equal(FLOOD_VERIFY_I18N.VERIFYING.en, 'Verifying with VLM...');
+    assert.equal(FLOOD_VERIFY_I18N.COOLDOWN.vi(15), 'Chờ xác minh (15s)');
+    assert.equal(FLOOD_VERIFY_I18N.COOLDOWN.en(15), 'Cooldown (15s)');
     assert.equal(FLOOD_VERIFY_I18N.BADGE_PREFIX.vi, 'XÁC MINH VLM');
     assert.equal(FLOOD_VERIFY_I18N.BADGE_PREFIX.en, 'VLM VERIFIED');
     assert.equal(FLOOD_VERIFY_I18N.SEVERITY.DRY.vi, 'Khô ráo');
