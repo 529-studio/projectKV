@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5deb576d1dc17d7c5515ad05_1791878749",
+  "camera_id": "5deb576d1dc17d7c5515ad05",
+  "image_path": "data/proofs/2026-10-13/5deb576d1dc17d7c5515ad05/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.946419+00:00",
+  "notes": "Rain afternoon frame on Điện Biên Phủ - Đinh Tiên Hoàng. PCU=12.0, SI=0.80, base_cap=15.0"
+}

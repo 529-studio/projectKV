@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58af994abd82540010390c37_1791878744",
+  "camera_id": "58af994abd82540010390c37",
+  "image_path": "data/proofs/2026-10-13/58af994abd82540010390c37/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.319675+00:00",
+  "notes": "Rain afternoon frame on Nguyễn Hữu Cảnh - Tôn Đức Thắng. PCU=10.0, SI=0.67, base_cap=15.0"
+}

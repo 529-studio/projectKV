@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5874769eb807da0011e33cec_1791878744",
+  "camera_id": "5874769eb807da0011e33cec",
+  "image_path": "data/proofs/2026-10-13/5874769eb807da0011e33cec/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.751455+00:00",
+  "notes": "Rain afternoon frame on Cộng Hòa - Út Tịch 2. PCU=8.0, SI=0.53, base_cap=15.0"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662a8cc51afb9c00172d2938_1791878746",
+  "camera_id": "662a8cc51afb9c00172d2938",
+  "image_path": "data/proofs/2026-10-13/662a8cc51afb9c00172d2938/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.845341+00:00",
+  "notes": "Rain afternoon frame on Huỳnh Tấn Phát - Phú Thuận. PCU=9.5, SI=0.63, base_cap=15.0"
+}

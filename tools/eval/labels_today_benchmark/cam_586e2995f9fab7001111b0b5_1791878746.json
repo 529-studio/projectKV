@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_586e2995f9fab7001111b0b5_1791878746",
+  "camera_id": "586e2995f9fab7001111b0b5",
+  "image_path": "data/proofs/2026-10-13/586e2995f9fab7001111b0b5/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.535295+00:00",
+  "notes": "Rain afternoon frame on Ung Văn Khiêm - Nguyễn Gia Trí (D2). PCU=2.0, SI=0.13, base_cap=15.0"
+}

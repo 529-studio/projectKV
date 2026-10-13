@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5d8cd7fb766c880017188954_1791878744",
+  "camera_id": "5d8cd7fb766c880017188954",
+  "image_path": "data/proofs/2026-10-13/5d8cd7fb766c880017188954/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.549772+00:00",
+  "notes": "Rain afternoon frame on Phạm Văn Đồng - Đường 20 (hướng đi Sân bay). PCU=13.0, SI=0.87, base_cap=15.0"
+}

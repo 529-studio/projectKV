@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58175c81edeb6c0012a2d5c2_1791878750",
+  "camera_id": "58175c81edeb6c0012a2d5c2",
+  "image_path": "data/proofs/2026-10-13/58175c81edeb6c0012a2d5c2/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.123711+00:00",
+  "notes": "Rain afternoon frame on Mai Chí Thọ - Trần Não 2. PCU=2.0, SI=0.13, base_cap=15.0"
+}

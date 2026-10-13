@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5deb576d1dc17d7c5515ad0a_1791878749",
+  "camera_id": "5deb576d1dc17d7c5515ad0a",
+  "image_path": "data/proofs/2026-10-13/5deb576d1dc17d7c5515ad0a/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.979415+00:00",
+  "notes": "Rain afternoon frame on Hoàng Văn Thụ - Xuân Diệu. PCU=9.3, SI=0.62, base_cap=15.0"
+}

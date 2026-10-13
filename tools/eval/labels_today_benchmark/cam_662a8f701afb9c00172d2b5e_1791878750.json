@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662a8f701afb9c00172d2b5e_1791878750",
+  "camera_id": "662a8f701afb9c00172d2b5e",
+  "image_path": "data/proofs/2026-10-13/662a8f701afb9c00172d2b5e/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.945667+00:00",
+  "notes": "Rain afternoon frame on Nguyễn Thị Thập - Lê Văn Lương. PCU=6.5, SI=0.43, base_cap=15.0"
+}

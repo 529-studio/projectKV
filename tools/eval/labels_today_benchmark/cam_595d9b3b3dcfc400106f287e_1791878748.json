@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595d9b3b3dcfc400106f287e_1791878748",
+  "camera_id": "595d9b3b3dcfc400106f287e",
+  "image_path": "data/proofs/2026-10-13/595d9b3b3dcfc400106f287e/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.905015+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - An Phú Đông 12 (1). PCU=6.0, SI=0.40, base_cap=15.0"
+}

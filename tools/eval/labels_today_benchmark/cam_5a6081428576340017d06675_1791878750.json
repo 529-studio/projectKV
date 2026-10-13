@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a6081428576340017d06675_1791878750",
+  "camera_id": "5a6081428576340017d06675",
+  "image_path": "data/proofs/2026-10-13/5a6081428576340017d06675/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.004128+00:00",
+  "notes": "Rain afternoon frame on IDICO-QL1 14. PCU=13.5, SI=0.90, base_cap=15.0"
+}

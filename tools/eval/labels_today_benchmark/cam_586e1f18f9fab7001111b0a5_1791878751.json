@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_586e1f18f9fab7001111b0a5_1791878751",
+  "camera_id": "586e1f18f9fab7001111b0a5",
+  "image_path": "data/proofs/2026-10-13/586e1f18f9fab7001111b0a5/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.458322+00:00",
+  "notes": "Rain afternoon frame on Cộng Hòa - Trường Chinh. PCU=14.0, SI=0.93, base_cap=15.0"
+}

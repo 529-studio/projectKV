@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6623f4df6f998a001b2528eb_1791878744",
+  "camera_id": "6623f4df6f998a001b2528eb",
+  "image_path": "data/proofs/2026-10-13/6623f4df6f998a001b2528eb/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.667611+00:00",
+  "notes": "Rain afternoon frame on Quốc Lộ 13 - cầu Ông Dầu. PCU=19.0, SI=1.27, base_cap=15.0"
+}

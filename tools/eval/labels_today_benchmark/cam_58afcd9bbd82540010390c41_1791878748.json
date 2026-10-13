@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58afcd9bbd82540010390c41_1791878748",
+  "camera_id": "58afcd9bbd82540010390c41",
+  "image_path": "data/proofs/2026-10-13/58afcd9bbd82540010390c41/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.484765+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Nguyễn Hữu Trí 2. PCU=14.5, SI=0.97, base_cap=15.0"
+}

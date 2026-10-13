@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6623f1996f998a001b252805_1791878751",
+  "camera_id": "6623f1996f998a001b252805",
+  "image_path": "data/proofs/2026-10-13/6623f1996f998a001b252805/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.564167+00:00",
+  "notes": "Rain afternoon frame on Mai Chí Thọ - Xa Lộ Hà Nội (3). PCU=0.0, SI=0.00, base_cap=15.0"
+}

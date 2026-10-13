@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595dd3a63dcfc400106f28a7_1791878746",
+  "camera_id": "595dd3a63dcfc400106f28a7",
+  "image_path": "data/proofs/2026-10-13/595dd3a63dcfc400106f28a7/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.176259+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Đường Tô Ngọc Vân 1. PCU=8.0, SI=0.53, base_cap=15.0"
+}

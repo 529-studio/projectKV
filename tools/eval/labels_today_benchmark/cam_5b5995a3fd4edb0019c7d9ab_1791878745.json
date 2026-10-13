@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5b5995a3fd4edb0019c7d9ab_1791878745",
+  "camera_id": "5b5995a3fd4edb0019c7d9ab",
+  "image_path": "data/proofs/2026-10-13/5b5995a3fd4edb0019c7d9ab/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.475787+00:00",
+  "notes": "Rain afternoon frame on Võ Văn Kiệt - Cầu Chà Và 2 (trên cầu). PCU=5.5, SI=0.37, base_cap=15.0"
+}

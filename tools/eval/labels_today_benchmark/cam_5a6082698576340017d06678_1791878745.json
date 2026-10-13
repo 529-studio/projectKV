@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a6082698576340017d06678_1791878745",
+  "camera_id": "5a6082698576340017d06678",
+  "image_path": "data/proofs/2026-10-13/5a6082698576340017d06678/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.060321+00:00",
+  "notes": "Rain afternoon frame on QL1 - Trạm thu phí AS-AL 2. PCU=13.5, SI=0.90, base_cap=15.0"
+}

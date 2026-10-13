@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662a89211afb9c00172d2636_1791878749",
+  "camera_id": "662a89211afb9c00172d2636",
+  "image_path": "data/proofs/2026-10-13/662a89211afb9c00172d2636/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.776630+00:00",
+  "notes": "Rain afternoon frame on Quốc Lộ 1 - Dương Đình Cúc. PCU=7.3, SI=0.49, base_cap=15.0"
+}

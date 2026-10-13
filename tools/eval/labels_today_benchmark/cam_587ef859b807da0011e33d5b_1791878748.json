@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_587ef859b807da0011e33d5b_1791878748",
+  "camera_id": "587ef859b807da0011e33d5b",
+  "image_path": "data/proofs/2026-10-13/587ef859b807da0011e33d5b/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.996486+00:00",
+  "notes": "Rain afternoon frame on Phạm Văn Đồng - Lê Quang Định 2. PCU=4.9, SI=0.33, base_cap=15.0"
+}

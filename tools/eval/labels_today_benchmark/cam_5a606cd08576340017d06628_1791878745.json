@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a606cd08576340017d06628_1791878745",
+  "camera_id": "5a606cd08576340017d06628",
+  "image_path": "data/proofs/2026-10-13/5a606cd08576340017d06628/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.889984+00:00",
+  "notes": "Rain afternoon frame on BX Miền Đông - Đinh Bộ Lĩnh 2. PCU=10.0, SI=0.67, base_cap=15.0"
+}

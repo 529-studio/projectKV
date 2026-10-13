@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595dd4f43dcfc400106f28ab_1791878749",
+  "camera_id": "595dd4f43dcfc400106f28ab",
+  "image_path": "data/proofs/2026-10-13/595dd4f43dcfc400106f28ab/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.210982+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Cầu Bến Cát 1. PCU=15.0, SI=1.00, base_cap=15.0"
+}

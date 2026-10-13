@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b5adc1afb9c00172d925b_1791878746",
+  "camera_id": "662b5adc1afb9c00172d925b",
+  "image_path": "data/proofs/2026-10-13/662b5adc1afb9c00172d925b/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.225508+00:00",
+  "notes": "Rain afternoon frame on Trường Chinh - Phan Huy Ích 1. PCU=4.3, SI=0.29, base_cap=15.0"
+}

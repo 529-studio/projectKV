@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a607f078576340017d0666f_1791878749",
+  "camera_id": "5a607f078576340017d0666f",
+  "image_path": "data/proofs/2026-10-13/5a607f078576340017d0666f/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.988566+00:00",
+  "notes": "Rain afternoon frame on QL1-Phan Văn Hớn (H.Hoc Mon). PCU=6.0, SI=0.40, base_cap=15.0"
+}

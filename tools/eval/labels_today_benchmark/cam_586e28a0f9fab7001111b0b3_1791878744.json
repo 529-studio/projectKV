@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_586e28a0f9fab7001111b0b3_1791878744",
+  "camera_id": "586e28a0f9fab7001111b0b3",
+  "image_path": "data/proofs/2026-10-13/586e28a0f9fab7001111b0b3/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.514892+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - KCX Linh Trung 1. PCU=6.5, SI=0.43, base_cap=15.0"
+}

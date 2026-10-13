@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595dc29c3dcfc400106f2894_1791878744",
+  "camera_id": "595dc29c3dcfc400106f2894",
+  "image_path": "data/proofs/2026-10-13/595dc29c3dcfc400106f2894/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.073994+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Rạch Láng Le 1. PCU=7.5, SI=0.50, base_cap=15.0"
+}

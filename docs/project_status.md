@@ -97,6 +97,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
     - [#225](https://github.com/529-studio/projectKV/issues/225): S6-T5 — `[go-server] Telegram Flood Alert Dispatcher (internal/notify, Subscription Store & Debounce)` (Est: 2–2.5d)
   - Explicit architectural deferral: Route A→B deferred pending perception ground-truth verification and dedicated routing engine spike.
   - Operational multi-wave guide and `agy` CLI instructions compiled in [`docs/sprint6_execution_guide.md`](sprint6_execution_guide.md).
+- **Real-Time Environmental Frame Harvesting (2026-10-13 Rain Event)**:
+  - Exploited active afternoon rainfall across HCMC (`rain: 0.10 mm`, `weather_code: 51`) to capture fresh real-world wet/rain frames across 10 authentic municipal flood chokepoints and flood-prone corridors: **201 real frames** collected (97.1% success rate).
+  - Generated dual-format ground-truth labels using OpenVINO YOLOv8n FP16 416x416 inference at 31.2 frames/sec + visual road surface verification (`tools/eval/label_today_rain.py`): Traffic (CLEAR=62, MODERATE=66, HEAVY=31, CONGESTED=42), Flood (NONE=133, SHALLOW=68, DEEP=0), Weather (`rain`=201, 100%), Time of day (`day`=201, 100%).
+  - Synchronized both 201 JPEGs and 201 JSON labels to Cloudflare R2 bucket `warded-proofs` (`R2:warded-proofs/2026-10-13/` and `R2:warded-proofs/labels/2026-10-13/`). Full report in [`docs/reports/rain_collection_report_2026-10-13.md`](reports/rain_collection_report_2026-10-13.md).
 
 
 - **Inference Runtime**:

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6623f1f16f998a001b25281f_1791878745",
+  "camera_id": "6623f1f16f998a001b25281f",
+  "image_path": "data/proofs/2026-10-13/6623f1f16f998a001b25281f/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.580656+00:00",
+  "notes": "Rain afternoon frame on Phạm Văn Đồng - Đào Trinh Nhất. PCU=9.3, SI=0.62, base_cap=15.0"
+}

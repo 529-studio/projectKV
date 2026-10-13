@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_66b1c426779f74001867415e_1791878744",
+  "camera_id": "66b1c426779f74001867415e",
+  "image_path": "data/proofs/2026-10-13/66b1c426779f74001867415e/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.477877+00:00",
+  "notes": "Rain afternoon frame on Điện Biên Phủ - Nguyễn Gia Trí. PCU=9.0, SI=0.60, base_cap=15.0"
+}

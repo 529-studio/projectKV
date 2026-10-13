@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_62da3e390637a10017d706ff_1791878750",
+  "camera_id": "62da3e390637a10017d706ff",
+  "image_path": "data/proofs/2026-10-13/62da3e390637a10017d706ff/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.036896+00:00",
+  "notes": "Rain afternoon frame on Quốc Lộ 13 - Đinh Thị Thi 1. PCU=4.6, SI=0.31, base_cap=15.0"
+}
