@@ -443,3 +443,58 @@ func TestPCUCalculator_ConcurrentBaseCapacityAndCalculations(t *testing.T) {
 	wg.Wait()
 	calc.WaitPersist()
 }
+
+// TestPCUCalculator_HysteresisDeadband verifies that the Schmitt trigger prevents
+// rapid chattering/jittering when vehicle count fluctuates right at threshold boundaries.
+func TestPCUCalculator_HysteresisDeadband(t *testing.T) {
+	cfg := defaultTestConfig()
+	cfg.CapacityFloor = 100.0 // 1 PCU = 0.01 SI for clean arithmetic
+	cfg.HysteresisDelta = 0.05
+	calc := NewPCUCalculator(cfg)
+	camID := "cam-conghoa"
+
+	// 1. Initial baseline: 20 cars = 20 PCU -> SI = 0.20 < 0.30 -> CLEAR
+	sev1, _, _ := calc.Calculate(camID, VehicleCounts{Car: 20}, 0)
+	if sev1 != hotset.SeverityClear {
+		t.Fatalf("expected CLEAR at SI=0.20, got %q", sev1)
+	}
+
+	// 2. Rising transition: 30 cars = 30 PCU -> SI = 0.30 >= Moderate (0.30) -> MODERATE
+	sev2, _, _ := calc.Calculate(camID, VehicleCounts{Car: 30}, 0)
+	if sev2 != hotset.SeverityModerate {
+		t.Fatalf("expected MODERATE at SI=0.30, got %q", sev2)
+	}
+
+	// 3. Fluctuation within deadband: 28 cars = 28 PCU -> SI = 0.28.
+	// Without hysteresis, this would jitter down to CLEAR.
+	// With hysteresis (deadband 0.05, threshold 0.30 - 0.05 = 0.25):
+	// SI 0.28 >= 0.25 -> MUST RETAIN MODERATE!
+	sev3, _, _ := calc.Calculate(camID, VehicleCounts{Car: 28}, 0)
+	if sev3 != hotset.SeverityModerate {
+		t.Fatalf("expected MODERATE retained within deadband (SI=0.28 >= 0.25), got %q", sev3)
+	}
+
+	// 4. Drop below deadband: 24 cars = 24 PCU -> SI = 0.24 < 0.25 -> TRANSITIONS TO CLEAR
+	sev4, _, _ := calc.Calculate(camID, VehicleCounts{Car: 24}, 0)
+	if sev4 != hotset.SeverityClear {
+		t.Fatalf("expected CLEAR below deadband (SI=0.24 < 0.25), got %q", sev4)
+	}
+
+	// 5. Rising to HEAVY: 60 cars = 60 PCU -> SI = 0.60 >= Heavy (0.60) -> HEAVY
+	sev5, _, _ := calc.Calculate(camID, VehicleCounts{Car: 60}, 0)
+	if sev5 != hotset.SeverityHeavy {
+		t.Fatalf("expected HEAVY at SI=0.60, got %q", sev5)
+	}
+
+	// 6. Fluctuation within HEAVY deadband: 58 cars -> SI = 0.58 >= (0.60 - 0.05 = 0.55) -> RETAINS HEAVY
+	sev6, _, _ := calc.Calculate(camID, VehicleCounts{Car: 58}, 0)
+	if sev6 != hotset.SeverityHeavy {
+		t.Fatalf("expected HEAVY retained within deadband (SI=0.58 >= 0.55), got %q", sev6)
+	}
+
+	// 7. Drop below HEAVY deadband: 54 cars -> SI = 0.54 < 0.55 -> TRANSITIONS TO MODERATE
+	sev7, _, _ := calc.Calculate(camID, VehicleCounts{Car: 54}, 0)
+	if sev7 != hotset.SeverityModerate {
+		t.Fatalf("expected MODERATE below HEAVY deadband (SI=0.54 < 0.55), got %q", sev7)
+	}
+}

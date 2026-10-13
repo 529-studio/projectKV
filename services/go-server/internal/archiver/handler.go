@@ -345,7 +345,7 @@ func (h *Handler) SaveLabel(c *gin.Context) {
 	}
 
 	if err := h.store.Put(c.Request.Context(), labelKey, bytes.NewReader(data)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist label: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist label"})
 		return
 	}
 
