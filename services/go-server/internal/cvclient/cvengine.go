@@ -152,6 +152,9 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 	// Step 5: Compute PCU-weighted Saturation Index severity.
 	severity := resp.TrafficSeverity
 	if a.calculator != nil {
+		if cam.BaseCapacity > 0 && a.calculator.GetBaseCapacity(cam.ID) == a.calculator.CapacityFloor() {
+			a.calculator.SetBaseCapacity(cam.ID, cam.BaseCapacity)
+		}
 		pcuSev, _, _ := a.calculator.Calculate(cam.ID, resp.VehicleCounts, resp.VehiclesDetected)
 		if pcuSev != "" {
 			severity = pcuSev

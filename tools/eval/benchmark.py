@@ -523,6 +523,23 @@ class CVEngineAnalyzer(BaseAnalyzer):
         self.capacity_floor = capacity_floor
         self.request_timeout = request_timeout
         self.capacities: Dict[str, float] = {}
+        self.base_capacities: Dict[str, float] = {}
+
+        # Load corridor design capacities from cameras_enriched.json (S6-T2 Issue #222)
+        enriched_path = Path("cameras_enriched.json")
+        if not enriched_path.is_file():
+            enriched_path = Path(__file__).resolve().parent.parent.parent / "cameras_enriched.json"
+        if enriched_path.is_file():
+            try:
+                with open(enriched_path, "r", encoding="utf-8") as f:
+                    cams = json.load(f)
+                    for c in cams:
+                        cid = c.get("_id") or c.get("id")
+                        bcap = c.get("base_capacity")
+                        if cid and bcap is not None:
+                            self.base_capacities[str(cid)] = float(bcap)
+            except Exception:
+                pass
 
         # PCU weights conforming to cvclient/pcu.go (calibrated per Issue #196) and ADR-005 T6
         self.pcu_weights = {
@@ -559,7 +576,8 @@ class CVEngineAnalyzer(BaseAnalyzer):
             hist_max = pcu_total
             self.capacities[camera_id] = hist_max
 
-        eff_capacity = max(hist_max, self.capacity_floor)
+        base_floor = self.base_capacities.get(camera_id, self.capacity_floor)
+        eff_capacity = max(hist_max, base_floor)
         if eff_capacity < 1.0:
             eff_capacity = 1.0
         saturation_index = pcu_total / eff_capacity
