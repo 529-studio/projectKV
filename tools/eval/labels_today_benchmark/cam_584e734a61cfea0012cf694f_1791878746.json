@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_584e734a61cfea0012cf694f_1791878746",
+  "camera_id": "584e734a61cfea0012cf694f",
+  "image_path": "data/proofs/2026-10-13/584e734a61cfea0012cf694f/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.212190+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Lê Trọng Tấn. PCU=4.5, SI=0.30, base_cap=15.0"
+}

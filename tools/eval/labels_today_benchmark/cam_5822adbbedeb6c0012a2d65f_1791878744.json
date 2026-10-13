@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5822adbbedeb6c0012a2d65f_1791878744",
+  "camera_id": "5822adbbedeb6c0012a2d65f",
+  "image_path": "data/proofs/2026-10-13/5822adbbedeb6c0012a2d65f/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.140856+00:00",
+  "notes": "Rain afternoon frame on Võ Văn Kiệt - Cầu Chữ Y 1. PCU=6.5, SI=0.43, base_cap=15.0"
+}

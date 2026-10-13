@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595da7783dcfc400106f2888_1791878747",
+  "camera_id": "595da7783dcfc400106f2888",
+  "image_path": "data/proofs/2026-10-13/595da7783dcfc400106f2888/1791878747_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.001426+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Đường Vườn Lài 1. PCU=13.6, SI=0.91, base_cap=15.0"
+}

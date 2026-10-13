@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_63ae7938bfd3d90017e8f226_1791878750",
+  "camera_id": "63ae7938bfd3d90017e8f226",
+  "image_path": "data/proofs/2026-10-13/63ae7938bfd3d90017e8f226/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.073416+00:00",
+  "notes": "Rain afternoon frame on Quốc Lộ 1- Công ty Pouyen 3 (Cổng). PCU=3.0, SI=0.20, base_cap=15.0"
+}

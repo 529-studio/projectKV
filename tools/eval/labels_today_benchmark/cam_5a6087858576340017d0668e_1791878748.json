@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a6087858576340017d0668e_1791878748",
+  "camera_id": "5a6087858576340017d0668e",
+  "image_path": "data/proofs/2026-10-13/5a6087858576340017d0668e/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.255765+00:00",
+  "notes": "Rain afternoon frame on QL1-Trạm Biến Áp 500Kv Phú Lâm. PCU=9.8, SI=0.65, base_cap=15.0"
+}

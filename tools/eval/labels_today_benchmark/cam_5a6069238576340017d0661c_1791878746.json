@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a6069238576340017d0661c_1791878746",
+  "camera_id": "5a6069238576340017d0661c",
+  "image_path": "data/proofs/2026-10-13/5a6069238576340017d0661c/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.770072+00:00",
+  "notes": "Rain afternoon frame on Bạch Đằng - Lê Quang Định. PCU=0.0, SI=0.00, base_cap=15.0"
+}

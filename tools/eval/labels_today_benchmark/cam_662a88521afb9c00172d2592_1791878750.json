@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662a88521afb9c00172d2592_1791878750",
+  "camera_id": "662a88521afb9c00172d2592",
+  "image_path": "data/proofs/2026-10-13/662a88521afb9c00172d2592/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.760854+00:00",
+  "notes": "Rain afternoon frame on Kinh Dương Vương - Hồ Học Lãm. PCU=11.1, SI=0.74, base_cap=15.0"
+}

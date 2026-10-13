@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595f8d813dcfc400106f28f2_1791878750",
+  "camera_id": "595f8d813dcfc400106f28f2",
+  "image_path": "data/proofs/2026-10-13/595f8d813dcfc400106f28f2/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.363294+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Quang Trung 2 (hướng đi An Sương). PCU=10.0, SI=0.67, base_cap=15.0"
+}

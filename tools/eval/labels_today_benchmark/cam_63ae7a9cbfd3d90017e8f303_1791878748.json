@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_63ae7a9cbfd3d90017e8f303_1791878748",
+  "camera_id": "63ae7a9cbfd3d90017e8f303",
+  "image_path": "data/proofs/2026-10-13/63ae7a9cbfd3d90017e8f303/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.094308+00:00",
+  "notes": "Rain afternoon frame on Điện Biên Phủ – Cao Thắng. PCU=3.3, SI=0.22, base_cap=15.0"
+}

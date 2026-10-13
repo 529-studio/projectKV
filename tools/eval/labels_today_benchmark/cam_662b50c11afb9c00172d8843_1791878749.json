@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b50c11afb9c00172d8843_1791878749",
+  "camera_id": "662b50c11afb9c00172d8843",
+  "image_path": "data/proofs/2026-10-13/662b50c11afb9c00172d8843/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.028291+00:00",
+  "notes": "Rain afternoon frame on An Dương Vương - Đường số 7. PCU=5.5, SI=0.37, base_cap=15.0"
+}

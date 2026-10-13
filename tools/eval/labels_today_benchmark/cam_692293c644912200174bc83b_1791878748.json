@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_692293c644912200174bc83b_1791878748",
+  "camera_id": "692293c644912200174bc83b",
+  "image_path": "data/proofs/2026-10-13/692293c644912200174bc83b/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.636844+00:00",
+  "notes": "Rain afternoon frame on Quốc Lộ 51 - Xô Viết Nghệ Tĩnh. PCU=0.0, SI=0.00, base_cap=15.0"
+}

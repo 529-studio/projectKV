@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_584e738361cfea0012cf6951_1791878751",
+  "camera_id": "584e738361cfea0012cf6951",
+  "image_path": "data/proofs/2026-10-13/584e738361cfea0012cf6951/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.230325+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Nguyễn Thị Tú. PCU=2.0, SI=0.13, base_cap=15.0"
+}

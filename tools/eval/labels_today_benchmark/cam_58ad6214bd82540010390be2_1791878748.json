@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58ad6214bd82540010390be2_1791878748",
+  "camera_id": "58ad6214bd82540010390be2",
+  "image_path": "data/proofs/2026-10-13/58ad6214bd82540010390be2/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.124028+00:00",
+  "notes": "Rain afternoon frame on Cộng Hòa - Hoàng Hoa Thám. PCU=6.5, SI=0.43, base_cap=15.0"
+}

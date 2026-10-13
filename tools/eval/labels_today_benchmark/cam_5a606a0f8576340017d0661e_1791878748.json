@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a606a0f8576340017d0661e_1791878748",
+  "camera_id": "5a606a0f8576340017d0661e",
+  "image_path": "data/proofs/2026-10-13/5a606a0f8576340017d0661e/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.786528+00:00",
+  "notes": "Rain afternoon frame on Nơ Trang Long - Nguyễn Xí. PCU=0.3, SI=0.02, base_cap=15.0"
+}

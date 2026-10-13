@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b57471afb9c00172d9095_1791878748",
+  "camera_id": "662b57471afb9c00172d9095",
+  "image_path": "data/proofs/2026-10-13/662b57471afb9c00172d9095/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.129357+00:00",
+  "notes": "Rain afternoon frame on Cộng Hòa - Ấp Bắc. PCU=8.5, SI=0.57, base_cap=15.0"
+}

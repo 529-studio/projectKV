@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a6065c58576340017d06615_1791878744",
+  "camera_id": "5a6065c58576340017d06615",
+  "image_path": "data/proofs/2026-10-13/5a6065c58576340017d06615/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.712104+00:00",
+  "notes": "Rain afternoon frame on Tô Ngọc Vân - TX25. PCU=3.6, SI=0.24, base_cap=15.0"
+}

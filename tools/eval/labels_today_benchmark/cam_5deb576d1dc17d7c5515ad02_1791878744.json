@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5deb576d1dc17d7c5515ad02_1791878744",
+  "camera_id": "5deb576d1dc17d7c5515ad02",
+  "image_path": "data/proofs/2026-10-13/5deb576d1dc17d7c5515ad02/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.870475+00:00",
+  "notes": "Rain afternoon frame on Điện Biên Phủ - Pasteur. PCU=4.0, SI=0.27, base_cap=15.0"
+}

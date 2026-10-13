@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a8256df5058170011f6eacb_1791878751",
+  "camera_id": "5a8256df5058170011f6eacb",
+  "image_path": "data/proofs/2026-10-13/5a8256df5058170011f6eacb/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.459937+00:00",
+  "notes": "Rain afternoon frame on BX Miền Đông - Quốc Lộ 13 (2). PCU=5.3, SI=0.35, base_cap=15.0"
+}

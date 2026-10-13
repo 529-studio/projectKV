@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5d8cd8e2766c880017188958_1791878746",
+  "camera_id": "5d8cd8e2766c880017188958",
+  "image_path": "data/proofs/2026-10-13/5d8cd8e2766c880017188958/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.586012+00:00",
+  "notes": "Rain afternoon frame on Phạm Văn Đồng - Hiệp Bình (hướng đi Sân bay). PCU=3.0, SI=0.20, base_cap=15.0"
+}

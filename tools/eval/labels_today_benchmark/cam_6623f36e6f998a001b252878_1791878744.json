@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6623f36e6f998a001b252878_1791878744",
+  "camera_id": "6623f36e6f998a001b252878",
+  "image_path": "data/proofs/2026-10-13/6623f36e6f998a001b252878/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.651592+00:00",
+  "notes": "Rain afternoon frame on Phạm Văn Đồng - Kha Vạn Cân 2. PCU=0.0, SI=0.00, base_cap=15.0"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_587c8d97b807da0011e33d49_1791878749",
+  "camera_id": "587c8d97b807da0011e33d49",
+  "image_path": "data/proofs/2026-10-13/587c8d97b807da0011e33d49/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.937052+00:00",
+  "notes": "Rain afternoon frame on Hoàng Văn Thụ - Nguyễn Văn Trỗi 2. PCU=4.0, SI=0.27, base_cap=15.0"
+}

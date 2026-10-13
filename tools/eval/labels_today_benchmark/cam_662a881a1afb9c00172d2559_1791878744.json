@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662a881a1afb9c00172d2559_1791878744",
+  "camera_id": "662a881a1afb9c00172d2559",
+  "image_path": "data/proofs/2026-10-13/662a881a1afb9c00172d2559/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.742609+00:00",
+  "notes": "Rain afternoon frame on Kinh Dương Vương - Tên Lửa. PCU=8.0, SI=0.53, base_cap=15.0"
+}

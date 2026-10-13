@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5d8cdb4b766c880017188966_1791878750",
+  "camera_id": "5d8cdb4b766c880017188966",
+  "image_path": "data/proofs/2026-10-13/5d8cdb4b766c880017188966/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.748358+00:00",
+  "notes": "Rain afternoon frame on Hoàng Văn Thụ - Út Tịch. PCU=15.0, SI=1.00, base_cap=15.0"
+}

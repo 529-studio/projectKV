@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b4d781afb9c00172d8571_1791878750",
+  "camera_id": "662b4d781afb9c00172d8571",
+  "image_path": "data/proofs/2026-10-13/662b4d781afb9c00172d8571/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.976770+00:00",
+  "notes": "Rain afternoon frame on An Dương Vương - Lê Hồng Phong. PCU=12.0, SI=0.80, base_cap=15.0"
+}

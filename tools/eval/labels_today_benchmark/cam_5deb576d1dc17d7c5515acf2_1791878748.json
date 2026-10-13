@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5deb576d1dc17d7c5515acf2_1791878748",
+  "camera_id": "5deb576d1dc17d7c5515acf2",
+  "image_path": "data/proofs/2026-10-13/5deb576d1dc17d7c5515acf2/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.838814+00:00",
+  "notes": "Rain afternoon frame on Điện Biên Phủ - Cách Mạng Tháng Tám. PCU=8.9, SI=0.59, base_cap=15.0"
+}

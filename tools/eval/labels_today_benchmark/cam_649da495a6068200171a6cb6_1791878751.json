@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_649da495a6068200171a6cb6_1791878751",
+  "camera_id": "649da495a6068200171a6cb6",
+  "image_path": "data/proofs/2026-10-13/649da495a6068200171a6cb6/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.368772+00:00",
+  "notes": "Rain afternoon frame on Mai Chí Thọ - Trần Quý Kiên (3). PCU=4.0, SI=0.27, base_cap=15.0"
+}

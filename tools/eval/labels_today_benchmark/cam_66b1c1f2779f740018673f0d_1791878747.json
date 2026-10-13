@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_66b1c1f2779f740018673f0d_1791878747",
+  "camera_id": "66b1c1f2779f740018673f0d",
+  "image_path": "data/proofs/2026-10-13/66b1c1f2779f740018673f0d/1791878747_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.441775+00:00",
+  "notes": "Rain afternoon frame on An Dương Vương - Nguyễn Văn Cừ. PCU=8.0, SI=0.53, base_cap=15.0"
+}

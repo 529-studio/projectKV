@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_63b65f8dbfd3d90017eaa434_1791878751",
+  "camera_id": "63b65f8dbfd3d90017eaa434",
+  "image_path": "data/proofs/2026-10-13/63b65f8dbfd3d90017eaa434/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.273365+00:00",
+  "notes": "Rain afternoon frame on Xô Viết Nghệ Tĩnh - Phan Văn Hân (Cầu Thị Nghè). PCU=7.8, SI=0.52, base_cap=15.0"
+}

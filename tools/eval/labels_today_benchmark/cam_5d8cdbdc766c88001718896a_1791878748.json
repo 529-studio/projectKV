@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5d8cdbdc766c88001718896a_1791878748",
+  "camera_id": "5d8cdbdc766c88001718896a",
+  "image_path": "data/proofs/2026-10-13/5d8cdbdc766c88001718896a/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.765399+00:00",
+  "notes": "Rain afternoon frame on Hoàng Văn Thụ - Cộng Hòa. PCU=12.6, SI=0.84, base_cap=15.0"
+}

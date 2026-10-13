@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58afdbaebd82540010390c48_1791878748",
+  "camera_id": "58afdbaebd82540010390c48",
+  "image_path": "data/proofs/2026-10-13/58afdbaebd82540010390c48/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.513002+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Cao tốc Trung Lương. PCU=0.0, SI=0.00, base_cap=15.0"
+}

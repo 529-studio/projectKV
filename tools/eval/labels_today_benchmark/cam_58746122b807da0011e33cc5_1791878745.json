@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58746122b807da0011e33cc5_1791878745",
+  "camera_id": "58746122b807da0011e33cc5",
+  "image_path": "data/proofs/2026-10-13/58746122b807da0011e33cc5/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.612728+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - ĐH Nông Lâm 2. PCU=13.0, SI=0.87, base_cap=15.0"
+}

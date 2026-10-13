@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b857b1afb9c00172dd106_1791878746",
+  "camera_id": "662b857b1afb9c00172dd106",
+  "image_path": "data/proofs/2026-10-13/662b857b1afb9c00172dd106/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.337712+00:00",
+  "notes": "Rain afternoon frame on Điện Biên Phủ - Nguyễn Bỉnh Khiêm. PCU=21.5, SI=1.43, base_cap=15.0"
+}

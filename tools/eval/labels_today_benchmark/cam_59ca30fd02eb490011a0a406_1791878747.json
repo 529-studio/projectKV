@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_59ca30fd02eb490011a0a406_1791878747",
+  "camera_id": "59ca30fd02eb490011a0a406",
+  "image_path": "data/proofs/2026-10-13/59ca30fd02eb490011a0a406/1791878747_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.569149+00:00",
+  "notes": "Rain afternoon frame on QL1 - Tỉnh lộ 10 (1). PCU=0.0, SI=0.00, base_cap=15.0"
+}

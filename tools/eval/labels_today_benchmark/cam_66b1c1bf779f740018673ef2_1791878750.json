@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_66b1c1bf779f740018673ef2_1791878750",
+  "camera_id": "66b1c1bf779f740018673ef2",
+  "image_path": "data/proofs/2026-10-13/66b1c1bf779f740018673ef2/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.424880+00:00",
+  "notes": "Rain afternoon frame on An Dương Vương - Trần Phú. PCU=6.0, SI=0.40, base_cap=15.0"
+}

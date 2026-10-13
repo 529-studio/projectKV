@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a8256315058170011f6eac9_1791878747",
+  "camera_id": "5a8256315058170011f6eac9",
+  "image_path": "data/proofs/2026-10-13/5a8256315058170011f6eac9/1791878747_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.444013+00:00",
+  "notes": "Rain afternoon frame on Đinh Bộ Lĩnh - Nguyễn Xí. PCU=7.0, SI=0.47, base_cap=15.0"
+}
