@@ -17,7 +17,8 @@ as GitHub strictly requires closing keywords to link and auto-close issues upon 
 <!-- Paste real operational simulation logs, command output, and test pass evidence -->
 
 ## Checklist
-- [ ] Explicit time estimate provided before work started (Rule 2)
+- [ ] Sound solutions & root-cause verification over shortcuts (Rule 2)
+- [ ] Explicit time estimate provided before work started (Rule 3)
 - [ ] End-to-end bug reproduction/simulation verified before fix (Rule 4)
 - [ ] Zero hardcoded secrets / credentials in code and configs (Rule 8)
 - [ ] Monochromatic, zero-emoji UI and structured backend logs (Rule 1)
