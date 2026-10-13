@@ -4,9 +4,9 @@ This document defines the core principles, design standards, and mandatory techn
 
 1. **Design & UX Philosophy**: Minimalist, monochromatic, zero-emoji in user-facing UI and backend logs. Web UI supports bilingual i18n (`vi` default with full diacritics, `en` secondary). Codebase, documentation, commit messages, and tooling must be 100% English.
 
-2. **Issue Estimation Mandate**: Before starting any issue or task, AI agents and developers MUST provide an explicit completion time estimate (active effort hours/days and expected delivery window) based on task scope.
+2. **Sound Solutions & Root-Cause Verification (Never Fear Effort)**: When implementing any issue or task, never shy away from implementation effort or labor. Never choose sloppy, convenient shortcuts, superficial band-aids, or quick hacks out of convenience or fear of complexity. Always investigate and resolve problems at their absolute root cause, architect the soundest, most maintainable solution for the system, and verify exhaustively end-to-end before considering any task complete.
 
-3. **Sound Solutions Over Shortcuts**: Once an issue is estimated, never shy away from implementation effort or choose sub-optimal shortcuts out of convenience. Always select and build the most robust, rational, and maintainable solution for the project.
+3. **Issue Estimation Mandate**: Before starting any issue or task, AI agents and developers MUST provide an explicit completion time estimate (active effort hours/days and expected delivery window) based on task scope. The estimate must honestly reflect the full effort required for sound, root-cause implementation per Rule 2, never anchoring to premature shortcuts.
 
 4. **End-to-End Bug Reproduction**: When investigating any bug or regression, you MUST simulate and reproduce the failure end-to-end from a real user/client perspective before attempting fixes. Passing unit tests alone is NEVER sufficient.
 
