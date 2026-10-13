@@ -22,5 +22,5 @@ as GitHub strictly requires closing keywords to link and auto-close issues upon 
 - [ ] End-to-end bug reproduction/simulation verified before fix (Rule 4)
 - [ ] Zero hardcoded secrets / credentials in code and configs (Rule 8)
 - [ ] Monochromatic, zero-emoji UI and structured backend logs (Rule 1)
-- [ ] Updated docs/project_status.md and docs/lesson_learn.md (Rule 6)
+- [ ] Updated docs/project_status.md, docs/lesson_learn.md, affected docs/*, and README.md if applicable (Rule 6)
 - [ ] Full automated test suite passes (`make test-go`, `npm test`)
