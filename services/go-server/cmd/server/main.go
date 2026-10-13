@@ -653,6 +653,7 @@ func main() {
 	// 8. Setup Gin Engine
 	router := gin.Default()
 	router.Use(middleware.CORSMiddleware())
+	router.Use(middleware.SecretSanitizer())
 	router.Use(middleware.RateLimitMiddleware(cfg.RateLimitRPS, cfg.RateLimitBurst))
 
 	// Health check probes
