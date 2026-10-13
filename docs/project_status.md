@@ -96,6 +96,7 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
     - [#224](https://github.com/529-studio/projectKV/issues/224): S6-T4 — `[ci + ops] Automated Secret Scanning in GitHub Actions CI (Gitleaks)` (Est: 0.5d)
     - [#225](https://github.com/529-studio/projectKV/issues/225): S6-T5 — `[go-server] Telegram Flood Alert Dispatcher (internal/notify, Subscription Store & Debounce)` (Est: 2–2.5d)
   - Explicit architectural deferral: Route A→B deferred pending perception ground-truth verification and dedicated routing engine spike.
+  - Operational multi-wave guide and `agy` CLI instructions compiled in [`docs/sprint6_execution_guide.md`](sprint6_execution_guide.md).
 
 
 - **Inference Runtime**:
