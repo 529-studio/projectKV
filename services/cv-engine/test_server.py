@@ -14,8 +14,14 @@ import urllib.request
 import urllib.error
 import json
 
-import numpy as np
-from PIL import Image
+try:
+    import numpy as np
+    from PIL import Image
+    HAS_CV_DEPS = True
+except ImportError:
+    HAS_CV_DEPS = False
+    np = None
+    Image = None
 
 from server import CVServer, CVRequestHandler, letterbox, nms_cpu
 
@@ -129,6 +135,7 @@ class TestCVServer(unittest.TestCase):
             self.assertEqual(resp.status, 200)
 
 
+@unittest.skipUnless(HAS_CV_DEPS, "NumPy and Pillow required for preprocessing and NMS tests")
 class TestPreprocessingAndNMS(unittest.TestCase):
     def test_letterbox_preserves_aspect_ratio_and_pads(self):
         # 16:9 test image (512x288) filled with white (255, 255, 255)
