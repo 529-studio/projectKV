@@ -26,10 +26,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **131 Pull Requests** processed across repository history:
-  - **122 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, PR #215 `tooling/s5-t2-cv-detection-audit`, PR #216 `feat/s5-t3-hybrid-flood-pipeline`, PR #217 `docs/pr-issue-linking-rule-and-template`, and PR #218 `feat/s5-t4-r2-shared-team-labeler`)
+- **Lifetime PR History**: Exactly **134 Pull Requests** processed across repository history:
+  - **126 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, PR #215 `tooling/s5-t2-cv-detection-audit`, PR #216 `feat/s5-t3-hybrid-flood-pipeline`, PR #217 `docs/pr-issue-linking-rule-and-template`, PR #218 `feat/s5-t4-r2-shared-team-labeler`, PR #220 `docs/sprint5-report`, PR #227 `docs/adr-007-sprint6-plan`, PR #229 `docs/sprint6-execution-guide`, and PR #231 `docs/readme-fullstack-dev-guide`)
   - **8 Closed** without merging
-  - **1 Open** PR pending: PR for `docs/sprint5_report.md` (`docs/sprint5-report`)
+  - **0 Open** PRs pending
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
@@ -90,7 +90,7 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Operational wave guide and `agy` CLI instructions compiled in [`docs/sprint5_execution_guide.md`](sprint5_execution_guide.md).
 - **Sprint 6 Backlog Roadmap & Perception Hard Gate (ADR-007)**:
   - Formulated in [`docs/ADR-007-sprint5-audit-and-sprint6-plan.md`](ADR-007-sprint5-audit-and-sprint6-plan.md) with 5 tracked GitHub issues:
-    - [#221](https://github.com/529-studio/projectKV/issues/221): S6-T1 — `[cv-engine + tooling] Implement NMS, Letterbox, 416px Scaling & Re-run 764-Frame D6 Benchmark` (Hard Gate, Est: 1.5–2d)
+    - [#221](https://github.com/529-studio/projectKV/issues/221): S6-T1 — `[cv-engine + tooling] Implement NMS, Letterbox, 416px Scaling & Re-run 764-Frame D6 Benchmark` (**Completed / Verified**): Implemented aspect-preserving `letterbox` (16:9, neutral gray padding `(114, 114, 114)`) and `nms_cpu` ($\text{IoU} \le 0.45, \text{conf} \ge 0.25$) in `services/cv-engine/server.py`. Upgraded model input resolution to $416\times 416$ OpenVINO FP16 (`[1, 3, 416, 416]` input tensor, `[1, 84, 3549]` output tensor). Re-ran the complete 764-frame real benchmark: Traffic Macro F1 improved from **0.206 to 0.245** (+18.9%), Traffic Weighted F1 improved from **0.351 to 0.402** (+14.5%), CONGESTED false alarms on CLEAR frames dropped by **50.0%** (from 46 frames down to 23), and MODERATE correct predictions tripled (21 to 63, +200%). All 10 unit tests pass (`make test-model`). Hard Gate satisfied, unblocking downstream S6-T2 traffic calibration. Full report committed in [`docs/reports/eval_report_d6_sprint6.md`](reports/eval_report_d6_sprint6.md).
     - [#222](https://github.com/529-studio/projectKV/issues/222): S6-T2 — `[go-server] Corridor-Specific Visual Capacity Calibration & Persistent Peak Storage` (Est: 1d)
     - [#223](https://github.com/529-studio/projectKV/issues/223): S6-T3 — `[web] CameraModal UI/UX Redesign (Tactile Affordance) & 15s Client-Side Cooldown` (Est: 1d)
     - [#224](https://github.com/529-studio/projectKV/issues/224): S6-T4 — `[ci + ops] Automated Secret Scanning in GitHub Actions CI (Gitleaks)` (Est: 0.5d)
@@ -100,8 +100,8 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 
 - **Inference Runtime**:
-  - Model: Stock COCO YOLOv8n OpenVINO IR 320x320 FP16 (~6.3 MB)
-  - Latency: ~425ms P50 per frame on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).
+  - Model: Stock COCO YOLOv8n OpenVINO IR 416x416 FP16 (~6.3 MB) with NMS ($\text{IoU} \le 0.45, \text{conf} \ge 0.25$) and aspect-preserving letterboxing
+  - Latency: ~13–30ms per frame on host CPU, ~425ms P50 on non-AVX Celeron hardware; 57 cameras polled every 30s (~1.90 FPS, well within 2.27 FPS capacity).
   - Traffic Scoring: Passenger Car Unit (PCU) Saturation Index ($SI = PCU_{current} / PCU_{capacity}$), mapping into `CLEAR`, `MODERATE`, `HEAVY`, `CONGESTED`.
   - Archiver Direct Frame Delivery (Issue #182): Archiver pipeline directly saves the analyzed frame (`Verdict.RawFrame`) forwarded from the inference analyzers (`cvengine`, `cloudvision`, `mock`), eliminating reliance on viewer proxy cache hits while preserving fallback to `proxycache` and mock frames.
   - Container Vehicle Class Resolution (Issue #186, ADR-005 T6): Resolved dead code gap where COCO model only outputs 4 vehicle classes. Per `docs/decision-container-class-gap.md`, Container is folded into heavy freight vehicle weight (`Truck = 2.0`), aligning with COCO ground truth and HCMC peak-hour freight restrictions.

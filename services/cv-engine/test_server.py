@@ -14,7 +14,10 @@ import urllib.request
 import urllib.error
 import json
 
-from server import CVServer, CVRequestHandler
+import numpy as np
+from PIL import Image
+
+from server import CVServer, CVRequestHandler, letterbox, nms_cpu
 
 
 class TestCVServer(unittest.TestCase):
@@ -124,6 +127,61 @@ class TestCVServer(unittest.TestCase):
         check_req = urllib.request.Request(f"{self.base_url}/healthz")
         with urllib.request.urlopen(check_req, timeout=5.0) as resp:
             self.assertEqual(resp.status, 200)
+
+
+class TestPreprocessingAndNMS(unittest.TestCase):
+    def test_letterbox_preserves_aspect_ratio_and_pads(self):
+        # 16:9 test image (512x288) filled with white (255, 255, 255)
+        orig_w, orig_h = 512, 288
+        img = Image.new("RGB", (orig_w, orig_h), (255, 255, 255))
+
+        target_size = (416, 416)
+        letterboxed, scale, pad_x, pad_y = letterbox(img, target_size=target_size, fill_color=(114, 114, 114))
+
+        self.assertEqual(letterboxed.size, target_size)
+        expected_scale = 416.0 / 512.0
+        self.assertAlmostEqual(scale, expected_scale, places=4)
+        self.assertEqual(pad_x, 0)
+        self.assertGreater(pad_y, 0)
+
+        # Padding at top and bottom should have neutral gray (114, 114, 114)
+        top_pixel = letterboxed.getpixel((200, 0))
+        self.assertEqual(top_pixel, (114, 114, 114))
+        bottom_pixel = letterboxed.getpixel((200, 415))
+        self.assertEqual(bottom_pixel, (114, 114, 114))
+
+        # Center content should preserve original image color (255, 255, 255)
+        center_pixel = letterboxed.getpixel((200, 208))
+        self.assertEqual(center_pixel, (255, 255, 255))
+
+    def test_nms_cpu_suppresses_overlapping_boxes(self):
+        # Two bounding boxes heavily overlapping with IoU > 0.45
+        boxes = np.array([
+            [100.0, 100.0, 50.0, 50.0],
+            [102.0, 101.0, 48.0, 50.0],
+        ], dtype=np.float32)
+        scores = np.array([0.90, 0.75], dtype=np.float32)
+
+        keep = nms_cpu(boxes, scores, iou_thresh=0.45)
+        self.assertEqual(keep, [0])
+
+    def test_nms_cpu_keeps_distinct_boxes(self):
+        # Two non-overlapping bounding boxes
+        boxes = np.array([
+            [50.0, 50.0, 20.0, 20.0],
+            [200.0, 200.0, 30.0, 30.0],
+        ], dtype=np.float32)
+        scores = np.array([0.80, 0.70], dtype=np.float32)
+
+        keep = nms_cpu(boxes, scores, iou_thresh=0.45)
+        self.assertEqual(keep, [0, 1])
+
+    def test_nms_cpu_empty(self):
+        boxes = np.zeros((0, 4), dtype=np.float32)
+        scores = np.zeros((0,), dtype=np.float32)
+
+        keep = nms_cpu(boxes, scores, iou_thresh=0.45)
+        self.assertEqual(keep, [])
 
 
 if __name__ == "__main__":
