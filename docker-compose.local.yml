@@ -19,6 +19,7 @@ services:
       - MODEL_DIR=/app/models/yolov8n_openvino_320
     volumes:
       - ./yolov8n_openvino_model:/app/models/yolov8n_openvino_320:ro
+      - ./services/cv-engine/server.py:/app/server.py:ro
     deploy:
       resources:
         limits:
