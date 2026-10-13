@@ -4,15 +4,18 @@ This document defines the core principles, design standards, and mandatory techn
 
 1. **Design & UX Philosophy**: Minimalist, monochromatic, zero-emoji in user-facing UI and backend logs. Web UI supports bilingual i18n (`vi` default with full diacritics, `en` secondary). Codebase, documentation, commit messages, and tooling must be 100% English.
 
-2. **Issue Estimation Mandate**: Before starting any issue or task, AI agents and developers MUST provide an explicit completion time estimate (active effort hours/days and expected delivery window) based on task scope.
+2. **Sound Solutions & Root-Cause Verification (Never Fear Effort)**: When implementing any issue or task, never shy away from implementation effort or labor. Never choose sloppy, convenient shortcuts, superficial band-aids, or quick hacks out of convenience or fear of complexity. Always investigate and resolve problems at their absolute root cause, architect the soundest, most maintainable solution for the system, and verify exhaustively end-to-end before considering any task complete.
 
-3. **Sound Solutions Over Shortcuts**: Once an issue is estimated, never shy away from implementation effort or choose sub-optimal shortcuts out of convenience. Always select and build the most robust, rational, and maintainable solution for the project.
+3. **Issue Estimation Mandate**: Before starting any issue or task, AI agents and developers MUST provide an explicit completion time estimate (active effort hours/days and expected delivery window) based on task scope. The estimate must honestly reflect the full effort required for sound, root-cause implementation per Rule 2, never anchoring to premature shortcuts.
 
 4. **End-to-End Bug Reproduction**: When investigating any bug or regression, you MUST simulate and reproduce the failure end-to-end from a real user/client perspective before attempting fixes. Passing unit tests alone is NEVER sufficient.
 
 5. **Git Flow & Zero Direct Push**: Direct push to `main` and `dev` is strictly prohibited. Create feature/fix/doc branches (`feat/*`, `fix/*`, `docs/*`), push, and open PR targeting `dev`. AI agents must NEVER auto-merge PRs.
 
-6. **Living Documentation Maintenance**: Whenever a PR is created or merged, developers/agents MUST update `docs/project_status.md` and `docs/lesson_learn.md`. Codebase, git history, and PR list are the sole source of truth; never fabricate claims.
+6. **Living Documentation & Holistic Knowledge Maintenance**: Updating `docs/project_status.md` and `docs/lesson_learn.md` alone is NOT sufficient. Whenever any task or PR is implemented or merged, developers and AI agents MUST holistically audit and synchronize all related documentation across the repository:
+   - Update any relevant topic, architecture, operational, sprint, or guideline files under `docs/` directly affected by the changes (e.g. execution guides, ADR references, data schemas, API catalogs).
+   - Update root `README.md` (both English and Vietnamese sections) whenever public features, developer workflows, instructions, setup commands, or system architectures are affected or expanded.
+   - Codebase, git history, and PR list remain the sole source of truth; never fabricate claims.
 
 7. **Architecture Standards**: Follow leaf modulith pattern in `services/go-server` (see `GO_BACKEND_ARCHITECTURE.md`). Hand-written SQL only (no ORM). Never fetch snapshots directly from frontend; use backend proxy cache. Run `make swagger` on API route changes.
 
