@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58746295b807da0011e33ccb_1791878745",
+  "camera_id": "58746295b807da0011e33ccb",
+  "image_path": "data/proofs/2026-10-13/58746295b807da0011e33ccb/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.648650+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Bình Đường. PCU=3.0, SI=0.20, base_cap=15.0"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595d92013dcfc400106f2877_1791878751",
+  "camera_id": "595d92013dcfc400106f2877",
+  "image_path": "data/proofs/2026-10-13/595d92013dcfc400106f2877/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.871631+00:00",
+  "notes": "Rain afternoon frame on Quốc Lộ 1A - Cầu Bình Phước. PCU=4.5, SI=0.30, base_cap=15.0"
+}

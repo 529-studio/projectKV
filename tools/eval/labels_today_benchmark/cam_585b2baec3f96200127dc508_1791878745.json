@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_585b2baec3f96200127dc508_1791878745",
+  "camera_id": "585b2baec3f96200127dc508",
+  "image_path": "data/proofs/2026-10-13/585b2baec3f96200127dc508/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.407251+00:00",
+  "notes": "Rain afternoon frame on Nguyễn Văn Linh - Huỳnh Tấn Phát 2. PCU=0.0, SI=0.00, base_cap=15.0"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_59ca2d9d02eb490011a0a3f0_1791878751",
+  "camera_id": "59ca2d9d02eb490011a0a3f0",
+  "image_path": "data/proofs/2026-10-13/59ca2d9d02eb490011a0a3f0/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.396096+00:00",
+  "notes": "Rain afternoon frame on QL1 - Phan Văn Hớn 2. PCU=3.0, SI=0.20, base_cap=15.0"
+}

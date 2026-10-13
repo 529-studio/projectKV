@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a606dbc8576340017d0662b_1791878745",
+  "camera_id": "5a606dbc8576340017d0662b",
+  "image_path": "data/proofs/2026-10-13/5a606dbc8576340017d0662b/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.906338+00:00",
+  "notes": "Rain afternoon frame on Điện Biên Phủ - Nguyễn Hữu Cảnh. PCU=1.0, SI=0.07, base_cap=15.0"
+}

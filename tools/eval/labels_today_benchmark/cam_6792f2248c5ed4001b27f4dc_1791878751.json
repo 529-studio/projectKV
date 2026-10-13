@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6792f2248c5ed4001b27f4dc_1791878751",
+  "camera_id": "6792f2248c5ed4001b27f4dc",
+  "image_path": "data/proofs/2026-10-13/6792f2248c5ed4001b27f4dc/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.565882+00:00",
+  "notes": "Rain afternoon frame on Quốc Lộ 1 - Độc Lập (cổng KCN Sóng Thần). PCU=10.0, SI=0.67, base_cap=15.0"
+}

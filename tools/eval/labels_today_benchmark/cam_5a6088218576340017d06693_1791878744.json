@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a6088218576340017d06693_1791878744",
+  "camera_id": "5a6088218576340017d06693",
+  "image_path": "data/proofs/2026-10-13/5a6088218576340017d06693/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.273086+00:00",
+  "notes": "Rain afternoon frame on QL1 - Nút giao An Lạc 2. PCU=13.8, SI=0.92, base_cap=15.0"
+}

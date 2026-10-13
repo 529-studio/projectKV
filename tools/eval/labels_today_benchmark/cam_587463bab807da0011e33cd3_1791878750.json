@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_587463bab807da0011e33cd3_1791878750",
+  "camera_id": "587463bab807da0011e33cd3",
+  "image_path": "data/proofs/2026-10-13/587463bab807da0011e33cd3/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.730510+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Lê Thị Hoa. PCU=3.5, SI=0.23, base_cap=15.0"
+}

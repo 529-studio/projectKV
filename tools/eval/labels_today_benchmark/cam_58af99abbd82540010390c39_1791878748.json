@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58af99abbd82540010390c39_1791878748",
+  "camera_id": "58af99abbd82540010390c39",
+  "image_path": "data/proofs/2026-10-13/58af99abbd82540010390c39/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.344245+00:00",
+  "notes": "Rain afternoon frame on Nguyễn Hữu Cảnh - Nguyễn Bỉnh Khiêm. PCU=9.3, SI=0.62, base_cap=15.0"
+}

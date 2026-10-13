@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6792ef4f8c5ed4001b27f2c0_1791878749",
+  "camera_id": "6792ef4f8c5ed4001b27f2c0",
+  "image_path": "data/proofs/2026-10-13/6792ef4f8c5ed4001b27f2c0/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.547398+00:00",
+  "notes": "Rain afternoon frame on Quốc Lộ 1 - Ba Làng. PCU=1.0, SI=0.07, base_cap=15.0"
+}

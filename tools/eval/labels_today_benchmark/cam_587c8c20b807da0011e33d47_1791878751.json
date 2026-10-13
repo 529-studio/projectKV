@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_587c8c20b807da0011e33d47_1791878751",
+  "camera_id": "587c8c20b807da0011e33d47",
+  "image_path": "data/proofs/2026-10-13/587c8c20b807da0011e33d47/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.911964+00:00",
+  "notes": "Rain afternoon frame on Hoàng Văn Thụ - Hồ Văn Huê. PCU=16.0, SI=1.07, base_cap=15.0"
+}

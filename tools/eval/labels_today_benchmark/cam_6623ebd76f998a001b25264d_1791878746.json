@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6623ebd76f998a001b25264d_1791878746",
+  "camera_id": "6623ebd76f998a001b25264d",
+  "image_path": "data/proofs/2026-10-13/6623ebd76f998a001b25264d/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.463804+00:00",
+  "notes": "Rain afternoon frame on Quốc Lộ 1 - Tô Ký. PCU=7.8, SI=0.52, base_cap=15.0"
+}

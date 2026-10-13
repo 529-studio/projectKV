@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58aff2c6bd82540010390c55_1791878750",
+  "camera_id": "58aff2c6bd82540010390c55",
+  "image_path": "data/proofs/2026-10-13/58aff2c6bd82540010390c55/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.621744+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Đinh Đức Thiện 1. PCU=4.8, SI=0.32, base_cap=15.0"
+}

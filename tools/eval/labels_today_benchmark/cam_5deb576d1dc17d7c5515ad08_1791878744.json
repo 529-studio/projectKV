@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5deb576d1dc17d7c5515ad08_1791878744",
+  "camera_id": "5deb576d1dc17d7c5515ad08",
+  "image_path": "data/proofs/2026-10-13/5deb576d1dc17d7c5515ad08/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.962490+00:00",
+  "notes": "Rain afternoon frame on Cộng Hòa - Tân Kỳ Tân Quý. PCU=8.5, SI=0.57, base_cap=15.0"
+}

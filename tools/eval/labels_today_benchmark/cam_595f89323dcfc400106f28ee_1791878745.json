@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595f89323dcfc400106f28ee_1791878745",
+  "camera_id": "595f89323dcfc400106f28ee",
+  "image_path": "data/proofs/2026-10-13/595f89323dcfc400106f28ee/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.292510+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - BQB Cầu vượt Quang Trung A (hướng An Sương). PCU=0.0, SI=0.00, base_cap=15.0"
+}

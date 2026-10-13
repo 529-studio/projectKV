@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_59ca31d602eb490011a0a40b_1791878751",
+  "camera_id": "59ca31d602eb490011a0a40b",
+  "image_path": "data/proofs/2026-10-13/59ca31d602eb490011a0a40b/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.607146+00:00",
+  "notes": "Rain afternoon frame on QL1 - Hồ Học Lãm. PCU=4.8, SI=0.32, base_cap=15.0"
+}

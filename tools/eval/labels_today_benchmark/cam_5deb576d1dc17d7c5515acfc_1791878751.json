@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5deb576d1dc17d7c5515acfc_1791878751",
+  "camera_id": "5deb576d1dc17d7c5515acfc",
+  "image_path": "data/proofs/2026-10-13/5deb576d1dc17d7c5515acfc/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.854733+00:00",
+  "notes": "Rain afternoon frame on Điện Biên Phủ - Trương Định. PCU=6.3, SI=0.42, base_cap=15.0"
+}

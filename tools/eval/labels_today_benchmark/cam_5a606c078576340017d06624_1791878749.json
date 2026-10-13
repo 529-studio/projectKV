@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a606c078576340017d06624_1791878749",
+  "camera_id": "5a606c078576340017d06624",
+  "image_path": "data/proofs/2026-10-13/5a606c078576340017d06624/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.858597+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 13 - Hiệp Bình. PCU=12.5, SI=0.83, base_cap=15.0"
+}

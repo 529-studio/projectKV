@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b52a31afb9c00172d8b01_1791878745",
+  "camera_id": "662b52a31afb9c00172d8b01",
+  "image_path": "data/proofs/2026-10-13/662b52a31afb9c00172d8b01/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.059126+00:00",
+  "notes": "Rain afternoon frame on Lê Đức Thọ - Hẻm 688. PCU=9.0, SI=0.60, base_cap=15.0"
+}

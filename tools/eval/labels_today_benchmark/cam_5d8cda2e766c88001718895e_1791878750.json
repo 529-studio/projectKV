@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5d8cda2e766c88001718895e_1791878750",
+  "camera_id": "5d8cda2e766c88001718895e",
+  "image_path": "data/proofs/2026-10-13/5d8cda2e766c88001718895e/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.681579+00:00",
+  "notes": "Rain afternoon frame on Phạm Văn Đồng - Kha Vạn Cân (hướng đi Quốc lộ 1). PCU=2.0, SI=0.13, base_cap=15.0"
+}

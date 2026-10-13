@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662a902a1afb9c00172d2bed_1791878748",
+  "camera_id": "662a902a1afb9c00172d2bed",
+  "image_path": "data/proofs/2026-10-13/662a902a1afb9c00172d2bed/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.960877+00:00",
+  "notes": "Rain afternoon frame on Quốc Lộ 1 - Hưng Nhơn. PCU=12.5, SI=0.83, base_cap=15.0"
+}

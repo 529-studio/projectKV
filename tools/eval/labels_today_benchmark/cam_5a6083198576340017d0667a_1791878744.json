@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a6083198576340017d0667a_1791878744",
+  "camera_id": "5a6083198576340017d0667a",
+  "image_path": "data/proofs/2026-10-13/5a6083198576340017d0667a/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.076139+00:00",
+  "notes": "Rain afternoon frame on QL1 - Tân Kỳ Tân Quý 1. PCU=2.0, SI=0.13, base_cap=15.0"
+}

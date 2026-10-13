@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6623e7b76f998a001b25242d_1791878750",
+  "camera_id": "6623e7b76f998a001b25242d",
+  "image_path": "data/proofs/2026-10-13/6623e7b76f998a001b25242d/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.428286+00:00",
+  "notes": "Rain afternoon frame on Đinh Bộ Lĩnh - Bùi Đình Túy. PCU=6.0, SI=0.40, base_cap=15.0"
+}

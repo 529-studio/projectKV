@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_63b65ebebfd3d90017eaa3ae_1791878744",
+  "camera_id": "63b65ebebfd3d90017eaa3ae",
+  "image_path": "data/proofs/2026-10-13/63b65ebebfd3d90017eaa3ae/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.183035+00:00",
+  "notes": "Rain afternoon frame on Nguyễn Hữu Cảnh - Ngô Tất Tố 2 (Dạ cầu Thủ Thiêm 1). PCU=2.0, SI=0.13, base_cap=15.0"
+}

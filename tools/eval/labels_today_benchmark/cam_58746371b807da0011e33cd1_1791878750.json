@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58746371b807da0011e33cd1_1791878750",
+  "camera_id": "58746371b807da0011e33cd1",
+  "image_path": "data/proofs/2026-10-13/58746371b807da0011e33cd1/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.715125+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Đường 14. PCU=15.0, SI=1.00, base_cap=15.0"
+}

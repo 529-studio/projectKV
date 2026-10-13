@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a8253bc5058170011f6eac1_1791878751",
+  "camera_id": "5a8253bc5058170011f6eac1",
+  "image_path": "data/proofs/2026-10-13/5a8253bc5058170011f6eac1/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.305596+00:00",
+  "notes": "Rain afternoon frame on Đinh Bộ Lĩnh - Bạch Đằng 2. PCU=11.5, SI=0.77, base_cap=15.0"
+}

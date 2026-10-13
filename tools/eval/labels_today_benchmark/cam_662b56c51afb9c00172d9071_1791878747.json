@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b56c51afb9c00172d9071_1791878747",
+  "camera_id": "662b56c51afb9c00172d9071",
+  "image_path": "data/proofs/2026-10-13/662b56c51afb9c00172d9071/1791878747_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.075211+00:00",
+  "notes": "Rain afternoon frame on Bạch Đằng - Đặng Văn Sâm. PCU=5.5, SI=0.37, base_cap=15.0"
+}
