@@ -214,7 +214,8 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     assert.equal(FLOOD_VERIFY_I18N.COOLDOWN.vi(15), 'Chờ xác minh (15s)');
     assert.equal(FLOOD_VERIFY_I18N.COOLDOWN.en(15), 'Cooldown (15s)');
     assert.equal(FLOOD_VERIFY_I18N.BADGE_PREFIX.vi, 'XÁC MINH VLM');
-    assert.equal(FLOOD_VERIFY_I18N.BADGE_PREFIX.en, 'VLM VERIFIED');
+    assert.equal(FLOOD_VERIFY_I18N.ERROR_GENERIC.vi, 'Tạm thời gián đoạn');
+    assert.equal(FLOOD_VERIFY_I18N.ERROR_GENERIC.en, 'Temporarily unavailable');
     assert.equal(FLOOD_VERIFY_I18N.SEVERITY.DRY.vi, 'Khô ráo');
     assert.equal(FLOOD_VERIFY_I18N.SEVERITY.WET.vi, 'Đường ướt');
     assert.equal(FLOOD_VERIFY_I18N.SEVERITY.FLOODED_SHALLOW.vi, 'Ngập nông');
