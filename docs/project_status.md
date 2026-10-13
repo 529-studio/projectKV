@@ -26,10 +26,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **139 Pull Requests** processed across repository history:
-  - **131 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, PR #215 `tooling/s5-t2-cv-detection-audit`, PR #216 `feat/s5-t3-hybrid-flood-pipeline`, PR #217 `docs/pr-issue-linking-rule-and-template`, PR #218 `feat/s5-t4-r2-shared-team-labeler`, PR #220 `docs/sprint5-report`, PR #227 `docs/adr-007-sprint6-plan`, PR #229 `docs/sprint6-execution-guide`, PR #231 `docs/readme-fullstack-dev-guide`, PR #232 S6-T1, PR #233 S6-T2, PR #235 Rain collection, PR #236 S6-T3, and PR #237 Error Sanitization)
+- **Lifetime PR History**: Exactly **140 Pull Requests** processed across repository history:
+  - **132 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, PR #215 `tooling/s5-t2-cv-detection-audit`, PR #216 `feat/s5-t3-hybrid-flood-pipeline`, PR #217 `docs/pr-issue-linking-rule-and-template`, PR #218 `feat/s5-t4-r2-shared-team-labeler`, PR #220 `docs/sprint5-report`, PR #227 `docs/adr-007-sprint6-plan`, PR #229 `docs/sprint6-execution-guide`, PR #231 `docs/readme-fullstack-dev-guide`, PR #232 S6-T1, PR #233 S6-T2, PR #235 Rain collection, PR #236 S6-T3, PR #237 Error Sanitization, and PR #238 Secret Sanitizer & Traffic Hysteresis)
   - **8 Closed** without merging
-  - **0 Open** PRs pending
+  - **1 Open** PR pending (PR #240)
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
@@ -189,13 +189,13 @@ cd apps/web && npm test  # Web client unit test suite (92 tests)
 
 ## 5. Non-Negotiable AI Development Guardrails
 
-1. **Grounded Single Source of Truth**: All progress, metrics, and architecture claims must be verified directly against git commit history, PR list, or repository files. Never fabricate numbers.
-2. **Issue Estimation Mandate**: Always provide an explicit time and effort estimate before implementing any issue.
-3. **Sound Solutions Over Shortcuts**: Once an issue is estimated, never shy away from implementation effort or choose sub-optimal shortcuts out of convenience. Always build the most robust and architecturally sound solution for the project.
+1. **Grounded Single Source of Truth & Zero-Emoji UX**: All progress, metrics, and architecture claims must be verified directly against git commit history, PR list, or repository files. No Unicode emojis in UI controls, chips, modal headers, notifications, or backend Go log messages.
+2. **Sound Solutions & Root-Cause Verification (Never Fear Effort)**: When implementing any issue or task, never shy away from implementation effort or labor. Never choose sloppy, convenient shortcuts, superficial band-aids, or quick hacks out of convenience or fear of complexity. Always investigate and resolve problems at their absolute root cause, architect the soundest, most maintainable solution for the system, and verify exhaustively end-to-end before considering any task complete.
+3. **Issue Estimation Mandate**: Before starting any issue or task, AI agents and developers MUST provide an explicit completion time estimate (active effort hours/days and expected delivery window) based on task scope. The estimate must honestly reflect the full effort required for sound, root-cause implementation per Rule 2, never anchoring to premature shortcuts.
 4. **End-to-End Bug Reproduction**: Always simulate and reproduce bugs from a real user/network perspective before touching code. Unit tests passing in isolation is never acceptable proof of correctness.
-5. **Git Flow**: Zero direct push to `main` or `dev`. Always branch (`feat/*`, `fix/*`, `docs/*`), push, and open PR against `dev`. AI agents must NEVER auto-merge PRs.
-6. **Zero-Emoji Compliance**: No Unicode emojis in UI controls, chips, modal headers, notifications, or backend Go log messages. Use monochromatic SVGs and uppercase structured log prefixes (`[INIT]`, `[INFO]`, `[WARN]`, `[ERROR]`, `[FATAL]`).
-7. **Documentation Synchronization**: Whenever a PR is created or merged, update `docs/project_status.md` and `docs/lesson_learn.md`.
-8. **Zero Hardcoded Secrets**: Never hardcode credentials, tokens, or API keys in code or scripts. All secrets must be resolved dynamically from `.env`. Fallback parameters in `os.getenv` or configuration loaders must strictly be `""` (empty string) with fail-fast validation. Documentation templates must strictly use `<placeholder>` syntax.
-9. **PR Issue Linking Mandate**: PR descriptions must strictly start with `Close #<issue-number>` format to link and auto-close issues upon merge. Never use non-linking phrases like `Addresses Issue #...` or `Implement #...`. Follow `.github/pull_request_template.md`.
+5. **Git Flow & Zero Direct Push**: Zero direct push to `main` or `dev`. Always branch (`feat/*`, `fix/*`, `docs/*`), push, and open PR against `dev`. AI agents must NEVER auto-merge PRs.
+6. **Living Documentation & Holistic Knowledge Maintenance**: Updating `docs/project_status.md` and `docs/lesson_learn.md` alone is NOT sufficient. Whenever any task or PR is implemented or merged, developers and AI agents MUST holistically audit and update all related documentation under `docs/` and root `README.md` (both English and Vietnamese sections) if developer workflows, public features, or architecture are affected. Codebase, git history, and PR list are the sole source of truth; never fabricate claims.
+7. **Architecture Standards**: Follow leaf modulith pattern in `services/go-server`. Hand-written SQL only (no ORM). Never fetch snapshots directly from frontend; use backend proxy cache. Run `make swagger` on API route changes.
+8. **Zero Hardcoded Secrets & Mandatory Environment Configuration**: Never hardcode credentials, tokens, or API keys in code or scripts. All secrets must be dynamically loaded from `.env` or environment variables. Fallback parameters in `os.getenv` or configuration loaders must strictly be `""` (empty string) with fail-fast validation. Documentation templates must strictly use `<placeholder>` syntax.
+9. **PR Issue Linking Format Mandate**: PR descriptions must strictly start with `Close #<issue-number>` format to link and auto-close issues upon merge. Never use non-linking phrases like `Addresses Issue #...` or `Implement #...`. Follow `.github/pull_request_template.md`.
 

@@ -548,6 +548,34 @@
      - Falling transitions require traffic to definitively clear below threshold minus deadband: `MODERATE` $\rightarrow$ `CLEAR` requires $SI < 0.25$, `HEAVY` $\rightarrow$ `MODERATE` requires $SI < 0.55$, `CONGESTED` $\rightarrow$ `HEAVY` requires $SI < 0.75$.
      - Completely eliminates high-frequency chattering while preserving rapid alert onset.
 
+---
+
+## Lesson 34: Architectural & Psychological Priority: Sound Solutions Precede Task Estimation to Prevent Time-Anchoring
+
+- **Incident & Tracking:** Core Governance Update (`AGENTS.md`, `.github/pull_request_template.md`, `docs/sprint6_execution_guide.md`, `docs/project_status.md`).
+- **Symptom:**
+  When engineering rules enforce task estimation prior to mandating sound, root-cause solutions, developers and AI agents experience subconscious cognitive bias ("time anchoring"). Under pressure to provide brief estimates or deliver against aggressive initial timelines, implementers are tempted to adopt superficial band-aids, temporary hacks, or parameter tweaking (e.g. silently nudging thresholds instead of fixing perception pipelines) rather than doing the hard engineering work required to resolve root causes.
+- **Root Cause:**
+  Structural flaw in guideline ordering: prioritizing "how fast" (Estimation Mandate) before "how right" (Sound Solutions). If time estimation is anchored first, subsequent architectural choices become bounded by that premature estimate.
+- **Mandatory Takeaway & Engineering Resolution:**
+  1. **Strict Priority Inversion (Rule 2 Precedes Rule 3)**:
+     - **Rule 2**: *Sound Solutions & Root-Cause Verification (Never Fear Effort)*: Mandates that developers and AI agents must never shy away from implementation effort or labor, never choose sloppy band-aids out of convenience or fear of complexity, and always resolve problems at root cause with thorough end-to-end verification.
+     - **Rule 3**: *Issue Estimation Mandate*: Estimation must follow after the sound architecture is designed, honestly reflecting the full effort required for root-cause resolution rather than justifying shortcuts.
+  2. **Backward Compatibility Preservation**:
+     Rules 4 through 9 retain their exact historical numbering across all repository ADRs, PR templates, and operational documentation.
+
+---
+
+## Lesson 35: Holistic Repository Knowledge Maintenance vs. Isolated Status Logging
+
+- **Incident & Tracking:** Rule 6 Enhancement in `AGENTS.md` (Issue #239, PR #240).
+- **Symptom:**
+  Engineers and AI agents dutifully appended status bullets in `docs/project_status.md` and lessons in `docs/lesson_learn.md`, but left accompanying guides in `docs/` (e.g. execution guides, ADRs, schema notes) and the root `README.md` stale. As a result, onboarding developers or external contributors encountered outdated setup commands, omitted newly supported endpoints, or missed critical architectural constraints documented only in isolated status files.
+- **Root Cause:**
+  "Checklist tunnel vision": Treating Rule 6 as a superficial two-file checklist (`project_status.md` + `lesson_learn.md`) rather than an active commitment to holistic repo-wide documentation integrity.
+- **Mandatory Takeaway & Engineering Resolution:**
+  1. **Strict Expansion of Rule 6**: Codified that updating `project_status.md` and `lesson_learn.md` alone is explicitly insufficient.
+  2. **Active Blast-Radius Documentation Audit**: Every task completion requires surveying the blast radius of changes across `docs/` and root `README.md` (both English and Vietnamese sections). If CLI commands, environment variables, API endpoints, or workflows changed, `README.md` and related `docs/` must be updated in lockstep in the very same PR.
 
 
 

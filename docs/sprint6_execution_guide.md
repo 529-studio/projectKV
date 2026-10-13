@@ -197,15 +197,19 @@ Open PR targeting dev starting with 'Close #225'. Do NOT merge."
 
 1. **Tuân thủ quy chuẩn Rule 1 (Zero-Emoji & Monochromatic UI)**:
    Mọi giao diện web, thông báo Telegram, và log hệ thống tuyệt đối không dùng emoji. Giao diện tuân thủ bảng màu đơn sắc tương phản cao, hỗ trợ song ngữ (`vi` mặc định, `en` phụ).
-2. **Khai báo dự toán thời gian bắt buộc (Rule 2)**:
-   Mọi PR phải khai báo rõ thời gian dự toán và thực tế thực hiện.
-3. **Bằng chứng thực nghiệm Staging (Rule 4 & Lesson 3)**:
+2. **Giải pháp tận gốc & verify triệt để (Rule 2)**:
+   Không sợ tốn sức; không đi tắt cẩu thả; luôn giải quyết tận gốc và verify triệt để trước khi hoàn thành task.
+3. **Khai báo dự toán thời gian bắt buộc (Rule 3)**:
+   Mọi PR phải khai báo rõ thời gian dự toán và thực tế thực hiện dựa trên giải pháp đúng đắn theo Rule 2.
+4. **Bằng chứng thực nghiệm Staging (Rule 4 & Lesson 3)**:
    Mọi PR tuyên bố mô hình cải thiện, UI thay đổi, hoặc tính năng thông báo hoạt động MUST đính kèm log terminal thật, curl output, hoặc ảnh chụp màn hình từ Staging/môi trường chạy thật.
-4. **Quy trình Git & Zero Auto-Merge (Rule 5)**:
+5. **Quy trình Git & Zero Auto-Merge (Rule 5)**:
    Tạo nhánh tính năng (`tooling/*`, `feat/*`, `ci/*`), push lên origin, và mở PR hướng về `dev`. AI agents tuyệt đối không được tự động merge PR.
-5. **Không lộ secret & Fail-Fast rỗng (Rule 8)**:
+6. **Đồng bộ tài liệu toàn diện & README (Rule 6)**:
+   Cập nhật `docs/project_status.md` và `docs/lesson_learn.md` là chưa đủ. Bắt buộc rà soát và cập nhật mọi file `docs/` liên quan và `README.md` (cả EN & VI) nếu thay đổi ảnh hưởng đến quy trình, lệnh chạy, cấu hình hay tính năng.
+7. **Không lộ secret & Fail-Fast rỗng (Rule 8)**:
    Không hardcode API key/token ở bất kỳ file nào. Fallback trong code phải là chuỗi rỗng `""` hoặc dừng chương trình lập tức.
-6. **Bắt buộc cú pháp liên kết issue (Rule 9)**:
+8. **Bắt buộc cú pháp liên kết issue (Rule 9)**:
    Mô tả PR bắt buộc phải bắt đầu bằng `Close #<issue-number>` (ví dụ: `Close #221`). Không dùng các từ ngữ mô tả tự do như `Addresses #...` hay `Implement #...`.
-7. **Không tự ý hack tham số (Lesson 19)**:
+9. **Không tự ý hack tham số (Lesson 19)**:
    Không được sửa các ngưỡng `CapacityFloor` hay trọng số PCU để che giấu lỗi bỏ sót/nhận nhầm của detector. Lỗi tầng nhận diện phải được xử lý và kiểm chứng bằng 764 frame ground truth.
