@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_63b3c9bfbfd3d90017e9b039_1791878748",
+  "camera_id": "63b3c9bfbfd3d90017e9b039",
+  "image_path": "data/proofs/2026-10-13/63b3c9bfbfd3d90017e9b039/1791878748_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.150383+00:00",
+  "notes": "Rain afternoon frame on Kha Vạn Cân - Đường Số 2. PCU=5.2, SI=0.35, base_cap=15.0"
+}

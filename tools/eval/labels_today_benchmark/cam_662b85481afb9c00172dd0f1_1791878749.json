@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b85481afb9c00172dd0f1_1791878749",
+  "camera_id": "662b85481afb9c00172dd0f1",
+  "image_path": "data/proofs/2026-10-13/662b85481afb9c00172dd0f1/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.249498+00:00",
+  "notes": "Rain afternoon frame on Võ Văn Kiệt - Pasteur. PCU=0.0, SI=0.00, base_cap=15.0"
+}

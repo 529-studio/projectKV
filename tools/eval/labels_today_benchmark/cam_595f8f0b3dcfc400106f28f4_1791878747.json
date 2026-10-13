@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595f8f0b3dcfc400106f28f4_1791878747",
+  "camera_id": "595f8f0b3dcfc400106f28f4",
+  "image_path": "data/proofs/2026-10-13/595f8f0b3dcfc400106f28f4/1791878747_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.381133+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - BQB Cầu vượt Quang Trung B (hướng Ngã 4 Ga). PCU=5.5, SI=0.37, base_cap=15.0"
+}

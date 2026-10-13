@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a60839c8576340017d0667c_1791878750",
+  "camera_id": "5a60839c8576340017d0667c",
+  "image_path": "data/proofs/2026-10-13/5a60839c8576340017d0667c/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.092231+00:00",
+  "notes": "Rain afternoon frame on QL1 - Hương Lộ 2 (2). PCU=18.0, SI=1.20, base_cap=15.0"
+}

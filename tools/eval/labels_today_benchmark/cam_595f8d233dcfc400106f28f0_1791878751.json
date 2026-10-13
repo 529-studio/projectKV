@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595f8d233dcfc400106f28f0_1791878751",
+  "camera_id": "595f8d233dcfc400106f28f0",
+  "image_path": "data/proofs/2026-10-13/595f8d233dcfc400106f28f0/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.309629+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Quang Trung 1 (hướng đi Bình Phước). PCU=0.0, SI=0.00, base_cap=15.0"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58aff01fbd82540010390c50_1791878751",
+  "camera_id": "58aff01fbd82540010390c50",
+  "image_path": "data/proofs/2026-10-13/58aff01fbd82540010390c50/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.593626+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Bùi Thanh Khiết 2. PCU=11.0, SI=0.73, base_cap=15.0"
+}

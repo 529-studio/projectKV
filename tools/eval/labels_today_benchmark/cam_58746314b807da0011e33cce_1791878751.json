@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58746314b807da0011e33cce_1791878751",
+  "camera_id": "58746314b807da0011e33cce",
+  "image_path": "data/proofs/2026-10-13/58746314b807da0011e33cce/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.699057+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Cầu vượt Linh Xuân. PCU=7.5, SI=0.50, base_cap=15.0"
+}

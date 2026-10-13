@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5d9ddec9766c880017188c9c_1791878744",
+  "camera_id": "5d9ddec9766c880017188c9c",
+  "image_path": "data/proofs/2026-10-13/5d9ddec9766c880017188c9c/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.782559+00:00",
+  "notes": "Rain afternoon frame on Nút giao Hàng Xanh 5 (Hàng Xanh - Bạch Đằng). PCU=4.3, SI=0.29, base_cap=15.0"
+}

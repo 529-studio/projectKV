@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_59ca308302eb490011a0a403_1791878750",
+  "camera_id": "59ca308302eb490011a0a403",
+  "image_path": "data/proofs/2026-10-13/59ca308302eb490011a0a403/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.499618+00:00",
+  "notes": "Rain afternoon frame on QL1 - Tân Tạo Chợ Đệm 1. PCU=19.5, SI=1.30, base_cap=15.0"
+}

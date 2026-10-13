@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_6623ee176f998a001b25270c_1791878751",
+  "camera_id": "6623ee176f998a001b25270c",
+  "image_path": "data/proofs/2026-10-13/6623ee176f998a001b25270c/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.532836+00:00",
+  "notes": "Rain afternoon frame on Phan Văn Trị - Lê Đức Thọ. PCU=3.3, SI=0.22, base_cap=15.0"
+}

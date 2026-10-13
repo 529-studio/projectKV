@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5d8cd653766c88001718894c_1791878751",
+  "camera_id": "5d8cd653766c88001718894c",
+  "image_path": "data/proofs/2026-10-13/5d8cd653766c88001718894c/1791878751_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.492204+00:00",
+  "notes": "Rain afternoon frame on Kha Vạn Cân - Võ Văn Ngân. PCU=13.3, SI=0.89, base_cap=15.0"
+}

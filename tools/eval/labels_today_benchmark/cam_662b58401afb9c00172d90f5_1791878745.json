@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662b58401afb9c00172d90f5_1791878745",
+  "camera_id": "662b58401afb9c00172d90f5",
+  "image_path": "data/proofs/2026-10-13/662b58401afb9c00172d90f5/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:14.165775+00:00",
+  "notes": "Rain afternoon frame on Hoàng Văn Thụ - Bùi Thị Xuân. PCU=7.5, SI=0.50, base_cap=15.0"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_595dd7693dcfc400106f28b0_1791878747",
+  "camera_id": "595dd7693dcfc400106f28b0",
+  "image_path": "data/proofs/2026-10-13/595dd7693dcfc400106f28b0/1791878747_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.226904+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Đường Lê Thị Riêng 1. PCU=18.5, SI=1.23, base_cap=15.0"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5d8cda6a766c880017188960_1791878744",
+  "camera_id": "5d8cda6a766c880017188960",
+  "image_path": "data/proofs/2026-10-13/5d8cda6a766c880017188960/1791878744_sample.jpg",
+  "labels": {
+    "traffic": "HEAVY",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.699990+00:00",
+  "notes": "Rain afternoon frame on Phạm Văn Đồng - Kha Vạn Cân (hướng đi Sân bay). PCU=10.5, SI=0.70, base_cap=15.0"
+}

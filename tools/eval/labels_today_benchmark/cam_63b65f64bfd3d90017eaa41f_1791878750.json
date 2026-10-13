@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_63b65f64bfd3d90017eaa41f_1791878750",
+  "camera_id": "63b65f64bfd3d90017eaa41f",
+  "image_path": "data/proofs/2026-10-13/63b65f64bfd3d90017eaa41f/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.255334+00:00",
+  "notes": "Rain afternoon frame on Xô Viết Nghệ Tĩnh - Đường D5. PCU=6.0, SI=0.40, base_cap=15.0"
+}

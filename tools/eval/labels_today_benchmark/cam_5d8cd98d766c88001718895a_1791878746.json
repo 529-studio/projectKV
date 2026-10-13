@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5d8cd98d766c88001718895a_1791878746",
+  "camera_id": "5d8cd98d766c88001718895a",
+  "image_path": "data/proofs/2026-10-13/5d8cd98d766c88001718895a/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.644331+00:00",
+  "notes": "Rain afternoon frame on Phạm Văn Đồng - Tô Ngọc Vân (hướng đi Bình Dương). PCU=3.0, SI=0.20, base_cap=15.0"
+}

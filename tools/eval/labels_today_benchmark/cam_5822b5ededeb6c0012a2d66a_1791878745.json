@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5822b5ededeb6c0012a2d66a_1791878745",
+  "camera_id": "5822b5ededeb6c0012a2d66a",
+  "image_path": "data/proofs/2026-10-13/5822b5ededeb6c0012a2d66a/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.158722+00:00",
+  "notes": "Rain afternoon frame on Mai Chí Thọ - Nguyễn Cơ Thạch 1. PCU=17.5, SI=1.17, base_cap=15.0"
+}

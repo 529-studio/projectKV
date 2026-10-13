@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58af9670bd82540010390c34_1791878747",
+  "camera_id": "58af9670bd82540010390c34",
+  "image_path": "data/proofs/2026-10-13/58af9670bd82540010390c34/1791878747_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.294175+00:00",
+  "notes": "Rain afternoon frame on Phạm Văn Đồng - Phan Văn Trị 1. PCU=6.0, SI=0.40, base_cap=15.0"
+}

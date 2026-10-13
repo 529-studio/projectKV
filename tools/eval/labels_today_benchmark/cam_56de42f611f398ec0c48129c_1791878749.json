@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_56de42f611f398ec0c48129c_1791878749",
+  "camera_id": "56de42f611f398ec0c48129c",
+  "image_path": "data/proofs/2026-10-13/56de42f611f398ec0c48129c/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.036889+00:00",
+  "notes": "Rain afternoon frame on Võ Văn Kiệt - Quốc Lộ 1. PCU=5.0, SI=0.33, base_cap=15.0"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_587461c1b807da0011e33cc8_1791878747",
+  "camera_id": "587461c1b807da0011e33cc8",
+  "image_path": "data/proofs/2026-10-13/587461c1b807da0011e33cc8/1791878747_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.630799+00:00",
+  "notes": "Rain afternoon frame on Quốc lộ 1 - Ngã tư Linh Xuân. PCU=14.8, SI=0.99, base_cap=15.0"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_662a8ef41afb9c00172d2af2_1791878745",
+  "camera_id": "662a8ef41afb9c00172d2af2",
+  "image_path": "data/proofs/2026-10-13/662a8ef41afb9c00172d2af2/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:13.928011+00:00",
+  "notes": "Rain afternoon frame on Lê Văn Lương - Đường số 15. PCU=0.0, SI=0.00, base_cap=15.0"
+}

@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58af8b69bd82540010390c28_1791878749",
+  "camera_id": "58af8b69bd82540010390c28",
+  "image_path": "data/proofs/2026-10-13/58af8b69bd82540010390c28/1791878749_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.195362+00:00",
+  "notes": "Rain afternoon frame on Nam Kỳ Khởi Nghĩa - Điện Biên Phủ 1. PCU=4.0, SI=0.27, base_cap=15.0"
+}

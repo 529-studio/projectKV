@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_585b2980c3f96200127dc502_1791878747",
+  "camera_id": "585b2980c3f96200127dc502",
+  "image_path": "data/proofs/2026-10-13/585b2980c3f96200127dc502/1791878747_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.307544+00:00",
+  "notes": "Rain afternoon frame on Huỳnh Tấn Phát - Lưu Trọng Lư 2. PCU=4.0, SI=0.27, base_cap=15.0"
+}

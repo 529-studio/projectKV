@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a606a958576340017d06621_1791878750",
+  "camera_id": "5a606a958576340017d06621",
+  "image_path": "data/proofs/2026-10-13/5a606a958576340017d06621/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CONGESTED",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:11.801802+00:00",
+  "notes": "Rain afternoon frame on Đinh Bộ Lĩnh - Bạch Đằng 3. PCU=17.0, SI=1.13, base_cap=15.0"
+}

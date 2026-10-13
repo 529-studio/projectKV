@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_586e1d4ef9fab7001111b0a2_1791878750",
+  "camera_id": "586e1d4ef9fab7001111b0a2",
+  "image_path": "data/proofs/2026-10-13/586e1d4ef9fab7001111b0a2/1791878750_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:09.431245+00:00",
+  "notes": "Rain afternoon frame on Cộng Hòa - Đường C 18. PCU=3.0, SI=0.20, base_cap=15.0"
+}

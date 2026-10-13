@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_5a6086e88576340017d0668a_1791878746",
+  "camera_id": "5a6086e88576340017d0668a",
+  "image_path": "data/proofs/2026-10-13/5a6086e88576340017d0668a/1791878746_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "flood": "NONE",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:12.200084+00:00",
+  "notes": "Rain afternoon frame on QL1-Cty Pouyuen (1). PCU=0.0, SI=0.00, base_cap=15.0"
+}

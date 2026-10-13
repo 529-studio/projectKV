@@ -1,0 +1,14 @@
+{
+  "frame_id": "cam_58df4e22dc195800111e04bb_1791878745",
+  "camera_id": "58df4e22dc195800111e04bb",
+  "image_path": "data/proofs/2026-10-13/58df4e22dc195800111e04bb/1791878745_sample.jpg",
+  "labels": {
+    "traffic": "MODERATE",
+    "flood": "SHALLOW",
+    "time_of_day": "day",
+    "weather": "rain"
+  },
+  "annotator": "sprint6_rain_curator",
+  "annotated_at": "2026-10-13T08:07:10.798711+00:00",
+  "notes": "Rain afternoon frame on Yên Thế - Bạch Đằng. PCU=5.0, SI=0.33, base_cap=15.0"
+}
