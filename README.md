@@ -113,11 +113,14 @@ hcm-traffic-cameras/
 
 ## 2. Quick Start
 
+### 2.1. Basic Mode (UI & Backend without Local Model Inference)
+Suitable for rapid UI development, offline testing, or lightweight exploration:
+
 ```bash
 # Install dependencies (Go modules + frontend, first time only)
 make install
 
-# [RECOMMENDED] Launch entire system concurrently (Go Backend :3000 & Frontend Dev :3001)
+# Launch Go backend (:3000) and Next.js frontend dev server (:3001) concurrently
 make dev-all
 
 # Or run the Go backend only (Port 3000) - Serves both API and Web Frontend
@@ -129,6 +132,36 @@ make dev-web
 # Crawl & update camera dataset from official DOT portal
 make crawl
 ```
+
+### 2.2. Full-Stack with Local OpenVINO Model Inference (Recommended)
+To run real AI vehicle detection and PCU saturation scoring locally using self-hosted OpenVINO (`yolov8n_openvino_320`):
+
+```bash
+# Step 1: Start the CV Engine container in the background (port 8000)
+make dev-model
+# (Equivalent to: docker compose -f docker-compose.local.yml up -d)
+
+# Step 2: Ensure .env is configured for local OpenVINO inference:
+# ANALYZER=onnx
+# CV_ENGINE_URL=http://localhost:8000
+
+# Step 3: Launch Go Backend (:3000) and Next.js Frontend (:3001)
+make dev-all
+```
+
+#### Service Endpoints & Verification Matrix
+
+| Service | Port | Endpoint URL | Verification Check |
+|---|:---:|---|---|
+| **Web Map Explorer** | `3001` | http://localhost:3001 | Interactive Leaflet map, corridor dock |
+| **Collaborative Labeler** | `3001` | http://localhost:3001/labeler | Team snapshot labeling tool |
+| **Go Backend API** | `3000` | http://localhost:3000 | Core Gin HTTP REST server |
+| **Swagger UI** | `3000` | http://localhost:3000/swagger/index.html | Interactive OpenAPI documentation |
+| **Backend Health** | `3000` | http://localhost:3000/health | Returns `{"status":"ok"}` |
+| **CV Inference Engine** | `8000` | http://localhost:8000/healthz | Returns `{"status":"healthy","model":"yolov8n_openvino_320"}` |
+
+> [!NOTE]
+> `make dev-all` launches the Go backend and Next.js dev server. It expects the `warded-model` Docker container to be already running if `ANALYZER=onnx` is configured.
 
 *   **Browser Access**:
     *   Full Application (Backend + Web): `http://localhost:3000`
@@ -212,8 +245,54 @@ Detailed architectural decisions are documented in:
 Hệ thống được tổ chức theo mô hình monorepo, tách biệt Web Client (`apps/web`) khỏi backend Go (`services/go-server`), với một service Python riêng (`services/cv-engine`) chuyên trách suy luận mô hình (model inference).
 
 ## Khởi chạy nhanh
-- Khởi chạy toàn bộ: `make dev-all`
-- Truy cập trình duyệt: `http://localhost:3000` (Backend + Web) hoặc `http://localhost:3001` (Frontend Dev).
+
+### Cách 1: Khởi chạy cơ bản (Không cần Docker model)
+Phù hợp để phát triển giao diện hoặc kiểm thử nhanh mà không cần chạy mô hình nhận diện AI:
+
+```bash
+# Cài đặt dependencies (lần đầu tiên)
+make install
+
+# Khởi chạy Go Backend (:3000) và Next.js Frontend (:3001) đồng thời
+make dev-all
+
+# Hoặc chỉ chạy Go Backend (cổng 3000) - Phục vụ cả API và Web tĩnh
+make dev-go
+```
+
+### Cách 2: Khởi chạy Full-Stack kèm Mô hình OpenVINO cục bộ (Khuyên dùng)
+Để chạy toàn bộ hệ thống thực tế với mô hình YOLOv8n OpenVINO nhận diện xe và tính toán chỉ số bão hòa PCU:
+
+```bash
+# Bước 1: Khởi động container model ngầm (cổng 8000)
+make dev-model
+# (Tương đương: docker compose -f docker-compose.local.yml up -d)
+
+# Bước 2: Đảm bảo file .env đã cấu hình kết nối model:
+# ANALYZER=onnx
+# CV_ENGINE_URL=http://localhost:8000
+
+# Bước 3: Chạy song song Go Backend (:3000) và Next.js Frontend (:3001)
+make dev-all
+```
+
+#### Bảng Cổng Dịch Vụ & Địa Chỉ Truy Cập Cục Bộ
+
+| Dịch vụ | Cổng | Địa chỉ truy cập | Mục đích kiểm tra |
+|---|:---:|---|---|
+| **Giao diện Bản đồ** | `3001` | http://localhost:3001 | Bản đồ camera, dock theo dõi hành lang |
+| **Gán nhãn Labeler** | `3001` | http://localhost:3001/labeler | Công cụ dán nhãn bằng chứng tập trung |
+| **Go Backend API** | `3000` | http://localhost:3000 | Máy chủ API Gin |
+| **Tài liệu Swagger** | `3000` | http://localhost:3000/swagger/index.html | Tài liệu API tương tác |
+| **Kiểm tra Sức khỏe BE** | `3000` | http://localhost:3000/health | Phản hồi `{"status":"ok"}` |
+| **Mô hình CV Engine** | `8000` | http://localhost:8000/healthz | Phản hồi trạng thái container `warded-model` |
+
+> [!NOTE]
+> `make dev-all` khởi chạy Go Backend và Next.js Dev Server. Lệnh này giả định container Docker `warded-model` đã được khởi động từ trước khi chọn `ANALYZER=onnx`.
+
+*   **Truy cập trình duyệt**:
+    *   Toàn bộ ứng dụng (Backend + Web tĩnh): `http://localhost:3000`
+    *   Giao diện Frontend Dev (Hot Reload): `http://localhost:3001`
 
 ## Hạ tầng & Phân bổ Microservices
 
