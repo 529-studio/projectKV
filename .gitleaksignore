@@ -1,0 +1,2 @@
+# Format: <commit_sha>:<file_path>:<rule_id>:<start_line>
+# Add verified historical false-positives or revoked test tokens below:
