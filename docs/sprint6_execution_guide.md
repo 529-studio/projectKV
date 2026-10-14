@@ -32,7 +32,7 @@ bộ Sprint 6 Backlog theo quy chuẩn [ADR-007](ADR-007-sprint5-audit-and-sprin
 | **0** | **S6-T4** | [#224](https://github.com/529-studio/projectKV/issues/224) | `[ci + ops] Automated Secret Scanning in GitHub Actions CI (Gitleaks)` | epic:infra-resilience | `tooling, cross-cutting` | None (Độc lập CI) |
 | **1** | **S6-T2** | [#222](https://github.com/529-studio/projectKV/issues/222) | `[go-server] Corridor-Specific Visual Capacity Calibration & Persistent Peak Storage` | epic:vehicle-detection | `go, backend, epic:vehicle-detection` | [#221](https://github.com/529-studio/projectKV/issues/221) (S6-T1) |
 | **1** | **S6-T3** | [#223](https://github.com/529-studio/projectKV/issues/223) | `[web] CameraModal UI/UX Redesign (Tactile Affordance) & 15s Client-Side Cooldown` | epic:dock-ux | `frontend, epic:dock-ux` | None (Độc lập UI) |
-| **2** | **S6-T5** | [#225](https://github.com/529-studio/projectKV/issues/225) | `[go-server] Telegram Flood Alert Dispatcher (internal/notify, Subscription Store & Debounce)` | epic:flood-integrity | `go, backend, epic:flood-integrity` | S5-T3 ([#209](https://github.com/529-studio/projectKV/issues/209)) |
+| **2** | **S6-T5** | [#225](https://github.com/529-studio/projectKV/issues/225) | `[go-server] Telegram Flood Alert Dispatcher (internal/notify, Subscription Store & Debounce)` (**Completed / Verified**) | epic:flood-integrity | `go, backend, epic:flood-integrity` | S5-T3 ([#209](https://github.com/529-studio/projectKV/issues/209)) |
 
 > **Quy tắc cổng chặn (Hard Gate)**:
 > 1. **S6-T1 là Hard Gate của Sprint 6**: Bắt buộc nghiệm thu và đo lại toàn bộ 764 frame thực tế trước khi thực hiện hiệu chỉnh giao thông downstream ở S6-T2 (tuân thủ nghiêm ngặt **Lesson 19**).
