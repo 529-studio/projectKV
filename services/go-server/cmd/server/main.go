@@ -26,9 +26,11 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
+	"github.com/529-studio/projectKV/services/go-server/internal/notify"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
 	"github.com/529-studio/projectKV/services/go-server/internal/storage"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
+	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
 	"github.com/529-studio/projectKV/services/go-server/internal/tilecache"
 	"github.com/529-studio/projectKV/services/go-server/internal/weather"
 	"github.com/529-studio/projectKV/services/go-server/internal/ws"
@@ -271,11 +273,107 @@ func main() {
 	// 5. Initialize SQLite DB and Verdict Repository
 	db, err := store.NewDB(cfg.SQLitePath)
 	var verdictRepo *store.VerdictRepo
+	var subStore subscription.Store
+	var subHandler *subscription.Handler
 	if err != nil {
 		log.Printf("[WARN] Failed to initialize SQLite database (%s): %v", cfg.SQLitePath, err)
 	} else {
 		verdictRepo = store.NewVerdictRepo(db)
+		subStore = subscription.NewSQLiteStore(db)
+		subHandler = subscription.NewHandler(subStore)
 		defer db.Close()
+	}
+
+	// 5a. Initialize notification subsystem (Issue #225 / S6-T5)
+	debounceMinutes := cfg.TelegramDebounceMinutes
+	if debounceMinutes <= 0 {
+		debounceMinutes = 30
+	}
+	notifyDebouncer := notify.NewDebouncer(time.Duration(debounceMinutes) * time.Minute)
+	notifyManager := notify.NewManager(notifyDebouncer)
+
+	// Dependency Inversion: adapt subscription store to notify.SubscriberFinder
+	subFinder := notify.SubscriberFinderFunc(func(ctx context.Context, channelName string, alert notify.FloodAlert) ([]string, error) {
+		if subStore == nil {
+			return nil, nil
+		}
+		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.District, alert.Ward)
+	})
+
+	telegramChan := notify.NewTelegramChannel(cfg.TelegramBotToken, subFinder)
+	notifyManager.Register(telegramChan)
+	if cfg.TelegramBotToken != "" {
+		log.Println("[INIT] Telegram notification channel registered and active.")
+	} else {
+		log.Println("[INIT] TELEGRAM_BOT_TOKEN not configured: Telegram channel registered in simulation mode (delivery skipped).")
+	}
+
+	// Load authentic municipal flood chokepoints fixture
+	floodChokepointsPath := config.ResolvePath("tools/eval/fixtures/flood_chokepoints.json")
+	floodChokepoints, err := flood.LoadChokepoints(floodChokepointsPath)
+	chokepointMap := make(map[string]flood.FloodChokepoint)
+	if err != nil {
+		log.Printf("[WARN] Failed to load authentic flood chokepoints from %s: %v", floodChokepointsPath, err)
+	} else {
+		log.Printf("[INIT] Loaded %d authentic municipal flood chokepoints from %s", len(floodChokepoints), floodChokepointsPath)
+		for _, cp := range floodChokepoints {
+			chokepointMap[cp.CameraID] = cp
+		}
+	}
+
+	dispatchFloodAlert := func(v hotset.Verdict) {
+		if !notify.IsFloodSeverity(v.FloodSeverity) {
+			return
+		}
+
+		camName := v.CameraID
+		district := ""
+		ward := ""
+		snapshotURL := ""
+		if camCatalog != nil {
+			if cam, ok := camCatalog.ByID(v.CameraID); ok {
+				if cam.DisplayName != "" {
+					camName = cam.DisplayName
+				} else if cam.Title != "" {
+					camName = cam.Title
+				}
+				district = cam.Zone
+				ward = cam.PhuongName
+				snapshotURL = cam.SnapshotURL
+			}
+		}
+
+		var typicalDepth int
+		if cp, ok := chokepointMap[v.CameraID]; ok {
+			typicalDepth = cp.TypicalDepthCm
+		}
+
+		obs := v.ObservedAt
+		if obs.IsZero() {
+			obs = v.Timestamp
+		}
+		if obs.IsZero() {
+			obs = time.Now()
+		}
+
+		alert := notify.FloodAlert{
+			CameraID:       v.CameraID,
+			CameraName:     camName,
+			District:       district,
+			Ward:           ward,
+			FloodSeverity:  v.FloodSeverity,
+			TypicalDepthCm: typicalDepth,
+			ObservedAt:     obs,
+			SnapshotURL:    snapshotURL,
+		}
+
+		go func() {
+			dispatchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := notifyManager.Dispatch(dispatchCtx, alert); err != nil {
+				log.Printf("[WARN] Failed to dispatch flood alert for %s: %v", v.CameraID, err)
+			}
+		}()
 	}
 
 	// 5b. Analyzer selection and environment validation (ADR-004 H0)
@@ -455,13 +553,6 @@ func main() {
 
 	var floodHandler *flood.Handler
 	if floodAnalyzer != nil && camCatalog != nil {
-		floodChokepointsPath := config.ResolvePath("tools/eval/fixtures/flood_chokepoints.json")
-		chokepoints, err := flood.LoadChokepoints(floodChokepointsPath)
-		if err != nil {
-			log.Printf("[WARN] Failed to load authentic flood chokepoints from %s: %v", floodChokepointsPath, err)
-		} else {
-			log.Printf("[INIT] Loaded %d authentic municipal flood chokepoints from %s", len(chokepoints), floodChokepointsPath)
-		}
 		floodLimiter := flood.NewQuotaLimiter(10, 300)
 		onFloodVerdict := func(v hotset.Verdict) {
 			if verdictRepo != nil {
@@ -480,12 +571,13 @@ func main() {
 			}
 			floodHexAggregator.OnVerdict(v)
 			liveHub.Broadcast(v)
+			dispatchFloodAlert(v)
 		}
 		floodService := flood.NewService(
 			floodAnalyzer,
 			weatherService,
 			camCatalog,
-			chokepoints,
+			floodChokepoints,
 			floodLimiter,
 			flood.WithOnVerdict(onFloodVerdict),
 		)
@@ -591,6 +683,9 @@ func main() {
 			if floodHexAggregator != nil {
 				floodHexAggregator.OnVerdict(v)
 			}
+
+			// Fan-out 1d: dispatch real-time flood alert notification to subscribers.
+			dispatchFloodAlert(v)
 
 			// Fan-out 2: persist to SQLite for GET /api/traffic-status hydration.
 			if verdictRepo != nil {
@@ -705,6 +800,10 @@ func main() {
 		if floodHandler != nil {
 			floodHandler.RegisterRoutes(api)
 		}
+		// Flood alert subscriptions (Issue #225 / S6-T5)
+		if subHandler != nil {
+			subHandler.RegisterRoutes(api)
+		}
 		// Shared archiver snapshots and collaborative team labeler endpoints (Issue #214)
 		if archiverHandler != nil {
 			devAuth := middleware.RequireDevAuth(cfg.DevAccessToken, cfg.AppEnv)
@@ -772,6 +871,7 @@ func main() {
 			}
 		}
 		log.Printf(" [CAM] Loaded %d cameras into memory (%d online)", totalCams, onlineCams)
+		log.Printf(" [NOTIF] Telegram:   debounce=%dm, active=%t", cfg.TelegramDebounceMinutes, cfg.TelegramBotToken != "")
 		log.Println("================================================================")
 
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

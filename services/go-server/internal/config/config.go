@@ -275,6 +275,8 @@ type ServerConfig struct {
 	CVEngineURL                   string // default: "http://localhost:8000" or from CV_ENGINE_URL
 	AppEnv                        string // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
 	DevAccessToken                string // DEV_ACCESS_TOKEN or LABELER_SECRET_TOKEN
+	TelegramBotToken              string // TELEGRAM_BOT_TOKEN
+	TelegramDebounceMinutes       int    // default: 30 (TELEGRAM_DEBOUNCE_MINUTES)
 	StorageDriver                 string // default: "local"
 	StorageLocalRoot              string // default: "./data/proofs"
 	R2AccountID                   string
@@ -398,6 +400,14 @@ func LoadConfig() *ServerConfig {
 	devAccessToken := strings.TrimSpace(os.Getenv("DEV_ACCESS_TOKEN"))
 	if devAccessToken == "" {
 		devAccessToken = strings.TrimSpace(os.Getenv("LABELER_SECRET_TOKEN"))
+	}
+
+	telegramBotToken := strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN"))
+	telegramDebounceMinutes := 30
+	if val := os.Getenv("TELEGRAM_DEBOUNCE_MINUTES"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			telegramDebounceMinutes = v
+		}
 	}
 
 	storageDriver := strings.ToLower(strings.TrimSpace(os.Getenv("STORAGE_DRIVER")))
@@ -629,6 +639,8 @@ func LoadConfig() *ServerConfig {
 		CVEngineURL:                   cvEngineURL,
 		AppEnv:                        appEnv,
 		DevAccessToken:                devAccessToken,
+		TelegramBotToken:              telegramBotToken,
+		TelegramDebounceMinutes:       telegramDebounceMinutes,
 		StorageDriver:                 storageDriver,
 		StorageLocalRoot:              storageLocalRoot,
 		R2AccountID:                   r2AccountID,
