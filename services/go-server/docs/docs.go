@@ -572,6 +572,180 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/subscriptions": {
+            "get": {
+                "description": "Lists all active subscriptions for a given user chat ID on a channel.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subscriptions"
+                ],
+                "summary": "List flood alert subscriptions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Channel name (e.g. telegram)",
+                        "name": "channel_name",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "chat_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Subscribes a user chat ID on a channel (e.g. Telegram) to flood alerts (scope: all, chokepoint, zone, or ward).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subscriptions"
+                ],
+                "summary": "Create flood alert subscription",
+                "parameters": [
+                    {
+                        "description": "Subscription details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/subscription.SubscribeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Unsubscribes a user chat ID from a specific flood alert target.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subscriptions"
+                ],
+                "summary": "Delete flood alert subscription",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Channel name (e.g. telegram)",
+                        "name": "channel_name",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "chat_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target type (all, chokepoint, zone, ward)",
+                        "name": "target_type",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target ID",
+                        "name": "target_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/tiles/{z}/{x}/{y}": {
             "get": {
                 "description": "Serves OpenStreetMap raster tiles (PNG) cached on local disk with 30-day immutable HTTP cache headers.",
@@ -1334,6 +1508,32 @@ const docTemplate = `{
                 "worst_camera_name": {
                     "description": "display name",
                     "type": "string"
+                }
+            }
+        },
+        "subscription.SubscribeRequest": {
+            "type": "object",
+            "required": [
+                "channel_name",
+                "chat_id",
+                "target_type"
+            ],
+            "properties": {
+                "channel_name": {
+                    "type": "string",
+                    "example": "telegram"
+                },
+                "chat_id": {
+                    "type": "string",
+                    "example": "123456789"
+                },
+                "target_id": {
+                    "type": "string",
+                    "example": "Quận 1"
+                },
+                "target_type": {
+                    "type": "string",
+                    "example": "zone"
                 }
             }
         },

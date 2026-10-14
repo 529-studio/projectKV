@@ -156,6 +156,7 @@ make dev-all
 | **Web Map Explorer** | `3001` | http://localhost:3001 | Interactive Leaflet map, corridor dock |
 | **Collaborative Labeler** | `3001` | http://localhost:3001/labeler | Team snapshot labeling tool |
 | **Go Backend API** | `3000` | http://localhost:3000 | Core Gin HTTP REST server |
+| **Subscription API** | `3000` | http://localhost:3000/api/subscriptions | `POST`, `GET`, `DELETE` flood alert subscriptions |
 | **Swagger UI** | `3000` | http://localhost:3000/swagger/index.html | Interactive OpenAPI documentation |
 | **Backend Health** | `3000` | http://localhost:3000/health | Returns `{"status":"ok"}` |
 | **CV Inference Engine** | `8000` | http://localhost:8000/healthz | Returns `{"status":"healthy","model":"yolov8n_openvino_320"}` |
@@ -215,6 +216,8 @@ make dev-all
 | `CV_ENGINE_URL` | `http://localhost:8000` | URL of self-hosted CV inference worker |
 | `ANALYZER` | `none` | Traffic analyzer (`none`, `mock`, `vlm`, `onnx`) |
 | `SNAPSHOT_UPSTREAM_BASE_URL` | *(required)* | DOT upstream image snapshot endpoint |
+| `TELEGRAM_BOT_TOKEN` | `""` | Telegram Bot API token for flood warning dispatch (empty for simulation mode) |
+| `TELEGRAM_DEBOUNCE_MINUTES` | `30` | Anti-spam quiet period debounce window per chokepoint (in minutes) |
 
 #### CV Model Service (`services/cv-engine`)
 
@@ -283,6 +286,7 @@ make dev-all
 | **Giao diện Bản đồ** | `3001` | http://localhost:3001 | Bản đồ camera, dock theo dõi hành lang |
 | **Gán nhãn Labeler** | `3001` | http://localhost:3001/labeler | Công cụ dán nhãn bằng chứng tập trung |
 | **Go Backend API** | `3000` | http://localhost:3000 | Máy chủ API Gin |
+| **API Đăng ký Cảnh báo** | `3000` | http://localhost:3000/api/subscriptions | `POST`, `GET`, `DELETE` đăng ký cảnh báo ngập |
 | **Tài liệu Swagger** | `3000` | http://localhost:3000/swagger/index.html | Tài liệu API tương tác |
 | **Kiểm tra Sức khỏe BE** | `3000` | http://localhost:3000/health | Phản hồi `{"status":"ok"}` |
 | **Mô hình CV Engine** | `8000` | http://localhost:8000/healthz | Phản hồi trạng thái container `warded-model` |
@@ -331,6 +335,8 @@ make dev-all
 | `CV_ENGINE_URL` | `http://localhost:8000` | Địa chỉ mạng kết nối tới máy chủ suy luận mô hình CV |
 | `ANALYZER` | `none` | Trình phân tích giao thông (`none`, `mock`, `vlm`, `onnx`) |
 | `SNAPSHOT_UPSTREAM_BASE_URL` | *(bắt buộc)* | Cổng snapshot camera giao thông Sở GTVT TP.HCM |
+| `TELEGRAM_BOT_TOKEN` | `""` | Token Telegram Bot API để phát cảnh báo ngập lụt (để trống để chạy ở chế độ giả lập) |
+| `TELEGRAM_DEBOUNCE_MINUTES` | `30` | Cửa sổ trượt chống spam cảnh báo cho từng điểm ngập (phút) |
 
 #### Dịch vụ Suy Luận Mô Hình (`services/cv-engine`)
 

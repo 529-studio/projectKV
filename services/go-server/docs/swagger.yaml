@@ -294,6 +294,25 @@ definitions:
         description: display name
         type: string
     type: object
+  subscription.SubscribeRequest:
+    properties:
+      channel_name:
+        example: telegram
+        type: string
+      chat_id:
+        example: "123456789"
+        type: string
+      target_id:
+        example: Quận 1
+        type: string
+      target_type:
+        example: zone
+        type: string
+    required:
+    - channel_name
+    - chat_id
+    - target_type
+    type: object
   weather.HourlyForecast:
     properties:
       precipitation_probability_percent:
@@ -758,6 +777,124 @@ paths:
       summary: Get camera snapshot (proxy cache)
       tags:
       - Camera
+  /api/subscriptions:
+    delete:
+      description: Unsubscribes a user chat ID from a specific flood alert target.
+      parameters:
+      - description: Channel name (e.g. telegram)
+        in: query
+        name: channel_name
+        required: true
+        type: string
+      - description: Chat ID
+        in: query
+        name: chat_id
+        required: true
+        type: string
+      - description: Target type (all, chokepoint, zone, ward)
+        in: query
+        name: target_type
+        required: true
+        type: string
+      - description: Target ID
+        in: query
+        name: target_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete flood alert subscription
+      tags:
+      - Subscriptions
+    get:
+      description: Lists all active subscriptions for a given user chat ID on a channel.
+      parameters:
+      - description: Channel name (e.g. telegram)
+        in: query
+        name: channel_name
+        required: true
+        type: string
+      - description: Chat ID
+        in: query
+        name: chat_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List flood alert subscriptions
+      tags:
+      - Subscriptions
+    post:
+      consumes:
+      - application/json
+      description: 'Subscribes a user chat ID on a channel (e.g. Telegram) to flood
+        alerts (scope: all, chokepoint, zone, or ward).'
+      parameters:
+      - description: Subscription details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.SubscribeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create flood alert subscription
+      tags:
+      - Subscriptions
   /api/tiles/{z}/{x}/{y}:
     get:
       description: Serves OpenStreetMap raster tiles (PNG) cached on local disk with
