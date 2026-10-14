@@ -1,0 +1,11 @@
+title = "projectKV Gitleaks Configuration"
+
+[extend]
+path = "/tmp/gitleaks.base.toml"
+
+[allowlist]
+description = "projectKV repository-specific exemptions for traffic camera mocks, test fixtures, and storage vectors"
+paths = [
+  '''(^|/)tests/fixtures/.*''',
+  '''(^|/)tools/storage/.*'''
+]
