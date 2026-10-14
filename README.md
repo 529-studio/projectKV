@@ -225,7 +225,7 @@ make dev-all
 |---|---|---|
 | **Host Worker** | `inference worker` (Portainer Endpoint 4) | Dedicated multi-core host with Tailscale mesh networking |
 | **Model Runtime** | Intel OpenVINO 2024.4 IR | Optimized FP16 vehicle detection engine (~6.3 MB) |
-| **Input Resolution** | 320x320 (scaling to 416x416 in Sprint 5) | Low-latency inference geometry (~18.2ms P50 latency) |
+| **Input Resolution** | 416x416 (with letterbox preprocessing & NMS) | Low-latency inference geometry with aspect ratio preservation and box deduplication |
 | **Resource Caps** | 2 vCPU / 2 GB RAM | Resource limits configured via Docker Compose stack |
 | **API Endpoints** | `POST /predict`, `GET /healthz` | Prediction endpoint accepting JPEG bytes and returning vehicle counts |
 
@@ -344,7 +344,7 @@ make dev-all
 |---|---|---|
 | **Máy chủ Host** | `inference worker` (Portainer Endpoint 4) | Máy chủ phần cứng độc lập, kết nối mạng nội bộ an toàn qua Tailscale mesh |
 | **Engine thực thi** | Intel OpenVINO 2024.4 IR | Runtime tối ưu hóa FP16 suy luận trên CPU cho kiến trúc YOLOv8n (~6.3 MB) |
-| **Kích thước ảnh** | 320x320 (nâng cấp lên 416x416 ở Sprint 5) | Cân bằng giữa độ trễ cực thấp (~18.2ms P50) và khả năng nhận diện xe máy |
+| **Kích thước ảnh** | 416x416 (kèm tiền xử lý letterbox & NMS) | Cân bằng giữa bảo toàn tỷ lệ khung hình, chống trùng lặp hộp nhận diện và độ trễ thấp |
 | **Giới hạn tài nguyên** | 2 vCPU / 2 GB RAM | Mức trần tài nguyên cấu hình qua Docker Compose stack |
 | **Endpoint API** | `POST /predict`, `GET /healthz` | Nhận ảnh JPEG nhị phân, phản hồi danh sách xe đếm được và nhịp tim sức khỏe |
 
