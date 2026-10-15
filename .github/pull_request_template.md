@@ -1,10 +1,12 @@
-Close #<issue-number>
+Close #<issue-number> closes [KV-<card-id>]
 
 <!--
-MANDATORY ISSUE LINKING (AGENTS.md Rule 9):
-Use "Close #<issue-number>" format only (e.g., Close #209).
-Do NOT use "Addresses Issue #209", "Addresses #209", or "Implement #209",
-as GitHub strictly requires closing keywords to link and auto-close issues upon merge.
+MANDATORY ISSUE & KANBAN LINKING (AGENTS.md Rule 9):
+1. GitHub Issue: Use "Close #<issue-number>" format only (e.g., Close #248).
+   Do NOT use informal phrasing like "Addresses Issue #248" or "Implement #248".
+2. Kanban Board (529 Studio Hub / Plane): Include "closes [KV-<card-id>]" (e.g., closes [KV-2]).
+   The n8n Gateway automation exclusively parses "closes [KV-X]" to automatically link the PR
+   and transition the card on the Kanban board (https://REDACTED_HUB_HOST).
 -->
 
 ## Summary & Rationale
