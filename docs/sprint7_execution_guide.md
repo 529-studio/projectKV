@@ -24,18 +24,18 @@ Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers 
 
 ### Bảng phân bố Wave thực thi
 
-| Wave | ID | GitHub Issue | Title | Epic | Labels | Phụ thuộc |
-|:---:|:---:|:---:|---|---|---|:---:|
-| **0** | **S7-T2** | [#247](https://github.com/529-studio/projectKV/issues/247) | `[web] Hide Offline / No-Signal Cameras by Default on Map (Map Hygiene)` | epic:dock-ux | `frontend` | None (Merged PR #257) |
-| **0** | **S7-T1** | [#246](https://github.com/529-studio/projectKV/issues/246) | `[ci + ops] Live Staging Telegram Flood Alert Verification & Simulation Deprecation (Stack 14 homesrv)` | epic:infra-resilience | `tooling, cross-cutting` | Nice-to-have (Dời sau Sprint 7) |
-| **1** | **S7-T3** | [#248](https://github.com/529-studio/projectKV/issues/248) | `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback` | epic:dock-ux | `frontend` | Hoàn thành (`feat/s7-t3-report-flood-button`) |
-| **1** | **S7-T4** | [#249](https://github.com/529-studio/projectKV/issues/249) | `[go-server] internal/feedback Leaf Package & Cloudflare R2 Ground-Truth Archiver` | epic:flood-integrity | `backend, go` | [#248](https://github.com/529-studio/projectKV/issues/248) (S7-T3) |
-| **2** | **S7-T5** | [#250](https://github.com/529-studio/projectKV/issues/250) | `[go-server + cv-engine] Autonomous 50 Hot Set Traffic Poller & Saturation Cache` | epic:vehicle-detection | `backend, go, epic:vehicle-detection` | None (Backend worker) |
-| **2** | **S7-T6** | [#251](https://github.com/529-studio/projectKV/issues/251) | `[web] Real-Time Arterial Marker Saturation Coloring (Green / Yellow / Red Dots)` | epic:dock-ux | `frontend` | [#250](https://github.com/529-studio/projectKV/issues/250) (S7-T5) |
-| **2** | **S7-T7** | [#252](https://github.com/529-studio/projectKV/issues/252) | `[go-server] Rain-Triggered Automated Hot Set Flood Poller (VLM Bridge)` | epic:flood-integrity | `backend, go, epic:flood-integrity` | [#250](https://github.com/529-studio/projectKV/issues/250) (S7-T5) |
-| **3** | **S7-T8** | [#253](https://github.com/529-studio/projectKV/issues/253) | `[tooling] Multi-Lane Directional Labeling Taxonomy & Toolchain Upgrade` | epic:eval-tooling | `tooling, epic:eval-tooling` | None (Tooling độc lập) |
-| **3** | **S7-T9** | [#254](https://github.com/529-studio/projectKV/issues/254) | `[docs + spike] ADR-009 Technical Design Spike: Self-Hosted Flood Segmentation (Zero-VLM)` | rfc | `documentation, rfc` | [#252](https://github.com/529-studio/projectKV/issues/252) (S7-T7) |
-| **4** | **S7-T10** | [#255](https://github.com/529-studio/projectKV/issues/255) | `[docs] Holistic Repository Knowledge Synchronization & Sprint 7 Closeout` | rfc | `documentation` | S7-T1 đến S7-T9 |
+| Wave | ID | Kanban (Plane) | GitHub Issue | Title | Epic | Labels | Phụ thuộc |
+|:---:|:---:|:---:|:---:|---|---|---|:---:|
+| **0** | **S7-T2** | - | [#247](https://github.com/529-studio/projectKV/issues/247) | `[web] Hide Offline / No-Signal Cameras by Default on Map (Map Hygiene)` | epic:dock-ux | `frontend` | None (Merged PR #257) |
+| **0** | **S7-T1** | **[KV-1]** | [#246](https://github.com/529-studio/projectKV/issues/246) | `[ci + ops] Live Staging Telegram Flood Alert Verification & Simulation Deprecation (Stack 14 homesrv)` | epic:infra-resilience | `tooling, cross-cutting` | Nice-to-have (Dời sau Sprint 7) |
+| **1** | **S7-T3** | **[KV-2]** | [#248](https://github.com/529-studio/projectKV/issues/248) | `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback` | epic:dock-ux | `frontend` | Hoàn thành (`feat/s7-t3-report-flood-button`) |
+| **1** | **S7-T4** | **[KV-3]** | [#249](https://github.com/529-studio/projectKV/issues/249) | `[go-server] internal/feedback Leaf Package & Cloudflare R2 Ground-Truth Archiver` | epic:flood-integrity | `backend, go` | [#248](https://github.com/529-studio/projectKV/issues/248) (S7-T3) |
+| **2** | **S7-T5** | **[KV-4]** | [#250](https://github.com/529-studio/projectKV/issues/250) | `[go-server + cv-engine] Autonomous 50 Hot Set Traffic Poller & Saturation Cache` | epic:vehicle-detection | `backend, go, epic:vehicle-detection` | None (Backend worker) |
+| **2** | **S7-T6** | **[KV-5]** | [#251](https://github.com/529-studio/projectKV/issues/251) | `[web] Real-Time Arterial Marker Saturation Coloring (Green / Yellow / Red Dots)` | epic:dock-ux | `frontend` | [#250](https://github.com/529-studio/projectKV/issues/250) (S7-T5) |
+| **2** | **S7-T7** | **[KV-6]** | [#252](https://github.com/529-studio/projectKV/issues/252) | `[go-server] Rain-Triggered Automated Hot Set Flood Poller (VLM Bridge)` | epic:flood-integrity | `backend, go, epic:flood-integrity` | [#250](https://github.com/529-studio/projectKV/issues/250) (S7-T5) |
+| **3** | **S7-T8** | - | [#253](https://github.com/529-studio/projectKV/issues/253) | `[tooling] Multi-Lane Directional Labeling Taxonomy & Toolchain Upgrade` | epic:eval-tooling | `tooling, epic:eval-tooling` | None (Merged PR #258) |
+| **3** | **S7-T9** | **[KV-7]** | [#254](https://github.com/529-studio/projectKV/issues/254) | `[docs + spike] ADR-009 Technical Design Spike: Self-Hosted Flood Segmentation (Zero-VLM)` | rfc | `documentation, rfc` | [#252](https://github.com/529-studio/projectKV/issues/252) (S7-T7) |
+| **4** | **S7-T10** | **[KV-8]** | [#255](https://github.com/529-studio/projectKV/issues/255) | `[docs] Holistic Repository Knowledge Synchronization & Sprint 7 Closeout` | rfc | `documentation` | S7-T1 đến S7-T9 |
 
 ---
 
@@ -333,4 +333,4 @@ Trước khi mở bất kỳ Pull Request nào, kiểm tra nghiêm ngặt:
 - [ ] **Rule 6 (Đồng bộ tài liệu)**: Cập nhật tài liệu liên quan trong `docs/` và `README.md` song ngữ nếu có thay đổi hành vi/endpoint.
 - [ ] **Rule 7 (Kiến trúc leaf modulith & Raw SQL)**: Không dùng ORM, tuân thủ kiến trúc phân tầng trong Go backend. Chạy `make swagger` nếu sửa route API.
 - [ ] **Rule 8 (Zero Hardcoded Secrets)**: Secret nạp từ `.env`, fallback là `""` hoặc dừng chương trình. Không để lộ token trong log hay error.
-- [ ] **Rule 9 (Cú pháp link PR)**: Mô tả PR bắt buộc bắt đầu bằng `Close #<issue-number>` (ví dụ: `Close #247`).
+- [ ] **Rule 9 (Cú pháp link PR & Kanban)**: Mô tả PR bắt buộc bắt đầu bằng `Close #<issue-number> closes [KV-<card-id>]` (ví dụ: `Close #248 closes [KV-2]`) để GitHub và n8n Gateway trên 529 Studio Hub (https://hub.529studio.site) tự động liên kết PR và di chuyển card trên bảng Kanban.
