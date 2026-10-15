@@ -166,6 +166,15 @@ def load_schema(schema_path: Optional[Path]) -> Dict[str, List[str]]:
                     # Nested in "categories" property
                     if "categories" in data and isinstance(data["categories"], dict):
                         return data["categories"]
+                    # Draft-07 JSON Schema with properties.labels.properties
+                    if "properties" in data and "labels" in data["properties"]:
+                        props = data["properties"]["labels"].get("properties", {})
+                        enums: Dict[str, List[str]] = {}
+                        for k, v in props.items():
+                            if isinstance(v, dict) and "enum" in v:
+                                enums[k] = v["enum"]
+                        if enums:
+                            return enums
         except Exception as e:
             print(f"[WARN] Failed to parse schema file {schema_path}: {e}. Falling back to default schema.", file=sys.stderr)
     return DEFAULT_SCHEMA
