@@ -20,9 +20,13 @@ var mockSeverities = []string{
 
 var mockFloodSeverities = []string{
 	hotset.SeverityDry,
+	hotset.SeverityDry,
 	hotset.SeverityWet,
+	hotset.SeverityDry,
+	hotset.SeverityDry,
 	hotset.SeverityFloodedShallow,
-	hotset.SeverityFloodedDeep,
+	hotset.SeverityDry,
+	hotset.SeverityDry,
 }
 
 type MockAnalyzer struct {

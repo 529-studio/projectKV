@@ -8,6 +8,7 @@ interface MobileCameraDrawerProps {
   cameras: Camera[];
   verdicts?: Map<string, TrafficVerdictLike>;
   floodedCameraIds?: Set<string>;
+  wetCameraCount?: number;
   isFloodFilterActive?: boolean;
   onToggleFloodFilter?: () => void;
   loading: boolean;
@@ -30,6 +31,7 @@ export default function MobileCameraDrawer({
   cameras,
   verdicts,
   floodedCameraIds,
+  wetCameraCount,
   isFloodFilterActive,
   onToggleFloodFilter,
   loading,
@@ -100,6 +102,7 @@ export default function MobileCameraDrawer({
                 cameras={cameras}
                 verdicts={verdicts}
                 floodedCameraIds={floodedCameraIds}
+                wetCameraCount={wetCameraCount}
                 isFloodFilterActive={isFloodFilterActive}
                 onToggleFloodFilter={onToggleFloodFilter}
                 loading={loading}
