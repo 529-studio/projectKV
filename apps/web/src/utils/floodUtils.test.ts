@@ -8,8 +8,15 @@ import {
   formatFloodHexTooltip,
   formatRadarHexTooltip,
   getFloodSeverityLabel,
+  isFloodedSeverity,
+  isWetRoadSeverity,
+  isDryRoadSeverity,
+  isFloodVerdictStale,
+  deriveFloodCameraGroups,
   FLOOD_I18N,
+  FLOOD_MODAL_I18N,
   type FloodHexCell,
+  type FloodVerdictLike,
 } from './floodUtils.ts';
 import { FLOOD_VERIFY_I18N } from '../config/constants.ts';
 
@@ -118,13 +125,100 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
   });
 
   test('getFloodSeverityLabel provides correct Vietnamese diacritics and English labels', () => {
-    assert.equal(getFloodSeverityLabel('FLOODED_DEEP', 'vi'), 'Mưa to (nguy cơ ngập)');
-    assert.equal(getFloodSeverityLabel('FLOODED_DEEP', 'en'), 'Heavy rain (flood risk)');
-    assert.equal(getFloodSeverityLabel('FLOODED_SHALLOW', 'vi'), 'Mưa vừa');
-    assert.equal(getFloodSeverityLabel('FLOODED_SHALLOW', 'en'), 'Moderate rain');
-    assert.equal(getFloodSeverityLabel('WET', 'vi'), 'Mưa nhẹ');
-    assert.equal(getFloodSeverityLabel('WET', 'en'), 'Light rain');
+    assert.equal(getFloodSeverityLabel('FLOODED_DEEP', 'vi'), 'Ngập sâu lòng đường');
+    assert.equal(getFloodSeverityLabel('FLOODED_DEEP', 'en'), 'Deep roadway flood');
+    assert.equal(getFloodSeverityLabel('FLOODED_SHALLOW', 'vi'), 'Ngập nông mép đường');
+    assert.equal(getFloodSeverityLabel('FLOODED_SHALLOW', 'en'), 'Shallow curbside flood');
+    assert.equal(getFloodSeverityLabel('WET', 'vi'), 'Đường ướt (chưa ngập)');
+    assert.equal(getFloodSeverityLabel('WET', 'en'), 'Wet road (no flood)');
+    assert.equal(getFloodSeverityLabel('DRY', 'vi'), 'Đường khô ráo');
+    assert.equal(getFloodSeverityLabel('DRY', 'en'), 'Dry road');
     assert.equal(getFloodSeverityLabel('UNKNOWN', 'vi'), 'Chưa xác minh');
+  });
+
+  test('severity classification functions correctly categorize levels', () => {
+    // isFloodedSeverity
+    assert.equal(isFloodedSeverity('FLOODED_SHALLOW'), true);
+    assert.equal(isFloodedSeverity('FLOODED_DEEP'), true);
+    assert.equal(isFloodedSeverity('flooded_shallow'), true);
+    assert.equal(isFloodedSeverity('flooded_deep'), true);
+    assert.equal(isFloodedSeverity('WET'), false);
+    assert.equal(isFloodedSeverity('DRY'), false);
+    assert.equal(isFloodedSeverity('UNKNOWN'), false);
+    assert.equal(isFloodedSeverity(''), false);
+    assert.equal(isFloodedSeverity(undefined), false);
+
+    // isWetRoadSeverity
+    assert.equal(isWetRoadSeverity('WET'), true);
+    assert.equal(isWetRoadSeverity('wet'), true);
+    assert.equal(isWetRoadSeverity('FLOODED_SHALLOW'), false);
+    assert.equal(isWetRoadSeverity('DRY'), false);
+
+    // isDryRoadSeverity
+    assert.equal(isDryRoadSeverity('DRY'), true);
+    assert.equal(isDryRoadSeverity('dry'), true);
+    assert.equal(isDryRoadSeverity('WET'), false);
+    assert.equal(isDryRoadSeverity('FLOODED_DEEP'), false);
+  });
+
+  test('isFloodVerdictStale respects stale flag and TTL window', () => {
+    assert.equal(isFloodVerdictStale(null), false);
+    assert.equal(isFloodVerdictStale(undefined), false);
+
+    // Explicit stale flag
+    assert.equal(isFloodVerdictStale({ camera_id: 'c1', stale: true }), true);
+
+    // Fresh verdict (< 3 min)
+    const fresh: FloodVerdictLike = {
+      camera_id: 'c2',
+      flood_severity: 'DRY',
+      timestamp: new Date(Date.now() - 30_000).toISOString(),
+    };
+    assert.equal(isFloodVerdictStale(fresh), false);
+
+    // Aged verdict (> 3 min)
+    const aged: FloodVerdictLike = {
+      camera_id: 'c3',
+      flood_severity: 'FLOODED_DEEP',
+      timestamp: new Date(Date.now() - 240_000).toISOString(),
+    };
+    assert.equal(isFloodVerdictStale(aged), true);
+  });
+
+  test('deriveFloodCameraGroups segregates flooded, wet, and dry cameras and filters stale', () => {
+    const verdicts: FloodVerdictLike[] = [
+      { camera_id: 'cam_dry', flood_severity: 'DRY', timestamp: new Date().toISOString() },
+      { camera_id: 'cam_wet', flood_severity: 'WET', timestamp: new Date().toISOString() },
+      { camera_id: 'cam_shallow', flood_severity: 'FLOODED_SHALLOW', timestamp: new Date().toISOString() },
+      { camera_id: 'cam_deep', flood_severity: 'FLOODED_DEEP', timestamp: new Date().toISOString() },
+      // Stale verdict (over 5 mins old) should be omitted
+      {
+        camera_id: 'cam_stale_flood',
+        flood_severity: 'FLOODED_DEEP',
+        timestamp: new Date(Date.now() - 300_000).toISOString(),
+      },
+      // Stale flag
+      {
+        camera_id: 'cam_stale_flag',
+        flood_severity: 'FLOODED_SHALLOW',
+        stale: true,
+        timestamp: new Date().toISOString(),
+      },
+    ];
+
+    const { floodedCameraIds, wetCameraIds, dryCameraIds } = deriveFloodCameraGroups(verdicts);
+    assert.equal(floodedCameraIds.size, 2);
+    assert.ok(floodedCameraIds.has('cam_shallow'));
+    assert.ok(floodedCameraIds.has('cam_deep'));
+    assert.ok(!floodedCameraIds.has('cam_stale_flood'));
+    assert.ok(!floodedCameraIds.has('cam_stale_flag'));
+    assert.ok(!floodedCameraIds.has('cam_wet'));
+
+    assert.equal(wetCameraIds.size, 1);
+    assert.ok(wetCameraIds.has('cam_wet'));
+
+    assert.equal(dryCameraIds.size, 1);
+    assert.ok(dryCameraIds.has('cam_dry'));
   });
 
   test('formatFloodHexTooltip shows severity, camera count, and verified subtitle; never a ward name', () => {
@@ -141,7 +235,7 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     const viTooltip = formatFloodHexTooltip(cell, 'vi');
     assert.ok(viTooltip.includes('Camera xác nhận ngập'));
     assert.ok(viTooltip.includes('Xác nhận bởi camera giám sát'));
-    assert.ok(viTooltip.includes('Mưa to (nguy cơ ngập)'));
+    assert.ok(viTooltip.includes('Ngập sâu lòng đường'));
     assert.ok(viTooltip.includes('2 camera giám sát'));
     assert.ok(viTooltip.includes('Điểm mưa/ngập nặng nhất'));
     assert.ok(viTooltip.includes('Đường Ung Văn Khiêm'));
@@ -151,7 +245,7 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     const enTooltip = formatFloodHexTooltip(cell, 'en');
     assert.ok(enTooltip.includes('Camera-verified flooding'));
     assert.ok(enTooltip.includes('Verified by surveillance cameras'));
-    assert.ok(enTooltip.includes('Heavy rain (flood risk)'));
+    assert.ok(enTooltip.includes('Deep roadway flood'));
     assert.ok(enTooltip.includes('2 cameras monitoring'));
     assert.ok(enTooltip.includes('Worst rain/flood spot'));
   });
@@ -170,13 +264,13 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     const viTooltip = formatRadarHexTooltip(radarCell, 'vi');
     assert.ok(viTooltip.includes('Dự báo radar'));
     assert.ok(viTooltip.includes('Dự báo — không phải quan sát thực tế'));
-    assert.ok(viTooltip.includes('Mưa vừa'));
+    assert.ok(viTooltip.includes('Ngập nông mép đường'));
     assert.ok(viTooltip.includes('Radar thời tiết RainViewer'));
 
     const enTooltip = formatRadarHexTooltip(radarCell, 'en');
     assert.ok(enTooltip.includes('Radar forecast'));
     assert.ok(enTooltip.includes('Forecast — not a live observation'));
-    assert.ok(enTooltip.includes('Moderate rain'));
+    assert.ok(enTooltip.includes('Shallow curbside flood'));
     assert.ok(enTooltip.includes('RainViewer weather radar'));
   });
 
@@ -201,9 +295,36 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     assert.equal(FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE.vi, 'Xác nhận bởi camera giám sát');
     assert.equal(FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE.en, 'Verified by surveillance cameras');
     assert.equal(FLOOD_I18N.TOOLTIP_TITLE.vi, 'Thời tiết khu vực');
+    assert.equal(FLOOD_I18N.STATUS_DRY_CITYWIDE.vi, 'TOÀN THÀNH PHỐ: Các tuyến đường khô ráo — Không ghi nhận ngập');
+    assert.equal(FLOOD_I18N.STATUS_DRY_CITYWIDE.en, 'CITYWIDE: Roadways dry — No flooding reported');
+    assert.equal(FLOOD_I18N.STATUS_WET_CITYWIDE.vi(3), 'GHI NHẬN MƯA: 3 điểm đường ướt (chưa ghi nhận ngập)');
+    assert.equal(FLOOD_I18N.STATUS_WET_CITYWIDE.en(3), 'RAIN RECORDED: 3 wet spots (no flooding)');
     assert.equal(FLOOD_I18N.FILTER_CHIP.vi(3), 'Điểm ngập camera (3)');
     assert.equal(FLOOD_I18N.FILTER_CHIP.en(3), 'Camera flood spots (3)');
     assert.equal(FLOOD_I18N.ACTIVE_ALERT_BADGE.vi(2), 'Vùng có mưa • 2');
+  });
+
+  test('FLOOD_MODAL_I18N contains bilingual badges with zero emojis (Rule 1)', () => {
+    const emojiRegex = /\p{Extended_Pictographic}/u;
+    const checkNoEmoji = (obj: Record<string, unknown>) => {
+      for (const val of Object.values(obj)) {
+        if (typeof val === 'string') {
+          assert.ok(!emojiRegex.test(val), `Emoji detected in string: ${val}`);
+        } else if (typeof val === 'object' && val !== null) {
+          checkNoEmoji(val as Record<string, unknown>);
+        }
+      }
+    };
+    checkNoEmoji(FLOOD_MODAL_I18N);
+
+    assert.equal(FLOOD_MODAL_I18N.DRY.vi, '[ĐƯỜNG KHÔ RÁO]');
+    assert.equal(FLOOD_MODAL_I18N.DRY.en, '[DRY ROAD]');
+    assert.equal(FLOOD_MODAL_I18N.WET.vi, '[ĐƯỜNG ƯỚT • CHƯA NGẬP]');
+    assert.equal(FLOOD_MODAL_I18N.WET.en, '[WET ROAD • NO FLOOD]');
+    assert.equal(FLOOD_MODAL_I18N.FLOODED_SHALLOW.vi, '[NGẬP NÔNG]');
+    assert.equal(FLOOD_MODAL_I18N.FLOODED_SHALLOW.en, '[SHALLOW FLOOD]');
+    assert.equal(FLOOD_MODAL_I18N.FLOODED_DEEP.vi, '[NGẬP SÂU]');
+    assert.equal(FLOOD_MODAL_I18N.FLOODED_DEEP.en, '[DEEP FLOOD]');
   });
 
   test('FLOOD_VERIFY_I18N has valid bilingual strings and zero emoji (Rule 1 / Issue #209)', () => {

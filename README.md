@@ -180,6 +180,7 @@ make dev-all
 *   **Map Clutter Hygiene & Offline Camera Filtering**: Automatically hides 135 offline or no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default, with dynamic header counter badge (`Đang hiển thị 702 / 837 camera`) and a monochromatic toggle button.
 *   **Chained Deep Filter**: Multi-tier faceted filtering — *Zone* ➔ *Road / Corridor* ➔ *Intersection / Node*.
 *   **Multi-Camera Corridor Tracking Dock**: Pin cameras into the bottom tracking dock with synchronized snapshot refresh.
+*   **Human-in-the-Loop Flood Reporting**: Commuters can report real-time street flooding directly from the camera modal with a 30s rate-limit cooldown and tactile feedback, queuing unverified community reports for model ingestion.
 *   **Directional Multi-Lane Taxonomy & Physical Flood Markers**: Classifies traffic density independently by direction (Direction A approaching vs Direction B receding) to resolve asymmetric divided boulevards, and anchors flood severity strictly to physical tire/wheel depth markers.
 *   **Responsive Layout (100dvh)**: Desktop, tablet, and smartphone friendly with collapsible legend and mobile bottom-sheet drawer.
 *   **Go Backend**: Single static binary, no runtime dependency install, in-memory + SQLite state, goroutine-based Hot Set scheduler.
@@ -260,6 +261,7 @@ Hệ thống được tổ chức theo mô hình monorepo, tách biệt Web Clie
 *   **Tối ưu trực quan bản đồ & Lọc camera mất tín hiệu**: Mặc định ẩn 135 camera mất tín hiệu hoặc lỗi nguồn (`NOT_IMAGE` / `NO_SIGNAL`), hiển thị huy hiệu đếm camera trực quan (`Đang hiển thị 702 / 837 camera`) kèm nút chuyển đổi tinh tế.
 *   **Bộ lọc sâu liên hoàn (Chained Filter)**: Lọc đa tầng theo *Phường / Khu vực* ➔ *Tuyến đường / Hành lang* ➔ *Giao lộ*.
 *   **Dock theo dõi nhiều camera đồng thời**: Ghim tối đa 12 camera quan trọng vào thanh dock bên dưới với chu kỳ tự động cập nhật snapshot đồng bộ.
+*   **Báo cáo ngập nước cộng đồng (Human-in-the-Loop)**: Cho phép người dân báo cáo ngập thực địa ngay trong modal camera kèm bộ đếm ngược chống spam 30 giây và phản hồi xúc giác tối giản.
 *   **Phân loại đa làn hai chiều & Mốc ngập thực tế**: Phân loại mật độ giao thông độc lập theo hướng (Hướng A xe tiến vs Hướng B xe lùi) xử lý bất đối xứng trên đại lộ phân cách, đồng thời neo mức độ ngập lụt chuẩn hóa theo vạch vành bánh xe máy.
 *   **Backend Go hiệu năng cao**: File thực thi tĩnh duy nhất, lưu trữ SQLite WAL, điều phối Hot Set theo chu kỳ 30s.
 *   **Lưu trữ Cloudflare R2**: Lưu trữ ảnh snapshot bằng chứng giao thông chuẩn hóa thời gian ICT (UTC+7), phân phối qua Edge CDN (`https://file.529studio.site`).
