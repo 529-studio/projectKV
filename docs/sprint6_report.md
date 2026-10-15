@@ -25,20 +25,22 @@ Following the Sprint 5 reality check, the engineering team executed a strict dep
 3. Overhauled user affordances and eliminated quota exhaustion in the web UI (S6-T3), followed by defense-in-depth API key shielding, response sanitization, and telematic hysteresis filtering.
 4. Exploited live meteorological events (2026-10-13 rainfall) to capture and label 201 real flood/rain frames to Cloudflare R2.
 5. Built the missing leaf notification subsystem, raw SQLite subscription store, and 30-minute anti-spam sliding debouncer for Telegram alerts (S6-T5).
-6. Codified fundamental governance in `AGENTS.md`: Rule 2 (sound solutions before estimation) and Rule 6 (holistic documentation maintenance).
+6. Integrated centralized automated secret scanning via Gitleaks in GitHub Actions CI (S6-T4 via PR #243).
+7. Codified fundamental governance in `AGENTS.md`: Rule 2 (sound solutions before estimation) and Rule 6 (holistic documentation maintenance).
 
-Ticket **S6-T4** (Automated Secret Scanning via Gitleaks) was **formally excluded from the repository backlog** after DevOps leadership determined that secret scanning must be enforced organization-wide across all `529-studio` repositories via GitHub organization security policies, rather than fragmented into repository-specific workflows. With all active feature and perception deliverables verified end-to-end, **Sprint 6 is officially closed**.
+With all 5 planned backlog tickets (S6-T1, S6-T2, S6-T3, S6-T4, S6-T5) completed, verified, and merged to `dev`, **Sprint 6 achieved 100% delivery of its active backlog**.
 
 ### Quantitative Scorecard & Audit Reconciliation
 
 | Metric | Planned in ADR-007 Backlog | Delivered in Sprint 6 | Status |
 |---|:---:|:---:|:---:|
-| **Core Sprint 6 Backlog Items** | 5 planned (S6-T1, S6-T2, S6-T3, S6-T4, S6-T5) | 4 completed, 1 excluded to org-level DevOps | **100% of Active Backlog Delivered** |
-| **Completed Backlog Tickets** | 4 | 4 | S6-T1 ([#221](https://github.com/529-studio/projectKV/issues/221)), S6-T2 ([#222](https://github.com/529-studio/projectKV/issues/222)), S6-T3 ([#223](https://github.com/529-studio/projectKV/issues/223)), S6-T5 ([#225](https://github.com/529-studio/projectKV/issues/225)) |
-| **Excluded / Deferred Tickets** | — | 1 ticket | S6-T4 ([#224](https://github.com/529-studio/projectKV/issues/224)) transferred to org-level DevOps |
-| **Supplementary Features & Governance** | — | 3 PRs | PR #235 (201 Rain Frames Harvested), PR #237 & #238 (SecretSanitizer & Hysteresis), PR #240 (Rule 2 & Rule 6 Governance) |
-| **Total Sprint 6 PRs Merged to `dev`** | — | **12 Pull Requests** | PR #220, #227, #229, #231, #232, #233, #235, #236, #237, #238, #240, #241 |
-| **Lifetime Repository PR History** | — | **142 Pull Requests** | **134 Merged to `dev`**, 8 Closed without merging, 0 Open |
+| **Core Sprint 6 Backlog Items** | 5 planned (S6-T1, S6-T2, S6-T3, S6-T4, S6-T5) | 5 completed | **100% of Active Backlog Delivered** |
+| **Completed Backlog Tickets** | 5 | 5 | S6-T1 ([#221](https://github.com/529-studio/projectKV/issues/221)), S6-T2 ([#222](https://github.com/529-studio/projectKV/issues/222)), S6-T3 ([#223](https://github.com/529-studio/projectKV/issues/223)), S6-T4 ([#224](https://github.com/529-studio/projectKV/issues/224)), S6-T5 ([#225](https://github.com/529-studio/projectKV/issues/225)) |
+| **Excluded / Deferred Tickets** | — | 0 backlog tickets (Route A→B deferred) | Route A→B deferred to Sprint 7 spike |
+| **Supplementary Features & Governance** | — | 4 PRs | PR #235 (201 Rain Frames Harvested), PR #237 & #238 (SecretSanitizer & Hysteresis), PR #240 (Rule 2 & Rule 6 Governance) |
+| **Total Sprint 6 PRs Merged to `dev`** | — | **14 Pull Requests** | PR #227, #229, #231, #232, #233, #235, #236, #237, #238, #240, #241, #242, #243 |
+| **Lifetime Repository PR History** | — | **144 Pull Requests** | **136 Merged to `dev`**, 8 Closed without merging, 0 Open |
+| **Open Repository Issues** | — | **0 Open Issues** | **100% Backlog Cleared** |
 | **Go Backend Test Suite** | 22 packages | 22 packages | **100% Passing under `-race` (0 failures, 0 races)** |
 | **Web Client Unit Tests** | 103 tests | 114 tests (21 suites) | **100% Passing (0 failures)** |
 | **CV Engine Model Tests** | 10 tests | 10 tests (`test_server.py`) | **100% Passing** |
@@ -49,7 +51,7 @@ Ticket **S6-T4** (Automated Secret Scanning via Gitleaks) was **formally exclude
 
 ## 2. Comprehensive Audit of Sprint 6 Deliverables & Waves
 
-### Wave 0 — Perception Hard Gate (S6-T1 / Issue #221)
+### Wave 0 — Perception Hard Gate & Security CI Baseline (S6-T1, S6-T4)
 
 #### 1. S6-T1 (Issue #221) — `[cv-engine + tooling] Implement NMS, Letterbox, 416px Scaling & Re-run 764-Frame D6 Benchmark`
 - **Merged PR:** [#232](https://github.com/529-studio/projectKV/pull/232) (`tooling/s6-t1-cv-nms-letterbox-benchmark`)
@@ -65,11 +67,19 @@ Ticket **S6-T4** (Automated Secret Scanning via Gitleaks) was **formally exclude
   - **MODERATE Detections** tripled from 21 to 63 correct classifications (+200%).
   - Hard Gate satisfied, conclusively proving Lesson 29 ("Fix perception at the perception layer, never hack downstream math").
 
+#### 2. S6-T4 (Issue #224) — `[ci + ops] Automated Secret Scanning in GitHub Actions CI (Gitleaks)`
+- **Merged PR:** [#243](https://github.com/529-studio/projectKV/pull/243) (`ci/s6-t4-gitleaks-secret-scanning`)
+- **Key Deliverables:** [`.github/workflows/secret-scan.yml`](../.github/workflows/secret-scan.yml), [`.gitleaks.toml`](../.gitleaks.toml), [`.gitleaksignore`](../.gitleaksignore).
+- **Technical Implementation & Root-Cause Protection:**
+  1. **Centralized Reusable Workflow Integration:** Leveraged organization-wide workflow `529-studio/.github/.github/workflows/reusable-secret-scan.yml@main` with `fail-on-leak: true`, ensuring secret scanning is unified across `529-studio` while executing locally as a blocking gate on every `push` and `pull_request` targeting `main` and `dev`.
+  2. **Scoped Allowlist Configuration:** Extended base Gitleaks ruleset via `.gitleaks.toml` with scoped path exemptions for test mock fixtures (`(^|/)tests/fixtures/.*`) and verified cloud storage scripts (`(^|/)tools/storage/.*`), ensuring clean CI execution while preventing genuine credentials from leaking.
+  3. **Permanent Rule 8 Enforcement:** Enforces automated, fail-fast detection of hardcoded API keys, tokens, or credentials across all future code contributions.
+
 ---
 
 ### Wave 1 — Downstream Traffic Calibration & Frontend Affordance/Cooldown (S6-T2, S6-T3)
 
-#### 2. S6-T2 (Issue #222) — `[go-server] Corridor-Specific Visual Capacity Calibration & Persistent Peak Storage`
+#### 3. S6-T2 (Issue #222) — `[go-server] Corridor-Specific Visual Capacity Calibration & Persistent Peak Storage`
 - **Merged PR:** [#233](https://github.com/529-studio/projectKV/pull/233) (`feat/s6-t2-corridor-capacity-sqlite`)
 - **Key Deliverables:** [`cameras_enriched.json`](../cameras_enriched.json), [`services/go-server/internal/cvclient/pcu.go`](../services/go-server/internal/cvclient/pcu.go), [`services/go-server/internal/store/migrations/0005_add_camera_capacities.sql`](../services/go-server/internal/store/migrations/0005_add_camera_capacities.sql), [`services/go-server/internal/store/capacity_repo.go`](../services/go-server/internal/store/capacity_repo.go).
 - **Technical Implementation & Operational Fix:**
@@ -83,7 +93,7 @@ Ticket **S6-T4** (Automated Secret Scanning via Gitleaks) was **formally exclude
      - Corridor baseline (45.0): $SI = 10.2 / 45.0 = 0.2267 < 0.30 \rightarrow$ `CLEAR` (Accurate Ground Truth).
   3. **SQLite Peak Capacity Persistence:** Built `store.CapacityRepo` with hand-written upsert SQL (`ON CONFLICT(camera_id) DO UPDATE SET learned_max = excluded.learned_max, updated_at = CURRENT_TIMESTAMP`) backed by WAL mode. Restores learned peak capacities across container restarts and redeployments, eliminating transient cold-start over-reporting.
 
-#### 3. S6-T3 (Issue #223, PR #236, #237, #238) — `[web] CameraModal UI/UX Redesign & 15s Client-Side Cooldown`
+#### 4. S6-T3 (Issue #223, PR #236, #237, #238) — `[web] CameraModal UI/UX Redesign & 15s Client-Side Cooldown`
 - **Merged PRs:**
   - [#236](https://github.com/529-studio/projectKV/pull/236): Primary UI/UX redesign & 15-second client-side cooldown.
   - [#237](https://github.com/529-studio/projectKV/pull/237): Follow-up: VLM error sanitization & Gemini API key shielding.
@@ -103,7 +113,7 @@ Ticket **S6-T4** (Automated Secret Scanning via Gitleaks) was **formally exclude
 
 ### Wave 2 — Verified Real-Time Flood Alerting (S6-T5 / Issue #225)
 
-#### 4. S6-T5 (Issue #225) — `[go-server] Telegram Flood Alert Dispatcher (internal/notify, Subscription Store & Debounce)`
+#### 5. S6-T5 (Issue #225) — `[go-server] Telegram Flood Alert Dispatcher (internal/notify, Subscription Store & Debounce)`
 - **Merged PR:** [#241](https://github.com/529-studio/projectKV/pull/241) (`feat/s6-t5-telegram-flood-alert`)
 - **Key Deliverables:** [`services/go-server/internal/notify/`](../services/go-server/internal/notify), [`services/go-server/internal/subscription/`](../services/go-server/internal/subscription), [`services/go-server/internal/store/migrations/0006_flood_subscriptions.sql`](../services/go-server/internal/store/migrations/0006_flood_subscriptions.sql), [`services/go-server/cmd/server/notify_integration_test.go`](../services/go-server/cmd/server/notify_integration_test.go).
 - **Technical Implementation:**
@@ -134,12 +144,12 @@ Ticket **S6-T4** (Automated Secret Scanning via Gitleaks) was **formally exclude
 
 ### Supplementary Technical Work & Real-World Harvesting
 
-#### 5. Real-Time Environmental Frame Harvesting (2026-10-13 Rain Event, PR #235)
+#### 6. Real-Time Environmental Frame Harvesting (2026-10-13 Rain Event, PR #235)
 - Exploited active afternoon rainfall across HCMC (`rain: 0.10 mm`, `weather_code: 51`) to capture fresh real-world wet/rain frames across 10 authentic municipal flood chokepoints and flood-prone corridors: **201 real frames** collected (97.1% success rate).
 - Generated dual-format ground-truth labels using OpenVINO YOLOv8n FP16 416x416 inference at 31.2 frames/sec + visual road surface verification (`tools/eval/label_today_rain.py`): Traffic (CLEAR=62, MODERATE=66, HEAVY=31, CONGESTED=42), Flood (NONE=133, SHALLOW=68, DEEP=0), Weather (`rain`=201, 100%), Time of day (`day`=201, 100%).
 - Synchronized both 201 JPEGs and 201 JSON labels directly to Cloudflare R2 bucket `warded-proofs` (`R2:warded-proofs/2026-10-13/` and `R2:warded-proofs/labels/2026-10-13/`). Full report in [`docs/reports/rain_collection_report_2026-10-13.md`](reports/rain_collection_report_2026-10-13.md).
 
-#### 6. Core Governance Hardening (PR #240, Issue #239)
+#### 7. Core Governance Hardening (PR #240, Issue #239)
 - **Priority Inversion Correction (Rule 2 Precedes Rule 3):** Codified in `AGENTS.md` that Rule 2 (*Sound Solutions & Root-Cause Verification (Never Fear Effort)*) must strictly precede Rule 3 (*Issue Estimation Mandate*). This prevents developers and AI agents from suffering cognitive time-anchoring bias and choosing superficial shortcuts out of pressure to meet premature estimates.
 - **Holistic Documentation Mandate (Rule 6 Expansion):** Codified that updating `project_status.md` and `lesson_learn.md` alone is explicitly insufficient. Every task requires auditing the entire documentation surface under `docs/` and root `README.md` (both English and Vietnamese sections).
 
@@ -147,17 +157,9 @@ Ticket **S6-T4** (Automated Secret Scanning via Gitleaks) was **formally exclude
 
 ## 3. Status of Excluded / Deferred Work
 
-### S6-T4 (Issue #224) — Automated Secret Scanning in GitHub Actions CI (Gitleaks)
-- **Status:** **EXCLUDED FROM SPRINT 6 / TRANSFERRED TO ORG-LEVEL DEVOPS**.
-- **Rationale:** DevOps leadership determined that implementing Gitleaks as an isolated, standalone GitHub Actions workflow inside `projectKV` creates maintenance fragmentation across multiple team repositories. Instead, Gitleaks scanning is being deployed at the **`529-studio` GitHub Organization level**, covering all repositories globally under a single unified security policy.
-- **Interim Repository Protections:**
-  1. **Rule 8 Compliance:** All configuration loaders (`config.go`) enforce empty-string defaults (`os.Getenv("KEY")`) and fail-fast termination.
-  2. **Secret Redaction in Middleware:** `middleware.SecretSanitizer` intercepts all backend responses, scrubbing credential patterns into `[REDACTED_KEY]`.
-  3. **Sanitized Templates:** Example templates in `.env.example` strictly use uppercase angle-bracket placeholders (`<placeholder>`).
-
 ### Route A→B (Navigation & Route-Level Check)
 - **Status:** **DEFERRED FROM SPRINT 6 (Per ADR-007 Decision 6)**.
-- **Rationale:** Two hard blockers remain: (1) routing recommendations require calibrated traffic perception, and (2) routing engine architecture (OSRM/Valhalla integration) requires a dedicated infrastructure spike that was out of scope for Sprint 6.
+- **Rationale:** Two hard blockers remain: (1) routing recommendations require calibrated traffic perception, and (2) routing engine architecture (OSRM/Valhalla integration) requires a dedicated infrastructure spike that was out of scope for Sprint 6. All 5 active backlog tickets were 100% delivered.
 
 ---
 
@@ -202,7 +204,7 @@ API Documentation        make swagger                                Updated    
 
 ## 6. Documented Lessons Learned in Sprint 6
 
-Sprint 6 codified **8 authoritative lessons** in [`docs/lesson_learn.md`](lesson_learn.md):
+Sprint 6 codified **9 authoritative lessons** in [`docs/lesson_learn.md`](lesson_learn.md):
 - **Lesson 29:** Perception-Layer Fixes vs. Scoring Hacks & Empirical Validation of NMS and Letterboxing (S6-T1).
 - **Lesson 30:** Uniform Capacity Floors vs. Physical Corridor Geometry & Persistent Capacity Storage across Redeployments (S6-T2).
 - **Lesson 31:** Active Environmental Opportunism & Continuous Cloud Label Synchronization (2026-10-13 Rain Event).
@@ -211,11 +213,45 @@ Sprint 6 codified **8 authoritative lessons** in [`docs/lesson_learn.md`](lesson
 - **Lesson 34:** Architectural & Psychological Priority: Sound Solutions Precede Task Estimation to Prevent Time-Anchoring (Rule 2 update, PR #240).
 - **Lesson 35:** Holistic Repository Knowledge Maintenance vs. Isolated Status Logging (Rule 6 expansion, PR #240).
 - **Lesson 36:** Leaf-Modulith Notification Infrastructure, 30-Minute Sliding Debouncing, and Zero-Emoji Telegram Dispatch (S6-T5, PR #241).
+- **Lesson 37:** Data Labeling Paradigms, Why Frame-Diff Fails in Outdoor Surveillance, and Zero-VLM Flood Detection Architecture.
 
 ---
 
 ## 7. Recommendations & Strategic Input for Sprint 7
 
-1. **Deploy and Validate Staging Notification Dispatch:** Complete end-to-end verification of `warded-backend` with a live Telegram bot token on `homesrv` Stack 14 following the runbook posted in PR #241.
-2. **Begin Zalo OA Feasibility & Architecture Spike:** In accordance with ADR-001, Telegram reaches tech-savvy commuters, but everyday Vietnamese motorbike riders rely on Zalo. With the `Channel` abstraction proven in `internal/notify`, begin designing the `ZaloChannel` adapter and evaluating official Zalo OA webhook and template requirements.
-3. **Route A→B Infrastructure Spike:** Prepare the technical foundation for commuter route navigation by evaluating OSRM / Valhalla deployment constraints on `homesrv` and edge-weight overlay strategies consuming live PCU saturation indices.
+1. **Deploy and Validate Staging Notification Dispatch (Operational Reality-Check):**
+   - *Current State vs. Field Reality:* The notification subsystem (`internal/notify`, `internal/subscription`, sliding 30-min debouncer) is fully implemented and passes all unit and race detector tests under Go (`make test-go`, PR #241). However, on the staging server (`homesrv` Stack 14), it **has NOT yet been verified live with an active Telegram bot token** and currently runs in simulation mode (`TELEGRAM_BOT_TOKEN=""`).
+   - *Immediate Action:* Provision a dedicated staging Telegram bot token, configure Portainer Stack 14 environment, and verify live end-to-end alert delivery on staging following the runbook posted in PR #241 before opening public subscription endpoints.
+
+2. **Autonomous Model Perception & Strategic De-coupling from Cloud VLM (50 Arterial Cameras First ➔ 800 Cameras):**
+   - *Eliminate User Verification Burden:* Forcing commuters to manually click `[Xác minh ngập nước]` shifts the burden of perception onto the user. The system must run autonomously.
+   - *Zero-VLM Directive:* Progressively deprecate external Multimodal VLM (Google Gemini) dependencies to eliminate cloud API costs, 10 RPM rate-limiting bottlenecks, 1.5–4.0s network roundtrip latency, and vulnerability to network partitions during severe storms.
+   - *Phased Rollout:*
+     - **Phase 1 (50 Arterial Cameras):** Focus autonomous perception on the ~50 Hot Set cameras along priority corridors (Võ Văn Kiệt, Mai Chí Thọ, Điện Biên Phủ, Cộng Hòa, Quốc Lộ 13). Concurrently assess both traffic saturation (CLEAR / MODERATE / HEAVY / CONGESTED ➔ Green / Yellow / Red) and standing water accumulation (DRY / FLOODED ➔ Blue / Amber) and render discrete status dots directly on the map.
+     - **Phase 2 (City-Wide Scale):** Once the arterial perception pipeline is stabilized and calibrated, expand autonomous inference across all 800+ cameras.
+   - *Three-Tier Self-Hosted Vision Pipeline:*
+     - *Tier 1 (Physical Triangulation):* Gated by physical metrics (`rainfall >= 5mm/h` from Open-Meteo or river tide $>1.50\text{m}$ at Phú An / Nhà Bè stations).
+     - *Tier 2 (On-Premise Water Segmentation):* Lightweight semantic segmentation model (BiSeNet / SegFormer-B0 / YOLOv8-seg via OpenVINO on `dev-box`) trained to segment standing water puddles vs. road asphalt.
+     - *Tier 3 (Motorcycle Wheel Waterline Occlusion):* Detect physical tire submersion depth and spray truncation on detected motorcycles as an irrefutable metric of hazardous flooding ($\ge 20\text{cm}$) without cloud dependencies.
+
+3. **Human-in-the-Loop Active Crowdsource & Ground-Truth Flywheel (`[Báo cáo ngập tại đây]`):**
+   - *Acknowledging Perception Fallibility:* Outdoor computer vision models inevitably encounter ambiguous scenes (headlight flare, heavy spray, lens water droplets).
+   - *Crowdsource Affordance:* In the camera modal, provide an explicit, high-contrast action button: `[Báo cáo ngập tại đây]` or `[Báo cáo sai lệch]`.
+   - *Active-Learning Data Flywheel:* When a user submits a report, the backend immediately archives the live snapshot + user vote + timestamp to Cloudflare R2 (`warded-proofs/feedback/`). Regardless of whether individual user reports are noisy, this continuously captures authentic, contested production edge cases for team review and model fine-tuning.
+
+4. **Rebuilding the Data Labeling Taxonomy for Model Retraining:**
+   - *Auditing Current Flaws:* Current datasets (`labels_d6_real.json`, `label_schema.json`, `label_today_rain.py`) use whole-image categorical tags (`traffic: CLEAR`, `flood: SHALLOW`). These serve strictly as an evaluation benchmark, NOT training data:
+     - YOLO requires bounding boxes $[x, y, w, h]$ per vehicle, not whole-frame labels.
+     - Flood segmentation requires pixel masks of standing water.
+     - *Directional Congestion Anomaly:* On dual-carriageway corridors, one outbound lane can be completely jammed while the inbound lane is empty. Whole-frame tags lose directional saturation.
+     - *False Congestion on Empty Roads:* Occasional empty scenes are misclassified as CONGESTED due to anchor noise or floor mismatch.
+   - *Action for Sprint 7:* Re-evaluate and rebuild the labeling taxonomy and toolchain with Claude to support directional bounding boxes and polygon water masks.
+
+5. **Map Clutter Hygiene: Filtering Dead / Ghost Cameras (Black Dots):**
+   - *The Problem:* 125 cameras in `cameras_enriched.json` are permanently or temporarily offline (`NOT_IMAGE` / `NO_SIGNAL`), appearing as black dots. Commuters clicking them encounter frustrating 503 ghost camera modals.
+   - *Action for Sprint 7:* Implement an active map toggle (enabled by default) that automatically filters out and hides offline/no-signal cameras, ensuring the explorer displays only functional, actionable live camera feeds.
+
+6. **Zalo OA Integration & Proactive Commute Route Monitoring (Future Evolution):**
+   - *Zalo OA Channel (ADR-001 Phase 2):* Telegram reaches tech-savvy users; everyday Vietnamese motorbike riders rely on Zalo. Leverage the leaf `Channel` abstraction in `internal/notify` to design the `ZaloChannel` adapter and begin Zalo Official Account (OA) webhook and template verification.
+   - *Proactive Commute Route Monitoring:* Allow commuters to save routine homebound routes (e.g. departing office at 17:30). The system monitors corridor cameras along the route and dispatches a proactive notification ~30 minutes prior to departure (17:00) with route conditions and recommended navigation advice.
+   - *Route A→B Infrastructure Spike:* Evaluate OSRM / Valhalla deployment constraints on `homesrv` and edge-weight overlay strategies consuming live PCU saturation indices.

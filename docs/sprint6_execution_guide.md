@@ -29,14 +29,14 @@ bộ Sprint 6 Backlog theo quy chuẩn [ADR-007](ADR-007-sprint5-audit-and-sprin
 | Wave | ID | GitHub Issue | Title | Epic | Labels | Phụ thuộc |
 |:---:|:---:|:---:|---|---|---|:---:|
 | **0** | **S6-T1** | [#221](https://github.com/529-studio/projectKV/issues/221) | `[cv-engine + tooling] Implement NMS, Letterbox, 416px Scaling & Re-run 764-Frame D6 Benchmark` (**Completed / Merged in PR #232**) | epic:eval-tooling | `tooling, epic:eval-tooling, backend` | None (**Hard Gate**) |
-| **0** | **S6-T4** | [#224](https://github.com/529-studio/projectKV/issues/224) | `[ci + ops] Automated Secret Scanning in GitHub Actions CI (Gitleaks)` (**Excluded — Transferred to Org DevOps**) | epic:infra-resilience | `tooling, cross-cutting` | Cấp Organization |
+| **0** | **S6-T4** | [#224](https://github.com/529-studio/projectKV/issues/224) | `[ci + ops] Automated Secret Scanning in GitHub Actions CI (Gitleaks)` (**Completed / Merged in PR #243**) | epic:infra-resilience | `tooling, cross-cutting` | None (Độc lập CI) |
 | **1** | **S6-T2** | [#222](https://github.com/529-studio/projectKV/issues/222) | `[go-server] Corridor-Specific Visual Capacity Calibration & Persistent Peak Storage` (**Completed / Merged in PR #233**) | epic:vehicle-detection | `go, backend, epic:vehicle-detection` | [#221](https://github.com/529-studio/projectKV/issues/221) (S6-T1) |
 | **1** | **S6-T3** | [#223](https://github.com/529-studio/projectKV/issues/223) | `[web] CameraModal UI/UX Redesign (Tactile Affordance) & 15s Client-Side Cooldown` (**Completed / Merged in PR #236**) | epic:dock-ux | `frontend, epic:dock-ux` | None (Độc lập UI) |
 | **2** | **S6-T5** | [#225](https://github.com/529-studio/projectKV/issues/225) | `[go-server] Telegram Flood Alert Dispatcher (internal/notify, Subscription Store & Debounce)` (**Completed / Merged in PR #241**) | epic:flood-integrity | `go, backend, epic:flood-integrity` | S5-T3 ([#209](https://github.com/529-studio/projectKV/issues/209)) |
 
 > **Quy tắc cổng chặn (Hard Gate) & Ghi chú hoàn thành**:
 > 1. **S6-T1 là Hard Gate của Sprint 6**: Đã nghiệm thu và đo lại toàn bộ 764 frame thực tế, Macro F1 tăng +18.9% (tuân thủ nghiêm ngặt **Lesson 19** & **Lesson 29**).
-> 2. **S6-T4 được loại khỏi scope repo**: DevOps quyết định triển khai Gitleaks tập trung cho toàn bộ Organization `529-studio` thay vì phân mảnh trên từng repo đơn lẻ.
+> 2. **S6-T4 hoàn thành ở Wave 0**: Đã tích hợp workflow Gitleaks tập trung của Organization `529-studio` (`.github/workflows/secret-scan.yml` + `.gitleaks.toml`), bảo vệ toàn bộ commit tiếp theo khỏi rò rỉ secret (PR #243).
 > 3. **S6-T3 hoàn thành ở Wave 1**: Đã phân tách affordance nút bấm, chặn spam 15s, che giấu lỗi VLM và gắn middleware `SecretSanitizer`.
 > 4. **S6-T5 hoàn thành ở Wave 2**: Đã xây dựng package `internal/notify`, `internal/subscription`, debounce 30 phút, hoàn thành tích hợp composition root và đã merge vào `dev` (PR #241).
 > 5. **Báo cáo tổng kết Sprint 6**: Xem chi tiết tại [`docs/sprint6_report.md`](sprint6_report.md).
