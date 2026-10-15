@@ -162,6 +162,11 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
     - Backend: Supports `X-Dev-Token`, `Authorization: Bearer`, and `?token=` / `?dev_token=` query params (for raw `<img>` binary streaming), validated via `crypto/subtle.ConstantTimeCompare`.
     - Fail-Closed: Automatically returns `503 Service Unavailable` on production/staging if `DEV_ACCESS_TOKEN` is unset or blank.
     - Frontend: In-place monochromatic lock screen at `/labeler`, session persistence via `sessionStorage`, and automatic token eviction upon receiving `401 Unauthorized`.
+- **Offline Camera Map Hygiene & Live Counter Badge (Sprint 7 Task S7-T2, Issue #247)**:
+  - Implemented client-side filtering in `apps/web/src/components/CameraFilter.tsx` and `apps/web/src/app/page.tsx` hiding 135 offline / no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default on the interactive Leaflet map.
+  - Added monochromatic toggle control (`[Ẩn camera mất tín hiệu]` / `[Hiện camera mất tín hiệu]`) and live dynamic counter badge (`Đang hiển thị 702 / 837 camera`).
+  - Persisted user toggle state in `localStorage` (`warded_hide_offline_cameras`).
+  - Maintained complete integrity of underlying camera catalog (`cameras_enriched.json`) and non-destructive view-layer filtering.
 - **Directional Labeling Taxonomy, Physical Flood Markers & R2 Proofs Sync (Sprint 7 Task S7-T8, Issue #253)**:
   - Formulated formal labeling specification `docs/taxonomy_traffic_and_flood_labeling.md` and architecture decision `docs/ADR-009-self-hosted-flood-segmentation-and-directional-pcu.md`.
   - Solved directional flow asymmetry on divided boulevards by separating Direction A (approaching) and Direction B (receding) with max-severity global map rollup.
