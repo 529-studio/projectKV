@@ -167,6 +167,13 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Added monochromatic toggle control (`[Ẩn camera mất tín hiệu]` / `[Hiện camera mất tín hiệu]`) and live dynamic counter badge (`Đang hiển thị 702 / 837 camera`).
   - Persisted user toggle state in `localStorage` (`warded_hide_offline_cameras`).
   - Maintained complete integrity of underlying camera catalog (`cameras_enriched.json`) and non-destructive view-layer filtering.
+- **Directional Labeling Taxonomy, Physical Flood Markers & R2 Proofs Sync (Sprint 7 Task S7-T8, Issue #253)**:
+  - Formulated formal labeling specification `docs/taxonomy_traffic_and_flood_labeling.md` and architecture decision `docs/ADR-009-self-hosted-flood-segmentation-and-directional-pcu.md`.
+  - Solved directional flow asymmetry on divided boulevards by separating Direction A (approaching) and Direction B (receding) with max-severity global map rollup.
+  - Eliminated naive street-name guessing for flood; established physical immersion markers (`dry`, `wet_asphalt_no_standing`, `tire_base_under_10cm`, `exhaust_hub_over_15cm`).
+  - Upgraded `tools/eval/label_schema.json`, `services/go-server/internal/archiver/handler.go` (`LabelPayload`), and `apps/web/src/app/labeler/page.tsx` with directional inputs, physical depth anchors, and quality tags.
+  - Built high-concurrency Go CLI `services/go-server/cmd/sync-proofs` and uploaded all 880 authentic rain frames (41.43 MB) from `2026-10-15` to Cloudflare R2 bucket `warded-proofs`.
+  - Built dataset curation tool `tools/eval/label_curator.py` and curated 135 gold-standard labels across 73 priority cameras for `2026-10-15`.
 
 ---
 
