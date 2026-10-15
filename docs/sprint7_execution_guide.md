@@ -26,9 +26,9 @@ Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers 
 
 | Wave | ID | GitHub Issue | Title | Epic | Labels | Phụ thuộc |
 |:---:|:---:|:---:|---|---|---|:---:|
-| **0** | **S7-T2** | [#247](https://github.com/529-studio/projectKV/issues/247) | `[web] Hide Offline / No-Signal Cameras by Default on Map (Map Hygiene)` | epic:dock-ux | `frontend` | None (Bắt đầu ngay) |
-| **0** | **S7-T1** | [#246](https://github.com/529-studio/projectKV/issues/246) | `[ci + ops] Live Staging Telegram Flood Alert Verification & Simulation Deprecation (Stack 14 homesrv)` | epic:infra-resilience | `tooling, cross-cutting` | None (Độc lập Ops) |
-| **1** | **S7-T3** | [#248](https://github.com/529-studio/projectKV/issues/248) | `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback` | epic:dock-ux | `frontend` | None (UI component) |
+| **0** | **S7-T2** | [#247](https://github.com/529-studio/projectKV/issues/247) | `[web] Hide Offline / No-Signal Cameras by Default on Map (Map Hygiene)` | epic:dock-ux | `frontend` | None (Merged PR #257) |
+| **0** | **S7-T1** | [#246](https://github.com/529-studio/projectKV/issues/246) | `[ci + ops] Live Staging Telegram Flood Alert Verification & Simulation Deprecation (Stack 14 homesrv)` | epic:infra-resilience | `tooling, cross-cutting` | Nice-to-have (Dời sau Sprint 7) |
+| **1** | **S7-T3** | [#248](https://github.com/529-studio/projectKV/issues/248) | `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback` | epic:dock-ux | `frontend` | Hoàn thành (`feat/s7-t3-report-flood-button`) |
 | **1** | **S7-T4** | [#249](https://github.com/529-studio/projectKV/issues/249) | `[go-server] internal/feedback Leaf Package & Cloudflare R2 Ground-Truth Archiver` | epic:flood-integrity | `backend, go` | [#248](https://github.com/529-studio/projectKV/issues/248) (S7-T3) |
 | **2** | **S7-T5** | [#250](https://github.com/529-studio/projectKV/issues/250) | `[go-server + cv-engine] Autonomous 50 Hot Set Traffic Poller & Saturation Cache` | epic:vehicle-detection | `backend, go, epic:vehicle-detection` | None (Backend worker) |
 | **2** | **S7-T6** | [#251](https://github.com/529-studio/projectKV/issues/251) | `[web] Real-Time Arterial Marker Saturation Coloring (Green / Yellow / Red Dots)` | epic:dock-ux | `frontend` | [#250](https://github.com/529-studio/projectKV/issues/250) (S7-T5) |
@@ -78,7 +78,9 @@ Branch: feat/s7-t2-hide-offline-cameras
 Open PR targeting dev starting with 'Close #247'. Do NOT merge."
 ```
 
-### Terminal 2 — S7-T1 (Kiểm thử live bot Telegram trên staging Stack 14 homesrv)
+### Terminal 2 — S7-T1 (Kiểm thử live bot Telegram trên staging Stack 14 homesrv — Nice-to-have, dời sau Sprint 7)
+
+> **Lưu ý**: Ticket S7-T1 được đánh giá là nice-to-have và được dời sang các sprint sau để ưu tiên cho luồng dữ liệu ngập cộng đồng và thị giác máy tính.
 
 ```bash
 cd ~/repos/projectKV

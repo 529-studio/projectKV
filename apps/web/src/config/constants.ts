@@ -32,6 +32,7 @@ export const API_ENDPOINTS = Object.freeze({
   WEATHER: '/api/weather',
   WEATHER_RADAR: '/api/weather/radar',
   FLOOD_VERIFY: '/api/flood/verify',
+  REPORT_FLOOD: (id: string) => `/api/v1/cameras/${encodeURIComponent(id)}/report-flood`,
   FLOOD_CHOKEPOINTS: '/api/flood/chokepoints',
   FLOOD_QUOTA: '/api/flood/quota',
   SSE_LIVE: '/api/live/stream',
@@ -379,6 +380,33 @@ export const FLOOD_VERIFY_I18N = Object.freeze({
       vi: 'Không rõ',
       en: 'Unknown',
     },
+  },
+});
+
+export const FLOOD_REPORT_I18N = Object.freeze({
+  BUTTON_LABEL: {
+    vi: 'Báo cáo ngập tại đây',
+    en: 'Report flood here',
+  },
+  REPORTING: {
+    vi: 'Đang gửi báo cáo...',
+    en: 'Submitting report...',
+  },
+  COOLDOWN: {
+    vi: (seconds: number) => `Đã báo cáo (${seconds}s)`,
+    en: (seconds: number) => `Reported (${seconds}s)`,
+  },
+  SUCCESS_CHIP: {
+    vi: 'Cảm ơn bạn đã hỗ trợ ghi nhận',
+    en: 'Thank you for your report',
+  },
+  RATE_LIMITED: {
+    vi: 'Bạn đã gửi báo cáo gần đây',
+    en: 'You have submitted a report recently',
+  },
+  ERROR_GENERIC: {
+    vi: 'Không thể gửi báo cáo',
+    en: 'Unable to submit report',
   },
 });
 
