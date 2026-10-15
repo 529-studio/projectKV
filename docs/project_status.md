@@ -174,6 +174,13 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Upgraded `tools/eval/label_schema.json`, `services/go-server/internal/archiver/handler.go` (`LabelPayload`), and `apps/web/src/app/labeler/page.tsx` with directional inputs, physical depth anchors, and quality tags.
   - Built high-concurrency Go CLI `services/go-server/cmd/sync-proofs` and uploaded all 880 authentic rain frames (41.43 MB) from `2026-10-15` to Cloudflare R2 bucket `warded-proofs`.
   - Built dataset curation tool `tools/eval/label_curator.py` and curated 135 gold-standard labels across 73 priority cameras for `2026-10-15`.
+- **Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback (Sprint 7 Task S7-T3, Issue #248)**:
+  - Added secondary tactile monochromatic action button `[Báo cáo ngập tại đây]` / `[Report flood here]` in `apps/web/src/components/CameraModal.tsx` alongside the VLM verification trigger, styled with high-contrast zinc borders (`border-zinc-700 hover:bg-zinc-800 active:scale-[0.98] text-zinc-300`) and a crisp monochromatic alert SVG icon (zero emojis per Rule 1).
+  - Enforced 30-second client-side rate limit cooldown countdown (`[Đã báo cáo (30s)]` / `[Reported (30s)]`) with per-camera timestamp tracking in `apps/web/src/utils/cameraModalUtils.ts` persisting across modal close/open and camera switching.
+  - Dispatched `POST /api/v1/cameras/:id/report-flood` on click, rendering an ephemeral zinc chip `[Cảm ơn bạn đã hỗ trợ ghi nhận]` auto-dismissing after 3 seconds.
+  - Added comprehensive unit tests in `apps/web/src/utils/cameraModalUtils.test.ts` (131 total tests passing) verifying button states, zero-emoji compliance, cooldown math, and camera isolation.
+- **Sprint 7 Task S7-T1 Deferral Note (Issue #246)**:
+  - Task S7-T1 (`[ci + ops] Live Staging Telegram Flood Alert Verification & Simulation Deprecation`) was evaluated and classified as **nice-to-have** operational verification. To prioritize core perception accuracy, directional labeling taxonomy, and human-in-the-loop crowd-sourcing feedback loops, S7-T1 is deferred to post-Sprint 7 milestones.
 
 ---
 

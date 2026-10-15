@@ -31,7 +31,14 @@ const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: fals
 export default function Home() {
   const { cameras, loading, error, markCameraGhost } = useCameras();
   const { verdicts, hexCells, analysisEnabled, appEnv, loading: trafficLoading } = useTraffic();
-  const { floodVerdicts, floodHexCells, floodedCameraIds, floodedCameraCount, loading: floodLoading } = useFlood();
+  const {
+    floodVerdicts,
+    floodHexCells,
+    floodedCameraIds,
+    floodedCameraCount,
+    wetCameraCount,
+    loading: floodLoading,
+  } = useFlood();
   const { weather, radar, loading: weatherLoading } = useWeather();
   const { rainRadarHexCells, loading: rainRadarLoading } = useRainHexRadar(radar, weather, cameras);
 
@@ -300,6 +307,7 @@ export default function Home() {
             cameras={cameras}
             verdicts={verdicts}
             floodedCameraIds={floodedCameraIds}
+            wetCameraCount={wetCameraCount}
             isFloodFilterActive={isFloodFilterActive}
             onToggleFloodFilter={() => setIsFloodFilterActive(prev => !prev)}
             loading={loading}
@@ -465,6 +473,7 @@ export default function Home() {
           cameras={cameras}
           verdicts={verdicts}
           floodedCameraIds={floodedCameraIds}
+          wetCameraCount={wetCameraCount}
           isFloodFilterActive={isFloodFilterActive}
           onToggleFloodFilter={() => setIsFloodFilterActive(prev => !prev)}
           loading={loading}

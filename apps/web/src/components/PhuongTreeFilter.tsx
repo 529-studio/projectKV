@@ -17,6 +17,7 @@ export interface PhuongTreeFilterProps {
   cameras: Camera[];
   verdicts?: Map<string, TrafficVerdictLike>;
   floodedCameraIds?: Set<string>;
+  wetCameraCount?: number;
   isFloodFilterActive?: boolean;
   onToggleFloodFilter?: () => void;
   loading?: boolean;
@@ -112,6 +113,7 @@ export default function PhuongTreeFilter({
   cameras,
   verdicts,
   floodedCameraIds,
+  wetCameraCount = 0,
   isFloodFilterActive = false,
   onToggleFloodFilter,
   loading: camerasLoading = false,
@@ -201,7 +203,8 @@ export default function PhuongTreeFilter({
       title: lang === 'vi' ? 'Khám phá Camera' : 'Camera Explorer',
       subtitle: lang === 'vi' ? 'Warded • Cảnh báo ngập lụt & giao thông đô thị' : 'Warded • Urban flood alert & traffic intelligence',
       floodStatusAlert: (n: number) => (lang === 'vi' ? `CẢNH BÁO NGẬP: ${n} điểm camera xác nhận ngập` : `FLOOD ALERT: ${n} camera-verified flood spots`),
-      floodStatusDry: lang === 'vi' ? 'TOÀN THÀNH PHỐ: Không ghi nhận điểm ngập nào' : 'CITYWIDE: No flooding reported by cameras',
+      floodStatusWet: (n: number) => (lang === 'vi' ? `GHI NHẬN MƯA: ${n} điểm đường ướt (chưa ghi nhận ngập)` : `RAIN RECORDED: ${n} wet spots (no flooding)`),
+      floodStatusDry: lang === 'vi' ? 'TOÀN THÀNH PHỐ: Các tuyến đường khô ráo — Không ghi nhận ngập' : 'CITYWIDE: Roadways dry — No flooding reported',
       floodFilterActiveBtn: (n: number) => (lang === 'vi' ? `✕ Bỏ lọc ${n} camera ngập` : `✕ Clear ${n} flood cameras`),
       floodFilterInactiveBtn: (n: number) => (lang === 'vi' ? `Xem danh sách ${n} camera ngập →` : `View ${n} flood cameras →`),
       tabCorridors: lang === 'vi' ? 'Tuyến đường' : 'Corridors',
@@ -532,6 +535,13 @@ export default function PhuongTreeFilter({
                 </span>
               </button>
             )}
+          </div>
+        ) : wetCameraCount > 0 ? (
+          <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-sky-800/60 bg-sky-950/20 text-[11px] text-sky-300">
+            <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
+            <span className="font-medium text-sky-200 truncate">
+              {t.floodStatusWet(wetCameraCount)}
+            </span>
           </div>
         ) : (
           <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/40 text-[11px] text-zinc-300">
