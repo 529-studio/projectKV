@@ -105,18 +105,18 @@ Commute route monitoring (predicting route conditions 30 minutes before departur
 
 ## 3. Sprint 7 Backlog Matrix
 
-| Ticket | Summary & Scope | Dependencies | Active Effort | Delivery Window |
-|---|---|:---:|:---:|:---:|
-| **S7-T1** | `[ci+ops] Live Staging Telegram Flood Alert Verification (Stack 14 homesrv)` | None | 4h | 0.5 day |
-| **S7-T2** | `[web] Hide Offline / No-Signal Cameras by Default on Map (Map Hygiene)` | None | 4h | 0.5 day |
-| **S7-T3** | `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback` | None | 6h | 1 day |
-| **S7-T4** | `[go-server] internal/feedback Leaf Package & Cloudflare R2 Archiver` | S7-T3 | 10h | 1.5 days |
-| **S7-T5** | `[go-server + cv-engine] Autonomous 50 Hot Set Traffic Poller & Saturation Cache` | None | 14h | 2 days |
-| **S7-T6** | `[web] Real-Time Arterial Marker Saturation Coloring (Green / Yellow / Red Dots)` | S7-T5 | 8h | 1 day |
-| **S7-T7** | `[go-server] Rain-Triggered Automated Hot Set Flood Poller (VLM Bridge)` | S7-T5 | 12h | 1.5 days |
-| **S7-T8** | `[tooling] Multi-Lane Directional Labeling Taxonomy & Toolchain Upgrade` | None | 10h | 1.5 days |
-| **S7-T9** | `[docs + spike] ADR-009 Design Spike: Self-Hosted Flood Segmentation (Zero-VLM)` | S7-T7 | 8h | 1 day |
-| **S7-T10** | `[docs] Holistic Repository Knowledge Synchronization & Sprint 7 Closeout` | S7-T1–T9 | 6h | 1 day |
+| Ticket | Summary & Scope | Dependencies | Active Effort | Delivery Window | Issue Tracker |
+|---|---|:---:|:---:|:---:|:---:|
+| **S7-T1** | `[ci+ops] Live Staging Telegram Flood Alert Verification (Stack 14 homesrv)` | None | 4h | 0.5 day | [#246](https://github.com/529-studio/projectKV/issues/246) |
+| **S7-T2** | `[web] Hide Offline / No-Signal Cameras by Default on Map (Map Hygiene)` | None | 4h | 0.5 day | [#247](https://github.com/529-studio/projectKV/issues/247) |
+| **S7-T3** | `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback` | None | 6h | 1 day | [#248](https://github.com/529-studio/projectKV/issues/248) |
+| **S7-T4** | `[go-server] internal/feedback Leaf Package & Cloudflare R2 Archiver` | S7-T3 | 10h | 1.5 days | [#249](https://github.com/529-studio/projectKV/issues/249) |
+| **S7-T5** | `[go-server + cv-engine] Autonomous 50 Hot Set Traffic Poller & Saturation Cache` | None | 14h | 2 days | [#250](https://github.com/529-studio/projectKV/issues/250) |
+| **S7-T6** | `[web] Real-Time Arterial Marker Saturation Coloring (Green / Yellow / Red Dots)` | S7-T5 | 8h | 1 day | [#251](https://github.com/529-studio/projectKV/issues/251) |
+| **S7-T7** | `[go-server] Rain-Triggered Automated Hot Set Flood Poller (VLM Bridge)` | S7-T5 | 12h | 1.5 days | [#252](https://github.com/529-studio/projectKV/issues/252) |
+| **S7-T8** | `[tooling] Multi-Lane Directional Labeling Taxonomy & Toolchain Upgrade` | None | 10h | 1.5 days | [#253](https://github.com/529-studio/projectKV/issues/253) |
+| **S7-T9** | `[docs + spike] ADR-009 Design Spike: Self-Hosted Flood Segmentation (Zero-VLM)` | S7-T7 | 8h | 1 day | [#254](https://github.com/529-studio/projectKV/issues/254) |
+| **S7-T10** | `[docs] Holistic Repository Knowledge Synchronization & Sprint 7 Closeout` | S7-T1–T9 | 6h | 1 day | [#255](https://github.com/529-studio/projectKV/issues/255) |
 
 ---
 
