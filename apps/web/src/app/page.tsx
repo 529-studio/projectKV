@@ -22,6 +22,8 @@ import PhuongTreeFilter, {
 } from '../components/PhuongTreeFilter';
 import { getCameraSequence } from '../utils/cameraSequence';
 import type { ActiveLensMode } from '../components/HexOverlay';
+import CameraFilter from '../components/CameraFilter';
+import { isCameraOffline } from '../utils/cameraFilterUtils';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
@@ -59,6 +61,27 @@ export default function Home() {
   const [selectedPhuong, setSelectedPhuong] = useState<string | null>(null);
   const [selectedCorridor, setSelectedCorridor] = useState<string | null>(null);
   const [lang, setLang] = useState<'vi' | 'en'>('vi');
+
+  // Offline cameras filter default & persistence (S7-T2 / Issue #247)
+  const [hideOfflineCameras, setHideOfflineCameras] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = localStorage.getItem('warded_hide_offline_cameras');
+    if (saved !== null) {
+      setHideOfflineCameras(saved === 'true');
+    }
+  }, []);
+
+  const handleToggleHideOffline = useCallback(() => {
+    setHideOfflineCameras(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('warded_hide_offline_cameras', String(next));
+      }
+      return next;
+    });
+  }, []);
 
   // Pinned camera list & order persistence (ADR-004 §A4/S5)
   useEffect(() => {
@@ -176,6 +199,19 @@ export default function Home() {
     return baseLabel;
   }, [selectedPhuong, selectedCorridor, lang, isFloodFilterActive, floodedCameraCount]);
 
+  // Filter out offline / no-signal cameras by default for map hygiene (S7-T2 / Issue #247)
+  const displayCameras = useMemo(() => {
+    if (!hideOfflineCameras) return cameras;
+    return cameras.filter(c => !isCameraOffline(c));
+  }, [cameras, hideOfflineCameras]);
+
+  const visibleCameraCount = useMemo(() => {
+    if (isFiltered && filteredCameraIds) {
+      return displayCameras.filter(c => filteredCameraIds.has(c.id)).length;
+    }
+    return displayCameras.length;
+  }, [displayCameras, isFiltered, filteredCameraIds]);
+
   const pinnedCameras = useMemo(() => {
     return pinnedCameraIds.map(id => cameras.find(c => c.id === id)).filter(Boolean) as Camera[];
   }, [pinnedCameraIds, cameras]);
@@ -285,7 +321,7 @@ export default function Home() {
       <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-zinc-950">
         <div className="flex-1 w-full h-full relative z-0">
           <MapComponent
-            cameras={cameras}
+            cameras={displayCameras}
             verdicts={verdicts}
             onCameraClick={handleSelectCamera}
             selectedCamera={selectedCamera}
@@ -297,6 +333,15 @@ export default function Home() {
             appEnv={appEnv}
             onMapReady={setMap}
             hexOverlayEnabled={activeLens !== 'off'}
+            cameraFilterControl={
+              <CameraFilter
+                hideOfflineCameras={hideOfflineCameras}
+                onToggleHideOffline={handleToggleHideOffline}
+                visibleCount={visibleCameraCount}
+                totalCount={cameras.length}
+                lang={lang}
+              />
+            }
             weatherControl={
               <WeatherWidget
                 weather={weather}
