@@ -13,6 +13,10 @@ import {
   buildAuthHeaders,
   type FloodLevel,
   type TrafficLevel,
+  type DirectionalTrafficLevel,
+  type FloodSubmersionAnchor,
+  type QualityTag,
+  type QueueReason,
   type Weather,
   type TimeOfDay,
   type LabelState,
@@ -171,6 +175,11 @@ export default function LabelerPage() {
       setCurrentDraft({
         flood_level: existing.flood_level,
         traffic_level: existing.traffic_level,
+        traffic_dir_a: existing.traffic_dir_a,
+        traffic_dir_b: existing.traffic_dir_b,
+        queue_reason: existing.queue_reason,
+        flood_submersion_anchor: existing.flood_submersion_anchor,
+        quality_tags: existing.quality_tags,
         weather: existing.weather,
         time_of_day: existing.time_of_day,
         notes: existing.notes || '',
@@ -193,6 +202,11 @@ export default function LabelerPage() {
         annotator: annotator.trim() || 'anonymous',
         flood_level: currentDraft.flood_level || 'none',
         traffic_level: currentDraft.traffic_level || 'clear',
+        traffic_dir_a: currentDraft.traffic_dir_a || (currentDraft.traffic_level as DirectionalTrafficLevel) || 'clear',
+        traffic_dir_b: currentDraft.traffic_dir_b || 'not_applicable',
+        queue_reason: currentDraft.queue_reason || 'free_flow',
+        flood_submersion_anchor: currentDraft.flood_submersion_anchor || (currentDraft.flood_level === 'deep' ? 'exhaust_hub_over_15cm' : (currentDraft.flood_level === 'puddle' ? 'tire_base_under_10cm' : 'dry')),
+        quality_tags: currentDraft.quality_tags || [],
         weather: currentDraft.weather || 'clear',
         time_of_day: currentDraft.time_of_day || 'day',
         notes: currentDraft.notes || '',
@@ -597,21 +611,27 @@ export default function LabelerPage() {
 
         {/* Right: Annotation Controls & Hotkey Panels */}
         <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-zinc-800 bg-zinc-900/40 p-4 flex flex-col gap-5 overflow-y-auto">
-          {/* Dimension 1: Flood Level */}
+          {/* Dimension 1: Flood Level & Physical Anchor */}
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
               {t.floodLabel}
             </span>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { val: 'none' as FloodLevel, label: t.floodNone },
-                { val: 'puddle' as FloodLevel, label: t.floodPuddle },
-                { val: 'deep' as FloodLevel, label: t.floodDeep },
+                { val: 'none' as FloodLevel, label: t.floodNone, anchor: 'dry' as FloodSubmersionAnchor },
+                { val: 'puddle' as FloodLevel, label: t.floodPuddle, anchor: 'tire_base_under_10cm' as FloodSubmersionAnchor },
+                { val: 'deep' as FloodLevel, label: t.floodDeep, anchor: 'exhaust_hub_over_15cm' as FloodSubmersionAnchor },
               ].map((item) => (
                 <button
                   key={item.val}
                   type="button"
-                  onClick={() => setCurrentDraft((d) => ({ ...d, flood_level: item.val }))}
+                  onClick={() =>
+                    setCurrentDraft((d) => ({
+                      ...d,
+                      flood_level: item.val,
+                      flood_submersion_anchor: d.flood_submersion_anchor || item.anchor,
+                    }))
+                  }
                   className={`text-xs px-2 py-2 rounded border font-mono transition text-left ${
                     currentDraft.flood_level === item.val
                       ? 'bg-zinc-100 text-black border-white font-bold'
@@ -622,33 +642,162 @@ export default function LabelerPage() {
                 </button>
               ))}
             </div>
+
+            {/* Physical Flood Submersion Anchor */}
+            <div className="mt-1 flex flex-col gap-1 bg-zinc-950/60 border border-zinc-800/80 p-2 rounded">
+              <span className="text-[11px] font-mono text-zinc-400 font-medium">
+                {t.floodSubmersionLabel}
+              </span>
+              <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
+                {[
+                  { val: 'dry' as FloodSubmersionAnchor, label: t.anchorDry },
+                  { val: 'wet_asphalt_no_standing' as FloodSubmersionAnchor, label: t.anchorWetNoStanding },
+                  { val: 'tire_base_under_10cm' as FloodSubmersionAnchor, label: t.anchorTireBase },
+                  { val: 'exhaust_hub_over_15cm' as FloodSubmersionAnchor, label: t.anchorExhaustHub },
+                ].map((item) => (
+                  <button
+                    key={item.val}
+                    type="button"
+                    onClick={() => setCurrentDraft((d) => ({ ...d, flood_submersion_anchor: item.val }))}
+                    className={`px-1.5 py-1 rounded border text-left truncate transition ${
+                      currentDraft.flood_submersion_anchor === item.val
+                        ? 'bg-zinc-200 text-zinc-950 border-white font-semibold'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Dimension 2: Traffic Level */}
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-              {t.trafficLabel}
+          {/* Dimension 2: Directional Traffic Density */}
+          <div className="flex flex-col gap-2.5">
+            {/* Direction A (Primary / Near lane) */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                {t.trafficDirALabel}
+              </span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { val: 'clear' as DirectionalTrafficLevel, rollup: 'clear' as TrafficLevel, label: t.trafficClear },
+                  { val: 'moderate' as DirectionalTrafficLevel, rollup: 'moderate' as TrafficLevel, label: t.trafficModerate },
+                  { val: 'heavy' as DirectionalTrafficLevel, rollup: 'heavy' as TrafficLevel, label: t.trafficHeavy },
+                  { val: 'congested' as DirectionalTrafficLevel, rollup: 'gridlock' as TrafficLevel, label: t.trafficGridlock },
+                ].map((item) => (
+                  <button
+                    key={item.val}
+                    type="button"
+                    onClick={() =>
+                      setCurrentDraft((d) => ({
+                        ...d,
+                        traffic_dir_a: item.val,
+                        traffic_level: item.rollup,
+                      }))
+                    }
+                    className={`text-xs px-2 py-1.5 rounded border font-mono transition text-left ${
+                      currentDraft.traffic_dir_a === item.val || currentDraft.traffic_level === item.rollup
+                        ? 'bg-zinc-100 text-black border-white font-bold'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:border-zinc-600'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Direction B (Secondary / Far lane) */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                {t.trafficDirBLabel}
+              </span>
+              <div className="grid grid-cols-3 gap-1.5 text-[11px] font-mono">
+                {[
+                  { val: 'clear' as DirectionalTrafficLevel, label: 'Q: Clear' },
+                  { val: 'moderate' as DirectionalTrafficLevel, label: 'W: Mod' },
+                  { val: 'heavy' as DirectionalTrafficLevel, label: 'E: Hvy' },
+                  { val: 'congested' as DirectionalTrafficLevel, label: 'R: Jam' },
+                  { val: 'not_applicable' as DirectionalTrafficLevel, label: t.trafficNotApplicable },
+                ].map((item) => (
+                  <button
+                    key={item.val}
+                    type="button"
+                    onClick={() => setCurrentDraft((d) => ({ ...d, traffic_dir_b: item.val }))}
+                    className={`px-1.5 py-1.5 rounded border text-center transition ${
+                      currentDraft.traffic_dir_b === item.val
+                        ? 'bg-zinc-100 text-black border-white font-bold'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:border-zinc-600'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Queue Reason */}
+            <div className="flex flex-col gap-1 bg-zinc-950/60 border border-zinc-800/80 p-2 rounded">
+              <span className="text-[11px] font-mono text-zinc-400 font-medium">
+                {t.queueReasonLabel}
+              </span>
+              <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
+                {[
+                  { val: 'free_flow' as QueueReason, label: t.reasonFreeFlow },
+                  { val: 'traffic_light' as QueueReason, label: t.reasonTrafficLight },
+                  { val: 'bottleneck' as QueueReason, label: t.reasonBottleneck },
+                  { val: 'flood_barrier' as QueueReason, label: t.reasonFloodBarrier },
+                ].map((item) => (
+                  <button
+                    key={item.val}
+                    type="button"
+                    onClick={() => setCurrentDraft((d) => ({ ...d, queue_reason: item.val }))}
+                    className={`px-1.5 py-1 rounded border text-left truncate transition ${
+                      currentDraft.queue_reason === item.val
+                        ? 'bg-zinc-200 text-zinc-950 border-white font-semibold'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Dimension: Quality & Environmental Tags */}
+          <div className="flex flex-col gap-1.5 bg-zinc-950/60 border border-zinc-800/80 p-2 rounded">
+            <span className="text-[11px] font-mono text-zinc-400 font-medium">
+              {t.qualityTagsLabel}
             </span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
               {[
-                { val: 'clear' as TrafficLevel, label: t.trafficClear },
-                { val: 'moderate' as TrafficLevel, label: t.trafficModerate },
-                { val: 'heavy' as TrafficLevel, label: t.trafficHeavy },
-                { val: 'gridlock' as TrafficLevel, label: t.trafficGridlock },
-              ].map((item) => (
-                <button
-                  key={item.val}
-                  type="button"
-                  onClick={() => setCurrentDraft((d) => ({ ...d, traffic_level: item.val }))}
-                  className={`text-xs px-2 py-2 rounded border font-mono transition text-left ${
-                    currentDraft.traffic_level === item.val
-                      ? 'bg-zinc-100 text-black border-white font-bold'
-                      : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:border-zinc-600'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+                { tag: 'rain_on_lens' as QualityTag, label: t.tagRainOnLens },
+                { tag: 'night_glare' as QualityTag, label: t.tagNightGlare },
+                { tag: 'occluded' as QualityTag, label: t.tagOccluded },
+                { tag: 'signal_noise' as QualityTag, label: t.tagSignalNoise },
+              ].map((item) => {
+                const isActive = (currentDraft.quality_tags || []).includes(item.tag);
+                return (
+                  <button
+                    key={item.tag}
+                    type="button"
+                    onClick={() => {
+                      const tags = currentDraft.quality_tags || [];
+                      const updated = isActive ? tags.filter((x) => x !== item.tag) : [...tags, item.tag];
+                      setCurrentDraft((d) => ({ ...d, quality_tags: updated }));
+                    }}
+                    className={`px-1.5 py-1 rounded border text-left truncate transition ${
+                      isActive
+                        ? 'bg-zinc-200 text-zinc-950 border-white font-semibold'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Flood Frame Labeler — ProjectKV</title>
+  <title>Directional Traffic & Flood Frame Labeler — ProjectKV</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -31,7 +31,7 @@
       user-select: none;
     }
 
-    /* ── Top bar ─────────────────────────────────────────── */
+    /* Top bar */
     #topbar {
       display: flex;
       align-items: center;
@@ -42,8 +42,7 @@
     }
     #topbar h1 { font-size: 13px; font-weight: 600; letter-spacing: .04em; }
     #progress { color: var(--muted); font-size: 12px; }
-    #open-btn, #export-btn {
-      margin-left: auto;
+    #open-btn, #export-btn, #api-btn, #autoload-btn {
       background: #1e1e1e;
       border: 1px solid #3a3a3a;
       color: #fff;
@@ -53,10 +52,10 @@
       font-size: 12px;
       font-family: inherit;
     }
-    #open-btn:hover, #export-btn:hover { background: #2a2a2a; }
-    #export-btn { margin-left: 6px; }
+    #open-btn:hover, #export-btn:hover, #api-btn:hover, #autoload-btn:hover { background: #2a2a2a; }
+    #topbar-actions { margin-left: auto; display: flex; gap: 6px; }
 
-    /* ── Main area ───────────────────────────────────────── */
+    /* Main area */
     #main {
       display: flex;
       flex: 1;
@@ -64,7 +63,7 @@
       min-height: 0;
     }
 
-    /* ── Image pane ──────────────────────────────────────── */
+    /* Image pane */
     #img-pane {
       flex: 1;
       display: flex;
@@ -104,19 +103,19 @@
     }
     #placeholder svg { opacity: .2; }
 
-    /* ── Sidebar ─────────────────────────────────────────── */
+    /* Sidebar */
     #sidebar {
-      width: 260px;
+      width: 320px;
       flex-shrink: 0;
       border-left: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       overflow-y: auto;
       padding: 14px;
-      gap: 18px;
+      gap: 14px;
     }
 
-    .label-group { display: flex; flex-direction: column; gap: 6px; }
+    .label-group { display: flex; flex-direction: column; gap: 5px; }
     .label-group h2 {
       font-size: 10px;
       font-weight: 600;
@@ -125,13 +124,15 @@
       color: var(--muted);
       padding-bottom: 4px;
       border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
     }
 
     .key-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 5px 7px;
+      padding: 4px 6px;
       border-radius: 3px;
       cursor: pointer;
       border: 1px solid transparent;
@@ -144,30 +145,85 @@
     }
     .key-row.active .key-badge { background: var(--accent-active); color: #000; }
 
-    /* flood-specific active colors */
-    .key-row[data-val="NONE"].active   { border-color: var(--accent-none); }
-    .key-row[data-val="NONE"].active   .key-badge { background: var(--accent-none); color: #000; }
-    .key-row[data-val="SHALLOW"].active { border-color: var(--accent-shallow); }
-    .key-row[data-val="SHALLOW"].active .key-badge { background: var(--accent-shallow); color: #000; }
-    .key-row[data-val="DEEP"].active   { border-color: var(--accent-deep); }
-    .key-row[data-val="DEEP"].active   .key-badge { background: var(--accent-deep); color: #000; }
+    /* waterline-specific active colors */
+    .key-row[data-group="waterline_depth"][data-val="DRY"].active,
+    .key-row[data-group="waterline_depth"][data-val="WET_SURFACE"].active {
+      border-color: var(--accent-none);
+    }
+    .key-row[data-group="waterline_depth"][data-val="DRY"].active .key-badge,
+    .key-row[data-group="waterline_depth"][data-val="WET_SURFACE"].active .key-badge {
+      background: var(--accent-none); color: #000;
+    }
+
+    .key-row[data-group="waterline_depth"][data-val="TIRE_QUARTER_SUBMERGED"].active {
+      border-color: var(--accent-shallow);
+    }
+    .key-row[data-group="waterline_depth"][data-val="TIRE_QUARTER_SUBMERGED"].active .key-badge {
+      background: var(--accent-shallow); color: #000;
+    }
+
+    .key-row[data-group="waterline_depth"][data-val="TIRE_HALF_SUBMERGED"].active,
+    .key-row[data-group="waterline_depth"][data-val="IMPASSABLE"].active {
+      border-color: var(--accent-deep);
+    }
+    .key-row[data-group="waterline_depth"][data-val="TIRE_HALF_SUBMERGED"].active .key-badge,
+    .key-row[data-group="waterline_depth"][data-val="IMPASSABLE"].active .key-badge {
+      background: var(--accent-deep); color: #000;
+    }
 
     .key-badge {
-      min-width: 22px;
-      height: 22px;
+      min-width: 20px;
+      height: 20px;
       background: #2a2a2a;
       border-radius: 3px;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      padding: 0 4px;
     }
-    .key-label { font-size: 12px; color: #ccc; }
+    .key-label { font-size: 11px; color: #ccc; }
     .key-desc  { font-size: 10px; color: var(--muted); margin-left: auto; }
 
-    /* ── Nav + save row ──────────────────────────────────── */
+    /* Checkbox row */
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 6px;
+      cursor: pointer;
+      font-size: 11px;
+      color: #ccc;
+    }
+    .check-row input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: #fff;
+    }
+
+    /* Tag pill list */
+    .pill-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .pill-btn {
+      background: #141414;
+      border: 1px solid #333;
+      color: #888;
+      padding: 2px 7px;
+      border-radius: 2px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .pill-btn.active {
+      background: #2a2a2a;
+      color: #fff;
+      border-color: #666;
+    }
+
+    /* Nav + save row */
     #bottombar {
       border-top: 1px solid var(--border);
       padding: 8px 14px;
@@ -191,7 +247,7 @@
     #save-status { font-size: 12px; color: var(--muted); }
     #hotkey-hint { margin-left: auto; font-size: 11px; color: #444; }
 
-    /* ── Toast ───────────────────────────────────────────── */
+    /* Toast */
     #toast {
       position: fixed;
       bottom: 48px;
@@ -208,36 +264,35 @@
     }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    /* ── Notes textarea ──────────────────────────────────── */
+    /* Inputs */
     #notes {
-      width: 100%;
-      background: #0a0a0a;
-      border: 1px solid var(--border);
-      color: #ccc;
-      padding: 6px 8px;
-      border-radius: 3px;
-      resize: vertical;
-      font-family: inherit;
-      font-size: 11px;
-      min-height: 52px;
-    }
-    #notes:focus { outline: 1px solid #444; }
-
-    /* ── Annotator input ─────────────────────────────────── */
-    #annotator-input {
       width: 100%;
       background: #0a0a0a;
       border: 1px solid var(--border);
       color: #ccc;
       padding: 5px 8px;
       border-radius: 3px;
+      resize: vertical;
+      font-family: inherit;
+      font-size: 11px;
+      min-height: 44px;
+    }
+    #notes:focus { outline: 1px solid #444; }
+
+    #annotator-input {
+      width: 100%;
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+      color: #ccc;
+      padding: 4px 8px;
+      border-radius: 3px;
       font-family: inherit;
       font-size: 11px;
     }
     #annotator-input:focus { outline: 1px solid #444; }
 
-    /* ── Labeled badge in list ───────────────────────────── */
-    .thumb-list { display: flex; flex-direction: column; gap: 3px; max-height: 140px; overflow-y: auto; }
+    /* Thumb list */
+    .thumb-list { display: flex; flex-direction: column; gap: 3px; max-height: 120px; overflow-y: auto; }
     .thumb-item {
       display: flex;
       align-items: center;
@@ -267,15 +322,16 @@
 
 <!-- Top bar -->
 <div id="topbar">
-  <h1>Flood Frame Labeler</h1>
+  <h1>Directional Traffic & Flood Frame Labeler</h1>
   <span id="progress">No frames loaded</span>
-  <button id="api-btn" onclick="loadFromAPI()" style="background:#1e1e1e;border:1px solid #3a3a3a;color:#fff;padding:4px 12px;border-radius:3px;cursor:pointer;font-size:12px;font-family:inherit;">Load from API</button>
-  <button id="autoload-btn" onclick="tryAutoLoadManifest(true)">Auto Load (764 Frames)</button>
-  <button id="open-btn" onclick="openFolder()">Open Folder</button>
-  <input type="file" id="folder-input" webkitdirectory directory multiple style="display:none" onchange="handleFolderSelect(event)" />
-  <button id="export-btn" onclick="exportAll()" style="display:none">Export All JSON</button>
+  <div id="topbar-actions">
+    <button id="api-btn" onclick="loadFromAPI()">Load from API</button>
+    <button id="autoload-btn" onclick="tryAutoLoadManifest(true)">Auto Load Manifest</button>
+    <button id="open-btn" onclick="openFolder()">Open Folder</button>
+    <input type="file" id="folder-input" webkitdirectory directory multiple style="display:none" onchange="handleFolderSelect(event)" />
+    <button id="export-btn" onclick="exportAll()" style="display:none">Export All JSON</button>
+  </div>
 </div>
-
 
 <!-- Main area -->
 <div id="main">
@@ -287,8 +343,8 @@
         <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
         <path d="m21 15-5-5L5 21"/>
       </svg>
-      <span>Open a folder containing JPEG frames</span>
-      <span style="font-size:11px;color:#555">data/proofs/  or  tools/eval/fixtures/frames/</span>
+      <span>Open a folder or load snapshots</span>
+      <span style="font-size:11px;color:#555">data/proofs/YYYY-MM-DD/</span>
     </div>
     <img id="frame-img" style="display:none" alt="frame" />
     <div id="frame-name"></div>
@@ -297,44 +353,100 @@
   <!-- Sidebar -->
   <div id="sidebar">
 
-    <!-- Flood -->
+    <!-- Waterline Depth & Flood -->
     <div class="label-group">
-      <h2>Flood ★ (primary)</h2>
-      <div class="key-row" data-group="flood" data-val="NONE"    onclick="setLabel('flood','NONE')"   >
-        <span class="key-badge">1</span><span class="key-label">NONE</span><span class="key-desc">Dry / spray</span>
+      <h2>Waterline Depth (Physical Anchor)</h2>
+      <div class="key-row" data-group="waterline_depth" data-val="DRY" onclick="setWaterline('DRY')">
+        <span class="key-badge">1</span><span class="key-label">DRY</span><span class="key-desc">0cm dry</span>
       </div>
-      <div class="key-row" data-group="flood" data-val="SHALLOW" onclick="setLabel('flood','SHALLOW')">
-        <span class="key-badge">2</span><span class="key-label">SHALLOW</span><span class="key-desc">Pooling / ankle</span>
+      <div class="key-row" data-group="waterline_depth" data-val="WET_SURFACE" onclick="setWaterline('WET_SURFACE')">
+        <span class="key-badge">2</span><span class="key-label">WET_SURFACE</span><span class="key-desc">Reflection only</span>
       </div>
-      <div class="key-row" data-group="flood" data-val="DEEP"    onclick="setLabel('flood','DEEP')"   >
-        <span class="key-badge">3</span><span class="key-label">DEEP</span><span class="key-desc">Wheel-height+</span>
+      <div class="key-row" data-group="waterline_depth" data-val="TIRE_QUARTER_SUBMERGED" onclick="setWaterline('TIRE_QUARTER_SUBMERGED')">
+        <span class="key-badge">3</span><span class="key-label">TIRE_QUARTER</span><span class="key-desc">5-10cm ankle</span>
+      </div>
+      <div class="key-row" data-group="waterline_depth" data-val="TIRE_HALF_SUBMERGED" onclick="setWaterline('TIRE_HALF_SUBMERGED')">
+        <span class="key-badge">4</span><span class="key-label">TIRE_HALF</span><span class="key-desc">15-20cm hub/exhaust</span>
+      </div>
+      <div class="key-row" data-group="waterline_depth" data-val="IMPASSABLE" onclick="setWaterline('IMPASSABLE')">
+        <span class="key-badge">5</span><span class="key-label">IMPASSABLE</span><span class="key-desc">&gt;25cm engine flooded</span>
       </div>
     </div>
 
-    <!-- Traffic -->
+    <!-- Carriageway Direction -->
     <div class="label-group">
-      <h2>Traffic</h2>
-      <div class="key-row" data-group="traffic" data-val="CLEAR"     onclick="setLabel('traffic','CLEAR')"    >
+      <h2>Carriageway Direction</h2>
+      <div class="key-row" data-group="carriageway_direction" data-val="bidirectional" onclick="setLabel('carriageway_direction','bidirectional')">
+        <span class="key-badge">B</span><span class="key-label">bidirectional</span><span class="key-desc">Two-way</span>
+      </div>
+      <div class="key-row" data-group="carriageway_direction" data-val="inbound" onclick="setLabel('carriageway_direction','inbound')">
+        <span class="key-badge">I</span><span class="key-label">inbound</span><span class="key-desc">Approaching only</span>
+      </div>
+      <div class="key-row" data-group="carriageway_direction" data-val="outbound" onclick="setLabel('carriageway_direction','outbound')">
+        <span class="key-badge">O</span><span class="key-label">outbound</span><span class="key-desc">Receding only</span>
+      </div>
+    </div>
+
+    <!-- Traffic Direction A -->
+    <div class="label-group">
+      <h2>Traffic: Dir A (Near Lane)</h2>
+      <div class="key-row" data-group="traffic_dir_a" data-val="CLEAR" onclick="setTraffic('traffic_dir_a','CLEAR')">
         <span class="key-badge">Q</span><span class="key-label">CLEAR</span>
       </div>
-      <div class="key-row" data-group="traffic" data-val="MODERATE"  onclick="setLabel('traffic','MODERATE')" >
+      <div class="key-row" data-group="traffic_dir_a" data-val="MODERATE" onclick="setTraffic('traffic_dir_a','MODERATE')">
         <span class="key-badge">W</span><span class="key-label">MODERATE</span>
       </div>
-      <div class="key-row" data-group="traffic" data-val="HEAVY"     onclick="setLabel('traffic','HEAVY')"    >
+      <div class="key-row" data-group="traffic_dir_a" data-val="HEAVY" onclick="setTraffic('traffic_dir_a','HEAVY')">
         <span class="key-badge">E</span><span class="key-label">HEAVY</span>
       </div>
-      <div class="key-row" data-group="traffic" data-val="CONGESTED" onclick="setLabel('traffic','CONGESTED')">
+      <div class="key-row" data-group="traffic_dir_a" data-val="CONGESTED" onclick="setTraffic('traffic_dir_a','CONGESTED')">
         <span class="key-badge">R</span><span class="key-label">CONGESTED</span>
+      </div>
+    </div>
+
+    <!-- Traffic Direction B -->
+    <div class="label-group">
+      <h2>Traffic: Dir B (Far Lane)</h2>
+      <div class="key-row" data-group="traffic_dir_b" data-val="CLEAR" onclick="setTraffic('traffic_dir_b','CLEAR')">
+        <span class="key-badge">⇧Q</span><span class="key-label">CLEAR</span>
+      </div>
+      <div class="key-row" data-group="traffic_dir_b" data-val="MODERATE" onclick="setTraffic('traffic_dir_b','MODERATE')">
+        <span class="key-badge">⇧W</span><span class="key-label">MODERATE</span>
+      </div>
+      <div class="key-row" data-group="traffic_dir_b" data-val="HEAVY" onclick="setTraffic('traffic_dir_b','HEAVY')">
+        <span class="key-badge">⇧E</span><span class="key-label">HEAVY</span>
+      </div>
+      <div class="key-row" data-group="traffic_dir_b" data-val="CONGESTED" onclick="setTraffic('traffic_dir_b','CONGESTED')">
+        <span class="key-badge">⇧R</span><span class="key-label">CONGESTED</span>
+      </div>
+      <div class="key-row" data-group="traffic_dir_b" data-val="NOT_APPLICABLE" onclick="setTraffic('traffic_dir_b','NOT_APPLICABLE')">
+        <span class="key-badge">⇧T</span><span class="key-label">N/A</span>
+      </div>
+    </div>
+
+    <!-- Queue & Red Light -->
+    <div class="label-group">
+      <h2>Queue Reason &amp; Red Light</h2>
+      <label class="check-row">
+        <input type="checkbox" id="red-light-check" onchange="toggleRedLight(this.checked)" />
+        <span>Waiting at Red Light [L]</span>
+      </label>
+      <div class="pill-grid">
+        <button class="pill-btn" data-group="queue_reason" data-val="free_flow" onclick="setLabel('queue_reason','free_flow')">free_flow</button>
+        <button class="pill-btn" data-group="queue_reason" data-val="traffic_light" onclick="setLabel('queue_reason','traffic_light')">traffic_light</button>
+        <button class="pill-btn" data-group="queue_reason" data-val="bottleneck" onclick="setLabel('queue_reason','bottleneck')">bottleneck</button>
+        <button class="pill-btn" data-group="queue_reason" data-val="flood_barrier" onclick="setLabel('queue_reason','flood_barrier')">flood_barrier</button>
+        <button class="pill-btn" data-group="queue_reason" data-val="accident" onclick="setLabel('queue_reason','accident')">accident</button>
       </div>
     </div>
 
     <!-- Weather -->
     <div class="label-group">
       <h2>Weather</h2>
-      <div class="key-row" data-group="weather" data-val="dry"        onclick="setLabel('weather','dry')"       >
+      <div class="key-row" data-group="weather" data-val="dry" onclick="setLabel('weather','dry')">
         <span class="key-badge">A</span><span class="key-label">dry</span>
       </div>
-      <div class="key-row" data-group="weather" data-val="rain"       onclick="setLabel('weather','rain')"      >
+      <div class="key-row" data-group="weather" data-val="rain" onclick="setLabel('weather','rain')">
         <span class="key-badge">S</span><span class="key-label">rain</span>
       </div>
       <div class="key-row" data-group="weather" data-val="heavy_rain" onclick="setLabel('weather','heavy_rain')">
@@ -342,13 +454,13 @@
       </div>
     </div>
 
-    <!-- Time of day -->
+    <!-- Time of Day -->
     <div class="label-group">
       <h2>Time of Day</h2>
-      <div class="key-row" data-group="time_of_day" data-val="day"       onclick="setLabel('time_of_day','day')"      >
+      <div class="key-row" data-group="time_of_day" data-val="day" onclick="setLabel('time_of_day','day')">
         <span class="key-badge">Z</span><span class="key-label">day</span>
       </div>
-      <div class="key-row" data-group="time_of_day" data-val="night"     onclick="setLabel('time_of_day','night')"    >
+      <div class="key-row" data-group="time_of_day" data-val="night" onclick="setLabel('time_of_day','night')">
         <span class="key-badge">X</span><span class="key-label">night</span>
       </div>
       <div class="key-row" data-group="time_of_day" data-val="dawn_dusk" onclick="setLabel('time_of_day','dawn_dusk')">
@@ -356,10 +468,21 @@
       </div>
     </div>
 
+    <!-- Quality Tags -->
+    <div class="label-group">
+      <h2>Quality Tags</h2>
+      <div class="pill-grid">
+        <button class="pill-btn" id="tag-rain_on_lens" onclick="toggleQualityTag('rain_on_lens')">rain_on_lens</button>
+        <button class="pill-btn" id="tag-night_glare" onclick="toggleQualityTag('night_glare')">night_glare</button>
+        <button class="pill-btn" id="tag-occluded" onclick="toggleQualityTag('occluded')">occluded</button>
+        <button class="pill-btn" id="tag-signal_noise" onclick="toggleQualityTag('signal_noise')">signal_noise</button>
+      </div>
+    </div>
+
     <!-- Notes -->
     <div class="label-group">
       <h2>Notes</h2>
-      <textarea id="notes" placeholder="Optional: glare, occlusion, landmark…" rows="3"></textarea>
+      <textarea id="notes" placeholder="Optional: capacity, obstruction, landmarks..." rows="2"></textarea>
     </div>
 
     <!-- Annotator -->
@@ -370,7 +493,7 @@
 
     <!-- Save / Skip -->
     <div style="display:flex;gap:6px;">
-      <button class="nav-btn" style="flex:1" onclick="saveAndNext()">Save &amp; Next  [Enter]</button>
+      <button class="nav-btn" style="flex:1" onclick="saveAndNext()">Save &amp; Next [Enter]</button>
       <button class="nav-btn" onclick="skipFrame()" title="Skip without saving [Tab]">Skip</button>
     </div>
 
@@ -385,40 +508,135 @@
 
 <!-- Bottom bar -->
 <div id="bottombar">
-  <button class="nav-btn" id="prev-btn" onclick="navigate(-1)" disabled>← Prev</button>
-  <button class="nav-btn" id="next-btn" onclick="navigate(1)"  disabled>Next →</button>
+  <button class="nav-btn" id="prev-btn" onclick="navigate(-1)" disabled>&larr; Prev</button>
+  <button class="nav-btn" id="next-btn" onclick="navigate(1)" disabled>Next &rarr;</button>
   <span id="save-status"></span>
-  <span id="hotkey-hint">1/2/3 = flood · Q-R = traffic · A-D = weather · Z-C = time · Enter = save</span>
+  <span id="hotkey-hint">1-5 = waterline &middot; Q-R = Dir A &middot; &uArr;Q-&uArr;T = Dir B &middot; L = red light &middot; A-D = weather &middot; Z-C = time</span>
 </div>
 
 <div id="toast"></div>
 
 <script>
-// ── State ────────────────────────────────────────────────────────────────────
+const TRAFFIC_RANKS = {
+  'CLEAR': 1,
+  'MODERATE': 2,
+  'HEAVY': 3,
+  'CONGESTED': 4,
+  'NOT_APPLICABLE': 0,
+};
+
 const state = {
-  frames: [],       // { name, file, handle? }
+  frames: [],
   index: -1,
-  labels: {},       // frameIndex → label object
-  dirHandle: null,  // FileSystemDirectoryHandle for writing
+  labels: {},
+  dirHandle: null,
 };
 
-const HOTKEYS = {
-  '1': ['flood', 'NONE'],
-  '2': ['flood', 'SHALLOW'],
-  '3': ['flood', 'DEEP'],
-  'q': ['traffic', 'CLEAR'],
-  'w': ['traffic', 'MODERATE'],
-  'e': ['traffic', 'HEAVY'],
-  'r': ['traffic', 'CONGESTED'],
-  'a': ['weather', 'dry'],
-  's': ['weather', 'rain'],
-  'd': ['weather', 'heavy_rain'],
-  'z': ['time_of_day', 'day'],
-  'x': ['time_of_day', 'night'],
-  'c': ['time_of_day', 'dawn_dusk'],
-};
+// ── Waterline & Flood ────────────────────────────────────────────────────────
+function setWaterline(val) {
+  if (state.index < 0) return;
+  if (!state.labels[state.index]) state.labels[state.index] = {};
+  const current = state.labels[state.index];
+  current.waterline_depth = val;
 
-// ── Auto-load Manifest (Live Server / HTTP mode) ──────────────────────────────
+  if (val === 'DRY') {
+    current.flood = 'NONE';
+    current.flood_submersion_anchor = 'dry';
+  } else if (val === 'WET_SURFACE') {
+    current.flood = 'NONE';
+    current.flood_submersion_anchor = 'wet_asphalt_no_standing';
+  } else if (val === 'TIRE_QUARTER_SUBMERGED') {
+    current.flood = 'SHALLOW';
+    current.flood_submersion_anchor = 'tire_base_under_10cm';
+  } else if (val === 'TIRE_HALF_SUBMERGED') {
+    current.flood = 'DEEP';
+    current.flood_submersion_anchor = 'exhaust_hub_over_15cm';
+  } else if (val === 'IMPASSABLE') {
+    current.flood = 'DEEP';
+    current.flood_submersion_anchor = 'exhaust_hub_over_15cm';
+  }
+
+  updateSidebarHighlights(current);
+}
+
+// ── Traffic & Directional PCU ─────────────────────────────────────────────────
+function setTraffic(dir, val) {
+  if (state.index < 0) return;
+  if (!state.labels[state.index]) state.labels[state.index] = {};
+  const current = state.labels[state.index];
+  current[dir] = val;
+
+  const rA = TRAFFIC_RANKS[current.traffic_dir_a] || 1;
+  const rB = current.traffic_dir_b === 'NOT_APPLICABLE' ? 0 : (TRAFFIC_RANKS[current.traffic_dir_b] || 1);
+  const maxR = Math.max(rA, rB);
+
+  const rankToTraffic = { 1: 'CLEAR', 2: 'MODERATE', 3: 'HEAVY', 4: 'CONGESTED' };
+  current.traffic = rankToTraffic[maxR] || 'CLEAR';
+
+  updateSidebarHighlights(current);
+}
+
+// ── Label Setter ──────────────────────────────────────────────────────────────
+function setLabel(group, val) {
+  if (state.index < 0) return;
+  if (!state.labels[state.index]) state.labels[state.index] = {};
+  state.labels[state.index][group] = val;
+  if (group === 'queue_reason') {
+    state.labels[state.index].is_waiting_red_light = (val === 'traffic_light');
+  }
+  updateSidebarHighlights(state.labels[state.index]);
+}
+
+function toggleRedLight(checked) {
+  if (state.index < 0) return;
+  if (!state.labels[state.index]) state.labels[state.index] = {};
+  state.labels[state.index].is_waiting_red_light = checked;
+  if (checked) {
+    state.labels[state.index].queue_reason = 'traffic_light';
+  } else if (state.labels[state.index].queue_reason === 'traffic_light') {
+    state.labels[state.index].queue_reason = 'free_flow';
+  }
+  updateSidebarHighlights(state.labels[state.index]);
+}
+
+function toggleQualityTag(tag) {
+  if (state.index < 0) return;
+  if (!state.labels[state.index]) state.labels[state.index] = {};
+  const current = state.labels[state.index];
+  if (!Array.isArray(current.quality_tags)) current.quality_tags = [];
+  const idx = current.quality_tags.indexOf(tag);
+  if (idx >= 0) {
+    current.quality_tags.splice(idx, 1);
+  } else {
+    current.quality_tags.push(tag);
+  }
+  updateSidebarHighlights(current);
+}
+
+function updateSidebarHighlights(saved) {
+  document.querySelectorAll('.key-row').forEach(row => {
+    const g = row.dataset.group;
+    const v = row.dataset.val;
+    row.classList.toggle('active', saved[g] === v);
+  });
+
+  document.querySelectorAll('button[data-group="queue_reason"]').forEach(btn => {
+    btn.classList.toggle('active', saved.queue_reason === btn.dataset.val);
+  });
+
+  const redCheck = document.getElementById('red-light-check');
+  if (redCheck) {
+    redCheck.checked = Boolean(saved.is_waiting_red_light);
+  }
+
+  const tags = saved.quality_tags || [];
+  ['rain_on_lens', 'night_glare', 'occluded', 'signal_noise'].forEach(tag => {
+    const el = document.getElementById('tag-' + tag);
+    if (el) el.classList.toggle('active', tags.includes(tag));
+  });
+}
+
+// ── Auto-load Manifest ────────────────────────────────────────────────────────
 async function tryAutoLoadManifest(explicit = false) {
   try {
     const res = await fetch('manifest.json');
@@ -438,6 +656,7 @@ async function tryAutoLoadManifest(explicit = false) {
       relUrl: item.rel_url || ('../../' + (item.image_url || '').replace(/^\/+/, '')),
       frameId: item.frame_id,
       cameraId: item.camera_id,
+      cameraName: item.camera_name,
       notes: item.notes,
     }));
 
@@ -446,7 +665,7 @@ async function tryAutoLoadManifest(explicit = false) {
       state.labels[idx] = {
         ...item.labels,
         notes: item.notes,
-        annotator: item.annotator || 'sprint4_t3_curator',
+        annotator: item.annotator || 's7_t8_taxonomy_curator',
       };
     });
 
@@ -512,9 +731,8 @@ async function loadFromAPI() {
   }
 }
 
-// ── Open folder ───────────────────────────────────────────────────────────────
+// ── Open Folder ───────────────────────────────────────────────────────────────
 async function openFolder() {
-
   if (window.showDirectoryPicker) {
     try {
       const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
@@ -525,7 +743,6 @@ async function openFolder() {
           files.push({ name, handle: fh });
         }
       }
-      // Recurse up to 2 levels (data/proofs/YYYY-MM-DD/<cam_id>/)
       if (files.length === 0) {
         for await (const [, subHandle] of handle.entries()) {
           if (subHandle.kind !== 'directory') continue;
@@ -554,7 +771,6 @@ async function openFolder() {
       if (err.name !== 'AbortError') toast('Error: ' + err.message);
     }
   } else {
-    // Safari / Firefox fallback: trigger file input
     document.getElementById('folder-input').click();
   }
 }
@@ -575,7 +791,7 @@ function handleFolderSelect(event) {
   toast(`Loaded ${fileList.length} frames via folder picker`);
 }
 
-// ── Navigate ──────────────────────────────────────────────────────────────────
+// ── Navigation ────────────────────────────────────────────────────────────────
 function navigate(delta) {
   const next = state.index + delta;
   if (next < 0 || next >= state.frames.length) return;
@@ -588,7 +804,6 @@ async function loadFrame(idx) {
   if (!frame) return;
 
   const img = document.getElementById('frame-img');
-
   if (frame.imageUrl) {
     img.src = frame.imageUrl;
     img.onerror = () => {
@@ -602,7 +817,7 @@ async function loadFrame(idx) {
     img.src = url;
   } else if (frame.handle) {
     const file = await frame.handle.getFile();
-    const url  = URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
     img.onload = () => URL.revokeObjectURL(url);
     img.src = url;
   }
@@ -611,8 +826,25 @@ async function loadFrame(idx) {
   document.getElementById('placeholder').style.display = 'none';
   document.getElementById('frame-name').textContent = frame.notes ? `${frame.name} — ${frame.notes}` : frame.name;
 
-  // Restore saved labels for this frame
-  const saved = state.labels[idx] || {};
+  // Defaults for frame
+  if (!state.labels[idx]) {
+    state.labels[idx] = {
+      waterline_depth: 'DRY',
+      flood: 'NONE',
+      flood_submersion_anchor: 'dry',
+      carriageway_direction: 'bidirectional',
+      traffic_dir_a: 'CLEAR',
+      traffic_dir_b: 'CLEAR',
+      traffic: 'CLEAR',
+      is_waiting_red_light: false,
+      queue_reason: 'free_flow',
+      weather: 'dry',
+      time_of_day: 'day',
+      quality_tags: [],
+    };
+  }
+
+  const saved = state.labels[idx];
   updateSidebarHighlights(saved);
 
   document.getElementById('notes').value = saved.notes || '';
@@ -624,61 +856,50 @@ async function loadFrame(idx) {
   renderThumbList();
 }
 
-// ── Label ─────────────────────────────────────────────────────────────────────
-function setLabel(group, val) {
-  if (state.index < 0) return;
-  if (!state.labels[state.index]) state.labels[state.index] = {};
-  state.labels[state.index][group] = val;
-  updateSidebarHighlights(state.labels[state.index]);
-}
-
-function updateSidebarHighlights(saved) {
-  document.querySelectorAll('.key-row').forEach(row => {
-    const g = row.dataset.group;
-    const v = row.dataset.val;
-    row.classList.toggle('active', saved[g] === v);
-  });
-}
-
-// ── Save ──────────────────────────────────────────────────────────────────────
+// ── Save & Next ───────────────────────────────────────────────────────────────
 async function saveAndNext() {
   if (state.index < 0 || state.frames.length === 0) return;
 
-  const frame  = state.frames[state.index];
+  const frame = state.frames[state.index];
   const labels = state.labels[state.index] || {};
 
-  const flood = labels.flood;
-  if (!flood) { toast('⚠ Set flood level first (1/2/3)'); return; }
-
-  const annotator = document.getElementById('annotator-input').value.trim() || 'labeler';
-  const notes     = document.getElementById('notes').value.trim();
-
-  // Derive frame_id from file name (strip extension)
-  const frameId = frame.name.replace(/\.[^.]+$/, '');
+  const annotator = document.getElementById('annotator-input').value.trim() || 's7_t8_taxonomy_curator';
+  const notes = document.getElementById('notes').value.trim();
+  const frameId = frame.frameId || frame.name.replace(/\.[^.]+$/, '');
   const ts = new Date().toISOString();
 
   const labelObj = {
-    frame_id:     frameId,
-    image_path:   frame.name,
+    frame_id: frameId,
+    camera_id: frame.cameraId || undefined,
+    camera_name: frame.cameraName || undefined,
+    image_path: frame.imageUrl || ('data/proofs/' + frame.name),
     labels: {
-      traffic:     labels.traffic     || '',
-      flood:       labels.flood       || '',
-      time_of_day: labels.time_of_day || '',
-      weather:     labels.weather     || '',
+      traffic: labels.traffic || 'CLEAR',
+      carriageway_direction: labels.carriageway_direction || 'bidirectional',
+      traffic_dir_a: labels.traffic_dir_a || 'CLEAR',
+      traffic_dir_b: labels.traffic_dir_b || 'CLEAR',
+      is_waiting_red_light: Boolean(labels.is_waiting_red_light),
+      queue_reason: labels.queue_reason || (labels.is_waiting_red_light ? 'traffic_light' : 'free_flow'),
+      flood: labels.flood || 'NONE',
+      waterline_depth: labels.waterline_depth || 'DRY',
+      flood_submersion_anchor: labels.flood_submersion_anchor || 'dry',
+      weather: labels.weather || 'dry',
+      time_of_day: labels.time_of_day || 'day',
+      quality_tags: labels.quality_tags || [],
     },
     annotator,
     annotated_at: ts,
-    notes:        notes || undefined,
+    notes: notes || undefined,
   };
-  // Remove undefined keys
+
+  if (!labelObj.camera_id) delete labelObj.camera_id;
+  if (!labelObj.camera_name) delete labelObj.camera_name;
   if (!labelObj.notes) delete labelObj.notes;
 
   const json = JSON.stringify(labelObj, null, 2) + '\n';
 
-  // Write to directory if available
   if (state.dirHandle) {
     try {
-      // Try to create/open a "labels" sub-folder next to the opened folder
       let outHandle;
       try {
         outHandle = await state.dirHandle.getDirectoryHandle('labels', { create: true });
@@ -686,10 +907,10 @@ async function saveAndNext() {
         outHandle = state.dirHandle;
       }
       const fileHandle = await outHandle.getFileHandle(frameId + '.json', { create: true });
-      const writable   = await fileHandle.createWritable();
+      const writable = await fileHandle.createWritable();
       await writable.write(json);
       await writable.close();
-      document.getElementById('save-status').textContent = `✓ saved ${frameId}.json`;
+      document.getElementById('save-status').textContent = `saved ${frameId}.json`;
     } catch (err) {
       downloadJson(json, frameId + '.json');
     }
@@ -697,7 +918,6 @@ async function saveAndNext() {
     downloadJson(json, frameId + '.json');
   }
 
-  // Persist in memory too
   state.labels[state.index] = { ...labels, annotator, notes };
   renderThumbList();
   navigate(1);
@@ -710,20 +930,30 @@ function skipFrame() {
 // ── Export All ────────────────────────────────────────────────────────────────
 function exportAll() {
   const all = Object.entries(state.labels).map(([idxStr, labels]) => {
-    const idx   = parseInt(idxStr);
+    const idx = parseInt(idxStr);
     const frame = state.frames[idx];
     if (!frame) return null;
-    const frameId = frame.name.replace(/\.[^.]+$/, '');
+    const frameId = frame.frameId || frame.name.replace(/\.[^.]+$/, '');
     return {
-      frame_id:     frameId,
-      image_path:   frame.name,
+      frame_id: frameId,
+      camera_id: frame.cameraId || undefined,
+      camera_name: frame.cameraName || undefined,
+      image_path: frame.imageUrl || ('data/proofs/' + frame.name),
       labels: {
-        traffic:     labels.traffic     || '',
-        flood:       labels.flood       || '',
-        time_of_day: labels.time_of_day || '',
-        weather:     labels.weather     || '',
+        traffic: labels.traffic || 'CLEAR',
+        carriageway_direction: labels.carriageway_direction || 'bidirectional',
+        traffic_dir_a: labels.traffic_dir_a || 'CLEAR',
+        traffic_dir_b: labels.traffic_dir_b || 'CLEAR',
+        is_waiting_red_light: Boolean(labels.is_waiting_red_light),
+        queue_reason: labels.queue_reason || (labels.is_waiting_red_light ? 'traffic_light' : 'free_flow'),
+        flood: labels.flood || 'NONE',
+        waterline_depth: labels.waterline_depth || 'DRY',
+        flood_submersion_anchor: labels.flood_submersion_anchor || 'dry',
+        weather: labels.weather || 'dry',
+        time_of_day: labels.time_of_day || 'day',
+        quality_tags: labels.quality_tags || [],
       },
-      annotator:    labels.annotator || 'labeler',
+      annotator: labels.annotator || 's7_t8_taxonomy_curator',
       annotated_at: new Date().toISOString(),
       ...(labels.notes ? { notes: labels.notes } : {}),
     };
@@ -733,19 +963,19 @@ function exportAll() {
   toast(`Exported ${all.length} labels`);
 }
 
-// ── Thumb list ────────────────────────────────────────────────────────────────
+// ── Thumb List ────────────────────────────────────────────────────────────────
 function renderThumbList() {
   const list = document.getElementById('thumb-list');
   list.innerHTML = '';
   state.frames.forEach((f, i) => {
-    const div  = document.createElement('div');
+    const div = document.createElement('div');
     div.className = 'thumb-item' + (i === state.index ? ' current' : '');
-    const dot  = document.createElement('span');
+    const dot = document.createElement('span');
     dot.className = 'thumb-dot';
-    const lbl  = state.labels[i];
+    const lbl = state.labels[i];
     if (lbl?.flood === 'SHALLOW') dot.classList.add('labeled', 'flood-shallow');
     else if (lbl?.flood === 'DEEP') dot.classList.add('labeled', 'flood-deep');
-    else if (lbl?.flood)           dot.classList.add('labeled');
+    else if (lbl?.flood) dot.classList.add('labeled');
     const name = document.createElement('span');
     name.className = 'thumb-name';
     name.textContent = f.name;
@@ -753,15 +983,13 @@ function renderThumbList() {
     div.onclick = () => { state.index = i; loadFrame(i); };
     list.append(div);
   });
-  // Scroll current into view
   const cur = list.querySelector('.current');
   if (cur) cur.scrollIntoView({ block: 'nearest' });
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function downloadJson(json, filename) {
-  const a   = document.createElement('a');
-  a.href    = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
@@ -776,38 +1004,72 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
-// ── Keyboard ──────────────────────────────────────────────────────────────────
+// ── Keyboard Shortcuts ────────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
-  // Don't intercept when typing in inputs
   if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
 
   const key = e.key.toLowerCase();
 
   if (e.key === 'Enter') { e.preventDefault(); saveAndNext(); return; }
-  if (e.key === 'Tab')   { e.preventDefault(); skipFrame();   return; }
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { navigate(1);  return; }
-  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { navigate(-1); return; }
+  if (e.key === 'Tab') { e.preventDefault(); skipFrame(); return; }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { navigate(1); return; }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { navigate(-1); return; }
 
-  const binding = HOTKEYS[key];
-  if (binding) {
+  // Waterline depth (1-5)
+  if (e.key === '1') { e.preventDefault(); setWaterline('DRY'); return; }
+  if (e.key === '2') { e.preventDefault(); setWaterline('WET_SURFACE'); return; }
+  if (e.key === '3') { e.preventDefault(); setWaterline('TIRE_QUARTER_SUBMERGED'); return; }
+  if (e.key === '4') { e.preventDefault(); setWaterline('TIRE_HALF_SUBMERGED'); return; }
+  if (e.key === '5') { e.preventDefault(); setWaterline('IMPASSABLE'); return; }
+
+  // Red light toggle (L)
+  if (key === 'l') {
     e.preventDefault();
-    setLabel(binding[0], binding[1]);
+    const cur = state.labels[state.index]?.is_waiting_red_light || false;
+    toggleRedLight(!cur);
+    return;
   }
+
+  // Carriageway direction (B, I, O)
+  if (key === 'b') { e.preventDefault(); setLabel('carriageway_direction', 'bidirectional'); return; }
+  if (key === 'i') { e.preventDefault(); setLabel('carriageway_direction', 'inbound'); return; }
+  if (key === 'o') { e.preventDefault(); setLabel('carriageway_direction', 'outbound'); return; }
+
+  // Direction B (Shift + Q/W/E/R/T)
+  if (e.shiftKey) {
+    if (key === 'q') { e.preventDefault(); setTraffic('traffic_dir_b', 'CLEAR'); return; }
+    if (key === 'w') { e.preventDefault(); setTraffic('traffic_dir_b', 'MODERATE'); return; }
+    if (key === 'e') { e.preventDefault(); setTraffic('traffic_dir_b', 'HEAVY'); return; }
+    if (key === 'r') { e.preventDefault(); setTraffic('traffic_dir_b', 'CONGESTED'); return; }
+    if (key === 't') { e.preventDefault(); setTraffic('traffic_dir_b', 'NOT_APPLICABLE'); return; }
+  }
+
+  // Direction A (Q/W/E/R)
+  if (key === 'q') { e.preventDefault(); setTraffic('traffic_dir_a', 'CLEAR'); return; }
+  if (key === 'w') { e.preventDefault(); setTraffic('traffic_dir_a', 'MODERATE'); return; }
+  if (key === 'e') { e.preventDefault(); setTraffic('traffic_dir_a', 'HEAVY'); return; }
+  if (key === 'r') { e.preventDefault(); setTraffic('traffic_dir_a', 'CONGESTED'); return; }
+
+  // Weather (A/S/D)
+  if (key === 'a') { e.preventDefault(); setLabel('weather', 'dry'); return; }
+  if (key === 's') { e.preventDefault(); setLabel('weather', 'rain'); return; }
+  if (key === 'd') { e.preventDefault(); setLabel('weather', 'heavy_rain'); return; }
+
+  // Time of Day (Z/X/C)
+  if (key === 'z') { e.preventDefault(); setLabel('time_of_day', 'day'); return; }
+  if (key === 'x') { e.preventDefault(); setLabel('time_of_day', 'night'); return; }
+  if (key === 'c') { e.preventDefault(); setLabel('time_of_day', 'dawn_dusk'); return; }
 });
 
-// ── Annotator persistence ─────────────────────────────────────────────────────
+// Annotator persistence
 const stored = localStorage.getItem('kv_labeler_annotator');
 if (stored) document.getElementById('annotator-input').value = stored;
 document.getElementById('annotator-input').addEventListener('change', (e) => {
   localStorage.setItem('kv_labeler_annotator', e.target.value);
 });
 
-// ── Auto-load if served via HTTP server (Live Server) ─────────────────────────
 if (window.location.protocol.startsWith('http')) {
-  window.addEventListener('DOMContentLoaded', () => {
-    tryAutoLoadManifest(false);
-  });
-  // Also invoke directly in case DOM is already ready
+  window.addEventListener('DOMContentLoaded', () => tryAutoLoadManifest(false));
   tryAutoLoadManifest(false);
 }
 </script>

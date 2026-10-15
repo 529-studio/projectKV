@@ -72,6 +72,7 @@ hcm-traffic-cameras/
 │   ├── go-server/                     # [BACKEND — Go] Single static binary (Gin + SQLite + R2 Storage)
 │   │   ├── cmd/
 │   │   │   ├── server/main.go         # Composition root, routing, graceful shutdown
+│   │   │   ├── sync-proofs/main.go    # High-concurrency Cloudflare R2 proofs sync CLI
 │   │   │   └── verify-r2/main.go      # Cloudflare R2 connectivity verification tool
 │   │   └── internal/
 │   │       ├── live/                  # Server-Sent Events (SSE) hub & live stream endpoint
@@ -89,6 +90,9 @@ hcm-traffic-cameras/
 │       └── api.py                     # Multi-threaded OpenVINO detection endpoint (:8000)
 │
 ├── tools/
+│   ├── eval/                          # [EVALUATION] Ground-truth benchmarks & label curation
+│   │   ├── label_curator.py           # Taxonomy curation and legacy label cleansing
+│   │   └── benchmark.py               # PCU & flood accuracy evaluation harness
 │   ├── storage/                       # [OBJECT STORAGE] Cloudflare R2 verification tooling
 │   │   └── verify_r2.py               # Boto3 / R2 connectivity verification script
 │   ├── geo-enrich/                    # [GEO ENRICHMENT] Batch Phường point-in-polygon tool
@@ -175,6 +179,7 @@ make dev-all
 *   **Clean Standard OSM Basemap**: OpenStreetMap tiles, no watermark, geographically constrained to Southeastern Vietnam (`maxBounds`).
 *   **Chained Deep Filter**: Multi-tier faceted filtering — *Zone* ➔ *Road / Corridor* ➔ *Intersection / Node*.
 *   **Multi-Camera Corridor Tracking Dock**: Pin cameras into the bottom tracking dock with synchronized snapshot refresh.
+*   **Directional Multi-Lane Taxonomy & Physical Flood Markers**: Classifies traffic density independently by direction (Direction A approaching vs Direction B receding) to resolve asymmetric divided boulevards, and anchors flood severity strictly to physical tire/wheel depth markers.
 *   **Responsive Layout (100dvh)**: Desktop, tablet, and smartphone friendly with collapsible legend and mobile bottom-sheet drawer.
 *   **Go Backend**: Single static binary, no runtime dependency install, in-memory + SQLite state, goroutine-based Hot Set scheduler.
 *   **Cloudflare R2 Object Storage**: S3-compatible cloud storage (`warded-proofs`) for snapshot proofs, distributed via edge CDN (`https://file.529studio.site`) for centralized team labeling workflows.

@@ -1,0 +1,23 @@
+{
+  "frame_id": "cam_587c79e9b807da0011e33d3d_1792045066",
+  "camera_id": "587c79e9b807da0011e33d3d",
+  "camera_name": "Điện Biên Phủ - Nguyễn Văn Thương 2",
+  "image_path": "data/proofs/2026-10-15/587c79e9b807da0011e33d3d/1792045066_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "carriageway_direction": "bidirectional",
+    "traffic_dir_a": "CLEAR",
+    "traffic_dir_b": "CLEAR",
+    "is_waiting_red_light": false,
+    "queue_reason": "free_flow",
+    "flood": "NONE",
+    "waterline_depth": "WET_SURFACE",
+    "flood_submersion_anchor": "wet_asphalt_no_standing",
+    "weather": "rain",
+    "time_of_day": "day",
+    "quality_tags": []
+  },
+  "annotator": "s7_t8_taxonomy_curator",
+  "annotated_at": "2026-10-15T06:56:40.833723+00:00",
+  "notes": "Curated via S7-T8 taxonomy. Base capacity: 35.0 PCU. Camera: Điện Biên Phủ - Nguyễn Văn Thương 2"
+}

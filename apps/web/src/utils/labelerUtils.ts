@@ -1,11 +1,29 @@
 export type FloodLevel = 'none' | 'puddle' | 'deep';
 export type TrafficLevel = 'clear' | 'moderate' | 'heavy' | 'gridlock';
+export type DirectionalTrafficLevel = 'clear' | 'moderate' | 'heavy' | 'congested' | 'not_applicable';
+export type FloodSubmersionAnchor =
+  | 'dry'
+  | 'wet_asphalt_no_standing'
+  | 'tire_base_under_10cm'
+  | 'exhaust_hub_over_15cm';
+export type QueueReason =
+  | 'free_flow'
+  | 'traffic_light'
+  | 'bottleneck'
+  | 'flood_barrier'
+  | 'accident';
+export type QualityTag = 'rain_on_lens' | 'night_glare' | 'occluded' | 'signal_noise';
 export type Weather = 'clear' | 'rain' | 'fog';
 export type TimeOfDay = 'day' | 'dusk' | 'night';
 
 export interface LabelState {
   flood_level?: FloodLevel;
   traffic_level?: TrafficLevel;
+  traffic_dir_a?: DirectionalTrafficLevel;
+  traffic_dir_b?: DirectionalTrafficLevel;
+  queue_reason?: QueueReason;
+  flood_submersion_anchor?: FloodSubmersionAnchor;
+  quality_tags?: QualityTag[];
   weather?: Weather;
   time_of_day?: TimeOfDay;
   notes?: string;
@@ -40,7 +58,6 @@ export interface HotkeyResult {
  */
 export function handleHotkey(key: string, current: LabelState): HotkeyResult {
   const next: LabelState = { ...current };
-  const lower = key.toLowerCase();
 
   // Navigation & Submission
   if (key === 'ArrowLeft') {
@@ -53,39 +70,69 @@ export function handleHotkey(key: string, current: LabelState): HotkeyResult {
     return { state: next, action: 'save' };
   }
 
-  // 1-3: Flood Level
+  // 1-3: Flood Level & Physical Submersion Anchor
   if (key === '1') {
     next.flood_level = 'none';
+    next.flood_submersion_anchor = 'dry';
     return { state: next };
   }
   if (key === '2') {
     next.flood_level = 'puddle';
+    next.flood_submersion_anchor = 'tire_base_under_10cm';
     return { state: next };
   }
   if (key === '3') {
     next.flood_level = 'deep';
+    next.flood_submersion_anchor = 'exhaust_hub_over_15cm';
     return { state: next };
   }
 
-  // Q-W-E-R: Traffic Level
-  if (lower === 'q') {
+  // Shift + Q-W-E-R-T: Direction B (Far lane / Receding flow)
+  if (key === 'Q') {
+    next.traffic_dir_b = 'clear';
+    return { state: next };
+  }
+  if (key === 'W') {
+    next.traffic_dir_b = 'moderate';
+    return { state: next };
+  }
+  if (key === 'E') {
+    next.traffic_dir_b = 'heavy';
+    return { state: next };
+  }
+  if (key === 'R') {
+    next.traffic_dir_b = 'congested';
+    return { state: next };
+  }
+  if (key === 'T') {
+    next.traffic_dir_b = 'not_applicable';
+    return { state: next };
+  }
+
+  // q-w-e-r: Direction A (Primary / Near lane) & Global Traffic Level rollup
+  if (key.toLowerCase() === 'q' && key !== 'Q') {
     next.traffic_level = 'clear';
+    next.traffic_dir_a = 'clear';
     return { state: next };
   }
-  if (lower === 'w') {
+  if (key.toLowerCase() === 'w' && key !== 'W') {
     next.traffic_level = 'moderate';
+    next.traffic_dir_a = 'moderate';
     return { state: next };
   }
-  if (lower === 'e') {
+  if (key.toLowerCase() === 'e' && key !== 'E') {
     next.traffic_level = 'heavy';
+    next.traffic_dir_a = 'heavy';
     return { state: next };
   }
-  if (lower === 'r') {
+  if (key.toLowerCase() === 'r' && key !== 'R') {
     next.traffic_level = 'gridlock';
+    next.traffic_dir_a = 'congested';
     return { state: next };
   }
 
   // A-S-D: Weather
+  const lower = key.toLowerCase();
   if (lower === 'a') {
     next.weather = 'clear';
     return { state: next };
@@ -117,12 +164,12 @@ export function handleHotkey(key: string, current: LabelState): HotkeyResult {
 }
 
 /**
- * Checks if a snapshot label has all 4 required dimensions populated.
+ * Checks if a snapshot label has all required dimensions populated.
  */
 export function isLabelComplete(label: Partial<LabelState>): boolean {
   return Boolean(
     label.flood_level &&
-    label.traffic_level &&
+    (label.traffic_level || label.traffic_dir_a) &&
     label.weather &&
     label.time_of_day
   );
@@ -161,13 +208,31 @@ export const LABELER_I18N = {
     loading: 'Đang tải danh sách ảnh...',
     floodLabel: 'Mức độ ngập (Phím 1-3)',
     floodNone: '1: Khô ráo',
-    floodPuddle: '2: Vũng nước / Mấp mé',
-    floodDeep: '3: Ngập sâu (Nửa bánh+)',
-    trafficLabel: 'Mật độ giao thông (Phím Q-R)',
-    trafficClear: 'Q: Thông thoáng',
-    trafficModerate: 'W: Bình thường',
-    trafficHeavy: 'E: Đông đúc',
-    trafficGridlock: 'R: Kẹt xe / Đứng yên',
+    floodPuddle: '2: Vũng nước / Mấp mé (<10cm)',
+    floodDeep: '3: Ngập sâu (Quá nửa bánh/ống xả >15cm)',
+    floodSubmersionLabel: 'Mỏ neo ngập vật lý',
+    anchorDry: 'Khô ráo / Không đọng nước',
+    anchorWetNoStanding: 'Ướt phản chiếu, không ngập',
+    anchorTireBase: 'Ngập mấp mé đế bánh xe (<10cm)',
+    anchorExhaustHub: 'Ngập trục bánh / ống bô (>15cm)',
+    trafficLabel: 'Mật độ giao thông (Phím q-r)',
+    trafficClear: 'q: Thông thoáng',
+    trafficModerate: 'w: Bình thường',
+    trafficHeavy: 'e: Rất đông',
+    trafficGridlock: 'r: Kẹt xe / Tắc đường',
+    trafficDirALabel: 'Chiều A / Làn gần (Phím q-r)',
+    trafficDirBLabel: 'Chiều B / Làn xa (Shift + Q-R / T)',
+    trafficNotApplicable: 'T: Không áp dụng',
+    queueReasonLabel: 'Nguyên nhân dừng xe',
+    reasonFreeFlow: 'Lưu thông tự do',
+    reasonTrafficLight: 'Chờ đèn đỏ (tạm thời)',
+    reasonBottleneck: 'Ùn ứ nút giao',
+    reasonFloodBarrier: 'Ngập chắn đường',
+    qualityTagsLabel: 'Chất lượng ảnh & Môi trường',
+    tagRainOnLens: 'Mưa bám ống kính',
+    tagNightGlare: 'Lóa đèn pha đêm',
+    tagOccluded: 'Bị che khuất',
+    tagSignalNoise: 'Nhiễu tín hiệu',
     weatherLabel: 'Thời tiết (Phím A-D)',
     weatherClear: 'A: Nắng ráo',
     weatherRain: 'S: Mưa',
@@ -204,13 +269,31 @@ export const LABELER_I18N = {
     loading: 'Loading snapshot catalog...',
     floodLabel: 'Flood Level (Keys 1-3)',
     floodNone: '1: None',
-    floodPuddle: '2: Puddle / Ankle-deep',
-    floodDeep: '3: Deep (Half-wheel+)',
-    trafficLabel: 'Traffic Density (Keys Q-R)',
-    trafficClear: 'Q: Clear',
-    trafficModerate: 'W: Moderate',
-    trafficHeavy: 'E: Heavy',
-    trafficGridlock: 'R: Gridlock / Standstill',
+    floodPuddle: '2: Shallow / Ankle-deep (<10cm)',
+    floodDeep: '3: Deep (Half-wheel/exhaust >15cm)',
+    floodSubmersionLabel: 'Physical Flood Depth Anchor',
+    anchorDry: 'Dry / No water pooling',
+    anchorWetNoStanding: 'Wet sheen / reflection, zero depth',
+    anchorTireBase: 'Tire contact patch submerged (<10cm)',
+    anchorExhaustHub: 'Wheel hub / exhaust submerged (>15cm)',
+    trafficLabel: 'Traffic Density (Keys q-r)',
+    trafficClear: 'q: Clear',
+    trafficModerate: 'w: Moderate',
+    trafficHeavy: 'e: Heavy',
+    trafficGridlock: 'r: Congested / Gridlock',
+    trafficDirALabel: 'Direction A / Near Lane (Keys q-r)',
+    trafficDirBLabel: 'Direction B / Far Lane (Shift + Q-R / T)',
+    trafficNotApplicable: 'T: Not Applicable',
+    queueReasonLabel: 'Traffic Queuing Reason',
+    reasonFreeFlow: 'Free flow',
+    reasonTrafficLight: 'Traffic light red phase',
+    reasonBottleneck: 'Bottleneck',
+    reasonFloodBarrier: 'Flooding blockage',
+    qualityTagsLabel: 'Image Quality & Environmental Tags',
+    tagRainOnLens: 'Rain on lens',
+    tagNightGlare: 'Night headlight glare',
+    tagOccluded: 'Occluded / Blocked',
+    tagSignalNoise: 'Signal compression noise',
     weatherLabel: 'Weather (Keys A-D)',
     weatherClear: 'A: Clear',
     weatherRain: 'S: Rain',
@@ -272,4 +355,3 @@ export function buildAuthHeaders(token: string, baseHeaders?: Record<string, str
   }
   return headers;
 }
-

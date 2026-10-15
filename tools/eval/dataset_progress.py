@@ -93,7 +93,19 @@ def load_schema(schema_path: Path) -> Dict[str, List[str]]:
     if not schema_path.exists():
         raise FileNotFoundError(f"Schema file not found: {schema_path}")
     with open(schema_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    if isinstance(data, dict):
+        if "properties" in data and "labels" in data["properties"]:
+            props = data["properties"]["labels"].get("properties", {})
+            enums: Dict[str, List[str]] = {}
+            for k, v in props.items():
+                if isinstance(v, dict) and "enum" in v:
+                    enums[k] = v["enum"]
+            if enums:
+                return enums
+        if "categories" in data and isinstance(data["categories"], dict):
+            return data["categories"]
+    return data
 
 
 def parse_label_file(file_path: Path, schema: Dict[str, List[str]]) -> FrameLabel:
