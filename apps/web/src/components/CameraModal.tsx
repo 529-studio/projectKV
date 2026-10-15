@@ -1,12 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
-import { API_ENDPOINTS, FLOOD_VERIFY_I18N, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
+import { API_ENDPOINTS, FLOOD_REPORT_I18N, FLOOD_VERIFY_I18N, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
 import { getFloodSeverityLabel } from '../utils/floodUtils';
 import {
   calculateCooldownRemaining,
   getFloodVerifyButtonText,
   isFloodVerifyDisabled,
+  getFloodReportButtonText,
+  isFloodReportDisabled,
+  getCameraReportCooldown,
+  setCameraReportCooldown,
 } from '../utils/cameraModalUtils';
 
 // Module-level timestamp tracking so 15s cooldown persists across modal closes and reopens (Issue #223)
@@ -65,6 +69,11 @@ export default function CameraModal({
     verified_at: string;
   } | null>(null);
   const [floodVerifyError, setFloodVerifyError] = useState<string | null>(null);
+  const [isReportingFlood, setIsReportingFlood] = useState(false);
+  const [reportCooldownRemaining, setReportCooldownRemaining] = useState<number>(() =>
+    camera?.id ? getCameraReportCooldown(camera.id) : 0
+  );
+  const [floodReportFeedback, setFloodReportFeedback] = useState<{ text: string; isError?: boolean } | null>(null);
   const mountTimeRef = useRef<number>(Date.now());
   // Camera id whose ghost probe is currently in flight (prevents duplicate probes).
   const probeInFlightRef = useRef<string | null>(null);
@@ -84,6 +93,21 @@ export default function CameraModal({
     return () => clearInterval(timer);
   }, [cooldownRemaining]);
 
+  // Active 1-second interval countdown for 30s human report cooldown (Issue #248 / S7-T3)
+  useEffect(() => {
+    if (reportCooldownRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setReportCooldownRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [reportCooldownRemaining]);
+
   // Auto-dismiss verification error after 4 seconds to maintain clean UI (Option A)
   useEffect(() => {
     if (!floodVerifyError) return;
@@ -92,6 +116,15 @@ export default function CameraModal({
     }, 4000);
     return () => clearTimeout(timer);
   }, [floodVerifyError]);
+
+  // Auto-dismiss flood report feedback chip after 3 seconds (Issue #248 / S7-T3)
+  useEffect(() => {
+    if (!floodReportFeedback) return;
+    const timer = setTimeout(() => {
+      setFloodReportFeedback(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [floodReportFeedback]);
 
   useEffect(() => {
     mountTimeRef.current = Date.now();
@@ -103,6 +136,9 @@ export default function CameraModal({
     setFloodVerifyResult(null);
     setFloodVerifyError(null);
     setCooldownRemaining(calculateCooldownRemaining(lastFloodVerifyTimestamp));
+    setIsReportingFlood(false);
+    setFloodReportFeedback(null);
+    setReportCooldownRemaining(camera?.id ? getCameraReportCooldown(camera.id) : 0);
     if (typeof window !== 'undefined') {
       window.getSelection()?.removeAllRanges();
     }
@@ -142,6 +178,45 @@ export default function CameraModal({
       setIsVerifyingFlood(false);
     }
   }, [camera?.id, isVerifyingFlood, cooldownRemaining, lang]);
+
+  const handleReportFlood = useCallback(async () => {
+    if (!camera?.id || isReportingFlood || reportCooldownRemaining > 0) return;
+    setCameraReportCooldown(camera.id, Date.now());
+    setReportCooldownRemaining(30);
+    setIsReportingFlood(true);
+    setFloodReportFeedback(null);
+
+    try {
+      const url = getApiUrl(API_ENDPOINTS.REPORT_FLOOD(camera.id));
+      const res = await fetch(url, { method: 'POST' });
+      if (res.ok || res.status === 200 || res.status === 201) {
+        setFloodReportFeedback({
+          text: lang === 'vi' ? FLOOD_REPORT_I18N.SUCCESS_CHIP.vi : FLOOD_REPORT_I18N.SUCCESS_CHIP.en,
+          isError: false,
+        });
+      } else if (res.status === 429) {
+        setFloodReportFeedback({
+          text: lang === 'vi' ? FLOOD_REPORT_I18N.RATE_LIMITED.vi : FLOOD_REPORT_I18N.RATE_LIMITED.en,
+          isError: false,
+        });
+      } else {
+        setFloodReportFeedback({
+          text: lang === 'vi' ? FLOOD_REPORT_I18N.ERROR_GENERIC.vi : FLOOD_REPORT_I18N.ERROR_GENERIC.en,
+          isError: true,
+        });
+      }
+    } catch (err) {
+      if (typeof window !== 'undefined') {
+        console.warn('[report-flood] network error:', err);
+      }
+      setFloodReportFeedback({
+        text: lang === 'vi' ? FLOOD_REPORT_I18N.ERROR_GENERIC.vi : FLOOD_REPORT_I18N.ERROR_GENERIC.en,
+        isError: true,
+      });
+    } finally {
+      setIsReportingFlood(false);
+    }
+  }, [camera?.id, isReportingFlood, reportCooldownRemaining, lang]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target !== e.currentTarget) return;
@@ -462,6 +537,55 @@ export default function CameraModal({
                     )}
                   </span>
                 </button>
+
+                {/* Secondary Tactile Action Button: Human-in-the-Loop Report Flood (Issue #248 / S7-T3) */}
+                <button
+                  type="button"
+                  onClick={handleReportFlood}
+                  disabled={isFloodReportDisabled({ isReporting: isReportingFlood, cooldownRemaining: reportCooldownRemaining })}
+                  className={`px-2.5 py-1 rounded text-xs font-mono font-medium tracking-wide inline-flex items-center gap-1.5 border transition-all select-none shadow-sm ${
+                    isFloodReportDisabled({ isReporting: isReportingFlood, cooldownRemaining: reportCooldownRemaining })
+                      ? 'bg-zinc-900/60 text-zinc-600 border-zinc-800 cursor-not-allowed opacity-60 shadow-none'
+                      : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700 hover:border-zinc-500 active:scale-[0.98] cursor-pointer'
+                  }`}
+                  title={
+                    reportCooldownRemaining > 0
+                      ? (lang === 'vi'
+                          ? `Đã ghi nhận báo cáo. Vui lòng đợi ${reportCooldownRemaining}s trước khi gửi lại`
+                          : `Report recorded. Please wait ${reportCooldownRemaining}s before reporting again`)
+                      : (lang === 'vi'
+                          ? 'Báo cáo thực địa ngập nước tại vị trí camera này'
+                          : 'Report local street flooding at this camera location')
+                  }
+                >
+                  <svg
+                    className="w-3.5 h-3.5 shrink-0 text-zinc-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  <span>
+                    {getFloodReportButtonText(
+                      { isReporting: isReportingFlood, cooldownRemaining: reportCooldownRemaining },
+                      lang
+                    )}
+                  </span>
+                </button>
+
+                {/* PASSIVE REPORT FEEDBACK CHIP (Auto-dismisses in 3s, subtle monochromatic zinc) */}
+                {floodReportFeedback && (
+                  <span className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-900 text-zinc-300 text-xs font-mono select-none">
+                    [{floodReportFeedback.text}]
+                  </span>
+                )}
 
                 {/* PASSIVE VLM VERDICT BADGE */}
                 {floodVerifyResult && (
