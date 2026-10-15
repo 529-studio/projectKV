@@ -2,7 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
 import { API_ENDPOINTS, FLOOD_REPORT_I18N, FLOOD_VERIFY_I18N, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
-import { getFloodSeverityLabel } from '../utils/floodUtils';
+import {
+  FLOOD_MODAL_I18N,
+  isDryRoadSeverity,
+  isWetRoadSeverity,
+} from '../utils/floodUtils';
 import {
   calculateCooldownRemaining,
   getFloodVerifyButtonText,
@@ -458,19 +462,67 @@ export default function CameraModal({
                       [{lang === 'vi' ? VERDICT_I18N.DEMO_BADGE.vi : VERDICT_I18N.DEMO_BADGE.en}]
                     </span>
                   )}
-                  {verdict?.flood_severity && verdict.flood_severity !== 'DRY' && verdict.flood_severity !== 'UNKNOWN' && (
-                    <span
-                      className="px-2 py-0.5 rounded border border-sky-500/80 bg-sky-500/20 text-sky-300 text-xs font-bold inline-flex items-center gap-1.5"
-                      title={lang === 'vi' ? 'Tình trạng mưa / ngập nước thực địa' : 'Local rain / flood status'}
-                    >
-                      <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
-                        <path d="M16 14v6" />
-                        <path d="M8 14v6" />
-                        <path d="M12 16v6" />
-                      </svg>
-                      <span>{getFloodSeverityLabel(verdict.flood_severity, lang)}</span>
-                    </span>
+                  {verdict?.flood_severity && verdict.flood_severity.toUpperCase().trim() !== 'UNKNOWN' && (
+                    <>
+                      {isDryRoadSeverity(verdict.flood_severity) && (
+                        <span
+                          className="px-2 py-0.5 rounded border border-emerald-600/70 bg-emerald-950/20 text-emerald-400 text-xs font-bold inline-flex items-center gap-1.5"
+                          title={FLOOD_MODAL_I18N.DRY.title[lang]}
+                        >
+                          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="4" />
+                            <path d="M12 2v2" />
+                            <path d="M12 20v2" />
+                            <path d="m4.93 4.93 1.41 1.41" />
+                            <path d="m17.66 17.66 1.41 1.41" />
+                            <path d="M2 12h2" />
+                            <path d="M20 12h2" />
+                            <path d="m6.34 17.66-1.41 1.41" />
+                            <path d="m19.07 4.93-1.41 1.41" />
+                          </svg>
+                          <span>{FLOOD_MODAL_I18N.DRY[lang]}</span>
+                        </span>
+                      )}
+                      {isWetRoadSeverity(verdict.flood_severity) && (
+                        <span
+                          className="px-2 py-0.5 rounded border border-sky-500/80 bg-sky-950/30 text-sky-300 text-xs font-bold inline-flex items-center gap-1.5"
+                          title={FLOOD_MODAL_I18N.WET.title[lang]}
+                        >
+                          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+                            <path d="M16 14v6" />
+                            <path d="M8 14v6" />
+                            <path d="M12 16v6" />
+                          </svg>
+                          <span>{FLOOD_MODAL_I18N.WET[lang]}</span>
+                        </span>
+                      )}
+                      {verdict.flood_severity.toUpperCase().trim() === 'FLOODED_SHALLOW' && (
+                        <span
+                          className="px-2 py-0.5 rounded border border-amber-500/80 bg-amber-950/60 text-amber-300 text-xs font-bold inline-flex items-center gap-1.5"
+                          title={FLOOD_MODAL_I18N.FLOODED_SHALLOW.title[lang]}
+                        >
+                          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M2 12c1.5 0 3-1 4.5-1s3 1 4.5 1 3-1 4.5-1 3 1 4.5 1 3-1 4.5-1" />
+                            <path d="M2 18c1.5 0 3-1 4.5-1s3 1 4.5 1 3-1 4.5-1 3 1 4.5 1 3-1 4.5-1" />
+                          </svg>
+                          <span>{FLOOD_MODAL_I18N.FLOODED_SHALLOW[lang]}</span>
+                        </span>
+                      )}
+                      {verdict.flood_severity.toUpperCase().trim() === 'FLOODED_DEEP' && (
+                        <span
+                          className="px-2 py-0.5 rounded border border-rose-500/80 bg-rose-950/60 text-rose-300 text-xs font-bold inline-flex items-center gap-1.5"
+                          title={FLOOD_MODAL_I18N.FLOODED_DEEP.title[lang]}
+                        >
+                          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          <span>{FLOOD_MODAL_I18N.FLOODED_DEEP[lang]}</span>
+                        </span>
+                      )}
+                    </>
                   )}
                 </>
               )}

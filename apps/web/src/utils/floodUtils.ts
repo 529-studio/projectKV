@@ -64,24 +64,32 @@ export const FLOOD_I18N = Object.freeze({
     en: 'Area Weather',
   },
   DEEP_WATER: {
-    vi: 'Mưa to (nguy cơ ngập)',
-    en: 'Heavy rain (flood risk)',
+    vi: 'Ngập sâu lòng đường',
+    en: 'Deep roadway flood',
   },
   SHALLOW_WATER: {
-    vi: 'Mưa vừa',
-    en: 'Moderate rain',
+    vi: 'Ngập nông mép đường',
+    en: 'Shallow curbside flood',
   },
   WET_ROAD: {
-    vi: 'Mưa nhẹ',
-    en: 'Light rain',
+    vi: 'Đường ướt (chưa ngập)',
+    en: 'Wet road (no flood)',
   },
   DRY_ROAD: {
-    vi: 'Khô ráo',
+    vi: 'Đường khô ráo',
     en: 'Dry road',
   },
   UNKNOWN_STATUS: {
     vi: 'Chưa xác minh',
     en: 'Unverified / Unknown',
+  },
+  STATUS_DRY_CITYWIDE: {
+    vi: 'TOÀN THÀNH PHỐ: Các tuyến đường khô ráo — Không ghi nhận ngập',
+    en: 'CITYWIDE: Roadways dry — No flooding reported',
+  },
+  STATUS_WET_CITYWIDE: {
+    vi: (n: number) => `GHI NHẬN MƯA: ${n} điểm đường ướt (chưa ghi nhận ngập)`,
+    en: (n: number) => `RAIN RECORDED: ${n} wet spots (no flooding)`,
   },
   CAMERAS_MONITORING: {
     vi: (n: number) => `${n} camera giám sát`,
@@ -100,6 +108,122 @@ export const FLOOD_I18N = Object.freeze({
     en: (n: number) => `Rain zones • ${n}`,
   },
 });
+
+export const FLOOD_MODAL_I18N = Object.freeze({
+  DRY: {
+    vi: '[ĐƯỜNG KHÔ RÁO]',
+    en: '[DRY ROAD]',
+    title: {
+      vi: 'Mặt đường khô ráo, không ghi nhận ngập nước',
+      en: 'Road surface is dry, no water accumulation detected',
+    },
+  },
+  WET: {
+    vi: '[ĐƯỜNG ƯỚT • CHƯA NGẬP]',
+    en: '[WET ROAD • NO FLOOD]',
+    title: {
+      vi: 'Đường ướt do mưa, chưa ghi nhận ngập bánh xe',
+      en: 'Wet roadway due to rain, no wheel-level flooding',
+    },
+  },
+  FLOODED_SHALLOW: {
+    vi: '[NGẬP NÔNG]',
+    en: '[SHALLOW FLOOD]',
+    title: {
+      vi: 'Ngập nông mép đường, phương tiện chú ý giảm tốc độ',
+      en: 'Shallow curbside water accumulation, reduce speed',
+    },
+  },
+  FLOODED_DEEP: {
+    vi: '[NGẬP SÂU]',
+    en: '[DEEP FLOOD]',
+    title: {
+      vi: 'Ngập sâu lòng đường, nguy cơ chết máy cao',
+      en: 'Deep roadway water accumulation, severe stall risk',
+    },
+  },
+});
+
+export interface FloodVerdictLike {
+  camera_id: string;
+  flood_severity?: string;
+  timestamp?: string | number | Date;
+  observed_at?: string | number | Date;
+  stale?: boolean;
+  source?: string;
+}
+
+/**
+ * Returns true if severity indicates actionable road flooding (SHALLOW or DEEP).
+ */
+export function isFloodedSeverity(severity?: string): boolean {
+  const s = (severity || '').toUpperCase().trim();
+  return s === 'FLOODED_SHALLOW' || s === 'FLOODED_DEEP';
+}
+
+/**
+ * Returns true if severity indicates wet pavement without standing flood water.
+ */
+export function isWetRoadSeverity(severity?: string): boolean {
+  const s = (severity || '').toUpperCase().trim();
+  return s === 'WET';
+}
+
+/**
+ * Returns true if severity indicates confirmed dry pavement.
+ */
+export function isDryRoadSeverity(severity?: string): boolean {
+  const s = (severity || '').toUpperCase().trim();
+  return s === 'DRY';
+}
+
+/**
+ * Checks whether a flood verdict is stale either from server flag or age exceeding TTL.
+ */
+export function isFloodVerdictStale(v?: FloodVerdictLike | null, ttlMs = 180000): boolean {
+  if (!v) return false;
+  if (v.stale) return true;
+  const timeStr = v.observed_at || v.timestamp;
+  if (!timeStr) return false;
+  const ts = new Date(timeStr).getTime();
+  if (isNaN(ts)) return false;
+  return Date.now() - ts > ttlMs;
+}
+
+/**
+ * Derives separated sets of flooded, wet, and dry camera IDs from active verdicts,
+ * strictly excluding stale observations older than ttlMs (default: 3 minutes).
+ */
+export function deriveFloodCameraGroups(
+  verdicts: Map<string, FloodVerdictLike> | FloodVerdictLike[],
+  ttlMs = 180000
+): {
+  floodedCameraIds: Set<string>;
+  wetCameraIds: Set<string>;
+  dryCameraIds: Set<string>;
+} {
+  const floodedCameraIds = new Set<string>();
+  const wetCameraIds = new Set<string>();
+  const dryCameraIds = new Set<string>();
+
+  const list = verdicts instanceof Map ? Array.from(verdicts.values()) : (verdicts || []);
+
+  for (const v of list) {
+    if (!v || !v.camera_id) continue;
+    if (isFloodVerdictStale(v, ttlMs)) continue;
+
+    const s = (v.flood_severity || '').toUpperCase().trim();
+    if (s === 'FLOODED_DEEP' || s === 'FLOODED_SHALLOW') {
+      floodedCameraIds.add(v.camera_id);
+    } else if (s === 'WET') {
+      wetCameraIds.add(v.camera_id);
+    } else if (s === 'DRY') {
+      dryCameraIds.add(v.camera_id);
+    }
+  }
+
+  return { floodedCameraIds, wetCameraIds, dryCameraIds };
+}
 
 export interface FloodHexCell {
   h3_id: string;
