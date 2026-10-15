@@ -27,6 +27,7 @@ interface MapComponentProps {
   appEnv?: string;
   onMapReady?: (map: L.Map | null) => void;
   hexOverlayEnabled?: boolean;
+  cameraFilterControl?: React.ReactNode;
   topRightControls?: React.ReactNode;
   weatherControl?: React.ReactNode;
   legendControl?: React.ReactNode;
@@ -46,6 +47,7 @@ export default function MapComponent({
   appEnv = 'production',
   onMapReady,
   hexOverlayEnabled = false,
+  cameraFilterControl,
   topRightControls,
   weatherControl,
   legendControl,
@@ -411,10 +413,11 @@ export default function MapComponent({
     <div className="relative w-full h-full overflow-hidden">
       <div ref={containerRef} className="w-full h-full z-0 absolute inset-0 bg-[#09090b]" />
 
-      {/* Left controls: Lens switchers & active filter chip */}
+      {/* Left controls: Lens switchers, camera filter toggle & active filter chip */}
       {/* Desktop (md+): top-3.5 left-14 in flex-row; Mobile (<md): top-16 left-3 in flex-col */}
       <div className="absolute top-16 left-3 md:top-3.5 md:left-14 z-[800] flex flex-col md:flex-row items-start md:items-center gap-2 pointer-events-none">
         {children}
+        {cameraFilterControl}
 
         {/* On-map active filter chip (ADR-004 A3 - Issue #65) */}
         {isFiltered && activeFilterLabel && (

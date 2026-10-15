@@ -173,6 +173,7 @@ make dev-all
 *   **Monochromatic & Intuitive Interface**: Minimalist high-contrast design using black, dark gray, and white tones.
 *   **Bilingual i18n Support**: Instant switching between Vietnamese (`vi`, default) and English (`en`), persisted across sessions.
 *   **Clean Standard OSM Basemap**: OpenStreetMap tiles, no watermark, geographically constrained to Southeastern Vietnam (`maxBounds`).
+*   **Map Clutter Hygiene & Offline Camera Filtering**: Automatically hides 135 offline or no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default, with dynamic header counter badge (`Đang hiển thị 702 / 837 camera`) and a monochromatic toggle button.
 *   **Chained Deep Filter**: Multi-tier faceted filtering — *Zone* ➔ *Road / Corridor* ➔ *Intersection / Node*.
 *   **Multi-Camera Corridor Tracking Dock**: Pin cameras into the bottom tracking dock with synchronized snapshot refresh.
 *   **Responsive Layout (100dvh)**: Desktop, tablet, and smartphone friendly with collapsible legend and mobile bottom-sheet drawer.
@@ -246,6 +247,16 @@ Detailed architectural decisions are documented in:
 > **Ứng dụng tra cứu và theo dõi camera giao thông Thành phố Hồ Chí Minh với độ trễ thấp tối ưu, giao diện tối giản trực quan, hỗ trợ bộ lọc phân cấp liên hoàn, dock ghim theo dõi nhiều camera đồng thời, tích hợp đa ngôn ngữ i18n cùng các tính năng phân tích mở rộng — hướng tới xử lý thị giác máy tính thời gian thực và cảnh báo ngập lụt.**
 
 Hệ thống được tổ chức theo mô hình monorepo, tách biệt Web Client (`apps/web`) khỏi backend Go (`services/go-server`), với một service Python riêng (`services/cv-engine`) chuyên trách suy luận mô hình (model inference).
+
+## Điểm nổi bật chính
+
+*   **Giao diện tối giản & Trực quan**: Thiết kế đơn sắc tương phản cao với gam màu đen, xám và trắng.
+*   **Hỗ trợ đa ngôn ngữ i18n**: Chuyển đổi tức thì giữa Tiếng Việt (`vi`, mặc định) và Tiếng Anh (`en`), tự động ghi nhớ tùy chọn.
+*   **Tối ưu trực quan bản đồ & Lọc camera mất tín hiệu**: Mặc định ẩn 135 camera mất tín hiệu hoặc lỗi nguồn (`NOT_IMAGE` / `NO_SIGNAL`), hiển thị huy hiệu đếm camera trực quan (`Đang hiển thị 702 / 837 camera`) kèm nút chuyển đổi tinh tế.
+*   **Bộ lọc sâu liên hoàn (Chained Filter)**: Lọc đa tầng theo *Phường / Khu vực* ➔ *Tuyến đường / Hành lang* ➔ *Giao lộ*.
+*   **Dock theo dõi nhiều camera đồng thời**: Ghim tối đa 12 camera quan trọng vào thanh dock bên dưới với chu kỳ tự động cập nhật snapshot đồng bộ.
+*   **Backend Go hiệu năng cao**: File thực thi tĩnh duy nhất, lưu trữ SQLite WAL, điều phối Hot Set theo chu kỳ 30s.
+*   **Lưu trữ Cloudflare R2**: Lưu trữ ảnh snapshot bằng chứng giao thông chuẩn hóa thời gian ICT (UTC+7), phân phối qua Edge CDN (`https://file.529studio.site`).
 
 ## Khởi chạy nhanh
 
