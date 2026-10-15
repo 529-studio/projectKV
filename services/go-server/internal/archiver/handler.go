@@ -53,15 +53,15 @@ type LabelPayload struct {
 	CameraID              string   `json:"camera_id" binding:"required"`
 	SnapshotKey           string   `json:"snapshot_key" binding:"required"`
 	Annotator             string   `json:"annotator"`
-	FloodLevel            string   `json:"flood_level"`                      // none, puddle/shallow, deep
-	TrafficLevel          string   `json:"traffic_level"`                    // clear, moderate, heavy, gridlock/congested
+	FloodLevel            string   `json:"flood_level"`                       // none, puddle/shallow, deep
+	TrafficLevel          string   `json:"traffic_level"`                     // clear, moderate, heavy, gridlock/congested
 	TrafficDirA           string   `json:"traffic_dir_a,omitempty"`           // CLEAR, MODERATE, HEAVY, CONGESTED
 	TrafficDirB           string   `json:"traffic_dir_b,omitempty"`           // CLEAR, MODERATE, HEAVY, CONGESTED, NOT_APPLICABLE
-	QueueReason           string   `json:"queue_reason,omitempty"`           // free_flow, traffic_light, bottleneck, flood_barrier, accident
+	QueueReason           string   `json:"queue_reason,omitempty"`            // free_flow, traffic_light, bottleneck, flood_barrier, accident
 	FloodSubmersionAnchor string   `json:"flood_submersion_anchor,omitempty"` // dry, wet_asphalt_no_standing, tire_base_under_10cm, exhaust_hub_over_15cm
-	Weather               string   `json:"weather"`                          // clear/dry, rain, heavy_rain/fog
-	TimeOfDay             string   `json:"time_of_day"`                      // day, dusk, night
-	QualityTags           []string `json:"quality_tags,omitempty"`           // rain_on_lens, night_glare, occluded, signal_noise
+	Weather               string   `json:"weather"`                           // clear/dry, rain, heavy_rain/fog
+	TimeOfDay             string   `json:"time_of_day"`                       // day, dusk, night
+	QualityTags           []string `json:"quality_tags,omitempty"`            // rain_on_lens, night_glare, occluded, signal_noise
 	Notes                 string   `json:"notes,omitempty"`
 	Timestamp             int64    `json:"timestamp"`
 }
