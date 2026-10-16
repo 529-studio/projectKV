@@ -7,6 +7,7 @@ import {
   getHotsetMarkerStyle,
   buildHotsetTooltipSection,
   parseHotsetStatusMap,
+  fetchHotsetStatus,
   type HotsetCameraStatus,
   type HotsetStatusResponse,
 } from './hotsetUtils.ts';
@@ -171,5 +172,75 @@ describe('Hot Set Saturation Utilities (Issue #251 / S7-T6)', () => {
     // Handles empty / malformed response gracefully
     assert.strictEqual(parseHotsetStatusMap(null).size, 0);
     assert.strictEqual(parseHotsetStatusMap(undefined).size, 0);
+  });
+
+  test('fetchHotsetStatus fetches, parses, and handles errors gracefully', async () => {
+    const mockData = {
+      total: 2,
+      updated_at: '2026-10-16T15:30:00Z',
+      cameras: [
+        {
+          camera_id: 'cam-arterial-1',
+          severity: 'MODERATE',
+          saturation_index: 0.45,
+          pcu_total: 35.0,
+          confidence: 0.95,
+          source: 'onnx',
+          observed_at: '2026-10-16T15:30:00Z',
+          stale: false,
+        },
+        {
+          camera_id: 'cam-arterial-2',
+          severity: 'CONGESTED',
+          saturation_index: 0.88,
+          pcu_total: 70.0,
+          confidence: 0.99,
+          source: 'onnx',
+          observed_at: '2026-10-16T15:30:00Z',
+          stale: false,
+        },
+      ],
+    };
+
+    const mockFetch = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => mockData,
+    })) as unknown as typeof fetch;
+
+    const successRes = await fetchHotsetStatus('/api/v1/cameras/hotset/status', mockFetch);
+    assert.strictEqual(successRes.total, 2);
+    assert.strictEqual(successRes.hotsetStatus.size, 2);
+    assert.strictEqual(successRes.hotsetStatus.get('cam-arterial-2')?.severity, 'CONGESTED');
+
+    // 503 HTTP error
+    const errFetch = (async () => ({
+      ok: false,
+      status: 503,
+      json: async () => ({}),
+    })) as unknown as typeof fetch;
+
+    const errRes = await fetchHotsetStatus('/api/v1/cameras/hotset/status', errFetch);
+    assert.strictEqual(errRes.total, 0);
+    assert.strictEqual(errRes.error, 'HTTP error 503');
+
+    // Network throw
+    const throwFetch = (async () => {
+      throw new Error('Connection refused');
+    }) as unknown as typeof fetch;
+
+    const throwRes = await fetchHotsetStatus('/api/v1/cameras/hotset/status', throwFetch);
+    assert.strictEqual(throwRes.total, 0);
+    assert.strictEqual(throwRes.error, 'Connection refused');
+
+    // Abort error (clean cancellation)
+    const abortFetch = (async () => {
+      const err = new Error('The user aborted a request.');
+      err.name = 'AbortError';
+      throw err;
+    }) as unknown as typeof fetch;
+
+    const abortRes = await fetchHotsetStatus('/api/v1/cameras/hotset/status', abortFetch);
+    assert.strictEqual(abortRes.error, null);
   });
 });

@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { API_ENDPOINTS, getApiUrl } from '../config/constants.ts';
+import { API_ENDPOINTS, getApiUrl } from '../config/constants';
 import {
-  parseHotsetStatusMap,
+  fetchHotsetStatus,
   type HotsetCameraStatus,
-  type HotsetStatusResponse,
-} from '../utils/hotsetUtils.ts';
+} from '../utils/hotsetUtils';
 
 export const DEFAULT_HOTSET_POLL_INTERVAL_MS = 30000;
 
@@ -20,61 +19,6 @@ export interface UseHotsetStatusResult {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-}
-
-/**
- * Pure fetcher function for hotset status endpoint.
- * Isolated from React state for testing and headless execution.
- */
-export async function fetchHotsetStatus(
-  customFetch: typeof fetch = fetch,
-  signal?: AbortSignal
-): Promise<{
-  hotsetStatus: Map<string, HotsetCameraStatus>;
-  total: number;
-  updatedAt: string | null;
-  error: string | null;
-}> {
-  try {
-    const res = await customFetch(getApiUrl(API_ENDPOINTS.HOTSET_STATUS), {
-      signal,
-    });
-
-    if (!res.ok) {
-      return {
-        hotsetStatus: new Map(),
-        total: 0,
-        updatedAt: null,
-        error: `HTTP error ${res.status}`,
-      };
-    }
-
-    const data: HotsetStatusResponse = await res.json();
-    const map = parseHotsetStatusMap(data);
-
-    return {
-      hotsetStatus: map,
-      total: data?.total ?? map.size,
-      updatedAt: data?.updated_at ?? null,
-      error: null,
-    };
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      return {
-        hotsetStatus: new Map(),
-        total: 0,
-        updatedAt: null,
-        error: null,
-      };
-    }
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return {
-      hotsetStatus: new Map(),
-      total: 0,
-      updatedAt: null,
-      error: message,
-    };
-  }
 }
 
 /**
@@ -99,7 +43,8 @@ export function useHotsetStatus(options: UseHotsetStatusOptions = {}): UseHotset
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    const result = await fetchHotsetStatus(fetch, controller.signal);
+    const endpointUrl = getApiUrl(API_ENDPOINTS.HOTSET_STATUS);
+    const result = await fetchHotsetStatus(endpointUrl, fetch, controller.signal);
 
     if (!controller.signal.aborted) {
       if (!result.error) {
