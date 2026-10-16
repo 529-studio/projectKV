@@ -81,6 +81,7 @@ hcm-traffic-cameras/
 │   │       ├── hotset/                # Hot Set Pool scheduler (see ADR-001 §2)
 │   │       ├── storage/               # Pluggable object storage (LocalStorage & Cloudflare R2)
 │   │       ├── archiver/              # Snapshot proof archiver with ICT (UTC+7) timezone standard
+│   │       ├── harvester/             # Autonomous dual-trigger poller, label generator & R2 streamer
 │   │       ├── notify/                # Notification Adapter: Telegram / Zalo / WebPush / SMS
 │   │       ├── store/                 # SQLite (pure Go, no cgo) — subscriptions, dedupe, verdicts
 │   │       └── tilecache/             # Offline/local map tile proxy and caching
@@ -226,6 +227,10 @@ make dev-all
 | `SNAPSHOT_UPSTREAM_BASE_URL` | *(required)* | DOT upstream image snapshot endpoint |
 | `TELEGRAM_BOT_TOKEN` | `""` | Telegram Bot API token for flood warning dispatch (empty for simulation mode) |
 | `TELEGRAM_DEBOUNCE_MINUTES` | `30` | Anti-spam quiet period debounce window per chokepoint (in minutes) |
+| `HARVESTER_ENABLED` | `false` | Enable background dual-trigger scheduled & rain harvester |
+| `HARVESTER_SCHEDULE_HOURS` | `7,12,17` | Daily peak harvest schedule in ICT (UTC+7, e.g. `07:30,12:00,17:30`) |
+| `HARVESTER_RAIN_COOLDOWN_MINUTES` | `60` | Sliding window cooldown for rain watcher triggers (in minutes) |
+| `HARVESTER_CONCURRENCY` | `15` | Worker pool concurrency for frame ingestion & R2 streaming |
 
 #### CV Model Service (`services/cv-engine`)
 
@@ -358,6 +363,10 @@ make dev-all
 | `SNAPSHOT_UPSTREAM_BASE_URL` | *(bắt buộc)* | Cổng snapshot camera giao thông Sở GTVT TP.HCM |
 | `TELEGRAM_BOT_TOKEN` | `""` | Token Telegram Bot API để phát cảnh báo ngập lụt (để trống để chạy ở chế độ giả lập) |
 | `TELEGRAM_DEBOUNCE_MINUTES` | `30` | Cửa sổ trượt chống spam cảnh báo cho từng điểm ngập (phút) |
+| `HARVESTER_ENABLED` | `false` | Bật module chạy nền tự động thu thập ảnh theo lịch và theo mưa |
+| `HARVESTER_SCHEDULE_HOURS` | `7,12,17` | Lịch thu thập khung giờ cao điểm theo giờ Việt Nam ICT (UTC+7, ví dụ `07:30,12:00,17:30`) |
+| `HARVESTER_RAIN_COOLDOWN_MINUTES` | `60` | Cửa sổ trượt giãn cách giữa các lần kích hoạt thu thập theo mưa (phút) |
+| `HARVESTER_CONCURRENCY` | `15` | Số lượng luồng worker thu thập ảnh và đẩy lên R2 đồng thời |
 
 #### Dịch vụ Suy Luận Mô Hình (`services/cv-engine`)
 
