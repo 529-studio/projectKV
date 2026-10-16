@@ -30,6 +30,7 @@ storage        → (leaf)
 archiver       → storage, hotset
 corridor       → camera, hotset
 weather        → (leaf)
+harvester      → (leaf)
 ```
 
 ### How to apply this rule

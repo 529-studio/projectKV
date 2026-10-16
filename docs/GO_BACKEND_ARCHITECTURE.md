@@ -59,6 +59,8 @@ tilecache      → (leaf)
 storage        → (leaf — minimal object storage interface and local driver)
 archiver       → storage, hotset   (event-driven snapshot archiver and retention policy)
 corridor       → camera, hotset    (camera for road_key lookup, hotset for verdict types)
+weather        → (leaf — Open-Meteo & RainViewer radar caching service)
+harvester      → (leaf — autonomous scheduled peak & rain watcher ingestor)
 ```
 If you find yourself needing an import not in this table, stop and reconsider the design — most likely you need an interface, not a direct import.
 

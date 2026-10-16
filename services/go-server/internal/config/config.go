@@ -42,6 +42,10 @@ type Config struct {
 	HexResolution                 int
 	HexMinCameras                 int
 	DevAccessToken                string
+	HarvesterEnabled              bool
+	HarvesterScheduleHours        string
+	HarvesterRainCooldownMinutes  int
+	HarvesterConcurrency          int
 }
 
 func loadDotEnv() {
@@ -100,6 +104,10 @@ func LoadFromEnv() (*Config, error) {
 		FrozenFrameThreshold:          3,
 		HexResolution:                 7,
 		HexMinCameras:                 3,
+		HarvesterEnabled:              false,
+		HarvesterScheduleHours:        "7,12,17",
+		HarvesterRainCooldownMinutes:  60,
+		HarvesterConcurrency:          15,
 	}
 
 	if portStr := os.Getenv("PORT"); portStr != "" {
@@ -253,6 +261,28 @@ func LoadFromEnv() (*Config, error) {
 		cfg.DevAccessToken = strings.TrimSpace(val)
 	}
 
+	if val := os.Getenv("HARVESTER_ENABLED"); val != "" {
+		if b, err := strconv.ParseBool(val); err == nil {
+			cfg.HarvesterEnabled = b
+		}
+	}
+
+	if val := os.Getenv("HARVESTER_SCHEDULE_HOURS"); val != "" {
+		cfg.HarvesterScheduleHours = strings.TrimSpace(val)
+	}
+
+	if val := os.Getenv("HARVESTER_RAIN_COOLDOWN_MINUTES"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			cfg.HarvesterRainCooldownMinutes = v
+		}
+	}
+
+	if val := os.Getenv("HARVESTER_CONCURRENCY"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			cfg.HarvesterConcurrency = v
+		}
+	}
+
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -310,6 +340,10 @@ type ServerConfig struct {
 	PCUThresholdModerate          float64       // default: 0.30 (PCU_THRESHOLD_MODERATE)
 	PCUThresholdHeavy             float64       // default: 0.60 (PCU_THRESHOLD_HEAVY)
 	PCUThresholdCongested         float64       // default: 0.80 (PCU_THRESHOLD_CONGESTED)
+	HarvesterEnabled              bool          // default: false (HARVESTER_ENABLED)
+	HarvesterScheduleHours        string        // default: "7,12,17" (HARVESTER_SCHEDULE_HOURS)
+	HarvesterRainCooldownMinutes  int           // default: 60 (HARVESTER_RAIN_COOLDOWN_MINUTES)
+	HarvesterConcurrency          int           // default: 15 (HARVESTER_CONCURRENCY)
 }
 
 // ResolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -624,6 +658,32 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
+	harvesterEnabled := false
+	if val := os.Getenv("HARVESTER_ENABLED"); val != "" {
+		if b, err := strconv.ParseBool(val); err == nil {
+			harvesterEnabled = b
+		}
+	}
+
+	harvesterScheduleHours := "7,12,17"
+	if val := os.Getenv("HARVESTER_SCHEDULE_HOURS"); val != "" {
+		harvesterScheduleHours = strings.TrimSpace(val)
+	}
+
+	harvesterRainCooldownMinutes := 60
+	if val := os.Getenv("HARVESTER_RAIN_COOLDOWN_MINUTES"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			harvesterRainCooldownMinutes = v
+		}
+	}
+
+	harvesterConcurrency := 15
+	if val := os.Getenv("HARVESTER_CONCURRENCY"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+			harvesterConcurrency = v
+		}
+	}
+
 	return &ServerConfig{
 		Port:                          port,
 		CamerasFilePath:               camerasPath,
@@ -674,5 +734,9 @@ func LoadConfig() *ServerConfig {
 		PCUThresholdModerate:          pcuThresholdModerate,
 		PCUThresholdHeavy:             pcuThresholdHeavy,
 		PCUThresholdCongested:         pcuThresholdCongested,
+		HarvesterEnabled:              harvesterEnabled,
+		HarvesterScheduleHours:        harvesterScheduleHours,
+		HarvesterRainCooldownMinutes:  harvesterRainCooldownMinutes,
+		HarvesterConcurrency:          harvesterConcurrency,
 	}
 }
