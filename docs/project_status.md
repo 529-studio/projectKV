@@ -174,6 +174,11 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Upgraded `tools/eval/label_schema.json`, `services/go-server/internal/archiver/handler.go` (`LabelPayload`), and `apps/web/src/app/labeler/page.tsx` with directional inputs, physical depth anchors, and quality tags.
   - Built high-concurrency Go CLI `services/go-server/cmd/sync-proofs` and uploaded all 880 authentic rain frames (41.43 MB) from `2026-10-15` to Cloudflare R2 bucket `warded-proofs`.
   - Built dataset curation tool `tools/eval/label_curator.py` and curated 135 gold-standard labels across 73 priority cameras for `2026-10-15`.
+  - **Real Camera Dataset Collection & Curation (2026-10-16)**:
+    - Collected 688 live camera frames (34.47 MB) for `2026-10-16` across city cameras into `data/proofs/2026-10-16/`.
+    - Synchronized 100% of the 688 frames to Cloudflare R2 bucket `warded-proofs` via `sync-proofs` (0 errors).
+    - Upgraded `tools/eval/label_curator.py` with dynamic `--weather` and flood anchor support (`dry`, `wet_asphalt_no_standing`).
+    - Curated 72 gold-standard labels across priority arterial corridors and chokepoints for `2026-10-16`, expanding the gold-standard dataset to 207 files (100% compliant with Draft-07 schema).
 - **Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback (Sprint 7 Task S7-T3, Issue #248)**:
   - Added secondary tactile monochromatic action button `[Báo cáo ngập tại đây]` / `[Report flood here]` in `apps/web/src/components/CameraModal.tsx` alongside the VLM verification trigger, styled with high-contrast zinc borders (`border-zinc-700 hover:bg-zinc-800 active:scale-[0.98] text-zinc-300`) and a crisp monochromatic alert SVG icon (zero emojis per Rule 1).
   - Enforced 30-second client-side rate limit cooldown countdown (`[Đã báo cáo (30s)]` / `[Reported (30s)]`) with per-camera timestamp tracking in `apps/web/src/utils/cameraModalUtils.ts` persisting across modal close/open and camera switching.
