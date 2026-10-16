@@ -41,6 +41,7 @@ export const API_ENDPOINTS = Object.freeze({
   ARCHIVER_SNAPSHOTS: '/api/archiver/snapshots',
   ARCHIVER_LABELS: '/api/archiver/labels',
   ARCHIVER_RAW: '/api/archiver/snapshots/raw',
+  HOTSET_STATUS: '/api/v1/cameras/hotset/status',
 });
 
 export const getApiUrl = (endpoint: string): string => {
@@ -410,6 +411,17 @@ export const FLOOD_REPORT_I18N = Object.freeze({
   },
 });
 
-
-
-
+export const HOTSET_LEGEND_I18N = Object.freeze({
+  CLEAR: {
+    vi: '[Xanh: Thông thoáng]',
+    en: '[Green: Clear]',
+  },
+  MODERATE: {
+    vi: '[Vàng: Đông xe]',
+    en: '[Yellow: Moderate]',
+  },
+  CONGESTED: {
+    vi: '[Đỏ: Ùn ứ]',
+    en: '[Red: Congested]',
+  },
+});
