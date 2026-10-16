@@ -8,6 +8,7 @@ import { useHotsetStatus } from '../hooks/useHotsetStatus';
 import {
   HotsetCameraStatus,
   getHotsetMarkerStyle,
+  isHotsetStatusValid,
   buildHotsetTooltipSection,
 } from '../utils/hotsetUtils';
 import {
@@ -141,9 +142,15 @@ export default function MapComponent({
     let trafficInfo = '';
     if (hotset) {
       const prefix = lang === 'vi' ? VERDICT_I18N.TRAFFIC_PREFIX.vi : VERDICT_I18N.TRAFFIC_PREFIX.en;
-      if (hotset.stale) {
+      const isStale = Boolean(hotset.stale);
+      const isUnknown = !hotset.severity || hotset.severity.toUpperCase() === 'UNKNOWN';
+
+      if (isStale) {
         const staleText = lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data';
         trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${staleText}</span>`;
+      } else if (isUnknown) {
+        const unknownText = lang === 'vi' ? 'Chưa xác định' : 'Unknown';
+        trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${unknownText}</span>`;
       } else {
         const sevLabel = getSeverityLabel(hotset.severity, lang);
         trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">${prefix}: ${sevLabel}</span>`;
@@ -155,8 +162,10 @@ export default function MapComponent({
         const staleText = lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data';
         trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${staleText}</span>`;
       } else if (verdict.source !== 'mock' || appEnv === 'dev') {
+        const isUnknown = !verdict.severity || verdict.severity.toUpperCase() === 'UNKNOWN';
+        const textColor = isUnknown ? '#a1a1aa' : fillColor;
         const sevLabel = getSeverityLabel(verdict.severity, lang);
-        trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">${prefix}: ${sevLabel}</span>`;
+        trafficInfo = `<br><span style="color:${textColor}; font-weight:bold;">${prefix}: ${sevLabel}</span>`;
       }
     }
     if (cam.isGhost) {
@@ -330,8 +339,8 @@ export default function MapComponent({
       const bVerdict = currentVerdicts.get(b.id);
       const aHotset = currentHotset.get(a.id);
       const bHotset = currentHotset.get(b.id);
-      const aHasAI = isVerdictValid(aVerdict) || Boolean(aHotset);
-      const bHasAI = isVerdictValid(bVerdict) || Boolean(bHotset);
+      const aHasAI = isVerdictValid(aVerdict) || isHotsetStatusValid(aHotset);
+      const bHasAI = isVerdictValid(bVerdict) || isHotsetStatusValid(bHotset);
       const aFilterDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(a.id));
       const bFilterDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(b.id));
       const aDimmed = aFilterDimmed || (isMacro && !aFilterDimmed && !aHasAI);
@@ -345,7 +354,7 @@ export default function MapComponent({
 
       const verdict = currentVerdicts.get(cam.id);
       const hotset = currentHotset.get(cam.id);
-      const hasAIVerdict = isVerdictValid(verdict) || Boolean(hotset);
+      const hasAIVerdict = isVerdictValid(verdict) || isHotsetStatusValid(hotset);
       const isFilteredDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(cam.id));
       const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !hasAIVerdict);
       const isDimmed = isFilteredDimmed || isMacroHexDimmed;
@@ -466,7 +475,7 @@ export default function MapComponent({
 
       const verdict = verdicts.get(cam.id);
       const hotset = hotsetStatus.get(cam.id);
-      const hasAIVerdict = isVerdictValid(verdict) || Boolean(hotset);
+      const hasAIVerdict = isVerdictValid(verdict) || isHotsetStatusValid(hotset);
       marker.hasAIVerdict = hasAIVerdict;
 
       const isFilteredDimmed = marker.isFilteredDimmed === true;

@@ -73,5 +73,6 @@ export function getSeverityLabel(severity?: string, lang: 'vi' | 'en' = 'vi'): s
   if (sev === 'CLEAR') return lang === 'vi' ? 'Thông thoáng' : 'Clear';
   if (sev === 'MODERATE') return lang === 'vi' ? 'Đông xe' : 'Moderate';
   if (sev === 'HEAVY' || sev === 'CONGESTED') return lang === 'vi' ? 'Ùn tắc' : 'Congested';
+  if (sev === 'UNKNOWN') return lang === 'vi' ? 'Chưa xác định' : 'Unknown';
   return severity || '';
 }

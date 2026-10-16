@@ -141,6 +141,10 @@ export const VERDICT_I18N = Object.freeze({
       vi: 'Ùn tắc',
       en: 'Congested',
     },
+    UNKNOWN: {
+      vi: 'Chưa xác định',
+      en: 'Unknown',
+    },
   },
 });
 
