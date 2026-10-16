@@ -17,4 +17,5 @@ const (
 const (
 	RouteTrafficStatus = "/traffic-status"
 	RouteFloodStatus   = "/flood-status"
+	RouteHotsetStatus  = "/cameras/hotset/status"
 )
