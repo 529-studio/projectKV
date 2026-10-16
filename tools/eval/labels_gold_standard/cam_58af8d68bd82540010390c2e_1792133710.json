@@ -1,0 +1,23 @@
+{
+  "frame_id": "cam_58af8d68bd82540010390c2e_1792133710",
+  "camera_id": "58af8d68bd82540010390c2e",
+  "camera_name": "Nam Kỳ Khởi Nghĩa - Điện Biên Phủ 2",
+  "image_path": "data/proofs/2026-10-16/58af8d68bd82540010390c2e/1792133710_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "carriageway_direction": "bidirectional",
+    "traffic_dir_a": "CLEAR",
+    "traffic_dir_b": "CLEAR",
+    "is_waiting_red_light": false,
+    "queue_reason": "free_flow",
+    "flood": "NONE",
+    "waterline_depth": "DRY",
+    "flood_submersion_anchor": "dry",
+    "weather": "dry",
+    "time_of_day": "day",
+    "quality_tags": []
+  },
+  "annotator": "s7_t8_taxonomy_curator",
+  "annotated_at": "2026-10-16T06:57:38.211743+00:00",
+  "notes": "Curated via S7-T8 taxonomy. Base capacity: 35.0 PCU. Camera: Nam Kỳ Khởi Nghĩa - Điện Biên Phủ 2"
+}

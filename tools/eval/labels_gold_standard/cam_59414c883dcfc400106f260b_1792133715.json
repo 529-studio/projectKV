@@ -1,0 +1,23 @@
+{
+  "frame_id": "cam_59414c883dcfc400106f260b_1792133715",
+  "camera_id": "59414c883dcfc400106f260b",
+  "camera_name": "Cộng Hòa - Bình Giã",
+  "image_path": "data/proofs/2026-10-16/59414c883dcfc400106f260b/1792133715_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "carriageway_direction": "bidirectional",
+    "traffic_dir_a": "CLEAR",
+    "traffic_dir_b": "CLEAR",
+    "is_waiting_red_light": false,
+    "queue_reason": "free_flow",
+    "flood": "NONE",
+    "waterline_depth": "DRY",
+    "flood_submersion_anchor": "dry",
+    "weather": "dry",
+    "time_of_day": "day",
+    "quality_tags": []
+  },
+  "annotator": "s7_t8_taxonomy_curator",
+  "annotated_at": "2026-10-16T06:57:38.206062+00:00",
+  "notes": "Curated via S7-T8 taxonomy. Base capacity: 30.0 PCU. Camera: Cộng Hòa - Bình Giã"
+}

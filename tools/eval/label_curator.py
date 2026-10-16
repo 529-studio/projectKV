@@ -106,7 +106,7 @@ def audit_and_cleanse_legacy_labels(labels_dir: Path) -> int:
     return cleansed_count
 
 
-def curate_gold_standard_for_date(date_str: str, out_dir: Path) -> int:
+def curate_gold_standard_for_date(date_str: str, out_dir: Path, weather: str = "dry") -> int:
     """
     Curates ground-truth labels for all priority cameras captured on date_str.
     """
@@ -126,7 +126,7 @@ def curate_gold_standard_for_date(date_str: str, out_dir: Path) -> int:
         if any(k in ("vo_van_kiet", "mai_chi_tho", "dien_bien_phu", "cong_hoa") for k in rkeys):
             priority_ids.add(cid)
 
-    print(f"[INFO] Curating gold-standard labels for {len(priority_ids)} priority cameras on {date_str}...")
+    print(f"[INFO] Curating gold-standard labels for {len(priority_ids)} priority cameras on {date_str} (weather={weather})...")
     curated_count = 0
 
     for cid in priority_ids:
@@ -152,7 +152,7 @@ def curate_gold_standard_for_date(date_str: str, out_dir: Path) -> int:
             frame_id = f"cam_{cid}_{unix_ts}"
             out_file = out_dir / f"{frame_id}.json"
 
-            # Deterministic baseline: rain event on 2026-10-15
+            # Deterministic baseline:
             # Directional taxonomy and physical submersion anchors
             is_chokepoint = cid in chokepoints
             is_smoke_congested = cid in smoke_cameras and smoke_cameras[cid].get("expected_baseline_traffic") == "CONGESTED"
@@ -162,10 +162,16 @@ def curate_gold_standard_for_date(date_str: str, out_dir: Path) -> int:
             traffic_dir_b = "CLEAR"
             queue_reason = "bottleneck" if is_smoke_congested else "free_flow"
 
-            # Physical flood anchor: default to wet_asphalt_no_standing for rain event
+            # Physical flood anchor based on weather condition
             flood_level = "NONE"
-            flood_anchor = "wet_asphalt_no_standing"
-            waterline_depth = "WET_SURFACE"
+            if weather in ("rain", "heavy_rain"):
+                flood_anchor = "wet_asphalt_no_standing"
+                waterline_depth = "WET_SURFACE"
+                norm_weather = weather
+            else:
+                flood_anchor = "dry"
+                waterline_depth = "DRY"
+                norm_weather = "dry"
 
             label_data = {
                 "frame_id": frame_id,
@@ -182,7 +188,7 @@ def curate_gold_standard_for_date(date_str: str, out_dir: Path) -> int:
                     "flood": flood_level,
                     "waterline_depth": waterline_depth,
                     "flood_submersion_anchor": flood_anchor,
-                    "weather": "rain",
+                    "weather": norm_weather,
                     "time_of_day": "day",
                     "quality_tags": [],
                 },
@@ -202,6 +208,7 @@ def main():
     parser = argparse.ArgumentParser(description="Gold-Standard Dataset Curation Tool")
     parser.add_argument("--audit-dir", help="Audit and cleanse existing labels directory")
     parser.add_argument("--curate-date", default="2026-10-15", help="Date partition to curate (default: 2026-10-15)")
+    parser.add_argument("--weather", default="dry", choices=["dry", "rain", "heavy_rain"], help="Weather condition on curated date (default: dry)")
     parser.add_argument("--out-dir", default="tools/eval/labels_gold_standard", help="Output directory for curated labels")
 
     args = parser.parse_args()
@@ -210,7 +217,7 @@ def main():
         audit_and_cleanse_legacy_labels(Path(args.audit_dir))
 
     if args.curate_date:
-        curate_gold_standard_for_date(args.curate_date, REPO_ROOT / args.out_dir)
+        curate_gold_standard_for_date(args.curate_date, REPO_ROOT / args.out_dir, weather=args.weather)
 
 
 if __name__ == "__main__":
