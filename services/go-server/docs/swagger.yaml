@@ -20,9 +20,20 @@ definitions:
       date:
         type: string
       flood_level:
-        description: none, puddle, deep
+        description: none, puddle/shallow, deep
+        type: string
+      flood_submersion_anchor:
+        description: dry, wet_asphalt_no_standing, tire_base_under_10cm, exhaust_hub_over_15cm
         type: string
       notes:
+        type: string
+      quality_tags:
+        description: rain_on_lens, night_glare, occluded, signal_noise
+        items:
+          type: string
+        type: array
+      queue_reason:
+        description: free_flow, traffic_light, bottleneck, flood_barrier, accident
         type: string
       snapshot_key:
         type: string
@@ -31,11 +42,17 @@ definitions:
         type: string
       timestamp:
         type: integer
+      traffic_dir_a:
+        description: CLEAR, MODERATE, HEAVY, CONGESTED
+        type: string
+      traffic_dir_b:
+        description: CLEAR, MODERATE, HEAVY, CONGESTED, NOT_APPLICABLE
+        type: string
       traffic_level:
-        description: clear, moderate, heavy, gridlock
+        description: clear, moderate, heavy, gridlock/congested
         type: string
       weather:
-        description: clear, rain, fog
+        description: clear/dry, rain, heavy_rain/fog
         type: string
     required:
     - camera_id
@@ -233,6 +250,17 @@ definitions:
           $ref: '#/definitions/hotset.Verdict'
         type: array
     type: object
+  hotset.HotsetStatusResponse:
+    properties:
+      cameras:
+        items:
+          $ref: '#/definitions/hotset.Verdict'
+        type: array
+      total:
+        type: integer
+      updated_at:
+        type: string
+    type: object
   hotset.TrafficStatusResponse:
     properties:
       analysis_enabled:
@@ -256,6 +284,10 @@ definitions:
         type: string
       observed_at:
         type: string
+      pcu_total:
+        type: number
+      saturation_index:
+        type: number
       severity:
         description: 'Traffic severity: e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED"'
         type: string
@@ -957,6 +989,27 @@ paths:
             type: object
       summary: Get latest traffic congestion verdicts
       tags:
+      - Traffic
+  /api/v1/cameras/hotset/status:
+    get:
+      description: Returns cached traffic severity, saturation index, and PCU counts
+        for the 50 Hot Set priority arterial cameras with sub-5ms latency.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/hotset.HotsetStatusResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get latest 50 Hot Set traffic status and Saturation Index
+      tags:
+      - Cameras
       - Traffic
   /api/weather:
     get:

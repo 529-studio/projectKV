@@ -194,6 +194,13 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
     - `[KV-10]` / Issue [#262](https://github.com/529-studio/projectKV/issues/262): S7-T7b — `internal/harvester` Autonomous Dual-Trigger Poller, Label Generator & Cloudflare R2 Archiver.
     - `[KV-11]` / Issue [#263](https://github.com/529-studio/projectKV/issues/263): S7-T7c — Standalone Automated Harvester CLI (`tools/eval/auto_harvest.py`).
     - `[KV-12]` / Issue [#264](https://github.com/529-studio/projectKV/issues/264): S7-T7d — Web Labeler Candidate Review Filter & Auto-Harvest Verification Badges.
+- **Autonomous 50 Hot Set Traffic Poller & Saturation Cache (Sprint 7 Task S7-T5, Issue #250, Plane [KV-4])**:
+  - Implemented high-performance thread-safe in-memory cache `hotset.Store` in `services/go-server/internal/hotset/store.go` guarded by `sync.RWMutex`, storing camera verdicts and Saturation Indexes.
+  - Exposed cached status endpoint `GET /api/v1/cameras/hotset/status` (with backward-compatible alias `GET /api/cameras/hotset/status`) serving all 50 Hot Set arterial camera states with sub-5ms latency (~0.5ms measured, 10x faster than requirement).
+  - Extended `hotset.Verdict` with `saturation_index` and `pcu_total` fields, wired into `cvclient.CVEngineAnalyzer` to directly consume PCU Saturation Index computed from OpenVINO YOLOv8n FP16 inference, corridor-specific capacities (S6-T2), and Schmitt trigger hysteresis deadband (S6 Lesson 33).
+  - Expanded priority arterial corridors and chokepoints in `cmd/server/main.go` to include Trường Chinh (`truong_chinh`) and Quốc Lộ 1 (`quoc_lo_1`, `ql1`).
+  - Updated `services/cv-engine/server.py` to accept both `POST /predict` and `POST /analyze`.
+  - Regenerated OpenAPI documentation via `make swagger` and verified full test suite under Go race detector (`go test -race ./...`).
 
 ---
 

@@ -1,7 +1,11 @@
 package main_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +13,15 @@ import (
 	"testing"
 	"time"
 )
+
+func getFreePort(t *testing.T) string {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("get free port: %v", err)
+	}
+	defer l.Close()
+	return fmt.Sprintf("%d", l.Addr().(*net.TCPAddr).Port)
+}
 
 func TestStartup_RefusesMockOutsideDev(t *testing.T) {
 	cmd := exec.Command("go", "run", "./main.go")
@@ -133,5 +146,98 @@ func TestStartup_AnalyzerNone_EmptyVerdictsAndNoSSE(t *testing.T) {
 		t.Fatalf("received unexpected camera_update SSE event when ANALYZER=none: %s", event)
 	case <-time.After(1 * time.Second):
 		// No event received within timeout, as expected
+	}
+}
+
+func TestStartup_HotsetStatusEndpoint_ServesCachedState(t *testing.T) {
+	port := getFreePort(t)
+	absCameras, err := filepath.Abs("../../../../cameras_enriched.json")
+	if err != nil {
+		t.Fatalf("resolve cameras path: %v", err)
+	}
+
+	cmd := exec.Command("go", "run", "./main.go")
+	cmd.Dir = "."
+	serverBuf := &bytes.Buffer{}
+	cmd.Stdout = serverBuf
+	cmd.Stderr = serverBuf
+	cmd.Env = append(cmd.Environ(),
+		"PORT="+port,
+		"ANALYZER=mock",
+		"APP_ENV=dev",
+		"CAMERAS_FILE_PATH="+absCameras,
+		"SQLITE_PATH=:memory:",
+		"HOTSET_FIXED_MAX_CAMERAS=10",
+		"HOTSET_INTERVAL_SECONDS=1",
+	)
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	defer func() {
+		_ = cmd.Process.Kill()
+	}()
+
+	baseURL := "http://localhost:" + port
+
+	// Wait for server readiness
+	ready := false
+	for i := 0; i < 40; i++ {
+		time.Sleep(100 * time.Millisecond)
+		resp, err := http.Get(baseURL + "/health")
+		if err == nil && resp.StatusCode == http.StatusOK {
+			_ = resp.Body.Close()
+			ready = true
+			break
+		}
+	}
+	if !ready {
+		t.Fatalf("server failed to become ready on %s", baseURL)
+	}
+
+	// Give the mock scheduler a moment to run the initial cycle and populate hotset.Store
+	time.Sleep(500 * time.Millisecond)
+
+	endpoints := []string{"/api/v1/cameras/hotset/status", "/api/cameras/hotset/status"}
+	for _, ep := range endpoints {
+		start := time.Now()
+		resp, err := http.Get(baseURL + ep)
+		latency := time.Since(start)
+
+		if err != nil {
+			t.Fatalf("GET %s failed: %v", ep, err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			t.Fatalf("%s: expected 200, got %d (body: %s)\nServer output:\n%s", ep, resp.StatusCode, string(body), serverBuf.String())
+		}
+
+		if latency >= 50*time.Millisecond {
+			t.Errorf("%s: cold request latency too high: %v", ep, latency)
+		}
+
+		var statusResp struct {
+			Total     int    `json:"total"`
+			UpdatedAt string `json:"updated_at"`
+			Cameras   []struct {
+				CameraID        string  `json:"camera_id"`
+				Severity        string  `json:"severity"`
+				SaturationIndex float64 `json:"saturation_index"`
+				PCUTotal        float64 `json:"pcu_total"`
+				Source          string  `json:"source"`
+			} `json:"cameras"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&statusResp); err != nil {
+			t.Fatalf("%s: decode response: %v", ep, err)
+		}
+
+		if statusResp.Total == 0 || len(statusResp.Cameras) == 0 {
+			t.Errorf("%s: expected populated cameras in hotset status, got %d", ep, statusResp.Total)
+		}
+
+		t.Logf("%s: successfully returned %d cameras in %v", ep, statusResp.Total, latency)
 	}
 }
