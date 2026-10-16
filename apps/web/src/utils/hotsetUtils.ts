@@ -1,5 +1,3 @@
-import { FUNCTIONAL_COLORS } from '../config/constants.ts';
-
 export interface HotsetCameraStatus {
   camera_id: string;
   severity: string;
@@ -27,6 +25,11 @@ export const SATURATION_COLORS = Object.freeze({
   CLEAR: '#10b981',
   MODERATE: '#f59e0b',
   CONGESTED: '#ef4444',
+});
+
+export const DEFAULT_MARKER_COLORS = Object.freeze({
+  ONLINE: '#ffffff',
+  OFFLINE: '#52525b',
 });
 
 /**
@@ -66,7 +69,7 @@ export function getHotsetMarkerStyle(
   if (!status) {
     return {
       isHotset: false,
-      fillColor: isOnline ? FUNCTIONAL_COLORS.ONLINE_DEFAULT : FUNCTIONAL_COLORS.OFFLINE_DEFAULT,
+      fillColor: isOnline ? DEFAULT_MARKER_COLORS.ONLINE : DEFAULT_MARKER_COLORS.OFFLINE,
       isCongested: false,
       isStale: false,
     };
@@ -119,4 +122,60 @@ export function parseHotsetStatusMap(
   });
 
   return map;
+}
+
+/**
+ * Pure fetcher function for hotset status endpoint.
+ * Isolated from React state for testing and headless execution.
+ */
+export async function fetchHotsetStatus(
+  url: string,
+  customFetch: typeof fetch = fetch,
+  signal?: AbortSignal
+): Promise<{
+  hotsetStatus: Map<string, HotsetCameraStatus>;
+  total: number;
+  updatedAt: string | null;
+  error: string | null;
+}> {
+  try {
+    const res = await customFetch(url, {
+      signal,
+    });
+
+    if (!res.ok) {
+      return {
+        hotsetStatus: new Map(),
+        total: 0,
+        updatedAt: null,
+        error: `HTTP error ${res.status}`,
+      };
+    }
+
+    const data: HotsetStatusResponse = await res.json();
+    const map = parseHotsetStatusMap(data);
+
+    return {
+      hotsetStatus: map,
+      total: data?.total ?? map.size,
+      updatedAt: data?.updated_at ?? null,
+      error: null,
+    };
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return {
+        hotsetStatus: new Map(),
+        total: 0,
+        updatedAt: null,
+        error: null,
+      };
+    }
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return {
+      hotsetStatus: new Map(),
+      total: 0,
+      updatedAt: null,
+      error: message,
+    };
+  }
 }
