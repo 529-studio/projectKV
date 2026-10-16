@@ -151,8 +151,9 @@ describe('Traffic Verdict Provenance and Staleness (Issue #64)', () => {
     assert.equal(getSeverityLabel('congested', 'vi'), 'Ùn tắc');
     assert.equal(getSeverityLabel('clear', 'vi'), 'Thông thoáng');
 
-    // Fallback for unknown / empty
-    assert.equal(getSeverityLabel('UNKNOWN', 'vi'), 'UNKNOWN');
+    // UNKNOWN localization & fallback for empty
+    assert.equal(getSeverityLabel('UNKNOWN', 'vi'), 'Chưa xác định');
+    assert.equal(getSeverityLabel('UNKNOWN', 'en'), 'Unknown');
     assert.equal(getSeverityLabel('', 'vi'), '');
   });
 });

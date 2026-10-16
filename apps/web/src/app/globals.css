@@ -658,6 +658,30 @@ body, html {
   display: inline-block;
 }
 
+/* Arterial Congested Marker Pulse Animation (Issue #251 / S7-T6) */
+@keyframes marker-congested-pulse {
+  0% {
+    stroke: #ef4444;
+    stroke-width: 2px;
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke: #fca5a5;
+    stroke-width: 6px;
+    stroke-opacity: 0.35;
+  }
+  100% {
+    stroke: #ef4444;
+    stroke-width: 2px;
+    stroke-opacity: 1;
+  }
+}
+
+.marker-congested-pulse {
+  animation: marker-congested-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  transform-origin: center;
+}
+
 .traffic-tag {
   font-size: 9.5px;
   font-family: var(--font-mono);
