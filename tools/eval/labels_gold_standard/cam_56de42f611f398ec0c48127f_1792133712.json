@@ -1,0 +1,23 @@
+{
+  "frame_id": "cam_56de42f611f398ec0c48127f_1792133712",
+  "camera_id": "56de42f611f398ec0c48127f",
+  "camera_name": "Mai Chí Thọ - Lương Định Của 1",
+  "image_path": "data/proofs/2026-10-16/56de42f611f398ec0c48127f/1792133712_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "carriageway_direction": "bidirectional",
+    "traffic_dir_a": "CLEAR",
+    "traffic_dir_b": "CLEAR",
+    "is_waiting_red_light": false,
+    "queue_reason": "free_flow",
+    "flood": "NONE",
+    "waterline_depth": "DRY",
+    "flood_submersion_anchor": "dry",
+    "weather": "dry",
+    "time_of_day": "day",
+    "quality_tags": []
+  },
+  "annotator": "s7_t8_taxonomy_curator",
+  "annotated_at": "2026-10-16T06:57:38.209402+00:00",
+  "notes": "Curated via S7-T8 taxonomy. Base capacity: 50.0 PCU. Camera: Mai Chí Thọ - Lương Định Của 1"
+}

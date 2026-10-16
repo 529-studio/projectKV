@@ -1,0 +1,23 @@
+{
+  "frame_id": "cam_56de42f611f398ec0c481290_1792133715",
+  "camera_id": "56de42f611f398ec0c481290",
+  "camera_name": "Võ Văn Kiệt - An Bình",
+  "image_path": "data/proofs/2026-10-16/56de42f611f398ec0c481290/1792133715_sample.jpg",
+  "labels": {
+    "traffic": "CLEAR",
+    "carriageway_direction": "bidirectional",
+    "traffic_dir_a": "CLEAR",
+    "traffic_dir_b": "CLEAR",
+    "is_waiting_red_light": false,
+    "queue_reason": "free_flow",
+    "flood": "NONE",
+    "waterline_depth": "DRY",
+    "flood_submersion_anchor": "dry",
+    "weather": "dry",
+    "time_of_day": "day",
+    "quality_tags": []
+  },
+  "annotator": "s7_t8_taxonomy_curator",
+  "annotated_at": "2026-10-16T06:57:38.213946+00:00",
+  "notes": "Curated via S7-T8 taxonomy. Base capacity: 45.0 PCU. Camera: Võ Văn Kiệt - An Bình"
+}
