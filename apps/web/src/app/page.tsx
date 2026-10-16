@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import type L from 'leaflet';
 import { useCameras, Camera } from '../hooks/useCameras';
 import { useTraffic } from '../hooks/useTraffic';
+import { useHotsetStatus } from '../hooks/useHotsetStatus';
 import { useFlood } from '../hooks/useFlood';
 import { useWeather } from '../hooks/useWeather';
 import { useRainHexRadar } from '../hooks/useRainHexRadar';
@@ -31,6 +32,7 @@ const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: fals
 export default function Home() {
   const { cameras, loading, error, markCameraGhost } = useCameras();
   const { verdicts, hexCells, analysisEnabled, appEnv, loading: trafficLoading } = useTraffic();
+  const { hotsetStatus } = useHotsetStatus();
   const {
     floodVerdicts,
     floodHexCells,
@@ -331,6 +333,7 @@ export default function Home() {
           <MapComponent
             cameras={displayCameras}
             verdicts={verdicts}
+            hotsetStatus={hotsetStatus}
             onCameraClick={handleSelectCamera}
             selectedCamera={selectedCamera}
             isFiltered={isFiltered}

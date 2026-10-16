@@ -2,6 +2,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { FUNCTIONAL_COLORS, VERDICT_I18N, HEX_I18N } from '../config/constants';
+import { SATURATION_COLORS } from '../utils/hotsetUtils';
 import { FLOOD_I18N } from '../utils/floodUtils';
 import { WEATHER_I18N } from '../utils/weatherUtils';
 import type { ActiveLensMode } from './HexOverlay';
@@ -85,23 +86,26 @@ function LegendContent({
           <div className="flex items-center gap-2.5">
             <span
               className="w-3 h-3 rounded-full border border-black shrink-0"
-              style={{ backgroundColor: FUNCTIONAL_COLORS.CLEAR }}
+              style={{ backgroundColor: SATURATION_COLORS.CLEAR }}
             />
-            <span>{lang === 'vi' ? 'Thông thoáng' : 'Clear'}</span>
+            <span>{lang === 'vi' ? 'Thông thoáng (SI < 30%)' : 'Clear (SI < 30%)'}</span>
           </div>
           <div className="flex items-center gap-2.5">
             <span
               className="w-3 h-3 rounded-full border border-black shrink-0"
-              style={{ backgroundColor: FUNCTIONAL_COLORS.MODERATE }}
+              style={{ backgroundColor: SATURATION_COLORS.MODERATE }}
             />
-            <span>{lang === 'vi' ? 'Đông xe / Chậm' : 'Moderate'}</span>
+            <span>{lang === 'vi' ? 'Đông xe (30% ≤ SI < 60%)' : 'Moderate (30% ≤ SI < 60%)'}</span>
           </div>
           <div className="flex items-center gap-2.5">
-            <span
-              className="w-3 h-3 rounded-full border border-black shrink-0"
-              style={{ backgroundColor: FUNCTIONAL_COLORS.CONGESTED }}
-            />
-            <span>{lang === 'vi' ? 'Ùn tắc / Kẹt xe' : 'Congested'}</span>
+            <span className="relative flex h-3 w-3 shrink-0 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-60" />
+              <span
+                className="relative inline-flex h-3 w-3 rounded-full border border-black"
+                style={{ backgroundColor: SATURATION_COLORS.CONGESTED }}
+              />
+            </span>
+            <span>{lang === 'vi' ? 'Ùn ứ / Kẹt xe (SI ≥ 60%)' : 'Congested (SI ≥ 60%)'}</span>
           </div>
           <div className="flex items-center gap-2.5">
             <span

@@ -4,13 +4,27 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict, isVerdictValid, getSeverityLabel } from '../hooks/useTraffic';
-import { MAP_CONFIG, FUNCTIONAL_COLORS, TRAFFIC_SEVERITY, VERDICT_I18N } from '../config/constants';
+import { useHotsetStatus } from '../hooks/useHotsetStatus';
+import {
+  HotsetCameraStatus,
+  getHotsetMarkerStyle,
+  isHotsetStatusValid,
+  buildHotsetTooltipSection,
+} from '../utils/hotsetUtils';
+import {
+  MAP_CONFIG,
+  FUNCTIONAL_COLORS,
+  TRAFFIC_SEVERITY,
+  VERDICT_I18N,
+  HOTSET_LEGEND_I18N,
+} from '../config/constants';
 import { isHexVisibleAtZoom } from '../utils/hexUtils';
 
 interface CustomCircleMarker extends L.CircleMarker {
   isDimmed?: boolean;
   isFilteredDimmed?: boolean;
   hasAIVerdict?: boolean;
+  isHotset?: boolean;
   camId?: string;
 }
 
@@ -18,6 +32,7 @@ interface MapComponentProps {
   onCameraClick?: (cam: Camera) => void;
   cameras: Camera[];
   verdicts: Map<string, TrafficVerdict>;
+  hotsetStatus?: Map<string, HotsetCameraStatus>;
   selectedCamera?: Camera | null;
   isFiltered?: boolean;
   filteredCameraIds?: Set<string>;
@@ -37,6 +52,7 @@ interface MapComponentProps {
 export default function MapComponent({
   cameras,
   verdicts,
+  hotsetStatus: propHotsetStatus,
   onCameraClick,
   selectedCamera,
   isFiltered = false,
@@ -62,6 +78,10 @@ export default function MapComponent({
   const markersMapRef = useRef<Map<string, CustomCircleMarker>>(new Map());
   const verdictsRef = useRef(verdicts);
 
+  const internalHotset = useHotsetStatus({ enabled: !propHotsetStatus });
+  const hotsetStatus = propHotsetStatus ?? internalHotset.hotsetStatus;
+  const hotsetStatusRef = useRef(hotsetStatus);
+
   useEffect(() => {
     hexOverlayEnabledRef.current = hexOverlayEnabled;
   }, [hexOverlayEnabled]);
@@ -69,6 +89,10 @@ export default function MapComponent({
   useEffect(() => {
     verdictsRef.current = verdicts;
   }, [verdicts]);
+
+  useEffect(() => {
+    hotsetStatusRef.current = hotsetStatus;
+  }, [hotsetStatus]);
 
   const getTrafficColorForVerdict = useCallback((camId: string, isOnline: boolean, currentVerdicts: Map<string, TrafficVerdict>) => {
     const verdict = currentVerdicts.get(camId);
@@ -83,16 +107,65 @@ export default function MapComponent({
     return isOnline ? FUNCTIONAL_COLORS.ONLINE_DEFAULT : FUNCTIONAL_COLORS.OFFLINE_DEFAULT;
   }, [appEnv]);
 
-  const buildTooltipHtml = useCallback((cam: Camera, verdict: TrafficVerdict | undefined, fillColor: string) => {
+  const getCameraMarkerVisual = useCallback((
+    camId: string,
+    isOnline: boolean,
+    currentVerdicts: Map<string, TrafficVerdict>,
+    currentHotset: Map<string, HotsetCameraStatus>
+  ) => {
+    const hotset = currentHotset.get(camId);
+    if (hotset) {
+      const style = getHotsetMarkerStyle(hotset, isOnline);
+      return {
+        fillColor: style.fillColor,
+        isCongested: style.isCongested,
+        isStale: style.isStale,
+        isHotset: true,
+      };
+    }
+    const fillColor = getTrafficColorForVerdict(camId, isOnline, currentVerdicts);
+    const verdict = currentVerdicts.get(camId);
+    return {
+      fillColor,
+      isCongested: false,
+      isStale: verdict?.stale ?? false,
+      isHotset: false,
+    };
+  }, [getTrafficColorForVerdict]);
+
+  const buildTooltipHtml = useCallback((
+    cam: Camera,
+    verdict: TrafficVerdict | undefined,
+    hotset: HotsetCameraStatus | undefined,
+    fillColor: string
+  ) => {
     let trafficInfo = '';
-    if (isVerdictValid(verdict)) {
+    if (hotset) {
+      const prefix = lang === 'vi' ? VERDICT_I18N.TRAFFIC_PREFIX.vi : VERDICT_I18N.TRAFFIC_PREFIX.en;
+      const isStale = Boolean(hotset.stale);
+      const isUnknown = !hotset.severity || hotset.severity.toUpperCase() === 'UNKNOWN';
+
+      if (isStale) {
+        const staleText = lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data';
+        trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${staleText}</span>`;
+      } else if (isUnknown) {
+        const unknownText = lang === 'vi' ? 'Chưa xác định' : 'Unknown';
+        trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${unknownText}</span>`;
+      } else {
+        const sevLabel = getSeverityLabel(hotset.severity, lang);
+        trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">${prefix}: ${sevLabel}</span>`;
+      }
+      trafficInfo += buildHotsetTooltipSection(hotset, lang);
+    } else if (isVerdictValid(verdict)) {
       const prefix = lang === 'vi' ? VERDICT_I18N.TRAFFIC_PREFIX.vi : VERDICT_I18N.TRAFFIC_PREFIX.en;
       if (verdict.stale) {
         const staleText = lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data';
         trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${staleText}</span>`;
       } else if (verdict.source !== 'mock' || appEnv === 'dev') {
+        const isUnknown = !verdict.severity || verdict.severity.toUpperCase() === 'UNKNOWN';
+        const textColor = isUnknown ? '#a1a1aa' : fillColor;
         const sevLabel = getSeverityLabel(verdict.severity, lang);
-        trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">${prefix}: ${sevLabel}</span>`;
+        trafficInfo = `<br><span style="color:${textColor}; font-weight:bold;">${prefix}: ${sevLabel}</span>`;
       }
     }
     if (cam.isGhost) {
@@ -258,13 +331,16 @@ export default function MapComponent({
     const isFew = isFiltered && filteredCameraIds ? filteredCameraIds.size <= 40 : cameras.length <= 40;
     const isMacro = Boolean(hexOverlayEnabled && isHexVisibleAtZoom(zoom));
     const currentVerdicts = verdictsRef.current;
+    const currentHotset = hotsetStatusRef.current;
 
     // Render dimmed markers first, then matching/active markers so matching markers appear on top
     const sortedCameras = [...cameras].sort((a, b) => {
       const aVerdict = currentVerdicts.get(a.id);
       const bVerdict = currentVerdicts.get(b.id);
-      const aHasAI = isVerdictValid(aVerdict);
-      const bHasAI = isVerdictValid(bVerdict);
+      const aHotset = currentHotset.get(a.id);
+      const bHotset = currentHotset.get(b.id);
+      const aHasAI = isVerdictValid(aVerdict) || isHotsetStatusValid(aHotset);
+      const bHasAI = isVerdictValid(bVerdict) || isHotsetStatusValid(bHotset);
       const aFilterDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(a.id));
       const bFilterDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(b.id));
       const aDimmed = aFilterDimmed || (isMacro && !aFilterDimmed && !aHasAI);
@@ -277,18 +353,21 @@ export default function MapComponent({
       if (!cam.latitude || !cam.longitude) return;
 
       const verdict = currentVerdicts.get(cam.id);
-      const hasAIVerdict = isVerdictValid(verdict);
+      const hotset = currentHotset.get(cam.id);
+      const hasAIVerdict = isVerdictValid(verdict) || isHotsetStatusValid(hotset);
       const isFilteredDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(cam.id));
       const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !hasAIVerdict);
       const isDimmed = isFilteredDimmed || isMacroHexDimmed;
 
       const baseR = getRadius(zoom, isFew);
       const radius = isDimmed ? Math.max(4.0, Math.round(baseR * 0.7)) : baseR;
-      const fillColor = getTrafficColorForVerdict(cam.id, cam.isOnline, currentVerdicts);
+      const visual = getCameraMarkerVisual(cam.id, cam.isOnline, currentVerdicts, currentHotset);
+      const fillColor = visual.fillColor;
       const strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
       const weight = isDimmed ? 1 : (zoom >= 14 ? 2 : 1.5);
       const opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
       const fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
+      const className = visual.isCongested ? 'marker-congested-pulse' : '';
 
       const marker = L.circleMarker([cam.latitude, cam.longitude], {
         radius,
@@ -297,6 +376,7 @@ export default function MapComponent({
         weight,
         opacity,
         fillOpacity,
+        className,
         pane: 'cameraMarkersPane',
       });
 
@@ -304,10 +384,11 @@ export default function MapComponent({
       customMarker.isDimmed = isDimmed;
       customMarker.isFilteredDimmed = isFilteredDimmed;
       customMarker.hasAIVerdict = hasAIVerdict;
+      customMarker.isHotset = visual.isHotset;
       customMarker.camId = cam.id;
       markersMapRef.current.set(cam.id, customMarker);
 
-      marker.bindTooltip(buildTooltipHtml(cam, verdict, fillColor), {
+      marker.bindTooltip(buildTooltipHtml(cam, verdict, hotset, fillColor), {
         direction: 'top',
         offset: [0, -4]
       });
@@ -350,14 +431,22 @@ export default function MapComponent({
         const strokeColor = isFilteredDim ? '#27272a' : (isMacroDim ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
         const opacity = isFilteredDim ? 0.25 : (isMacroDim ? 0.35 : 1);
         const fillOpacity = isFilteredDim ? 0.2 : (isMacroDim ? 0.25 : 0.95);
+        const visual = getCameraMarkerVisual(cam.id, cam.isOnline, verdictsRef.current, hotsetStatusRef.current);
 
         marker.setStyle({ 
-          fillColor: getTrafficColorForVerdict(cam.id, cam.isOnline, verdictsRef.current), 
+          fillColor: visual.fillColor, 
           color: strokeColor, 
           weight: isDim ? 1 : (curZ >= 14 ? 2 : 1.5),
           opacity,
           fillOpacity,
+          className: visual.isCongested ? 'marker-congested-pulse' : '',
         });
+
+        const el = marker.getElement();
+        if (el) {
+          if (visual.isCongested) el.classList.add('marker-congested-pulse');
+          else el.classList.remove('marker-congested-pulse');
+        }
       });
 
       marker.on('click', () => {
@@ -371,9 +460,9 @@ export default function MapComponent({
 
       markersLayerRef.current?.addLayer(marker);
     });
-  }, [cameras, getTrafficColorForVerdict, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled, buildTooltipHtml]);
+  }, [cameras, getCameraMarkerVisual, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled, buildTooltipHtml]);
 
-  // In-place marker style and tooltip updates on SSE live verdict streams without tearing down DOM layers
+  // In-place marker style and tooltip updates on SSE live verdict streams or Hot Set status updates without tearing down DOM layers
   useEffect(() => {
     if (!markersLayerRef.current || markersMapRef.current.size === 0) return;
 
@@ -385,7 +474,8 @@ export default function MapComponent({
       if (!marker) return;
 
       const verdict = verdicts.get(cam.id);
-      const hasAIVerdict = isVerdictValid(verdict);
+      const hotset = hotsetStatus.get(cam.id);
+      const hasAIVerdict = isVerdictValid(verdict) || isHotsetStatusValid(hotset);
       marker.hasAIVerdict = hasAIVerdict;
 
       const isFilteredDimmed = marker.isFilteredDimmed === true;
@@ -393,21 +483,31 @@ export default function MapComponent({
       const isDimmed = isFilteredDimmed || isMacroHexDimmed;
       marker.isDimmed = isDimmed;
 
-      const fillColor = getTrafficColorForVerdict(cam.id, cam.isOnline, verdicts);
+      const visual = getCameraMarkerVisual(cam.id, cam.isOnline, verdicts, hotsetStatus);
       const strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
       const opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
       const fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
 
       marker.setStyle({
-        fillColor,
+        fillColor: visual.fillColor,
         color: strokeColor,
         opacity,
         fillOpacity,
+        className: visual.isCongested ? 'marker-congested-pulse' : '',
       });
 
-      marker.setTooltipContent(buildTooltipHtml(cam, verdict, fillColor));
+      const el = marker.getElement();
+      if (el) {
+        if (visual.isCongested) {
+          el.classList.add('marker-congested-pulse');
+        } else {
+          el.classList.remove('marker-congested-pulse');
+        }
+      }
+
+      marker.setTooltipContent(buildTooltipHtml(cam, verdict, hotset, visual.fillColor));
     });
-  }, [verdicts, cameras, getTrafficColorForVerdict, buildTooltipHtml]);
+  }, [verdicts, hotsetStatus, cameras, getCameraMarkerVisual, buildTooltipHtml]);
 
   return (
     <div className="relative w-full h-full overflow-hidden">
@@ -475,6 +575,29 @@ export default function MapComponent({
           {topRightControls}
         </div>
       ) : null}
+
+      {/* Bottom map footer legend: Minimalist monochromatic arterial status (Issue #251 / S7-T6) */}
+      <div
+        className="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-[700] pointer-events-auto select-none flex items-center gap-2 md:gap-3 px-3 py-1.5 rounded-md bg-zinc-950/95 border border-zinc-800 text-zinc-300 font-mono text-[10px] md:text-[11px] shadow-2xl backdrop-blur-md"
+        role="region"
+        aria-label={lang === 'vi' ? 'Chú giải mật độ điểm nghẽn trục chính' : 'Arterial saturation legend'}
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full border border-black shrink-0" style={{ backgroundColor: '#10b981' }} />
+          <span>{HOTSET_LEGEND_I18N.CLEAR[lang]}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full border border-black shrink-0" style={{ backgroundColor: '#f59e0b' }} />
+          <span>{HOTSET_LEGEND_I18N.MODERATE[lang]}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-60" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-black" style={{ backgroundColor: '#ef4444' }} />
+          </span>
+          <span>{HOTSET_LEGEND_I18N.CONGESTED[lang]}</span>
+        </div>
+      </div>
     </div>
   );
 }
