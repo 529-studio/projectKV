@@ -186,6 +186,14 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Added comprehensive unit tests in `apps/web/src/utils/cameraModalUtils.test.ts` (131 total tests passing) verifying button states, zero-emoji compliance, cooldown math, and camera isolation.
 - **Sprint 7 Task S7-T1 Deferral Note (Issue #246)**:
   - Task S7-T1 (`[ci + ops] Live Staging Telegram Flood Alert Verification & Simulation Deprecation`) was evaluated and classified as **nice-to-have** operational verification. To prioritize core perception accuracy, directional labeling taxonomy, and human-in-the-loop crowd-sourcing feedback loops, S7-T1 is deferred to post-Sprint 7 milestones.
+- **Autonomous Continuous Data Flywheel & S7-T7 VLM Deprecation (ADR-009 Revision, Issues #261, #262, #263, #264)**:
+  - Formally updated ADR-009 with §2.4 Autonomous Continuous Data Flywheel architecture, establishing dual triggers (daily peak schedule at 07:30, 12:00, 17:30 ICT + Open-Meteo meteorological rain watcher with 60m sliding cooldown) and continuous Cloudflare R2 ground-truth ingestion.
+  - Closed and superseded Issue #252 (cloud VLM bridge) in favor of on-premise OpenVINO harvester to eliminate cloud API costs ($111/mo saved) and runtime latency.
+  - Decomposed implementation into 4 tracked tasks on GitHub and Plane Kanban (https://hub.529studio.site):
+    - `[KV-9]` / Issue [#261](https://github.com/529-studio/projectKV/issues/261): S7-T9b — Revise ADR-009 Data Flywheel & Reconcile S7-T7 VLM Deprecation.
+    - `[KV-10]` / Issue [#262](https://github.com/529-studio/projectKV/issues/262): S7-T7b — `internal/harvester` Autonomous Dual-Trigger Poller, Label Generator & Cloudflare R2 Archiver.
+    - `[KV-11]` / Issue [#263](https://github.com/529-studio/projectKV/issues/263): S7-T7c — Standalone Automated Harvester CLI (`tools/eval/auto_harvest.py`).
+    - `[KV-12]` / Issue [#264](https://github.com/529-studio/projectKV/issues/264): S7-T7d — Web Labeler Candidate Review Filter & Auto-Harvest Verification Badges.
 
 ---
 

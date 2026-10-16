@@ -14,11 +14,11 @@ Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers 
 | Epic | Tên Epic | Issues con | Mục tiêu chính |
 |---|---|---|---|
 | **epic:dock-ux** | `[Epic] Dock, Map & Modal Usability Hardening` | S7-T2, S7-T3, S7-T6 | Ẩn 125 camera mất tín hiệu; thêm nút xúc giác "Báo cáo ngập tại đây"; tô màu thời gian thực cho 50 camera trục chính |
-| **epic:infra-resilience** | `[Epic] Infrastructure Resilience & Staging Verification` | S7-T1 | Kiểm thử live bot Telegram trên môi trường staging Portainer Stack 14, bãi bỏ chế độ giả lập |
-| **epic:flood-integrity** | `[Epic] Verified Real-Time Flood Ingestion & Alerting` | S7-T4, S7-T7 | Leaf package `internal/feedback` lưu snapshot R2; quét ngập tự động theo mưa bảo vệ quota VLM |
+| **epic:infra-resilience** | `[Epic] Infrastructure Resilience & Staging Verification` | S7-T1 | Kiểm thử live bot Telegram trên môi trường staging Portainer Stack 14, bãi bỏ chế độ giả lập (Nice-to-have, dời sau S7) |
+| **epic:flood-integrity** | `[Epic] Verified Real-Time Flood Ingestion & Alerting` | S7-T4, S7-T7b | Leaf package `internal/feedback` lưu snapshot R2; background harvester tự động quét ngập on-premise theo mưa bảo vệ R2 & gateway |
 | **epic:vehicle-detection** | `[Epic] Autonomous Arterial Traffic Perception` | S7-T5 | Background worker quét tự động 50 camera trục chính bằng OpenVINO on-premise, không gọi cloud VLM |
-| **epic:eval-tooling** | `[Epic] Multi-Lane Labeling Taxonomy & Toolchain` | S7-T8 | Nâng cấp schema nhãn phân luồng 2 chiều, trạng thái dừng đèn đỏ và đo độ ngập bánh xe máy |
-| **rfc / architecture** | `[Epic] Zero-VLM Architecture & Governance` | S7-T9, S7-T10 | Đặc tả kỹ thuật ADR-009 phân đoạn ảnh mặt nước on-premise; nghiệm thu toàn diện Sprint 7 |
+| **epic:eval-tooling** | `[Epic] Multi-Lane Labeling Taxonomy & Toolchain` | S7-T8, S7-T7c, S7-T7d | Nâng cấp schema nhãn phân luồng 2 chiều, CLI tự động thu thập & đánh nhãn theo lịch/mưa, bộ lọc duyệt nhãn trên Web Labeler |
+| **rfc / architecture** | `[Epic] Zero-VLM Architecture & Governance` | S7-T9, S7-T9b, S7-T10 | Đặc tả kỹ thuật ADR-009 phân đoạn ảnh mặt nước on-premise & Data Flywheel; nghiệm thu toàn diện Sprint 7 |
 
 ---
 
@@ -26,16 +26,19 @@ Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers 
 
 | Wave | ID | Kanban (Plane) | GitHub Issue | Title | Epic | Labels | Phụ thuộc |
 |:---:|:---:|:---:|:---:|---|---|---|:---:|
-| **0** | **S7-T2** | - | [#247](https://github.com/529-studio/projectKV/issues/247) | `[web] Hide Offline / No-Signal Cameras by Default on Map (Map Hygiene)` | epic:dock-ux | `frontend` | None (Merged PR #257) |
+| **0** | **S7-T2** | - | [#247](https://github.com/529-studio/projectKV/issues/247) | `[web] Hide Offline / No-Signal Cameras by Default on Map (Map Hygiene)` | epic:dock-ux | `frontend` | Hoàn thành (Merged PR #257) |
 | **0** | **S7-T1** | **[KV-1]** | [#246](https://github.com/529-studio/projectKV/issues/246) | `[ci + ops] Live Staging Telegram Flood Alert Verification & Simulation Deprecation (Stack 14 homesrv)` | epic:infra-resilience | `tooling, cross-cutting` | Nice-to-have (Dời sau Sprint 7) |
-| **1** | **S7-T3** | **[KV-2]** | [#248](https://github.com/529-studio/projectKV/issues/248) | `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback` | epic:dock-ux | `frontend` | Hoàn thành (`feat/s7-t3-report-flood-button`) |
+| **1** | **S7-T3** | **[KV-2]** | [#248](https://github.com/529-studio/projectKV/issues/248) | `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback` | epic:dock-ux | `frontend` | Hoàn thành (Merged PR #259) |
 | **1** | **S7-T4** | **[KV-3]** | [#249](https://github.com/529-studio/projectKV/issues/249) | `[go-server] internal/feedback Leaf Package & Cloudflare R2 Ground-Truth Archiver` | epic:flood-integrity | `backend, go` | [#248](https://github.com/529-studio/projectKV/issues/248) (S7-T3) |
 | **2** | **S7-T5** | **[KV-4]** | [#250](https://github.com/529-studio/projectKV/issues/250) | `[go-server + cv-engine] Autonomous 50 Hot Set Traffic Poller & Saturation Cache` | epic:vehicle-detection | `backend, go, epic:vehicle-detection` | None (Backend worker) |
 | **2** | **S7-T6** | **[KV-5]** | [#251](https://github.com/529-studio/projectKV/issues/251) | `[web] Real-Time Arterial Marker Saturation Coloring (Green / Yellow / Red Dots)` | epic:dock-ux | `frontend` | [#250](https://github.com/529-studio/projectKV/issues/250) (S7-T5) |
-| **2** | **S7-T7** | **[KV-6]** | [#252](https://github.com/529-studio/projectKV/issues/252) | `[go-server] Rain-Triggered Automated Hot Set Flood Poller (VLM Bridge)` | epic:flood-integrity | `backend, go, epic:flood-integrity` | [#250](https://github.com/529-studio/projectKV/issues/250) (S7-T5) |
-| **3** | **S7-T8** | - | [#253](https://github.com/529-studio/projectKV/issues/253) | `[tooling] Multi-Lane Directional Labeling Taxonomy & Toolchain Upgrade` | epic:eval-tooling | `tooling, epic:eval-tooling` | None (Merged PR #258) |
-| **3** | **S7-T9** | **[KV-7]** | [#254](https://github.com/529-studio/projectKV/issues/254) | `[docs + spike] ADR-009 Technical Design Spike: Self-Hosted Flood Segmentation (Zero-VLM)` | rfc | `documentation, rfc` | [#252](https://github.com/529-studio/projectKV/issues/252) (S7-T7) |
-| **4** | **S7-T10** | **[KV-8]** | [#255](https://github.com/529-studio/projectKV/issues/255) | `[docs] Holistic Repository Knowledge Synchronization & Sprint 7 Closeout` | rfc | `documentation` | S7-T1 đến S7-T9 |
+| **2** | **S7-T7b** | **[KV-10]** | [#262](https://github.com/529-studio/projectKV/issues/262) | `[go-server] internal/harvester Autonomous Dual-Trigger Poller, Label Generator & Cloudflare R2 Archiver` | epic:flood-integrity | `backend, go, epic:eval-tooling` | [#250](https://github.com/529-studio/projectKV/issues/250) (S7-T5), [#261](https://github.com/529-studio/projectKV/issues/261) |
+| **2** | **S7-T7c** | **[KV-11]** | [#263](https://github.com/529-studio/projectKV/issues/263) | `[tooling] Standalone Automated Harvester CLI (tools/eval/auto_harvest.py)` | epic:eval-tooling | `tooling, epic:eval-tooling` | [#261](https://github.com/529-studio/projectKV/issues/261) (ADR-009) |
+| **2** | **S7-T7d** | **[KV-12]** | [#264](https://github.com/529-studio/projectKV/issues/264) | `[web] Web Labeler Candidate Review Filter & Auto-Harvest Verification Badges` | epic:eval-tooling | `frontend` | [#262](https://github.com/529-studio/projectKV/issues/262) (S7-T7b) |
+| **3** | **S7-T8** | - | [#253](https://github.com/529-studio/projectKV/issues/253) | `[tooling] Multi-Lane Directional Labeling Taxonomy & Toolchain Upgrade` | epic:eval-tooling | `tooling, epic:eval-tooling` | Hoàn thành (Merged PR #258) |
+| **3** | **S7-T9b** | **[KV-9]** | [#261](https://github.com/529-studio/projectKV/issues/261) | `[docs] Revise ADR-009: Autonomous Ground-Truth Data Flywheel & Reconcile S7-T7 VLM Deprecation` | rfc | `documentation, rfc` | Hoàn thành (PR #265) |
+| **3** | **S7-T9** | **[KV-7]** | [#254](https://github.com/529-studio/projectKV/issues/254) | `[docs + spike] ADR-009 Technical Design Spike: Self-Hosted Flood Segmentation (Zero-VLM)` | rfc | `documentation, rfc` | [#261](https://github.com/529-studio/projectKV/issues/261) (ADR-009) |
+| **4** | **S7-T10** | **[KV-8]** | [#255](https://github.com/529-studio/projectKV/issues/255) | `[docs] Holistic Repository Knowledge Synchronization & Sprint 7 Closeout` | rfc | `documentation` | S7-T2 đến S7-T9b |
 
 ---
 
@@ -215,63 +218,86 @@ Branch: feat/s7-t6-map-marker-saturation
 Open PR targeting dev starting with 'Close #251'. Do NOT merge."
 ```
 
-### Terminal 3 — S7-T7 (Tự động kiểm tra ngập khi có mưa theo Quota Governor)
+### Terminal 3 — S7-T7b (Engine internal/harvester Quét tự động kích hoạt kép & Lưu R2)
 
 ```bash
 cd ~/repos/projectKV
 
-agy "Implement issue #252: [go-server] S7-T7 — Rain-Triggered Automated Hot Set Flood Poller (VLM Bridge).
+agy "Implement issue #262: [go-server] S7-T7b — internal/harvester Autonomous Dual-Trigger Poller, Label Generator & Cloudflare R2 Archiver.
 
-Read the full issue at https://github.com/529-studio/projectKV/issues/252 for complete Technical Details, Out of Scope, and Definition of Done.
+Read the full issue at https://github.com/529-studio/projectKV/issues/262 for complete Technical Details, Out of Scope, and Definition of Done.
 
 Key requirements:
-- In services/go-server/internal/flood/service.go:
-  - Hook into Open-Meteo weather triggers: active rainfall >= 0.10 mm/h.
-  - Automatically schedules Gemini VLM verification across known flood chokepoints (Ung Văn Khiêm, Hồ Học Lãm, Huỳnh Tấn Phát, Tô Ngọc Vân, Nguyễn Xí).
-  - Strict Quota Governor: caps VLM dispatch to <= 2 requests per minute (strictly respecting 10 RPM / 300 RPD budget).
-  - Updates in-memory flood state to FLOODED_SHALLOW or FLOODED_DEEP.
-  - Dispatches Telegram alert via internal/notify with 30-minute debounce window.
-  - Exposes status on camera endpoint so Web UI shows Blue badge '[NGẬP NƯỚC]'.
-- Run tests: make test-go.
+- Create leaf package services/go-server/internal/harvester/ conforming to GO_BACKEND_ARCHITECTURE.md:
+  - harvester.go: Coordinator struct injecting weather.Service, proxycache.Cache, cvclient.Client, and storage.Storage (R2).
+  - scheduler.go: Ticker for daily scheduled harvest at peak commuting hours (07:30, 12:00, 17:30 ICT) across 57 Hot Set cameras.
+  - watcher.go: Weather watcher polling weather.Service every 5 minutes; triggers rain harvest when rainfall >= 0.10 mm/h with 60-minute sliding window cooldown across 184 flood-prone corridor cameras.
+  - pipeline.go: Concurrent frame downloader, local OpenVINO inference runner, directional PCU saturation mapper, physical waterline depth anchor mapper (dry / wet_asphalt / tire_base_under_10cm), in-memory Draft-07 schema validator, and concurrent R2 streamer (warded-proofs).
+- Add config keys in internal/config/config.go: HARVESTER_ENABLED, HARVESTER_SCHEDULE_HOURS, HARVESTER_RAIN_COOLDOWN_MINUTES, HARVESTER_CONCURRENCY.
+- Wire into cmd/server/main.go with graceful shutdown context.
+- Unit and race tests in harvester_test.go with mocked weather, storage, and cvclient.
 
-Branch: feat/s7-t7-rain-triggered-flood-poller
-Open PR targeting dev starting with 'Close #252'. Do NOT merge."
+Branch: feat/s7-t7b-internal-harvester
+Open PR targeting dev starting with 'Close #262 closes [KV-10]'. Do NOT merge."
+```
+
+### Terminal 4 — S7-T7c (CLI Tự động hóa Thu thập & Đánh nhãn Độc lập)
+
+```bash
+cd ~/repos/projectKV
+
+agy "Implement issue #263: [tooling] S7-T7c — Standalone Automated Harvester CLI (tools/eval/auto_harvest.py).
+
+Read the full issue at https://github.com/529-studio/projectKV/issues/263 for complete Technical Details, Out of Scope, and Definition of Done.
+
+Key requirements:
+- Create tools/eval/auto_harvest.py:
+  - CLI flags: --trigger [scheduled|rain|now], --scope [hotset|flood-prone|all], --weather [auto|dry|rain], --upload-r2, --validate, --dry-run.
+  - When --weather auto is passed, automatically queries Open-Meteo API for HCMC coordinates.
+  - Concurrently fetches frames, calls local OpenVINO /predict, computes directional PCU saturation, maps waterline depth anchors, validates Draft-07 JSON schema, and optionally uploads to Cloudflare R2.
+- Build unit tests in tools/eval/auto_harvest_test.py.
+- Verify: python3 -m unittest tools/eval/auto_harvest_test.py.
+
+Branch: tooling/s7-t7c-auto-harvest-cli
+Open PR targeting dev starting with 'Close #263 closes [KV-11]'. Do NOT merge."
+```
+
+### Terminal 5 — S7-T7d (Bộ lọc Thẩm định Nhãn Tự động trên Web Labeler)
+
+```bash
+cd ~/repos/projectKV
+
+agy "Implement issue #264: [web] S7-T7d — Web Labeler Candidate Review Filter & Auto-Harvest Verification Badges.
+
+Read the full issue at https://github.com/529-studio/projectKV/issues/264 for complete Technical Details, Out of Scope, and Definition of Done.
+
+Key requirements:
+- In apps/web/src/app/labeler/page.tsx:
+  - Add review filter buttons: '[Tất cả]', '[Chờ duyệt (Auto)]', '[Đã duyệt (Human)]'.
+  - Render monochromatic source badge: '[Tự động: Harvester]' vs '[Người duyệt: <tên>]'.
+  - Add hotkey Shift + Enter: fast-approves auto-generated candidate label, promoting it to certified gold standard with current annotator nickname.
+- In apps/web/src/utils/labelerUtils.ts:
+  - Add isAutoHarvested(label) helper and filter predicates.
+  - Update LABELER_I18N with bilingual zero-emoji strings.
+- Unit tests: cd apps/web && npm test (all tests pass).
+
+Branch: feat/s7-t7d-web-labeler-filter
+Open PR targeting dev starting with 'Close #264 closes [KV-12]'. Do NOT merge."
 ```
 
 ---
 
-## Wave 3 — Tái thiết Chuẩn Đánh nhãn & Thiết kế Zero-VLM (S7-T8, S7-T9)
+## Wave 3 — Tái thiết Chuẩn Đánh nhãn & Thiết kế Zero-VLM (S7-T8, S7-T9b, S7-T9)
 
 Khắc phục triệt để lỗ hổng của ground-truth cũ (script đoán mò theo tên đường) và lập đặc tả kỹ thuật cho mô hình phân đoạn ảnh ngập nước on-premise (BiSeNet / YOLOv8-seg).
 
-### Terminal 1 — S7-T8 (Chuẩn hóa Schema nhãn phân luồng 2 chiều & Toolchain)
+### Terminal 1 — S7-T8 (Chuẩn hóa Schema nhãn phân luồng 2 chiều & Toolchain) — ĐÃ HOÀN THÀNH (PR #258)
+Ticket này đã được hoàn thành trọn vẹn tại PR [#258](https://github.com/529-studio/projectKV/pull/258), nâng cấp `tools/eval/label_schema.json` lên JSON Schema Draft-07, bổ sung phân luồng 2 chiều và neo ngập bánh xe máy.
 
-```bash
-cd ~/repos/projectKV
+### Terminal 2 — S7-T9b (Bổ sung Đặc tả Data Flywheel vào ADR-009) — ĐÃ HOÀN THÀNH (PR #265)
+Ticket này đã được hoàn thành trọn vẹn tại PR [#265](https://github.com/529-studio/projectKV/pull/265) (`Close #261 closes [KV-9]`), chính thức bãi bỏ cloud VLM bridge và đặc tả kiến trúc Autonomous Data Flywheel (§2.4).
 
-agy "Implement issue #253: [tooling] S7-T8 — Multi-Lane Directional Labeling Taxonomy & Toolchain Upgrade.
-
-Read the full issue at https://github.com/529-studio/projectKV/issues/253 for complete Technical Details, Out of Scope, and Definition of Done.
-
-Key requirements:
-- Upgrade tools/eval/label_schema.json to JSON Schema Draft-07:
-  - Multi-lane directional structure: direction ('inbound', 'outbound', 'bidirectional').
-  - Traffic density: 'CLEAR', 'MODERATE', 'HEAVY', 'CONGESTED'.
-  - Red-light queue tracking: 'is_waiting_red_light' (boolean).
-  - Motorcycle wheel waterline depth indicators:
-    - 'DRY'
-    - 'WET_SURFACE' (wet road reflection only, no standing water)
-    - 'TIRE_QUARTER_SUBMERGED' (puddle, 5-10cm)
-    - 'TIRE_HALF_SUBMERGED' (hazardous flood, 15-20cm)
-    - 'IMPASSABLE' (> 25cm)
-- Upgrade tools/eval/labeler.html to support multi-lane tagging and waterline radio selectors.
-- Build validation script tools/eval/validate_labels.py ensuring all exported JSON files adhere to schema.
-
-Branch: tooling/s7-t8-multilane-labeling-taxonomy
-Open PR targeting dev starting with 'Close #253'. Do NOT merge."
-```
-
-### Terminal 2 — S7-T9 (Đặc tả thiết kế ADR-009: Phân đoạn ảnh ngập nước On-Premise)
+### Terminal 3 — S7-T9 (Đặc tả thiết kế ADR-009: Phân đoạn ảnh ngập nước On-Premise)
 
 ```bash
 cd ~/repos/projectKV
