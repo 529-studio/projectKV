@@ -125,13 +125,6 @@ func (m *mockStorageUploader) Put(ctx context.Context, path string, data io.Read
 	return nil
 }
 
-func (m *mockStorageUploader) getUpload(path string) ([]byte, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	data, ok := m.uploads[path]
-	return data, ok
-}
-
 func (m *mockStorageUploader) count() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
