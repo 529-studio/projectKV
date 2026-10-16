@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -22,6 +23,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/corridor"
 	"github.com/529-studio/projectKV/services/go-server/internal/cvclient"
 	"github.com/529-studio/projectKV/services/go-server/internal/flood"
+	"github.com/529-studio/projectKV/services/go-server/internal/harvester"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
@@ -205,6 +207,107 @@ func (a cameraTitleAdapter) GetCameraTitle(id string) string {
 		}
 	}
 	return ""
+}
+
+// harvesterWeatherAdapter adapts *weather.Service to harvester.WeatherProvider.
+type harvesterWeatherAdapter struct {
+	service *weather.Service
+}
+
+func (a *harvesterWeatherAdapter) GetWeather(ctx context.Context) (*harvester.WeatherInfo, error) {
+	if a.service == nil {
+		return nil, nil
+	}
+	w, err := a.service.GetWeather(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if w == nil {
+		return nil, nil
+	}
+	return &harvester.WeatherInfo{
+		RainfallMm:  w.RainMm,
+		WeatherCode: w.WeatherCode,
+	}, nil
+}
+
+// harvesterSnapshotFetcher adapts proxycache.Cache and HTTP client to harvester.SnapshotFetcher.
+type harvesterSnapshotFetcher struct {
+	cache        *proxycache.Cache
+	upstreamBase string
+	client       *http.Client
+}
+
+func (f *harvesterSnapshotFetcher) FetchSnapshot(ctx context.Context, cam harvester.Camera) ([]byte, error) {
+	if f.cache != nil {
+		if data, ok := f.cache.Get(cam.ID); ok && len(data) > 0 {
+			return data, nil
+		}
+	}
+	snapURL := cam.SnapshotURL
+	if snapURL == "" {
+		snapURL = fmt.Sprintf("%s?id=%s", f.upstreamBase, cam.ID)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, snapURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CameraViewHarvester/1.0)")
+	resp, err := f.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("snapshot returned status %d", resp.StatusCode)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+// harvesterPredictorAdapter adapts CVEngine /predict endpoint to harvester.VisionPredictor.
+type harvesterPredictorAdapter struct {
+	url    string
+	client *http.Client
+}
+
+func (p *harvesterPredictorAdapter) Predict(ctx context.Context, cam harvester.Camera, frame []byte) (*harvester.PredictionResult, error) {
+	if p.url == "" {
+		return &harvester.PredictionResult{
+			TrafficSeverity: "CLEAR",
+			Confidence:      0.8,
+		}, nil
+	}
+	predictURL := p.url + "/predict"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, predictURL, bytes.NewReader(frame))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("predict endpoint returned status %d", resp.StatusCode)
+	}
+	var parsed struct {
+		TrafficSeverity  string                  `json:"traffic_severity"`
+		Confidence       float64                 `json:"confidence"`
+		VehiclesDetected int                     `json:"vehicles_detected"`
+		VehicleCounts    harvester.VehicleCounts `json:"vehicle_counts"`
+		LatencyMs        float64                 `json:"latency_ms"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, err
+	}
+	return &harvester.PredictionResult{
+		TrafficSeverity:  parsed.TrafficSeverity,
+		Confidence:       parsed.Confidence,
+		VehiclesDetected: parsed.VehiclesDetected,
+		VehicleCounts:    parsed.VehicleCounts,
+		LatencyMs:        parsed.LatencyMs,
+	}, nil
 }
 
 func main() {
@@ -753,6 +856,69 @@ func main() {
 		go hotsetScheduler.Run(schedulerCtx)
 	}
 
+	// 6f. Initialize autonomous harvester subsystem (Issue #262 / S7-T7b)
+	var harvesterCoord *harvester.Coordinator
+	if storeDriver != nil {
+		var allHarvesterCameras []harvester.Camera
+		if camCatalog != nil {
+			for _, c := range camCatalog.All() {
+				if c.IsOnline && !c.IsGhost && c.DuplicateOf == "" {
+					allHarvesterCameras = append(allHarvesterCameras, harvester.Camera{
+						ID:          c.ID,
+						DisplayName: c.DisplayName,
+						Title:       c.Title,
+						SnapshotURL: c.SnapshotURL,
+						RoadKeys:    c.RoadKeys,
+					})
+				}
+			}
+		}
+		harvesterHotsetCams := harvester.FilterHotsetCameras(allHarvesterCameras)
+		harvesterRainCams := harvester.FilterFloodCorridorCameras(allHarvesterCameras)
+
+		harvesterCfg := harvester.Config{
+			Enabled:             cfg.HarvesterEnabled,
+			ScheduleHours:       cfg.HarvesterScheduleHours,
+			RainCooldownMinutes: cfg.HarvesterRainCooldownMinutes,
+			Concurrency:         cfg.HarvesterConcurrency,
+		}
+
+		var weatherProv harvester.WeatherProvider
+		if weatherService != nil {
+			weatherProv = &harvesterWeatherAdapter{service: weatherService}
+		}
+
+		snapFetcher := &harvesterSnapshotFetcher{
+			cache:        proxyCache,
+			upstreamBase: upstreamBase,
+			client:       cvclient.SharedClient,
+		}
+
+		predictor := &harvesterPredictorAdapter{
+			url:    cfg.CVEngineURL,
+			client: cvclient.SharedClient,
+		}
+
+		var err error
+		harvesterCoord, err = harvester.New(harvesterCfg, harvester.Dependencies{
+			Weather:       weatherProv,
+			Fetcher:       snapFetcher,
+			Predictor:     predictor,
+			Storage:       storeDriver,
+			HotsetCameras: harvesterHotsetCams,
+			RainCameras:   harvesterRainCams,
+		})
+		if err != nil {
+			log.Printf("[WARN] Failed to initialize autonomous harvester: %v", err)
+		} else if cfg.HarvesterEnabled {
+			harvesterCtx, cancelHarvester := context.WithCancel(context.Background())
+			defer cancelHarvester()
+			if err := harvesterCoord.Start(harvesterCtx); err != nil {
+				log.Printf("[WARN] Failed to start autonomous harvester: %v", err)
+			}
+		}
+	}
+
 	// 8. Setup Gin Engine
 	router := gin.Default()
 	router.Use(middleware.CORSMiddleware())
@@ -894,6 +1060,9 @@ func main() {
 
 	log.Println("[SHUTDOWN] Shutting down Camera View server...")
 	close(stopPurgeCh)
+	if harvesterCoord != nil {
+		harvesterCoord.Stop()
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

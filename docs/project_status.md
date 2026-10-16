@@ -213,6 +213,15 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Enriched map tooltips with exact Saturation Index percentage and PCU count.
   - Preserved camera preview modal click functionality across all markers.
   - Added comprehensive unit tests in `apps/web/src/utils/hotsetUtils.test.ts` (144 unit tests passing, Next.js static build verified).
+- **Autonomous Dual-Trigger Harvester & Cloudflare R2 Archiver (Sprint 7 T7b, Issue #262, PR #266)**:
+  - Created leaf package `services/go-server/internal/harvester/` conforming to `GO_BACKEND_ARCHITECTURE.md` (zero sibling internal imports, strict dependency inversion).
+  - Implemented `harvester.go` Coordinator orchestrating `Scheduler`, `Watcher`, and `Pipeline` with injected consumer interfaces (`WeatherProvider`, `SnapshotFetcher`, `VisionPredictor`, `StorageUploader`).
+  - Implemented `scheduler.go` with daily peak hour timer (`07:30`, `12:00`, `17:30` ICT / UTC+7) across 57 Hot Set dual-carriageway intersection cameras.
+  - Implemented `watcher.go` polling meteorological weather every 5 minutes; triggers rain harvest when rainfall $\ge 0.10\text{ mm/h}$ or rain WMO codes occur, protected by a thread-safe 60-minute sliding window cooldown across flood-prone corridor cameras.
+  - Implemented `pipeline.go` with semaphore-bounded worker pool (concurrency 15), JPEG integrity validation (`0xFFD8` SOI marker and $\ge 20\text{ KB}$), local OpenVINO `/predict` inference, directional PCU saturation mapping, physical waterline depth anchor mapping (`dry`, `wet_asphalt_no_standing`, `tire_base_under_10cm`), in-memory Draft-07 schema validation, and concurrent Cloudflare R2 streaming (`proofs/YYYY-MM-DD/<cam_id>/<ts>_sample.jpg` and `labels/YYYY-MM-DD/cam_<cam_id>_<ts>.json`).
+  - Added configuration keys `HARVESTER_ENABLED`, `HARVESTER_SCHEDULE_HOURS`, `HARVESTER_RAIN_COOLDOWN_MINUTES`, `HARVESTER_CONCURRENCY` in `services/go-server/internal/config/config.go`.
+  - Wired into `cmd/server/main.go` with graceful shutdown lifecycle integration.
+  - Comprehensive unit and race test suite in `internal/harvester/harvester_test.go` (`go test -race ./internal/harvester/...`).
 
 ---
 
