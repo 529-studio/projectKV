@@ -4,6 +4,7 @@ import {
   SATURATION_COLORS,
   getSaturationColor,
   isHotsetCongested,
+  isHotsetStatusValid,
   getHotsetMarkerStyle,
   buildHotsetTooltipSection,
   parseHotsetStatusMap,
@@ -58,7 +59,60 @@ describe('Hot Set Saturation Utilities (Issue #251 / S7-T6)', () => {
     assert.strictEqual(isHotsetCongested(0.95), true);
   });
 
-  test('getHotsetMarkerStyle handles non-hotset, fresh, and stale statuses', () => {
+  test('isHotsetStatusValid requires fresh, non-empty, non-UNKNOWN severity', () => {
+    assert.strictEqual(isHotsetStatusValid(null), false);
+    assert.strictEqual(isHotsetStatusValid(undefined), false);
+
+    // Stale is invalid
+    assert.strictEqual(isHotsetStatusValid({
+      camera_id: 'cam-1',
+      severity: 'CLEAR',
+      saturation_index: 0.1,
+      pcu_total: 5,
+      confidence: 0.9,
+      source: 'onnx',
+      observed_at: new Date().toISOString(),
+      stale: true,
+    }), false);
+
+    // UNKNOWN is invalid
+    assert.strictEqual(isHotsetStatusValid({
+      camera_id: 'cam-2',
+      severity: 'UNKNOWN',
+      saturation_index: 0.0,
+      pcu_total: 0,
+      confidence: 0.0,
+      source: 'fallback',
+      observed_at: new Date().toISOString(),
+      stale: false,
+    }), false);
+
+    // Empty severity is invalid
+    assert.strictEqual(isHotsetStatusValid({
+      camera_id: 'cam-3',
+      severity: '',
+      saturation_index: 0.0,
+      pcu_total: 0,
+      confidence: 0.0,
+      source: 'fallback',
+      observed_at: new Date().toISOString(),
+      stale: false,
+    }), false);
+
+    // Fresh CLEAR / MODERATE / CONGESTED is valid
+    assert.strictEqual(isHotsetStatusValid({
+      camera_id: 'cam-4',
+      severity: 'CLEAR',
+      saturation_index: 0.15,
+      pcu_total: 10,
+      confidence: 0.95,
+      source: 'onnx',
+      observed_at: new Date().toISOString(),
+      stale: false,
+    }), true);
+  });
+
+  test('getHotsetMarkerStyle handles non-hotset, fresh, stale, and unknown statuses', () => {
     // Non-hotset fallback to online/offline default
     const nonHotOnline = getHotsetMarkerStyle(null, true);
     assert.strictEqual(nonHotOnline.isHotset, false);
@@ -103,7 +157,7 @@ describe('Hot Set Saturation Utilities (Issue #251 / S7-T6)', () => {
     assert.strictEqual(congestedStyle.isCongested, true);
     assert.strictEqual(congestedStyle.isStale, false);
 
-    // Stale hotset camera (pulsing suppressed for safety)
+    // Stale hotset camera (pulsing suppressed AND falls back to neutral online color)
     const staleCam: HotsetCameraStatus = {
       ...congestedCam,
       stale: true,
@@ -111,10 +165,30 @@ describe('Hot Set Saturation Utilities (Issue #251 / S7-T6)', () => {
     const staleStyle = getHotsetMarkerStyle(staleCam, true);
     assert.strictEqual(staleStyle.isHotset, true);
     assert.strictEqual(staleStyle.isStale, true);
+    assert.strictEqual(staleStyle.fillColor, '#ffffff'); // Neutral white, not green or red!
     assert.strictEqual(staleStyle.isCongested, false);
+
+    const staleOfflineStyle = getHotsetMarkerStyle(staleCam, false);
+    assert.strictEqual(staleOfflineStyle.fillColor, '#52525b');
+
+    // UNKNOWN hotset camera (e.g. cold-boot / standby / fallback) must NEVER masquerade as green
+    const unknownCam: HotsetCameraStatus = {
+      camera_id: 'cam-3',
+      severity: 'UNKNOWN',
+      saturation_index: 0.0,
+      pcu_total: 0.0,
+      confidence: 0.0,
+      source: 'fallback',
+      observed_at: new Date().toISOString(),
+      stale: false,
+    };
+    const unknownStyle = getHotsetMarkerStyle(unknownCam, true);
+    assert.strictEqual(unknownStyle.isHotset, true);
+    assert.strictEqual(unknownStyle.fillColor, '#ffffff'); // Neutral white, NOT green (#10b981)
+    assert.strictEqual(unknownStyle.isCongested, false);
   });
 
-  test('buildHotsetTooltipSection formats saturation percentage and PCU without emojis', () => {
+  test('buildHotsetTooltipSection formats saturation percentage and PCU without emojis, and omits for UNKNOWN', () => {
     const cam: HotsetCameraStatus = {
       camera_id: 'cam-1',
       severity: 'CONGESTED',
@@ -134,6 +208,20 @@ describe('Hot Set Saturation Utilities (Issue #251 / S7-T6)', () => {
     const enTooltip = buildHotsetTooltipSection(cam, 'en');
     assert.match(enTooltip, /Saturation \(SI\):.*65%/);
     assert.match(enTooltip, /PCU:.*45/);
+
+    // UNKNOWN severity suppresses SI / PCU lines to avoid misleading users with false 0%
+    const unknownCam: HotsetCameraStatus = {
+      camera_id: 'cam-2',
+      severity: 'UNKNOWN',
+      saturation_index: 0.0,
+      pcu_total: 0.0,
+      confidence: 0.0,
+      source: 'fallback',
+      observed_at: new Date().toISOString(),
+      stale: false,
+    };
+    assert.strictEqual(buildHotsetTooltipSection(unknownCam, 'vi'), '');
+    assert.strictEqual(buildHotsetTooltipSection(unknownCam, 'en'), '');
   });
 
   test('parseHotsetStatusMap converts raw API response into camera_id Map', () => {

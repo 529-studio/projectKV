@@ -52,6 +52,18 @@ export function isHotsetCongested(si: number): boolean {
   return si >= 0.60;
 }
 
+/**
+ * Validates whether a Hot Set camera status has fresh, non-UNKNOWN traffic analysis.
+ */
+export function isHotsetStatusValid(status?: HotsetCameraStatus | null): boolean {
+  if (!status) return false;
+  if (status.stale) return false;
+  if (!status.severity) return false;
+  const sev = status.severity.toUpperCase();
+  if (sev === 'UNKNOWN' || sev === '') return false;
+  return true;
+}
+
 export interface HotsetMarkerStyle {
   isHotset: boolean;
   fillColor: string;
@@ -76,9 +88,16 @@ export function getHotsetMarkerStyle(
   }
 
   const isStale = Boolean(status.stale);
-  const fillColor = getSaturationColor(status.saturation_index ?? 0);
-  // Stale markers suppress pulsing animation for trust & safety
-  const isCongested = !isStale && isHotsetCongested(status.saturation_index ?? 0);
+  const isValid = isHotsetStatusValid(status);
+
+  // Trust & safety: Only fresh, valid, non-UNKNOWN verdicts qualify for arterial saturation coloring.
+  // Stale or unanalyzed (UNKNOWN) cameras gracefully fall back to neutral online/offline marker colors.
+  const fillColor = isValid
+    ? getSaturationColor(status.saturation_index ?? 0)
+    : (isOnline ? DEFAULT_MARKER_COLORS.ONLINE : DEFAULT_MARKER_COLORS.OFFLINE);
+
+  // Stale or unknown markers suppress pulsing animation for trust & safety
+  const isCongested = isValid && isHotsetCongested(status.saturation_index ?? 0);
 
   return {
     isHotset: true,
@@ -90,11 +109,17 @@ export function getHotsetMarkerStyle(
 
 /**
  * Formats Hot Set arterial saturation and PCU details for map tooltips without emojis.
+ * Omits saturation and PCU stats when camera has UNKNOWN / unanalyzed severity.
  */
 export function buildHotsetTooltipSection(
   status: HotsetCameraStatus,
   lang: 'vi' | 'en' = 'vi'
 ): string {
+  const isUnknown = !status.severity || status.severity.toUpperCase() === 'UNKNOWN';
+  if (isUnknown) {
+    return '';
+  }
+
   const pct = Math.round((status.saturation_index ?? 0) * 100);
   const pcu = Math.round(status.pcu_total ?? 0);
 
