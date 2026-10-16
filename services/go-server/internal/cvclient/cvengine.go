@@ -151,25 +151,31 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 
 	// Step 5: Compute PCU-weighted Saturation Index severity.
 	severity := resp.TrafficSeverity
+	var pcuTotal float64
+	var saturationIndex float64
 	if a.calculator != nil {
 		if cam.BaseCapacity > 0 && a.calculator.GetBaseCapacity(cam.ID) == a.calculator.CapacityFloor() {
 			a.calculator.SetBaseCapacity(cam.ID, cam.BaseCapacity)
 		}
-		pcuSev, _, _ := a.calculator.Calculate(cam.ID, resp.VehicleCounts, resp.VehiclesDetected)
+		pcuSev, pcuTot, satIdx := a.calculator.Calculate(cam.ID, resp.VehicleCounts, resp.VehiclesDetected)
 		if pcuSev != "" {
 			severity = pcuSev
 		}
+		pcuTotal = pcuTot
+		saturationIndex = satIdx
 	}
 
 	now := time.Now()
 	return hotset.Verdict{
-		CameraID:      cam.ID,
-		Severity:      severity,
-		FloodSeverity: hotset.SeverityUnknown, // cv-engine v1 does not detect flood
-		Confidence:    resp.Confidence,
-		Source:        "onnx",
-		Timestamp:     now,
-		ObservedAt:    now,
-		RawFrame:      jpegBytes,
+		CameraID:        cam.ID,
+		Severity:        severity,
+		FloodSeverity:   hotset.SeverityUnknown, // cv-engine v1 does not detect flood
+		Confidence:      resp.Confidence,
+		Source:          "onnx",
+		Timestamp:       now,
+		ObservedAt:      now,
+		RawFrame:        jpegBytes,
+		SaturationIndex: saturationIndex,
+		PCUTotal:        pcuTotal,
 	}, nil
 }

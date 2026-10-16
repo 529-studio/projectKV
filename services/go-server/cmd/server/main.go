@@ -79,16 +79,18 @@ var criticalKeywords = []string{
 	"an sương", "cát lái", "mỹ thủy", "ngã 4 ga", "quốc lộ 1",
 	"nguyễn văn linh", "điện biên phủ", "võ văn kiệt", "mai chí thọ",
 	"cộng hòa", "phạm văn đồng", "cầu sài gòn", "xô viết nghệ tĩnh",
-	"hành trình", "bình thái",
+	"hành trình", "bình thái", "trường chinh", "quốc lộ 1", "ql1",
 }
 
-// priorityCorridors contains the 4 priority corridors confirmed in Sprint 3 S1 (Option 1b).
-// Reference: docs/spike-vehicle-capacity.md §5 and Issue #136.
+// priorityCorridors contains the priority arterial corridors confirmed in S1 Option 1b and S7-T5.
+// Reference: docs/spike-vehicle-capacity.md §5 and Issue #250.
 var priorityCorridors = map[string]struct{}{
 	"vo_van_kiet":   {},
 	"mai_chi_tho":   {},
 	"dien_bien_phu": {},
 	"cong_hoa":      {},
+	"truong_chinh":  {},
+	"quoc_lo_1":     {},
 }
 
 // buildFixedHotSet selects a deterministic set of critical cameras from the
@@ -446,7 +448,8 @@ func main() {
 	}
 
 	frozenDetector := hotset.NewFrozenDetector(cfg.FrozenFrameThreshold)
-	hotsetHandler := hotset.NewHandlerWithConfig(&verdictStoreAdapter{repo: verdictRepo}, analysisEnabled, cfg.AppEnv)
+	hotsetStore := hotset.NewStore(time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second)
+	hotsetHandler := hotset.NewHandlerWithConfig(hotsetStore, analysisEnabled, cfg.AppEnv)
 	hotsetHandler.SetStaleTTL(time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second)
 
 	var corridorHandler *corridor.Handler
@@ -500,8 +503,8 @@ func main() {
 	}
 	liveHub.SetFloodHexAggregator(floodHexAggregator)
 
-	// Pre-seed aggregators with latest stored verdicts from SQLite so GET /api/flood-hex
-	// and GET /api/traffic-status return cached data immediately on cold boot.
+	// Pre-seed in-memory hotset store and aggregators with latest stored verdicts from SQLite so GET /api/v1/cameras/hotset/status,
+	// GET /api/flood-hex, and GET /api/traffic-status return cached data immediately on cold boot with sub-5ms latency.
 	if verdictRepo != nil {
 		if storedVerdicts, err := verdictRepo.GetLatest(context.Background()); err == nil && len(storedVerdicts) > 0 {
 			staleThreshold := time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second
@@ -528,10 +531,11 @@ func main() {
 					Timestamp:     sv.Timestamp,
 					Stale:         isStale,
 				}
+				hotsetStore.Set(hv)
 				hexAggregator.OnVerdict(hv)
 				floodHexAggregator.OnVerdict(hv)
 			}
-			log.Printf("[INIT] Pre-seeded hex aggregators with %d stored verdicts from database", len(storedVerdicts))
+			log.Printf("[INIT] Pre-seeded in-memory hotset store and hex aggregators with %d stored verdicts from database", len(storedVerdicts))
 		}
 	}
 
@@ -671,6 +675,9 @@ func main() {
 				}
 			}
 
+			// Fan-out 0: record in thread-safe in-memory cache for GET /api/v1/cameras/hotset/status (< 5ms latency).
+			hotsetStore.Set(v)
+
 			// Fan-out 1: push to all SSE clients immediately.
 			liveHub.Broadcast(v)
 
@@ -733,6 +740,7 @@ func main() {
 			onVerdict,
 			nil, // uses slog.Default()
 		)
+		hotsetScheduler.SetStore(hotsetStore)
 
 		// Global daily analyzer budget (ADR-004 §D9). When exhausted the
 		// scheduler degrades to UNKNOWN verdicts instead of invoking the analyzer.

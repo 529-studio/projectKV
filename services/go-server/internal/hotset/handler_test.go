@@ -2,6 +2,7 @@ package hotset_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -383,5 +384,119 @@ func TestGetTrafficStatus_CustomStaleTTLAndFrozenPreserved(t *testing.T) {
 	}
 	if resp.AppEnv != "dev" {
 		t.Errorf("expected app_env dev, got %s", resp.AppEnv)
+	}
+}
+
+func TestGetHotsetStatus_Returns50Cameras(t *testing.T) {
+	st := hotset.NewStore(60 * time.Second)
+	now := time.Now().UTC()
+
+	for i := 1; i <= 50; i++ {
+		camID := fmt.Sprintf("cam_%03d", i)
+		st.Set(hotset.Verdict{
+			CameraID:        camID,
+			Severity:        hotset.SeverityModerate,
+			Confidence:      0.88,
+			Source:          "onnx",
+			ObservedAt:      now,
+			Timestamp:       now,
+			SaturationIndex: 0.42,
+			PCUTotal:        35.0,
+		})
+	}
+
+	h := hotset.NewHandlerWithConfig(st, true, "production")
+	r := newTestRouter(h)
+
+	// Test both /api/v1/cameras/hotset/status and /api/cameras/hotset/status
+	endpoints := []string{"/api/v1/cameras/hotset/status", "/api/cameras/hotset/status"}
+	for _, ep := range endpoints {
+		req := httptest.NewRequest(http.MethodGet, ep, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: expected 200, got %d", ep, w.Code)
+		}
+
+		var resp hotset.HotsetStatusResponse
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("%s: decode response: %v", ep, err)
+		}
+
+		if resp.Total != 50 {
+			t.Errorf("%s: expected 50 cameras, got %d", ep, resp.Total)
+		}
+		if len(resp.Cameras) != 50 {
+			t.Errorf("%s: expected 50 cameras in slice, got %d", ep, len(resp.Cameras))
+		}
+		if resp.Cameras[0].SaturationIndex != 0.42 || resp.Cameras[0].PCUTotal != 35.0 {
+			t.Errorf("%s: expected SI=0.42, PCU=35.0, got SI=%f, PCU=%f", ep, resp.Cameras[0].SaturationIndex, resp.Cameras[0].PCUTotal)
+		}
+	}
+}
+
+func TestGetHotsetStatus_OmitsMockWhenNotDev(t *testing.T) {
+	store := &mockStorer{
+		verdicts: []hotset.Verdict{
+			{CameraID: "cam_mock", Severity: "CLEAR", Source: "mock"},
+			{CameraID: "cam_onnx", Severity: "HEAVY", Source: "onnx", SaturationIndex: 0.75},
+		},
+	}
+	hProd := hotset.NewHandlerWithConfig(store, true, "production")
+	rProd := newTestRouter(hProd)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/cameras/hotset/status", nil)
+	w := httptest.NewRecorder()
+	rProd.ServeHTTP(w, req)
+
+	var resp hotset.HotsetStatusResponse
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
+	if resp.Total != 1 || resp.Cameras[0].CameraID != "cam_onnx" {
+		t.Errorf("expected only onnx camera in production, got %+v", resp.Cameras)
+	}
+}
+
+func TestGetHotsetStatus_Sub5msLatency(t *testing.T) {
+	st := hotset.NewStore(60 * time.Second)
+	now := time.Now().UTC()
+
+	for i := 1; i <= 50; i++ {
+		camID := fmt.Sprintf("cam_%03d", i)
+		st.Set(hotset.Verdict{
+			CameraID:        camID,
+			Severity:        hotset.SeverityModerate,
+			Confidence:      0.88,
+			Source:          "onnx",
+			ObservedAt:      now,
+			Timestamp:       now,
+			SaturationIndex: 0.42,
+			PCUTotal:        35.0,
+		})
+	}
+
+	h := hotset.NewHandlerWithConfig(st, true, "production")
+	r := newTestRouter(h)
+
+	// Run 100 requests to measure latency under load
+	iterations := 100
+	start := time.Now()
+	for i := 0; i < iterations; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/cameras/hotset/status", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("iteration %d: expected 200, got %d", i, w.Code)
+		}
+	}
+	totalElapsed := time.Since(start)
+	avgLatency := totalElapsed / time.Duration(iterations)
+
+	t.Logf("50-camera hotset status average latency over %d requests: %v (total: %v)", iterations, avgLatency, totalElapsed)
+
+	// DoD Requirement: Sub-5ms latency
+	if avgLatency >= 5*time.Millisecond {
+		t.Errorf("expected average latency < 5ms, got %v", avgLatency)
 	}
 }

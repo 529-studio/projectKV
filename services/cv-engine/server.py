@@ -194,7 +194,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
             logger.warning("Client disconnected during HEAD request: %s", exc)
 
     def do_POST(self):
-        if self.path == "/predict":
+        if self.path in ("/predict", "/analyze"):
             content_length = int(self.headers.get("Content-Length", 0))
             if content_length == 0:
                 self._send_json(400, {"error": "empty request body"})
