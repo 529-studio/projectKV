@@ -41,15 +41,17 @@ type Analyzer interface {
 // congestion analysis and flood detection — only the Analyzer implementation
 // and the meaning of Severity differ.
 type Verdict struct {
-	CameraID      string    `json:"camera_id"`
-	Severity      string    `json:"severity"`                 // Traffic severity: e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED"
-	FloodSeverity string    `json:"flood_severity,omitempty"` // Flood severity: "DRY" | "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP" | "UNKNOWN"
-	Confidence    float64   `json:"confidence"`
-	Source        string    `json:"source"` // "mock" | "vlm" | "onnx"
-	ObservedAt    time.Time `json:"observed_at"`
-	Stale         bool      `json:"stale"`
-	Timestamp     time.Time `json:"timestamp"`
-	RawFrame      []byte    `json:"-"` // Direct analyzed frame bytes (unexported from JSON)
+	CameraID        string    `json:"camera_id"`
+	Severity        string    `json:"severity"`                 // Traffic severity: e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED"
+	FloodSeverity   string    `json:"flood_severity,omitempty"` // Flood severity: "DRY" | "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP" | "UNKNOWN"
+	Confidence      float64   `json:"confidence"`
+	Source          string    `json:"source"` // "mock" | "vlm" | "onnx"
+	ObservedAt      time.Time `json:"observed_at"`
+	Stale           bool      `json:"stale"`
+	Timestamp       time.Time `json:"timestamp"`
+	RawFrame        []byte    `json:"-"` // Direct analyzed frame bytes (unexported from JSON)
+	SaturationIndex float64   `json:"saturation_index"`
+	PCUTotal        float64   `json:"pcu_total"`
 }
 
 // OnVerdict is called for every successful analysis result. The caller
@@ -133,6 +135,7 @@ type Scheduler struct {
 	onVerdict   OnVerdict
 	budget      *AnalysisBudget
 	breaker     *CircuitBreaker
+	store       *Store
 	log         *slog.Logger
 }
 
@@ -166,6 +169,16 @@ func (s *Scheduler) Breaker() *CircuitBreaker {
 // analyzer.
 func (s *Scheduler) SetBudget(b *AnalysisBudget) {
 	s.budget = b
+}
+
+// SetStore attaches a hotset.Store to the scheduler so verdicts are cached in-memory.
+func (s *Scheduler) SetStore(st *Store) {
+	s.store = st
+}
+
+// Store returns the attached hotset.Store.
+func (s *Scheduler) Store() *Store {
+	return s.store
 }
 
 // Run blocks until ctx is cancelled. Intended to be started once from main
@@ -212,35 +225,43 @@ func (s *Scheduler) runOnce(ctx context.Context) {
 			defer cancel()
 
 			if s.budget != nil && !s.budget.Allow() {
+				now := time.Now()
+				deg := Verdict{
+					CameraID:      cam.ID,
+					Severity:      SeverityUnknown,
+					FloodSeverity: SeverityUnknown,
+					Confidence:    0,
+					Source:        "budget_breaker",
+					ObservedAt:    now,
+					Stale:         true,
+					Timestamp:     now,
+				}
+				if s.store != nil {
+					s.store.Set(deg)
+				}
 				if s.onVerdict != nil {
-					now := time.Now()
-					s.onVerdict(Verdict{
-						CameraID:      cam.ID,
-						Severity:      SeverityUnknown,
-						FloodSeverity: SeverityUnknown,
-						Confidence:    0,
-						Source:        "budget_breaker",
-						ObservedAt:    now,
-						Stale:         true,
-						Timestamp:     now,
-					})
+					s.onVerdict(deg)
 				}
 				return
 			}
 
 			if s.breaker != nil && !s.breaker.Allow() {
+				now := time.Now()
+				deg := Verdict{
+					CameraID:      cam.ID,
+					Severity:      SeverityUnknown,
+					FloodSeverity: SeverityUnknown,
+					Confidence:    0,
+					Source:        "circuit_breaker",
+					ObservedAt:    now,
+					Stale:         true,
+					Timestamp:     now,
+				}
+				if s.store != nil {
+					s.store.Set(deg)
+				}
 				if s.onVerdict != nil {
-					now := time.Now()
-					s.onVerdict(Verdict{
-						CameraID:      cam.ID,
-						Severity:      SeverityUnknown,
-						FloodSeverity: SeverityUnknown,
-						Confidence:    0,
-						Source:        "circuit_breaker",
-						ObservedAt:    now,
-						Stale:         true,
-						Timestamp:     now,
-					})
+					s.onVerdict(deg)
 				}
 				return
 			}
@@ -251,18 +272,22 @@ func (s *Scheduler) runOnce(ctx context.Context) {
 					s.breaker.RecordFailure(err)
 				}
 				s.log.Warn("analysis failed, degrading to unknown", "camera", cam.ID, "error", err)
+				now := time.Now()
+				deg := Verdict{
+					CameraID:      cam.ID,
+					Severity:      SeverityUnknown,
+					FloodSeverity: SeverityUnknown,
+					Confidence:    0,
+					Source:        "fallback",
+					ObservedAt:    now,
+					Stale:         true,
+					Timestamp:     now,
+				}
+				if s.store != nil {
+					s.store.Set(deg)
+				}
 				if s.onVerdict != nil {
-					now := time.Now()
-					s.onVerdict(Verdict{
-						CameraID:      cam.ID,
-						Severity:      SeverityUnknown,
-						FloodSeverity: SeverityUnknown,
-						Confidence:    0,
-						Source:        "fallback",
-						ObservedAt:    now,
-						Stale:         true,
-						Timestamp:     now,
-					})
+					s.onVerdict(deg)
 				}
 				return
 			}
@@ -276,6 +301,9 @@ func (s *Scheduler) runOnce(ctx context.Context) {
 			}
 			if verdict.Timestamp.IsZero() {
 				verdict.Timestamp = verdict.ObservedAt
+			}
+			if s.store != nil {
+				s.store.Set(verdict)
 			}
 			if s.onVerdict != nil {
 				s.onVerdict(verdict)

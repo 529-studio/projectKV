@@ -836,6 +836,36 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/cameras/hotset/status": {
+            "get": {
+                "description": "Returns cached traffic severity, saturation index, and PCU counts for the 50 Hot Set priority arterial cameras with sub-5ms latency.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cameras",
+                    "Traffic"
+                ],
+                "summary": "Get latest 50 Hot Set traffic status and Saturation Index",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/hotset.HotsetStatusResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/weather": {
             "get": {
                 "description": "Returns current temperature, humidity, WMO weather condition code, hourly rain probability, and precipitation volume from Open-Meteo with in-memory caching.",
@@ -1107,10 +1137,25 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "flood_level": {
-                    "description": "none, puddle, deep",
+                    "description": "none, puddle/shallow, deep",
+                    "type": "string"
+                },
+                "flood_submersion_anchor": {
+                    "description": "dry, wet_asphalt_no_standing, tire_base_under_10cm, exhaust_hub_over_15cm",
                     "type": "string"
                 },
                 "notes": {
+                    "type": "string"
+                },
+                "quality_tags": {
+                    "description": "rain_on_lens, night_glare, occluded, signal_noise",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "queue_reason": {
+                    "description": "free_flow, traffic_light, bottleneck, flood_barrier, accident",
                     "type": "string"
                 },
                 "snapshot_key": {
@@ -1123,12 +1168,20 @@ const docTemplate = `{
                 "timestamp": {
                     "type": "integer"
                 },
+                "traffic_dir_a": {
+                    "description": "CLEAR, MODERATE, HEAVY, CONGESTED",
+                    "type": "string"
+                },
+                "traffic_dir_b": {
+                    "description": "CLEAR, MODERATE, HEAVY, CONGESTED, NOT_APPLICABLE",
+                    "type": "string"
+                },
                 "traffic_level": {
-                    "description": "clear, moderate, heavy, gridlock",
+                    "description": "clear, moderate, heavy, gridlock/congested",
                     "type": "string"
                 },
                 "weather": {
-                    "description": "clear, rain, fog",
+                    "description": "clear/dry, rain, heavy_rain/fog",
                     "type": "string"
                 }
             }
@@ -1424,6 +1477,23 @@ const docTemplate = `{
                 }
             }
         },
+        "hotset.HotsetStatusResponse": {
+            "type": "object",
+            "properties": {
+                "cameras": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/hotset.Verdict"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "hotset.TrafficStatusResponse": {
             "type": "object",
             "properties": {
@@ -1456,6 +1526,12 @@ const docTemplate = `{
                 },
                 "observed_at": {
                     "type": "string"
+                },
+                "pcu_total": {
+                    "type": "number"
+                },
+                "saturation_index": {
+                    "type": "number"
                 },
                 "severity": {
                     "description": "Traffic severity: e.g. \"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\"",

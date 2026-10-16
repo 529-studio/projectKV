@@ -33,6 +33,13 @@ type FloodStatusResponse struct {
 	Verdicts        []Verdict `json:"verdicts"`
 }
 
+// HotsetStatusResponse represents the response payload for GET /api/v1/cameras/hotset/status.
+type HotsetStatusResponse struct {
+	Total     int       `json:"total"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Cameras   []Verdict `json:"cameras"`
+}
+
 // Handler exposes the verdict query endpoints defined in §4 of
 // docs/GO_BACKEND_ARCHITECTURE.md.
 type Handler struct {
@@ -69,6 +76,8 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET(RouteTrafficStatus, h.GetTrafficStatus)
 	rg.GET(RouteFloodStatus, h.GetFloodStatus)
 	rg.GET("/config", h.GetConfig)
+	rg.GET(RouteHotsetStatus, h.GetHotsetStatus)
+	rg.GET("/v1"+RouteHotsetStatus, h.GetHotsetStatus)
 }
 
 // GetTrafficStatus godoc
@@ -195,5 +204,54 @@ func (h *Handler) GetFloodStatus(c *gin.Context) {
 		AnalysisEnabled: h.analysisEnabled,
 		AppEnv:          h.appEnv,
 		Verdicts:        filtered,
+	})
+}
+
+// GetHotsetStatus godoc
+// @Summary Get latest 50 Hot Set traffic status and Saturation Index
+// @Description Returns cached traffic severity, saturation index, and PCU counts for the 50 Hot Set priority arterial cameras with sub-5ms latency.
+// @Tags Cameras, Traffic
+// @Produce json
+// @Success 200 {object} hotset.HotsetStatusResponse
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/cameras/hotset/status [get]
+func (h *Handler) GetHotsetStatus(c *gin.Context) {
+	allVerdicts := h.storer.GetLatest()
+	if allVerdicts == nil {
+		allVerdicts = []Verdict{}
+	}
+
+	staleThreshold := h.staleTTL
+	if staleThreshold <= 0 {
+		staleThreshold = 180 * time.Second
+	}
+
+	filtered := make([]Verdict, 0, len(allVerdicts))
+	for _, v := range allVerdicts {
+		// Provenance safety rule: filter out source=mock when appEnv is not "dev"
+		if strings.ToLower(v.Source) == "mock" && strings.ToLower(h.appEnv) != "dev" {
+			continue
+		}
+
+		if v.ObservedAt.IsZero() && !v.Timestamp.IsZero() {
+			v.ObservedAt = v.Timestamp
+		}
+
+		obs := v.ObservedAt
+		if obs.IsZero() {
+			obs = v.Timestamp
+		}
+		if !v.Stale && !obs.IsZero() && time.Since(obs) > staleThreshold {
+			v.Stale = true
+		}
+
+		filtered = append(filtered, v)
+	}
+
+	c.Header("X-Analysis-Enabled", fmt.Sprintf("%t", h.analysisEnabled))
+	c.JSON(http.StatusOK, HotsetStatusResponse{
+		Total:     len(filtered),
+		UpdatedAt: time.Now(),
+		Cameras:   filtered,
 	})
 }

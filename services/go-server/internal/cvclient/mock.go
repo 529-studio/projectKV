@@ -51,13 +51,33 @@ func (m *MockAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hotset.V
 	idx := m.counter.Add(1) - 1
 	severity := mockSeverities[idx%uint64(len(mockSeverities))]
 	floodSeverity := mockFloodSeverities[idx%uint64(len(mockFloodSeverities))]
+
+	var si float64
+	var pcu float64
+	switch severity {
+	case hotset.SeverityClear:
+		si = 0.15
+		pcu = 10.0
+	case hotset.SeverityModerate:
+		si = 0.45
+		pcu = 28.0
+	case hotset.SeverityHeavy:
+		si = 0.70
+		pcu = 45.0
+	case hotset.SeverityCongested:
+		si = 0.92
+		pcu = 65.0
+	}
+
 	return hotset.Verdict{
-		CameraID:      cam.ID,
-		Severity:      severity,
-		FloodSeverity: floodSeverity,
-		Confidence:    0.99,
-		Source:        "mock",
-		Timestamp:     time.Now(),
-		RawFrame:      m.mockFrame,
+		CameraID:        cam.ID,
+		Severity:        severity,
+		FloodSeverity:   floodSeverity,
+		Confidence:      0.99,
+		Source:          "mock",
+		Timestamp:       time.Now(),
+		RawFrame:        m.mockFrame,
+		SaturationIndex: si,
+		PCUTotal:        pcu,
 	}, nil
 }
