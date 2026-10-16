@@ -201,6 +201,18 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Expanded priority arterial corridors and chokepoints in `cmd/server/main.go` to include Trường Chinh (`truong_chinh`) and Quốc Lộ 1 (`quoc_lo_1`, `ql1`).
   - Updated `services/cv-engine/server.py` to accept both `POST /predict` and `POST /analyze`.
   - Regenerated OpenAPI documentation via `make swagger` and verified full test suite under Go race detector (`go test -race ./...`).
+- **Real-Time Arterial Marker Saturation Coloring & Monochromatic Map Footer Legend (Sprint 7 Task S7-T6, Issue #251, Plane [KV-5])**:
+  - Implemented real-time dynamic marker saturation styling across the 50 arterial Hot Set cameras on the web explorer map (`apps/web/src/components/MapComponent.tsx`).
+  - Added dedicated polling hook `useHotsetStatus` polling `GET /api/v1/cameras/hotset/status` every 30 seconds with automatic `AbortController` cancellation and memory leak prevention.
+  - Dynamically styled Leaflet circle markers based on empirical Saturation Index ($SI$):
+    - $SI < 0.30$ (`CLEAR`): Emerald green (`#10b981`)
+    - $0.30 \le SI < 0.60$ (`MODERATE`): Amber yellow (`#f59e0b`)
+    - $SI \ge 0.60$ (`HEAVY` / `CONGESTED`): Rose red (`#ef4444`)
+  - Added subtle pulsating SVG stroke animation (`@keyframes marker-congested-pulse` in `globals.css`) on `CONGESTED` markers without triggering DOM re-renders or layout reflows, maintaining smooth 60 FPS panning/zooming.
+  - Added monochromatic map footer legend `[Xanh: Thông thoáng] [Vàng: Đông xe] [Đỏ: Ùn ứ]` (bilingual with English equivalents) and updated expandable map legend in `MapLegend.tsx`.
+  - Enriched map tooltips with exact Saturation Index percentage and PCU count.
+  - Preserved camera preview modal click functionality across all markers.
+  - Added comprehensive unit tests in `apps/web/src/utils/hotsetUtils.test.ts` (144 unit tests passing, Next.js static build verified).
 
 ---
 
@@ -222,7 +234,7 @@ make dev-model
 make test-go       # Full Go backend test suite with -race
 make test-pcu      # PCU Saturation Index boundary test suite
 make test-enrich   # Geo-enrichment catalog filter unit tests
-cd apps/web && npm test  # Web client unit test suite (92 tests)
+cd apps/web && npm test  # Web client unit test suite (144 tests)
 ```
 
 ---
