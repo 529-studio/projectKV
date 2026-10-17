@@ -124,19 +124,20 @@ export function useRainHexRadar(
           return;
         }
 
-        // HCMC & Southeast Vietnam fit inside Zoom 8 tiles: (x=203, y=120) and (x=204, y=120)
-        const tile203Url = buildRadarTileUrl(template, 203, 120, 8);
-        const tile204Url = buildRadarTileUrl(template, 204, 120, 8);
+        // HCMC & Southeast Vietnam fit inside Zoom 7 tiles: (x=101, y=60) and (x=102, y=60)
+        // RainViewer radar tile API tops out at Zoom 7 (Zoom 8+ returns a placeholder "Zoom Level Not Supported" image)
+        const tile101Url = buildRadarTileUrl(template, 101, 60, 7);
+        const tile102Url = buildRadarTileUrl(template, 102, 60, 7);
 
-        const [img203, img204] = await Promise.all([
-          loadImage(tile203Url),
-          loadImage(tile204Url),
+        const [img101, img102] = await Promise.all([
+          loadImage(tile101Url),
+          loadImage(tile102Url),
         ]);
 
         if (isCancelled) return;
 
         // If both tile images failed (e.g. offline / CORS error), apply Open-Meteo fallback
-        if (!img203 && !img204) {
+        if (!img101 && !img102) {
           if (weather) {
             const monitoredSet = new Set(Object.keys(polygons));
             const fallback = generateOpenMeteoFallbackHexCells(weather, polygons, monitoredSet);
@@ -151,19 +152,19 @@ export function useRainHexRadar(
         canvas.height = 256;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-        let data203: ImageData | null = null;
-        let data204: ImageData | null = null;
+        let data101: ImageData | null = null;
+        let data102: ImageData | null = null;
 
-        if (img203 && ctx) {
+        if (img101 && ctx) {
           ctx.clearRect(0, 0, 256, 256);
-          ctx.drawImage(img203, 0, 0);
-          data203 = ctx.getImageData(0, 0, 256, 256);
+          ctx.drawImage(img101, 0, 0);
+          data101 = ctx.getImageData(0, 0, 256, 256);
         }
 
-        if (img204 && ctx) {
+        if (img102 && ctx) {
           ctx.clearRect(0, 0, 256, 256);
-          ctx.drawImage(img204, 0, 0);
-          data204 = ctx.getImageData(0, 0, 256, 256);
+          ctx.drawImage(img102, 0, 0);
+          data102 = ctx.getImageData(0, 0, 256, 256);
         }
 
         const mappedCells = new Map<string, FloodHexCell>();
@@ -178,12 +179,12 @@ export function useRainHexRadar(
           const points = getHexSamplingPoints(pts, 0.70);
 
           const sampleFn = (lat: number, lon: number) => {
-            const { tileX, tileY, pixelX, pixelY } = latLonToTilePixel(lat, lon, 8);
-            if (tileY !== 120) return null; // Outside HCMC latitude range
+            const { tileX, tileY, pixelX, pixelY } = latLonToTilePixel(lat, lon, 7);
+            if (tileY !== 60) return null; // Outside HCMC latitude range
 
             let targetData: ImageData | null = null;
-            if (tileX === 203) targetData = data203;
-            else if (tileX === 204) targetData = data204;
+            if (tileX === 101) targetData = data101;
+            else if (tileX === 102) targetData = data102;
 
             if (!targetData) return null;
 
