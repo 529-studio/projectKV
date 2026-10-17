@@ -828,15 +828,15 @@ export default function PinnedDock({
         {/* 1. Collapsed Floating Pill (shown when not expanded) */}
         {!isMobileExpanded && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[820] pointer-events-auto select-none"
+            initial={{ opacity: 0, y: 10, x: '-50%', scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
+            exit={{ opacity: 0, y: 10, x: '-50%', scale: 0.95 }}
+            className="fixed bottom-3.5 left-1/2 z-[820] pointer-events-auto select-none"
           >
             <button
               type="button"
               onClick={() => setIsMobileExpanded(true)}
-              className={`px-3.5 py-1.5 rounded-full bg-zinc-950/95 border text-zinc-200 font-mono text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all ${
+              className={`px-3.5 py-1.5 rounded-full bg-zinc-950/95 border text-zinc-200 font-mono text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all whitespace-nowrap ${
                 isCapReached ? 'border-amber-600' : 'border-zinc-700 hover:border-zinc-500'
               }`}
               aria-label={PINNED_DOCK_I18N.COLLAPSED_PILL[lang](pinnedCameras.length)}
