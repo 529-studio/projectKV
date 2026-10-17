@@ -2,8 +2,8 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.2.0  
-**Last Updated:** 2026-10-13  
+**Document Version:** 1.3.0  
+**Last Updated:** 2026-10-17  
 
 
 ---
@@ -18,16 +18,16 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 | Service | Technology | Port | Host & Node Role | Primary Responsibilities |
 |---|---|:---:|---|---|
-| **Web Client** (`apps/web`) | Next.js 15 (App Router), React 19, Tailwind CSS, Leaflet | `3001` | `homesrv` (Portainer Endpoint 3) | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal drag-to-scroll pinned camera dock, bilingual UI (`vi` default with full diacritics, `en` secondary). |
-| **Backend API** (`services/go-server`) | Go 1.24, Gin, SQLite (WAL mode) | `3000` | `homesrv` (Portainer Endpoint 3) | Snapshot proxy cache with 15s in-memory TTL, camera catalog, hotset scheduler (30s cycle), PCU Saturation Index calculator, SSE (`/api/live/stream`), WebSockets (`/ws/live`), Weather forecast (`/api/weather`), Swagger docs. |
+| **Web Client** (`apps/web`) | Next.js 15 (App Router), React 19, Tailwind CSS, Leaflet | `3001` | `homesrv` (Portainer Endpoint 3) | Map visualization, discrete camera marker dots with dynamic arterial saturation coloring (Green/Yellow/Red dots), H3 hex overlays, offline camera toggle, horizontal drag-to-scroll pinned camera dock, bilingual UI (`vi` default with full diacritics, `en` secondary). |
+| **Backend API** (`services/go-server`) | Go 1.24, Gin, SQLite (WAL mode) | `3000` | `homesrv` (Portainer Endpoint 3) | Snapshot proxy cache with 15s in-memory TTL, camera catalog, hotset scheduler (30s cycle, `internal/hotset`), autonomous harvester & Cloudflare R2 archiver (`internal/harvester`), PCU Saturation Index calculator, Telegram flood alert dispatcher (`internal/notify`), SSE (`/api/live/stream`), WebSockets (`/ws/live`), Weather forecast (`/api/weather`), Swagger docs. |
 | **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR runtime, YOLOv8n FP16 | `8000` | `dev-box` worker (Portainer Endpoint 4) | Automated vehicle detection (`POST /predict`), class counting (motorcycle, car, bus, truck), `GET /healthz` healthchecks, multi-threaded request processing, 2 vCPU / 2 GB RAM capped. |
 
 ---
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **144 Pull Requests** processed across repository history:
-  - **136 Merged** to `dev` (including PR #206 `docs/sprint4-report`, PR #211 `tooling/s5-t1-rerun-d6-benchmark`, PR #212 `feat/r2-storage-integration`, PR #213 `infra/s5-t4-tailscale-failover-drill`, PR #215 `tooling/s5-t2-cv-detection-audit`, PR #216 `feat/s5-t3-hybrid-flood-pipeline`, PR #217 `docs/pr-issue-linking-rule-and-template`, PR #218 `feat/s5-t4-r2-shared-team-labeler`, PR #220 `docs/sprint5-report`, PR #227 `docs/adr-007-sprint6-plan`, PR #229 `docs/sprint6-execution-guide`, PR #231 `docs/readme-fullstack-dev-guide`, PR #232 S6-T1, PR #233 S6-T2, PR #235 Rain collection, PR #236 S6-T3, PR #237 Error Sanitization, PR #238 Secret Sanitizer & Traffic Hysteresis, PR #240 Rule 2 & Rule 6, PR #241 S6-T5, PR #242 Sprint 6 Report, and PR #243 S6-T4 Gitleaks CI)
+- **Lifetime PR History**: Exactly **146 Pull Requests** processed across repository history:
+  - **138 Merged** to `dev` (including Sprint 4–6 PRs and Sprint 7 deliverables: PR #256 ADR-008, PR #257 S7-T2 Offline Camera Filtering, PR #258 S7-T8 Multi-Lane Directional Taxonomy, PR #259 S7-T3 Report Flood Affordance, PR #260 Curate 2026-10-16 Dataset, PR #265 S7-T9b ADR-009 Data Flywheel, PR #266 S7-T5 Autonomous Hot Set Poller, PR #267 S7-T6 Arterial Marker Saturation Coloring, and PR #268 S7-T7b Autonomous Harvester & R2 Archiver)
   - **8 Closed** without merging
   - **0 Open** PRs pending
 - **Staging Infrastructure Configuration (Stack 14)**:
@@ -102,6 +102,20 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Exploited active afternoon rainfall across HCMC (`rain: 0.10 mm`, `weather_code: 51`) to capture fresh real-world wet/rain frames across 10 authentic municipal flood chokepoints and flood-prone corridors: **201 real frames** collected (97.1% success rate).
   - Generated dual-format ground-truth labels using OpenVINO YOLOv8n FP16 416x416 inference at 31.2 frames/sec + visual road surface verification (`tools/eval/label_today_rain.py`): Traffic (CLEAR=62, MODERATE=66, HEAVY=31, CONGESTED=42), Flood (NONE=133, SHALLOW=68, DEEP=0), Weather (`rain`=201, 100%), Time of day (`day`=201, 100%).
   - Synchronized both 201 JPEGs and 201 JSON labels to Cloudflare R2 bucket `warded-proofs` (`R2:warded-proofs/2026-10-13/` and `R2:warded-proofs/labels/2026-10-13/`). Full report in [`docs/reports/rain_collection_report_2026-10-13.md`](reports/rain_collection_report_2026-10-13.md).
+- **Sprint 7 Completion, Staging Review & Continuous Data Flywheel (ADR-008 & ADR-009)** (**Completed / Audited**):
+  - Authoritative sprint completion report, empirical reality check, and technical verification matrix compiled in [`docs/sprint7_report.md`](sprint7_report.md).
+  - Core delivered features and pull requests merged to `dev`:
+    - [#247](https://github.com/529-studio/projectKV/issues/247): S7-T2 — `[web] Hide Offline / No-Signal Cameras by Default on Map` (**Merged in PR #257**): Filtered 125 offline cameras (`NOT_IMAGE`/`NO_SIGNAL`) by default with an active monochromatic header toggle `[Ẩn/Hiện camera mất tín hiệu]`.
+    - [#253](https://github.com/529-studio/projectKV/issues/253): S7-T8 — `[tooling] Multi-Lane Directional Labeling Taxonomy & Toolchain Upgrade` (**Merged in PR #258**): Draft-07 multi-lane directional schema (`label_schema.json`), physical depth anchors (`dry`, `wet_asphalt_no_standing`, `tire_base_under_10cm`, `tire_half_submerged`, `impassable`), and CLI validator `validate_labels.py`.
+    - [#248](https://github.com/529-studio/projectKV/issues/248): S7-T3 — `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button` (**Merged in PR #259**): High-contrast tactile action button with 30s module cooldown and confirmation toasts in `CameraModal.tsx`.
+    - PR #260: `feat(eval): Curate 2026-10-16 Real Camera Dataset & Gold-Standard Labels` (**Merged in PR #260**): 688 curated live camera frames uploaded to Cloudflare R2, 72 new gold-standard labels generated, expanding gold benchmark to 207 verified labels.
+    - [#261](https://github.com/529-studio/projectKV/issues/261): S7-T9b — `[docs] Revise ADR-009: Autonomous Continuous Data Flywheel & Reconcile S7-T7 VLM Deprecation` (**Merged in PR #265**): Codified zero-VLM architectural directive ($111/mo saved) and dual-trigger continuous data flywheel.
+    - [#250](https://github.com/529-studio/projectKV/issues/250): S7-T5 — `[go-server] Autonomous 50 Hot Set Traffic Poller & Saturation Cache` (**Merged in PR #266**): Built `internal/hotset` background poller, in-memory store, and `GET /api/v1/cameras/hotset/status`.
+    - [#251](https://github.com/529-studio/projectKV/issues/251): S7-T6 — `[web] Real-Time Arterial Marker Saturation Coloring (Green/Yellow/Red Dots)` (**Merged in PR #267**): Real-time marker coloring, 30s poller hook, CSS pulsating animation, monochromatic footer legend, and Trust & Safety status degradation (Lesson 38).
+    - [#262](https://github.com/529-studio/projectKV/issues/262): S7-T7b — `[go-server] internal/harvester Autonomous Dual-Trigger Poller, Label Generator & Cloudflare R2 Archiver` (**Merged in PR #268**): Built leaf package `internal/harvester` with scheduled peak harvest (07:30, 12:00, 17:30 ICT across 57 Hot Set cameras), meteorological rain watcher (Open-Meteo $\ge 0.10\text{ mm/h}$ across 207 flood corridor cameras with 60m sliding cooldown), Draft-07 in-memory validation, and concurrent R2 streamer. Verified 100% on staging and approved by `@giangdq202`.
+  - Reconciled architecture: S7-T7 VLM bridge formally superseded by ADR-009 / S7-T7b.
+  - Deferred backlog items carried into Sprint 8: S7-T1 (Staging Telegram bot token deployment), S7-T4 (`internal/feedback` backend archiver), S7-T7c (Python harvester CLI), S7-T7d (Web Labeler review UI), S7-T9 (Road water segmentation training spike).
+
 
 
 - **Inference Runtime**:
