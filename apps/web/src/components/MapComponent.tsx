@@ -552,7 +552,7 @@ export default function MapComponent({
       </div>
 
       {/* Right controls: Weather Widget & Map Legend */}
-      {/* If split controls provided: Mobile renders Legend at top-16 right-3 and Weather at top-28 right-3. Desktop renders both together at top-3.5 right-3. */}
+      {/* If split controls provided: Mobile renders Legend at bottom-20 left-3, Desktop renders Weather & Legend at top-3.5 right-3. Mobile weather is integrated in the top header bar. */}
       {weatherControl || legendControl ? (
         <>
           {/* Desktop view (md+): Both side-by-side in top-right */}
@@ -561,15 +561,10 @@ export default function MapComponent({
             {legendControl}
           </div>
 
-          {/* Mobile view (<md): Legend trigger at bottom-20 left-3 (bottom left corner, opposite to search FAB), Weather at top-28 right-3 */}
+          {/* Mobile view (<md): Legend trigger at bottom-20 left-3 (bottom left corner, opposite to search FAB) */}
           {legendControl && (
             <div className="md:hidden absolute bottom-20 left-3 z-[830] pointer-events-auto">
               {legendControl}
-            </div>
-          )}
-          {weatherControl && (
-            <div className="md:hidden absolute top-28 right-3 z-[800] pointer-events-auto">
-              {weatherControl}
             </div>
           )}
         </>
