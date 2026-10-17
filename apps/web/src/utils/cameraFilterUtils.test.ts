@@ -72,6 +72,37 @@ describe('Camera Filter Utilities (S7-T2 / Issue #247)', () => {
     });
   });
 
+  it('CAMERA_FILTER_I18N contains compact localization strings without emojis for mobile viewports', () => {
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u;
+
+    const counterCompactVi = CAMERA_FILTER_I18N.COUNTER_COMPACT.vi(9, 837);
+    const counterCompactEn = CAMERA_FILTER_I18N.COUNTER_COMPACT.en(9, 837);
+    const hideBtnCompactVi = CAMERA_FILTER_I18N.HIDE_OFFLINE_BTN_COMPACT.vi;
+    const hideBtnCompactEn = CAMERA_FILTER_I18N.HIDE_OFFLINE_BTN_COMPACT.en;
+    const showBtnCompactVi = CAMERA_FILTER_I18N.SHOW_OFFLINE_BTN_COMPACT.vi;
+    const showBtnCompactEn = CAMERA_FILTER_I18N.SHOW_OFFLINE_BTN_COMPACT.en;
+
+    assert.equal(counterCompactVi, '9 / 837 cam');
+    assert.equal(counterCompactEn, '9 / 837 cams');
+    assert.equal(hideBtnCompactVi, '[Ẩn offline]');
+    assert.equal(hideBtnCompactEn, '[Hide offline]');
+    assert.equal(showBtnCompactVi, '[Hiện offline]');
+    assert.equal(showBtnCompactEn, '[Show offline]');
+
+    const compactStrings = [
+      counterCompactVi,
+      counterCompactEn,
+      hideBtnCompactVi,
+      hideBtnCompactEn,
+      showBtnCompactVi,
+      showBtnCompactEn,
+    ];
+
+    compactStrings.forEach(str => {
+      assert.equal(emojiRegex.test(str), false, `Compact string contains emoji: ${str}`);
+    });
+  });
+
   it('filters out offline cameras accurately from a collection', () => {
     const cameras: Camera[] = [
       { id: 'c1', status: 'UP', isOnline: true },
