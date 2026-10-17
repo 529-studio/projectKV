@@ -342,6 +342,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/cameras/{id}/report-flood": {
+            "post": {
+                "description": "Accepts crowd-sourced flood observation, enforces 5-minute per-IP rate limit, and asynchronously archives snapshot to Cloudflare R2",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "feedback"
+                ],
+                "summary": "Report road flooding at camera location",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Camera ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/feedback.ReportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/feedback.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/feedback.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/feedback.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/config": {
             "get": {
                 "description": "Returns lightweight runtime configuration including whether AI analysis is enabled.",
@@ -861,6 +908,53 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/cameras/{id}/report-flood": {
+            "post": {
+                "description": "Accepts crowd-sourced flood observation, enforces 5-minute per-IP rate limit, and asynchronously archives snapshot to Cloudflare R2",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "feedback"
+                ],
+                "summary": "Report road flooding at camera location",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Camera ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/feedback.ReportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/feedback.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/feedback.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/feedback.ErrorResponse"
                         }
                     }
                 }
@@ -1402,6 +1496,43 @@ const docTemplate = `{
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "feedback.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "rate_limited"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Too many reports for this camera. Please try again later."
+                },
+                "retry_after_seconds": {
+                    "type": "integer",
+                    "example": 300
+                }
+            }
+        },
+        "feedback.ReportResponse": {
+            "type": "object",
+            "properties": {
+                "camera_id": {
+                    "type": "string",
+                    "example": "586e2995f9fab7001111b0b5"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Ghi nhận phản ánh ngập thành công"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "success"
+                },
+                "timestamp": {
+                    "type": "string"
                 }
             }
         },
