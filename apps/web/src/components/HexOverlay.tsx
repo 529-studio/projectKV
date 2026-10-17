@@ -51,7 +51,7 @@ export default function HexOverlay({
   trafficLoading = false,
 }: HexOverlayProps) {
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
-  const [internalMode, setInternalMode] = useState<ActiveLensMode>('radar');
+  const [internalMode, setInternalMode] = useState<ActiveLensMode>('traffic');
 
   const currentMode = mode ?? internalMode;
 
