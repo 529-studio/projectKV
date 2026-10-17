@@ -203,6 +203,32 @@ definitions:
       total:
         type: integer
     type: object
+  feedback.ErrorResponse:
+    properties:
+      error:
+        example: rate_limited
+        type: string
+      message:
+        example: Too many reports for this camera. Please try again later.
+        type: string
+      retry_after_seconds:
+        example: 300
+        type: integer
+    type: object
+  feedback.ReportResponse:
+    properties:
+      camera_id:
+        example: 586e2995f9fab7001111b0b5
+        type: string
+      message:
+        example: Ghi nhận phản ánh ngập thành công
+        type: string
+      status:
+        example: success
+        type: string
+      timestamp:
+        type: string
+    type: object
   flood.FloodVerificationResult:
     properties:
       camera_id:
@@ -646,6 +672,38 @@ paths:
       summary: Get camera by ID
       tags:
       - Camera
+  /api/cameras/{id}/report-flood:
+    post:
+      description: Accepts crowd-sourced flood observation, enforces 5-minute per-IP
+        rate limit, and asynchronously archives snapshot to Cloudflare R2
+      parameters:
+      - description: Camera ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/feedback.ReportResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/feedback.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/feedback.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/feedback.ErrorResponse'
+      summary: Report road flooding at camera location
+      tags:
+      - feedback
   /api/config:
     get:
       description: Returns lightweight runtime configuration including whether AI
@@ -990,6 +1048,38 @@ paths:
       summary: Get latest traffic congestion verdicts
       tags:
       - Traffic
+  /api/v1/cameras/{id}/report-flood:
+    post:
+      description: Accepts crowd-sourced flood observation, enforces 5-minute per-IP
+        rate limit, and asynchronously archives snapshot to Cloudflare R2
+      parameters:
+      - description: Camera ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/feedback.ReportResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/feedback.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/feedback.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/feedback.ErrorResponse'
+      summary: Report road flooding at camera location
+      tags:
+      - feedback
   /api/v1/cameras/hotset/status:
     get:
       description: Returns cached traffic severity, saturation index, and PCU counts

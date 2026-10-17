@@ -182,9 +182,8 @@ The following 5 tickets were planned or spawned during Sprint 7 but remain open 
    - *Reason Deferred:* Prioritized core data flywheel and arterial perception architecture over operational bot token deployment drills.
    - *Target:* Deferred to post-Sprint 7 operational maintenance.
 2. **S7-T4 (Issue #249) — `[go-server] internal/feedback Leaf Package & Cloudflare R2 Archiver`**:
-   - *Current State:* The frontend affordance and 30s cooldown were fully delivered in S7-T3 (`CameraModal.tsx`), but the dedicated backend ingestion package (`services/go-server/internal/feedback`) handling `POST /api/v1/cameras/:id/report-flood` was deferred.
-   - *Reason Deferred:* Team prioritized building the primary automated data flywheel (`internal/harvester`, S7-T7b) before user-submitted crowd ingestion.
-   - *Target:* Sprint 8 active learning wave.
+   - *Current State:* **Completed and verified in Sprint 8** (`feat/s7-t4-feedback-r2-archiver`, Kanban [KV-3]). Built leaf package `internal/feedback` with sliding rate limiter (`sync.RWMutex`), SHA-256 IP hashing, asynchronous frame fetch, and Cloudflare R2 manifest upload under `feedback/<YYYY-MM-DD>/`. Exposed `POST /api/v1/cameras/:id/report-flood` and legacy alias `POST /api/cameras/:id/report-flood`.
+   - *Target:* Delivered in Sprint 8 Wave 1.
 3. **S7-T7c (Issue #263) — `[tooling] Standalone Automated Harvester CLI (tools/eval/auto_harvest.py)`**:
    - *Current State:* The backend Go poller (`internal/harvester`) is fully functional. A Python CLI mirror for offline batch runs was planned but not authored.
    - *Target:* Sprint 8 evaluation tooling wave.
