@@ -46,6 +46,7 @@ interface MapComponentProps {
   topRightControls?: React.ReactNode;
   weatherControl?: React.ReactNode;
   legendControl?: React.ReactNode;
+  hasPinnedCameras?: boolean;
   children?: React.ReactNode;
 }
 
@@ -67,6 +68,7 @@ export default function MapComponent({
   topRightControls,
   weatherControl,
   legendControl,
+  hasPinnedCameras = false,
   children,
 }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
@@ -574,9 +576,11 @@ export default function MapComponent({
         </div>
       ) : null}
 
-      {/* Bottom map footer legend: Minimalist monochromatic arterial status (Issue #251 / S7-T6) */}
+      {/* Bottom map footer legend: Minimalist monochromatic arterial status (Issue #251 / S7-T6 / Layout Deconfliction) */}
       <div
-        className="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-[700] pointer-events-auto select-none flex items-center gap-2 md:gap-3 px-3 py-1.5 rounded-md bg-zinc-950/95 border border-zinc-800 text-zinc-300 font-mono text-[10px] md:text-[11px] shadow-2xl backdrop-blur-md"
+        className={`absolute left-1/2 -translate-x-1/2 z-[700] pointer-events-auto select-none flex items-center gap-2 md:gap-3 px-3 py-1.5 rounded-md bg-zinc-950/95 border border-zinc-800 text-zinc-300 font-mono text-[10px] md:text-[11px] shadow-2xl backdrop-blur-md transition-all ${
+          hasPinnedCameras ? 'bottom-14 md:bottom-2.5' : 'bottom-2.5'
+        }`}
         role="region"
         aria-label={lang === 'vi' ? 'Chú giải mật độ điểm nghẽn trục chính' : 'Arterial saturation legend'}
       >

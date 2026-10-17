@@ -344,6 +344,7 @@ export default function Home() {
             appEnv={appEnv}
             onMapReady={setMap}
             hexOverlayEnabled={activeLens !== 'off'}
+            hasPinnedCameras={pinnedCameras.length > 0}
             cameraFilterControl={
               <CameraFilter
                 hideOfflineCameras={hideOfflineCameras}
