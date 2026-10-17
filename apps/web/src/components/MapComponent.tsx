@@ -519,7 +519,7 @@ export default function MapComponent({
       {/* Desktop (md+): top-3.5 left-14; Mobile (<md): top-16 left-3 */}
       <div className="absolute top-16 left-3 md:top-3.5 md:left-14 z-[800] flex flex-col items-start gap-2 pointer-events-none">
         {/* Row 1: Lens switchers & camera filter toggle */}
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+        <div className="flex flex-col md:flex-row md:flex-wrap items-start md:items-center gap-2">
           {children}
           {cameraFilterControl}
         </div>

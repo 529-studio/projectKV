@@ -1172,7 +1172,7 @@ body, html {
 /* Mobile adjustments for Leaflet zoom controls to prevent overlap with top search & controls */
 @media (max-width: 767px) {
   .leaflet-top.leaflet-left {
-    top: 112px !important;
+    top: 195px !important;
   }
 }
 
