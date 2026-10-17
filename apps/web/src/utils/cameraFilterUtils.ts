@@ -15,13 +15,25 @@ export const CAMERA_FILTER_I18N = Object.freeze({
     vi: (visible: number, total: number) => `Đang hiển thị ${visible} / ${total} camera`,
     en: (visible: number, total: number) => `Showing ${visible} / ${total} cameras`,
   },
+  COUNTER_COMPACT: {
+    vi: (visible: number, total: number) => `${visible} / ${total} cam`,
+    en: (visible: number, total: number) => `${visible} / ${total} cams`,
+  },
   HIDE_OFFLINE_BTN: {
     vi: '[Ẩn camera mất tín hiệu]',
     en: '[Hide offline cameras]',
   },
+  HIDE_OFFLINE_BTN_COMPACT: {
+    vi: '[Ẩn offline]',
+    en: '[Hide offline]',
+  },
   SHOW_OFFLINE_BTN: {
     vi: '[Hiện camera mất tín hiệu]',
     en: '[Show offline cameras]',
+  },
+  SHOW_OFFLINE_BTN_COMPACT: {
+    vi: '[Hiện offline]',
+    en: '[Show offline]',
   },
   TOOLTIP: {
     vi: (hidden: boolean) =>
