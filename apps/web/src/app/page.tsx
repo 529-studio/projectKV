@@ -38,6 +38,7 @@ export default function Home() {
     floodHexCells,
     floodedCameraIds,
     floodedCameraCount,
+    wetCameraIds,
     wetCameraCount,
     loading: floodLoading,
   } = useFlood();
@@ -187,18 +188,24 @@ export default function Home() {
   const filteredCameraIds = useMemo(() => {
     const baseSet = computeFilteredCameraIds(cameras, selectedPhuong, selectedCorridor);
     if (!isFloodFilterActive) return baseSet;
-    if (!baseSet) return floodedCameraIds;
+    const floodOrWetIds = new Set<string>();
+    if (floodedCameraIds) floodedCameraIds.forEach(id => floodOrWetIds.add(id));
+    if (wetCameraIds) wetCameraIds.forEach(id => floodOrWetIds.add(id));
+
+    if (!baseSet) return floodOrWetIds;
     const intersected = new Set<string>();
     baseSet.forEach(id => {
-      if (floodedCameraIds.has(id)) intersected.add(id);
+      if (floodOrWetIds.has(id)) intersected.add(id);
     });
     return intersected;
-  }, [cameras, selectedPhuong, selectedCorridor, isFloodFilterActive, floodedCameraIds]);
+  }, [cameras, selectedPhuong, selectedCorridor, isFloodFilterActive, floodedCameraIds, wetCameraIds]);
 
   // Active filter label for on-map chip
   const activeFilterLabel = useMemo(() => {
     const baseLabel = computeActiveFilterLabel(selectedPhuong, selectedCorridor, lang);
-    const floodLabel = FLOOD_I18N.FILTER_CHIP[lang](floodedCameraCount);
+    const floodLabel = floodedCameraCount > 0
+      ? FLOOD_I18N.FILTER_CHIP[lang](floodedCameraCount)
+      : (lang === 'vi' ? `Camera đường ướt (${wetCameraCount})` : `Wet cameras (${wetCameraCount})`);
     if (isFloodFilterActive && baseLabel) {
       return `${baseLabel} • ${floodLabel}`;
     }
@@ -206,7 +213,7 @@ export default function Home() {
       return floodLabel;
     }
     return baseLabel;
-  }, [selectedPhuong, selectedCorridor, lang, isFloodFilterActive, floodedCameraCount]);
+  }, [selectedPhuong, selectedCorridor, lang, isFloodFilterActive, floodedCameraCount, wetCameraCount]);
 
   // Filter out offline / no-signal cameras by default for map hygiene (S7-T2 / Issue #247)
   const displayCameras = useMemo(() => {
@@ -309,6 +316,7 @@ export default function Home() {
             cameras={cameras}
             verdicts={verdicts}
             floodedCameraIds={floodedCameraIds}
+            wetCameraIds={wetCameraIds}
             wetCameraCount={wetCameraCount}
             isFloodFilterActive={isFloodFilterActive}
             onToggleFloodFilter={() => setIsFloodFilterActive(prev => !prev)}
@@ -333,6 +341,8 @@ export default function Home() {
           <MapComponent
             cameras={displayCameras}
             verdicts={verdicts}
+            floodVerdicts={floodVerdicts}
+            activeLens={activeLens}
             hotsetStatus={hotsetStatus}
             onCameraClick={handleSelectCamera}
             selectedCamera={selectedCamera}
@@ -462,7 +472,9 @@ export default function Home() {
             setShouldFocusSearch(true);
             setMobileDrawerOpen(true);
           }}
-          className="md:hidden absolute bottom-20 right-3 z-[830] w-11 h-11 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+          className={`md:hidden absolute right-3 z-[830] w-11 h-11 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
+            pinnedCameras.length > 0 ? 'bottom-[4.5rem]' : 'bottom-3.5'
+          }`}
           aria-label={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
           title={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
         >
@@ -486,6 +498,7 @@ export default function Home() {
           cameras={cameras}
           verdicts={verdicts}
           floodedCameraIds={floodedCameraIds}
+          wetCameraIds={wetCameraIds}
           wetCameraCount={wetCameraCount}
           isFloodFilterActive={isFloodFilterActive}
           onToggleFloodFilter={() => setIsFloodFilterActive(prev => !prev)}

@@ -16,15 +16,17 @@ import {
   FUNCTIONAL_COLORS,
   TRAFFIC_SEVERITY,
   VERDICT_I18N,
-  HOTSET_LEGEND_I18N,
 } from '../config/constants';
 import { isHexVisibleAtZoom } from '../utils/hexUtils';
+import { isFloodVerdictStale } from '../utils/floodUtils';
+import type { ActiveLensMode } from './HexOverlay';
 
 interface CustomCircleMarker extends L.CircleMarker {
   isDimmed?: boolean;
   isFilteredDimmed?: boolean;
   hasAIVerdict?: boolean;
   isHotset?: boolean;
+  isFloodProminent?: boolean;
   camId?: string;
 }
 
@@ -32,6 +34,8 @@ interface MapComponentProps {
   onCameraClick?: (cam: Camera) => void;
   cameras: Camera[];
   verdicts: Map<string, TrafficVerdict>;
+  floodVerdicts?: Map<string, TrafficVerdict>;
+  activeLens?: ActiveLensMode;
   hotsetStatus?: Map<string, HotsetCameraStatus>;
   selectedCamera?: Camera | null;
   isFiltered?: boolean;
@@ -53,6 +57,8 @@ interface MapComponentProps {
 export default function MapComponent({
   cameras,
   verdicts,
+  floodVerdicts = new Map(),
+  activeLens = 'traffic',
   hotsetStatus: propHotsetStatus,
   onCameraClick,
   selectedCamera,
@@ -83,6 +89,8 @@ export default function MapComponent({
   const internalHotset = useHotsetStatus({ enabled: !propHotsetStatus });
   const hotsetStatus = propHotsetStatus ?? internalHotset.hotsetStatus;
   const hotsetStatusRef = useRef(hotsetStatus);
+  const floodVerdictsRef = useRef(floodVerdicts);
+  const activeLensRef = useRef(activeLens);
 
   useEffect(() => {
     hexOverlayEnabledRef.current = hexOverlayEnabled;
@@ -95,6 +103,14 @@ export default function MapComponent({
   useEffect(() => {
     hotsetStatusRef.current = hotsetStatus;
   }, [hotsetStatus]);
+
+  useEffect(() => {
+    floodVerdictsRef.current = floodVerdicts;
+  }, [floodVerdicts]);
+
+  useEffect(() => {
+    activeLensRef.current = activeLens;
+  }, [activeLens]);
 
   const getTrafficColorForVerdict = useCallback((camId: string, isOnline: boolean, currentVerdicts: Map<string, TrafficVerdict>) => {
     const verdict = currentVerdicts.get(camId);
@@ -139,9 +155,23 @@ export default function MapComponent({
     cam: Camera,
     verdict: TrafficVerdict | undefined,
     hotset: HotsetCameraStatus | undefined,
-    fillColor: string
+    fillColor: string,
+    floodVerdict?: TrafficVerdict
   ) => {
     let trafficInfo = '';
+    if (floodVerdict && !isFloodVerdictStale(floodVerdict)) {
+      const s = (floodVerdict.flood_severity || '').toUpperCase().trim();
+      if (s === 'FLOODED_DEEP') {
+        const label = lang === 'vi' ? 'Camera xác nhận ngập sâu' : 'Camera-verified deep flood';
+        trafficInfo += `<br><span style="color:#ef4444; font-weight:bold;">[${label}]</span>`;
+      } else if (s === 'FLOODED_SHALLOW') {
+        const label = lang === 'vi' ? 'Camera xác nhận ngập nông mép đường' : 'Camera-verified shallow flood';
+        trafficInfo += `<br><span style="color:#0284c7; font-weight:bold;">[${label}]</span>`;
+      } else if (s === 'WET') {
+        const label = lang === 'vi' ? 'Camera ghi nhận đường ướt do mưa' : 'Camera-observed wet road';
+        trafficInfo += `<br><span style="color:#38bdf8; font-weight:bold;">[${label}]</span>`;
+      }
+    }
     if (hotset) {
       const prefix = lang === 'vi' ? VERDICT_I18N.TRAFFIC_PREFIX.vi : VERDICT_I18N.TRAFFIC_PREFIX.en;
       const isStale = Boolean(hotset.stale);
@@ -244,21 +274,37 @@ export default function MapComponent({
 
         markersLayerRef.current.eachLayer((layer) => {
           const marker = layer as CustomCircleMarker;
-          const isFilteredDimmed = marker.isFilteredDimmed === true;
-          const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !marker.hasAIVerdict);
-          const isDimmed = isFilteredDimmed || isMacroHexDimmed;
-          marker.isDimmed = isDimmed;
+          const isFloodLens = activeLensRef.current === 'flood';
+          const isFloodProminent = marker.isFloodProminent === true;
 
-          const targetR = isDimmed ? Math.max(4.0, Math.round(r * 0.7)) : r;
-          const targetW = isDimmed ? 1 : w;
-          const strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
-          const opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
-          const fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
+          let isDimmed = false;
+          let targetR = r;
+          let strokeColor: string = FUNCTIONAL_COLORS.MAP_STROKE;
+          let opacity = 1;
+          let fillOpacity = 0.95;
+
+          if (isFloodLens) {
+            isDimmed = !isFloodProminent;
+            targetR = isFloodProminent ? r + 1.5 : Math.max(3.5, Math.round(r * 0.65));
+            strokeColor = isFloodProminent ? '#ffffff' : '#27272a';
+            opacity = isFloodProminent ? 1 : 0.20;
+            fillOpacity = isFloodProminent ? 0.95 : 0.15;
+          } else {
+            const isFilteredDimmed = marker.isFilteredDimmed === true;
+            const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !marker.hasAIVerdict);
+            isDimmed = isFilteredDimmed || isMacroHexDimmed;
+            targetR = isDimmed ? Math.max(4.0, Math.round(r * 0.7)) : r;
+            strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
+            opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
+            fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
+          }
+
+          marker.isDimmed = isDimmed;
 
           if (marker.setRadius) {
             marker.setRadius(targetR);
             marker.setStyle({
-              weight: targetW,
+              weight: isDimmed ? 1 : (isFloodProminent ? 2.5 : w),
               color: strokeColor,
               opacity,
               fillOpacity,
@@ -334,9 +380,27 @@ export default function MapComponent({
     const isMacro = Boolean(hexOverlayEnabled && isHexVisibleAtZoom(zoom));
     const currentVerdicts = verdictsRef.current;
     const currentHotset = hotsetStatusRef.current;
+    const isFloodLens = activeLens === 'flood';
+    const currentFloodVerdicts = floodVerdictsRef.current;
+
+    const getCameraFloodInfo = (camId: string) => {
+      const fv = currentFloodVerdicts.get(camId);
+      if (!fv || isFloodVerdictStale(fv)) return null;
+      const s = (fv.flood_severity || '').toUpperCase().trim();
+      if (s === 'FLOODED_DEEP' || s === 'FLOODED_SHALLOW' || s === 'WET') {
+        return { verdict: fv, severity: s };
+      }
+      return null;
+    };
 
     // Render dimmed markers first, then matching/active markers so matching markers appear on top
     const sortedCameras = [...cameras].sort((a, b) => {
+      if (isFloodLens) {
+        const aFlood = getCameraFloodInfo(a.id) !== null;
+        const bFlood = getCameraFloodInfo(b.id) !== null;
+        if (aFlood === bFlood) return 0;
+        return aFlood ? 1 : -1;
+      }
       const aVerdict = currentVerdicts.get(a.id);
       const bVerdict = currentVerdicts.get(b.id);
       const aHotset = currentHotset.get(a.id);
@@ -356,20 +420,72 @@ export default function MapComponent({
 
       const verdict = currentVerdicts.get(cam.id);
       const hotset = currentHotset.get(cam.id);
+      const floodInfo = getCameraFloodInfo(cam.id);
       const hasAIVerdict = isVerdictValid(verdict) || isHotsetStatusValid(hotset);
-      const isFilteredDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(cam.id));
-      const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !hasAIVerdict);
-      const isDimmed = isFilteredDimmed || isMacroHexDimmed;
-
       const baseR = getRadius(zoom, isFew);
-      const radius = isDimmed ? Math.max(4.0, Math.round(baseR * 0.7)) : baseR;
-      const visual = getCameraMarkerVisual(cam.id, cam.isOnline, currentVerdicts, currentHotset);
-      const fillColor = visual.fillColor;
-      const strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
-      const weight = isDimmed ? 1 : (zoom >= 14 ? 2 : 1.5);
-      const opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
-      const fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
-      const className = visual.isCongested ? 'marker-congested-pulse' : '';
+
+      let radius = baseR;
+      let fillColor: string;
+      let strokeColor: string;
+      let weight: number;
+      let opacity: number;
+      let fillOpacity: number;
+      let className = '';
+      let isDimmed = false;
+      let isFilteredDimmed = false;
+      let isFloodProminent = false;
+      let isHotset = false;
+
+      if (isFloodLens) {
+        if (floodInfo) {
+          isFloodProminent = true;
+          isDimmed = false;
+          if (floodInfo.severity === 'FLOODED_DEEP') {
+            fillColor = '#dc2626';
+            strokeColor = '#ffffff';
+            weight = 2.5;
+            radius = baseR + 2.5;
+            className = 'marker-congested-pulse';
+          } else if (floodInfo.severity === 'FLOODED_SHALLOW') {
+            fillColor = '#0284c7';
+            strokeColor = '#ffffff';
+            weight = 2.5;
+            radius = baseR + 2.0;
+          } else {
+            // WET
+            fillColor = '#38bdf8';
+            strokeColor = '#ffffff';
+            weight = 2.0;
+            radius = baseR + 1.5;
+          }
+          opacity = 1;
+          fillOpacity = 0.95;
+        } else {
+          isFloodProminent = false;
+          isDimmed = true;
+          const visual = getCameraMarkerVisual(cam.id, cam.isOnline, currentVerdicts, currentHotset);
+          fillColor = visual.fillColor;
+          strokeColor = '#27272a';
+          weight = 1;
+          radius = Math.max(3.5, Math.round(baseR * 0.65));
+          opacity = 0.20;
+          fillOpacity = 0.15;
+          isHotset = visual.isHotset;
+        }
+      } else {
+        isFilteredDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(cam.id));
+        const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !hasAIVerdict);
+        isDimmed = isFilteredDimmed || isMacroHexDimmed;
+        radius = isDimmed ? Math.max(4.0, Math.round(baseR * 0.7)) : baseR;
+        const visual = getCameraMarkerVisual(cam.id, cam.isOnline, currentVerdicts, currentHotset);
+        fillColor = visual.fillColor;
+        strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
+        weight = isDimmed ? 1 : (zoom >= 14 ? 2 : 1.5);
+        opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
+        fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
+        className = visual.isCongested ? 'marker-congested-pulse' : '';
+        isHotset = visual.isHotset;
+      }
 
       const marker = L.circleMarker([cam.latitude, cam.longitude], {
         radius,
@@ -386,11 +502,12 @@ export default function MapComponent({
       customMarker.isDimmed = isDimmed;
       customMarker.isFilteredDimmed = isFilteredDimmed;
       customMarker.hasAIVerdict = hasAIVerdict;
-      customMarker.isHotset = visual.isHotset;
+      customMarker.isFloodProminent = isFloodProminent;
+      customMarker.isHotset = isHotset;
       customMarker.camId = cam.id;
       markersMapRef.current.set(cam.id, customMarker);
 
-      marker.bindTooltip(buildTooltipHtml(cam, verdict, hotset, fillColor), {
+      marker.bindTooltip(buildTooltipHtml(cam, verdict, hotset, fillColor, floodInfo?.verdict), {
         direction: 'top',
         offset: [0, -4]
       });
@@ -421,6 +538,20 @@ export default function MapComponent({
 
         const curZ = mapRef.current ? mapRef.current.getZoom() : zoom;
         const curBase = getRadius(curZ, isFew);
+
+        if (activeLensRef.current === 'flood') {
+          const isProminent = customMarker.isFloodProminent === true;
+          const targetRadius = isProminent ? curBase + 1.5 : Math.max(3.5, Math.round(curBase * 0.65));
+          marker.setRadius(targetRadius);
+          marker.setStyle({
+            color: isProminent ? '#ffffff' : '#27272a',
+            weight: isProminent ? 2.5 : 1,
+            opacity: isProminent ? 1 : 0.20,
+            fillOpacity: isProminent ? 0.95 : 0.15,
+          });
+          return;
+        }
+
         const isFilteredDim = customMarker.isFilteredDimmed === true;
         const isMacroNow = Boolean(hexOverlayEnabledRef.current && isHexVisibleAtZoom(curZ));
         const isMacroDim = Boolean(isMacroNow && !isFilteredDim && !customMarker.hasAIVerdict);
@@ -462,7 +593,7 @@ export default function MapComponent({
 
       markersLayerRef.current?.addLayer(marker);
     });
-  }, [cameras, getCameraMarkerVisual, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled, buildTooltipHtml]);
+  }, [cameras, getCameraMarkerVisual, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled, activeLens, floodVerdicts, buildTooltipHtml]);
 
   // In-place marker style and tooltip updates on SSE live verdict streams or Hot Set status updates without tearing down DOM layers
   useEffect(() => {
@@ -563,9 +694,11 @@ export default function MapComponent({
             {legendControl}
           </div>
 
-          {/* Mobile view (<md): Legend trigger at bottom-20 left-3 (bottom left corner, opposite to search FAB) */}
+          {/* Mobile view (<md): Legend trigger at bottom left, dynamically aligned with search FAB & bottom legend */}
           {legendControl && (
-            <div className="md:hidden absolute bottom-20 left-3 z-[830] pointer-events-auto">
+            <div className={`md:hidden absolute left-3 z-[830] pointer-events-auto transition-all ${
+              hasPinnedCameras ? 'bottom-[4.5rem]' : 'bottom-3.5'
+            }`}>
               {legendControl}
             </div>
           )}
@@ -578,26 +711,38 @@ export default function MapComponent({
 
       {/* Bottom map footer legend: Minimalist monochromatic arterial status (Issue #251 / S7-T6 / Layout Deconfliction) */}
       <div
-        className={`absolute left-1/2 -translate-x-1/2 z-[700] pointer-events-auto select-none flex items-center gap-2 md:gap-3 px-3 py-1.5 rounded-md bg-zinc-950/95 border border-zinc-800 text-zinc-300 font-mono text-[10px] md:text-[11px] shadow-2xl backdrop-blur-md transition-all ${
-          hasPinnedCameras ? 'bottom-14 md:bottom-2.5' : 'bottom-2.5'
+        className={`absolute left-1/2 -translate-x-1/2 z-[700] pointer-events-auto select-none flex items-center gap-2 md:gap-3 px-2.5 sm:px-3 py-1.5 rounded-md bg-zinc-950/95 border border-zinc-800 text-zinc-300 font-mono text-[9.5px] sm:text-[10px] md:text-[11px] shadow-2xl backdrop-blur-md transition-all whitespace-nowrap ${
+          hasPinnedCameras ? 'bottom-[4.5rem] md:bottom-2.5' : 'bottom-3.5 md:bottom-2.5'
         }`}
         role="region"
         aria-label={lang === 'vi' ? 'Chú giải mật độ điểm nghẽn trục chính' : 'Arterial saturation legend'}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
           <span className="w-2.5 h-2.5 rounded-full border border-black shrink-0" style={{ backgroundColor: '#10b981' }} />
-          <span>{HOTSET_LEGEND_I18N.CLEAR[lang]}</span>
+          <span>
+            <span className="hidden sm:inline">{lang === 'vi' ? '[Xanh: ' : '[Green: '}</span>
+            {lang === 'vi' ? 'Thông thoáng' : 'Clear'}
+            <span className="hidden sm:inline">]</span>
+          </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
           <span className="w-2.5 h-2.5 rounded-full border border-black shrink-0" style={{ backgroundColor: '#f59e0b' }} />
-          <span>{HOTSET_LEGEND_I18N.MODERATE[lang]}</span>
+          <span>
+            <span className="hidden sm:inline">{lang === 'vi' ? '[Vàng: ' : '[Yellow: '}</span>
+            {lang === 'vi' ? 'Đông xe' : 'Moderate'}
+            <span className="hidden sm:inline">]</span>
+          </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
           <span className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-60" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-black" style={{ backgroundColor: '#ef4444' }} />
           </span>
-          <span>{HOTSET_LEGEND_I18N.CONGESTED[lang]}</span>
+          <span>
+            <span className="hidden sm:inline">{lang === 'vi' ? '[Đỏ: ' : '[Red: '}</span>
+            {lang === 'vi' ? 'Ùn ứ' : 'Congested'}
+            <span className="hidden sm:inline">]</span>
+          </span>
         </div>
       </div>
     </div>

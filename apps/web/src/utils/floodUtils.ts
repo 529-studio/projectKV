@@ -446,6 +446,39 @@ export function getRadarHexColorAndOpacity(severity: string): {
 }
 
 /**
+ * Summary of active flood and wet H3 hexagonal cells.
+ */
+export interface FloodHexSummary {
+  floodedHexCount: number; // FLOODED_DEEP or FLOODED_SHALLOW
+  wetHexCount: number;     // WET
+  totalHexCount: number;
+}
+
+/**
+ * Derives separated counts of confirmed flood vs wet pavement H3 cells.
+ */
+export function deriveFloodHexCounts(
+  cells: Map<string, FloodHexCell> | FloodHexCell[]
+): FloodHexSummary {
+  let flooded = 0;
+  let wet = 0;
+  const list = cells instanceof Map ? Array.from(cells.values()) : (cells || []);
+  for (const cell of list) {
+    const s = (cell.flood_severity || '').toUpperCase().trim();
+    if (s === 'FLOODED_DEEP' || s === 'FLOODED_SHALLOW') {
+      flooded++;
+    } else if (s === 'WET') {
+      wet++;
+    }
+  }
+  return {
+    floodedHexCount: flooded,
+    wetHexCount: wet,
+    totalHexCount: flooded + wet,
+  };
+}
+
+/**
  * Styling for camera-verified flood hex cells: solid prominent border and higher fill.
  * Visual precedence ensures camera observations are never hidden behind radar clouds.
  */
@@ -455,13 +488,39 @@ export function getVerifiedFloodHexColorAndOpacity(severity: string): {
   strokeColor: string;
   strokeWeight: number;
 } {
-  const base = getFloodHexColorAndOpacity(severity);
-  return {
-    fillColor: base.fillColor,
-    fillOpacity: Math.min(0.35, base.fillOpacity + 0.08),
-    strokeColor: base.strokeColor,
-    strokeWeight: 1.75,
-  };
+  const s = (severity || '').toUpperCase().trim();
+  switch (s) {
+    case 'FLOODED_DEEP':
+      return {
+        fillColor: '#1d4ed8',
+        fillOpacity: 0.45,
+        strokeColor: '#1e3a8a',
+        strokeWeight: 3.0,
+      };
+    case 'FLOODED_SHALLOW':
+      return {
+        fillColor: '#0369a1',
+        fillOpacity: 0.38,
+        strokeColor: '#0c4a6e',
+        strokeWeight: 2.5,
+      };
+    case 'WET':
+      return {
+        fillColor: '#0284c7',
+        fillOpacity: 0.28,
+        strokeColor: '#0369a1',
+        strokeWeight: 2.5,
+      };
+    default: {
+      const base = getFloodHexColorAndOpacity(severity);
+      return {
+        fillColor: base.fillColor,
+        fillOpacity: Math.min(0.35, base.fillOpacity + 0.08),
+        strokeColor: base.strokeColor,
+        strokeWeight: 1.75,
+      };
+    }
+  }
 }
 
 /**

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
@@ -53,6 +54,8 @@ type FloodHexAggregator struct {
 	camToCell   map[string]string   // camera ID -> h3_id
 	polygons    map[string][][]float64
 	verdicts    map[string]hotset.Verdict // camera ID -> latest verdict
+	activeCells map[string]bool           // h3_id -> currently active cell
+	staleTTL    time.Duration             // maximum observation freshness TTL
 	allowMock   bool                      // allow mock verdicts when running in dev mode
 }
 
@@ -61,6 +64,15 @@ func (f *FloodHexAggregator) SetAllowMock(allow bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.allowMock = allow
+}
+
+// SetStaleTTL configures the freshness TTL before an observation is considered stale.
+func (f *FloodHexAggregator) SetStaleTTL(ttl time.Duration) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if ttl > 0 {
+		f.staleTTL = ttl
+	}
 }
 
 // NewFloodHexAggregator constructs a FloodHexAggregator.
@@ -95,6 +107,8 @@ func NewFloodHexAggregator(
 		camToCell:   make(map[string]string, len(cameras)),
 		polygons:    polygons,
 		verdicts:    make(map[string]hotset.Verdict),
+		activeCells: make(map[string]bool),
+		staleTTL:    180 * time.Second,
 	}
 
 	for _, c := range cameras {
@@ -115,7 +129,8 @@ func (f *FloodHexAggregator) OnVerdict(v hotset.Verdict) {
 	_, _ = f.ProcessVerdict(v)
 }
 
-// ProcessVerdict processes a new verdict and broadcasts flood_hex_update if qualifying.
+// ProcessVerdict processes a new verdict and broadcasts flood_hex_update if qualifying,
+// or a clearance event if a previously active cell transitions to empty/dry.
 func (f *FloodHexAggregator) ProcessVerdict(v hotset.Verdict) (*FloodHexCell, bool) {
 	f.mu.Lock()
 	h3ID, ok := f.camToCell[v.CameraID]
@@ -126,10 +141,28 @@ func (f *FloodHexAggregator) ProcessVerdict(v hotset.Verdict) (*FloodHexCell, bo
 
 	f.verdicts[v.CameraID] = v
 	cell, hasData := f.aggregateCellLocked(h3ID)
+	wasActive := f.activeCells[h3ID]
+	if hasData {
+		f.activeCells[h3ID] = true
+	} else {
+		delete(f.activeCells, h3ID)
+	}
 	f.mu.Unlock()
 
 	if hasData && f.broadcaster != nil {
 		f.broadcaster.BroadcastFloodHex(*cell)
+	} else if wasActive && !hasData && f.broadcaster != nil {
+		poly := f.polygons[h3ID]
+		if poly == nil {
+			poly = [][]float64{}
+		}
+		f.broadcaster.BroadcastFloodHex(FloodHexCell{
+			H3ID:          h3ID,
+			Resolution:    f.resolution,
+			CameraCount:   0,
+			FloodSeverity: hotset.SeverityDry,
+			Polygon:       poly,
+		})
 	}
 
 	return cell, hasData
@@ -142,17 +175,52 @@ func (f *FloodHexAggregator) GetCell(h3ID string) (*FloodHexCell, bool) {
 	return f.aggregateCellLocked(h3ID)
 }
 
-// GetAllCells returns current aggregates for all qualifying flood cells.
+// GetAllCells returns current aggregates for all qualifying flood cells,
+// filtering out cells whose observations are stale past staleTTL.
 func (f *FloodHexAggregator) GetAllCells() []FloodHexCell {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var cells []FloodHexCell
 	for h3ID := range f.cellCameras {
 		if cell, ok := f.aggregateCellLocked(h3ID); ok {
 			cells = append(cells, *cell)
+			f.activeCells[h3ID] = true
+		} else {
+			delete(f.activeCells, h3ID)
 		}
 	}
 	return cells
+}
+
+// ReapStaleCells sweeps active cells, clears expired cells, and broadcasts removal events to SSE clients.
+func (f *FloodHexAggregator) ReapStaleCells() []string {
+	f.mu.Lock()
+	var cleared []string
+	for h3ID := range f.activeCells {
+		cell, hasData := f.aggregateCellLocked(h3ID)
+		if !hasData || cell == nil {
+			delete(f.activeCells, h3ID)
+			cleared = append(cleared, h3ID)
+		}
+	}
+	f.mu.Unlock()
+
+	if f.broadcaster != nil {
+		for _, h3ID := range cleared {
+			poly := f.polygons[h3ID]
+			if poly == nil {
+				poly = [][]float64{}
+			}
+			f.broadcaster.BroadcastFloodHex(FloodHexCell{
+				H3ID:          h3ID,
+				Resolution:    f.resolution,
+				CameraCount:   0,
+				FloodSeverity: hotset.SeverityDry,
+				Polygon:       poly,
+			})
+		}
+	}
+	return cleared
 }
 
 func (f *FloodHexAggregator) aggregateCellLocked(h3ID string) (*FloodHexCell, bool) {
@@ -170,12 +238,16 @@ func (f *FloodHexAggregator) aggregateCellLocked(h3ID string) (*FloodHexCell, bo
 			continue
 		}
 		// Floor criteria:
-		// Fresh (stale == false), non-mock (unless allowMock in dev), and valid flood severity rank > 0 (WET, FLOODED_SHALLOW, FLOODED_DEEP).
+		// Fresh (stale == false and within staleTTL), non-mock (unless allowMock in dev), and valid flood severity rank > 0 (WET, FLOODED_SHALLOW, FLOODED_DEEP).
 		floodSev := v.FloodSeverity
 		if floodSev == "" {
 			floodSev = v.Severity
 		}
-		if v.Stale || (!f.allowMock && v.Source == "mock") || FloodSeverityRank(floodSev) <= 0 {
+		obs := v.ObservedAt
+		if obs.IsZero() {
+			obs = v.Timestamp
+		}
+		if v.Stale || (!obs.IsZero() && f.staleTTL > 0 && time.Since(obs) > f.staleTTL) || (!f.allowMock && v.Source == "mock") || FloodSeverityRank(floodSev) <= 0 {
 			continue
 		}
 		v.FloodSeverity = floodSev

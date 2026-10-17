@@ -71,9 +71,9 @@ export interface TilePixelCoord {
 
 /**
  * Projects (lat, lon) to Web Mercator tile index and pixel offset within tile.
- * Defaults to Zoom 8 (1px ≈ 600m in tropics).
+ * Defaults to Zoom 7 (1px ≈ 1.2km in tropics, the maximum zoom supported by RainViewer radar API).
  */
-export function latLonToTilePixel(lat: number, lon: number, zoom = 8): TilePixelCoord {
+export function latLonToTilePixel(lat: number, lon: number, zoom = 7): TilePixelCoord {
   const n = Math.pow(2, zoom);
   const exactX = ((lon + 180.0) / 360.0) * n;
   const latRad = (lat * Math.PI) / 180.0;
@@ -90,10 +90,11 @@ export function latLonToTilePixel(lat: number, lon: number, zoom = 8): TilePixel
 /**
  * Decodes RainViewer Universal Blue (Scheme 2) RGB reflectivity into meteorological rain tiers (dBZ):
  * - a < 120: Transparent or feathered boundary pixel -> null
- * - Faint / Ground clutter / Virga (< 18 dBZ): Low saturation gray/brown or faint blue -> null
- * - LIGHT_RAIN (18 - 29 dBZ): Cyan, vibrant teal, sky blue
+ * - Tan / brownish clutter / boundary mask (r > 180 && g > 180 && b > 120 && a < 200) -> null
+ * - Low saturation gray/brown atmospheric haze, virga, cirrus (sat < 0.20 && b < 180) -> null
+ * - LIGHT_RAIN (18 - 29 dBZ): Cyan, vibrant teal, sky blue, medium blue
  * - MODERATE_RAIN (30 - 39 dBZ): Saturated yellow/amber or deep navy blue
- * - HEAVY_RAIN (>= 40 dBZ): Orange, red, purple/pink storm core
+ * - HEAVY_RAIN (>= 40 dBZ): Orange, vivid red, crimson, purple/pink convective core
  */
 export function mapRadarPixelToRainIntensity(
   r: number,
@@ -103,6 +104,9 @@ export function mapRadarPixelToRainIntensity(
 ): RadarRainIntensity {
   if (a < 120) return null;
 
+  // Filter boundary mask / terrain tan clutter (e.g. #cec087 with a=150)
+  if (r > 180 && g > 180 && b > 120 && a < 200) return null;
+
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const saturation = max === 0 ? 0 : (max - min) / max;
@@ -111,18 +115,26 @@ export function mapRadarPixelToRainIntensity(
   if (saturation < 0.20 && b < 180) return null;
 
   // 1. Heavy rain / convective storm core (dBZ >= 40):
-  // Red, orange, pink/purple, white cores
-  if (r >= 180 && g <= 180 && b <= 80) return 'HEAVY_RAIN'; // Orange/Red (dBZ 40-52)
-  if (r >= 200 && g >= 120 && b >= 200) return 'HEAVY_RAIN'; // Pink/Purple (dBZ >= 55)
+  // Violet/pink convective storm core (dBZ >= 55)
+  if (r >= 200 && g >= 100 && b >= 200) return 'HEAVY_RAIN';
+  // Crimson core (dBZ 50-55)
+  if (r >= 180 && g <= 50 && b <= 50) return 'HEAVY_RAIN';
+  // Vivid red / red-orange core (dBZ 45-50)
+  if (r >= 230 && g <= 100 && b <= 50) return 'HEAVY_RAIN';
+  // Orange storm flank (dBZ 40-45)
+  if (r >= 230 && g >= 100 && g < 180 && b <= 50) return 'HEAVY_RAIN';
 
   // 2. Moderate rain (dBZ 30 - 39):
-  // Bright yellow / amber or deep saturated navy blue
-  if (r >= 210 && g >= 180 && b <= 70) return 'MODERATE_RAIN'; // Yellow/Amber (dBZ 35-39)
-  if (r <= 30 && g >= 60 && g <= 100 && b >= 110 && b <= 160) return 'MODERATE_RAIN'; // Deep Navy (dBZ 30-34)
+  // Pure yellow / amber (dBZ 35-39)
+  if (r >= 220 && g >= 180 && b <= 70) return 'MODERATE_RAIN';
+  // Deep saturated navy blue (dBZ 30-34)
+  if (r <= 50 && g >= 60 && g <= 110 && b >= 100 && b <= 160) return 'MODERATE_RAIN';
 
   // 3. Light rain (dBZ 18 - 29):
-  // Cyan, vibrant teal, sky blue
-  if (b >= 160 && g >= 100 && r <= 100) return 'LIGHT_RAIN'; // Cyan/Teal (dBZ 18-29)
+  // Medium / sky blue (dBZ 24-29)
+  if (r <= 50 && g > 110 && g <= 180 && b >= 150 && b <= 240) return 'LIGHT_RAIN';
+  // Cyan, vibrant teal, sky blue (dBZ 18-23)
+  if (r <= 160 && g >= 180 && b >= 200) return 'LIGHT_RAIN';
 
   return null;
 }
