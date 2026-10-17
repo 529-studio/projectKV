@@ -381,7 +381,7 @@ func (s *Service) GetRadar(ctx context.Context) (*RadarMetadata, error) {
 
 	latestTile := ""
 	if latestPath != "" && rvResp.Host != "" {
-		latestTile = fmt.Sprintf("%s%s/256/{z}/{x}/{y}/2/1_1.png", rvResp.Host, latestPath)
+		latestTile = fmt.Sprintf("%s%s/256/{z}/{x}/{y}/2/0_0.png", rvResp.Host, latestPath)
 	}
 
 	radarData := &RadarMetadata{

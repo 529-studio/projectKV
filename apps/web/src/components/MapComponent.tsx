@@ -46,6 +46,7 @@ interface MapComponentProps {
   topRightControls?: React.ReactNode;
   weatherControl?: React.ReactNode;
   legendControl?: React.ReactNode;
+  hasPinnedCameras?: boolean;
   children?: React.ReactNode;
 }
 
@@ -67,6 +68,7 @@ export default function MapComponent({
   topRightControls,
   weatherControl,
   legendControl,
+  hasPinnedCameras = false,
   children,
 }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
@@ -513,16 +515,19 @@ export default function MapComponent({
     <div className="relative w-full h-full overflow-hidden">
       <div ref={containerRef} className="w-full h-full z-0 absolute inset-0 bg-[#09090b]" />
 
-      {/* Left controls: Lens switchers, camera filter toggle & active filter chip */}
-      {/* Desktop (md+): top-3.5 left-14 in flex-row; Mobile (<md): top-16 left-3 in flex-col */}
-      <div className="absolute top-16 left-3 md:top-3.5 md:left-14 z-[800] flex flex-col md:flex-row items-start md:items-center gap-2 pointer-events-none">
-        {children}
-        {cameraFilterControl}
+      {/* Left controls: Lens switchers & camera filter toggle (Row 1), and contextual active filter chip (Row 2) */}
+      {/* Desktop (md+): top-3.5 left-14; Mobile (<md): top-16 left-3 */}
+      <div className="absolute top-16 left-3 md:top-3.5 md:left-14 z-[800] flex flex-col items-start gap-2 pointer-events-none">
+        {/* Row 1: Lens switchers & camera filter toggle */}
+        <div className="flex flex-col md:flex-row md:flex-wrap items-start md:items-center gap-2">
+          {children}
+          {cameraFilterControl}
+        </div>
 
-        {/* On-map active filter chip (ADR-004 A3 - Issue #65) */}
+        {/* Row 2: On-map active filter chip (ADR-004 A3 - Issue #65 / Layout Deconfliction) */}
         {isFiltered && activeFilterLabel && (
           <div
-            className="pointer-events-auto bg-zinc-950/95 border border-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded-lg shadow-2xl backdrop-blur-md flex items-center gap-2 font-mono text-xs select-none max-w-[calc(100vw-115px)] md:max-w-md transition-all"
+            className="pointer-events-auto bg-zinc-950/95 border border-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded-lg shadow-2xl backdrop-blur-md flex items-center gap-2 font-mono text-xs select-none max-w-[calc(100vw-24px)] md:max-w-xl transition-all"
             role="status"
             aria-live="polite"
           >
@@ -549,7 +554,7 @@ export default function MapComponent({
       </div>
 
       {/* Right controls: Weather Widget & Map Legend */}
-      {/* If split controls provided: Mobile renders Legend at top-16 right-3 and Weather at top-28 right-3. Desktop renders both together at top-3.5 right-3. */}
+      {/* If split controls provided: Mobile renders Legend at bottom-20 left-3, Desktop renders Weather & Legend at top-3.5 right-3. Mobile weather is integrated in the top header bar. */}
       {weatherControl || legendControl ? (
         <>
           {/* Desktop view (md+): Both side-by-side in top-right */}
@@ -558,15 +563,10 @@ export default function MapComponent({
             {legendControl}
           </div>
 
-          {/* Mobile view (<md): Legend trigger at bottom-20 left-3 (bottom left corner, opposite to search FAB), Weather at top-28 right-3 */}
+          {/* Mobile view (<md): Legend trigger at bottom-20 left-3 (bottom left corner, opposite to search FAB) */}
           {legendControl && (
             <div className="md:hidden absolute bottom-20 left-3 z-[830] pointer-events-auto">
               {legendControl}
-            </div>
-          )}
-          {weatherControl && (
-            <div className="md:hidden absolute top-28 right-3 z-[800] pointer-events-auto">
-              {weatherControl}
             </div>
           )}
         </>
@@ -576,9 +576,11 @@ export default function MapComponent({
         </div>
       ) : null}
 
-      {/* Bottom map footer legend: Minimalist monochromatic arterial status (Issue #251 / S7-T6) */}
+      {/* Bottom map footer legend: Minimalist monochromatic arterial status (Issue #251 / S7-T6 / Layout Deconfliction) */}
       <div
-        className="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-[700] pointer-events-auto select-none flex items-center gap-2 md:gap-3 px-3 py-1.5 rounded-md bg-zinc-950/95 border border-zinc-800 text-zinc-300 font-mono text-[10px] md:text-[11px] shadow-2xl backdrop-blur-md"
+        className={`absolute left-1/2 -translate-x-1/2 z-[700] pointer-events-auto select-none flex items-center gap-2 md:gap-3 px-3 py-1.5 rounded-md bg-zinc-950/95 border border-zinc-800 text-zinc-300 font-mono text-[10px] md:text-[11px] shadow-2xl backdrop-blur-md transition-all ${
+          hasPinnedCameras ? 'bottom-14 md:bottom-2.5' : 'bottom-2.5'
+        }`}
         role="region"
         aria-label={lang === 'vi' ? 'Chú giải mật độ điểm nghẽn trục chính' : 'Arterial saturation legend'}
       >

@@ -380,14 +380,22 @@ export function getFloodSeverityLabel(severity: string, lang: 'vi' | 'en' = 'vi'
       return FLOOD_I18N.WET_ROAD[lang];
     case 'DRY':
       return FLOOD_I18N.DRY_ROAD[lang];
+    case 'HEAVY_RAIN':
+      return lang === 'vi' ? 'Mưa to' : 'Heavy rain';
+    case 'MODERATE_RAIN':
+      return lang === 'vi' ? 'Mưa vừa' : 'Moderate rain';
+    case 'LIGHT_RAIN':
+      return lang === 'vi' ? 'Mưa nhỏ' : 'Light rain';
+    case 'ADVISORY_CLOUD':
+      return lang === 'vi' ? 'Mây trên không' : 'Airborne clouds';
     default:
       return FLOOD_I18N.UNKNOWN_STATUS[lang];
   }
 }
 
 /**
- * Styling for radar forecast hex cells: dashed border and subtle fill.
- * Visually distinguishes forecast data from camera-verified observations.
+ * Styling for radar forecast hex cells: translucent atmospheric styling and dashed border.
+ * Visually distinguishes atmospheric prediction from camera-verified observations.
  */
 export function getRadarHexColorAndOpacity(severity: string): {
   fillColor: string;
@@ -396,14 +404,45 @@ export function getRadarHexColorAndOpacity(severity: string): {
   strokeWeight: number;
   dashArray: string;
 } {
-  const base = getFloodHexColorAndOpacity(severity);
-  return {
-    fillColor: base.fillColor,
-    fillOpacity: Math.max(0.08, base.fillOpacity * 0.85),
-    strokeColor: base.strokeColor,
-    strokeWeight: 1.0,
-    dashArray: '5, 5',
-  };
+  const s = (severity || '').toUpperCase().trim();
+  switch (s) {
+    case 'HEAVY_RAIN':
+    case 'FLOODED_DEEP':
+      return {
+        fillColor: '#6366f1', // Indigo violet
+        fillOpacity: 0.24,
+        strokeColor: '#818cf8',
+        strokeWeight: 1.0,
+        dashArray: '4, 4',
+      };
+    case 'MODERATE_RAIN':
+    case 'FLOODED_SHALLOW':
+      return {
+        fillColor: '#3b82f6', // Ocean blue
+        fillOpacity: 0.16,
+        strokeColor: '#60a5fa',
+        strokeWeight: 0.75,
+        dashArray: '4, 4',
+      };
+    case 'LIGHT_RAIN':
+    case 'WET':
+      return {
+        fillColor: '#38bdf8', // Sky blue
+        fillOpacity: 0.08,
+        strokeColor: '#7dd3fc',
+        strokeWeight: 0.5,
+        dashArray: '3, 3',
+      };
+    case 'ADVISORY_CLOUD':
+    default:
+      return {
+        fillColor: '#94a3b8', // Slate gray
+        fillOpacity: 0.04,
+        strokeColor: '#cbd5e1',
+        strokeWeight: 0.5,
+        dashArray: '2, 4',
+      };
+  }
 }
 
 /**
@@ -428,6 +467,7 @@ export function getVerifiedFloodHexColorAndOpacity(severity: string): {
 /**
  * Formats radar forecast hex cell tooltip content.
  * Explicitly states: "Dự báo — không phải quan sát thực tế" / "Forecast — not a live observation".
+ * Zero emojis per AGENTS.md Rule 1.
  */
 export function formatRadarHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'vi'): string {
   const style = getRadarHexColorAndOpacity(cell.flood_severity);
@@ -440,12 +480,14 @@ export function formatRadarHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'v
 
   let advice = '';
   const s = (cell.flood_severity || '').toUpperCase().trim();
-  if (s === 'FLOODED_DEEP') {
-    advice = lang === 'vi' ? 'Mây đối lưu đậm, nguy cơ ngập cục bộ' : 'Heavy convective cloud, localized flood risk';
-  } else if (s === 'FLOODED_SHALLOW') {
-    advice = lang === 'vi' ? 'Mưa vừa diện rộng, chú ý đường trơn' : 'Moderate rain area, slick roads';
-  } else if (s === 'WET') {
-    advice = lang === 'vi' ? 'Mưa nhỏ rải rác / Khả năng có mưa' : 'Scattered light rain / chance of rain';
+  if (s === 'HEAVY_RAIN' || s === 'FLOODED_DEEP') {
+    advice = lang === 'vi' ? 'Mây đối lưu đậm (> 40 dBZ), khả năng mưa rào lớn' : 'Heavy convective clouds (> 40 dBZ), chance of downpour';
+  } else if (s === 'MODERATE_RAIN' || s === 'FLOODED_SHALLOW') {
+    advice = lang === 'vi' ? 'Mưa vừa diện rộng (30 - 39 dBZ), chú ý đường ướt' : 'Moderate rain area (30 - 39 dBZ), wet road conditions';
+  } else if (s === 'LIGHT_RAIN' || s === 'WET') {
+    advice = lang === 'vi' ? 'Mưa nhỏ rải rác (18 - 29 dBZ) / Khả năng có mưa' : 'Scattered light rain (18 - 29 dBZ) / chance of rain';
+  } else if (s === 'ADVISORY_CLOUD') {
+    advice = lang === 'vi' ? 'Mây đối lưu trên không; mặt đường ghi nhận khô ráo' : 'High-altitude cloud echo; ground cameras observe dry roads';
   }
 
   return `<div style="font-family:var(--font-mono, monospace); font-size:10.5px; line-height:1.4;">` +
@@ -454,7 +496,7 @@ export function formatRadarHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'v
       `<span style="font-weight:700; color:#ffffff;">${layerTitle} • ${severityText}</span>` +
     `</div>` +
     `<div style="font-size:9.5px; color:#38bdf8; margin-bottom:4px; font-style:italic;">` +
-      `⚠ ${layerSubtitle}` +
+      `[i] ${layerSubtitle}` +
     `</div>` +
     (advice ? `<div style="color:#e4e4e7; margin-bottom:3px;">${advice}</div>` : '') +
     `<div style="margin-top:2px; color:#d4d4d8;">` +
@@ -468,6 +510,7 @@ export function formatRadarHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'v
  * Formats camera-verified flood hex cell tooltip content.
  * Strictly NEVER shows ward names (ADR-004 §D11 Correction 2).
  * Shows severity badge, camera count, worst flood camera name, and explicit verification subtitle.
+ * Zero emojis per AGENTS.md Rule 1.
  */
 export function formatFloodHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'vi'): string {
   // If a radar cell is passed, delegate to radar tooltip
@@ -501,7 +544,7 @@ export function formatFloodHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'v
       `<span style="font-weight:700; color:#ffffff;">${layerTitle} • ${severityText}</span>` +
     `</div>` +
     `<div style="font-size:9.5px; color:#4ade80; margin-bottom:4px;">` +
-      `✓ ${layerSubtitle}` +
+      `[Xác thực] ${layerSubtitle}` +
     `</div>` +
     (advice ? `<div style="color:#e4e4e7; margin-bottom:3px;">${advice}</div>` : '') +
     `<div style="color:#a1a1aa;">${countText}</div>` +

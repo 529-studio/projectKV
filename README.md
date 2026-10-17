@@ -181,6 +181,7 @@ make dev-all
 *   **Map Clutter Hygiene & Offline Camera Filtering**: Automatically hides 135 offline or no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default, with dynamic header counter badge (`Đang hiển thị 702 / 837 camera`) and a monochromatic toggle button.
 *   **Chained Deep Filter**: Multi-tier faceted filtering — *Zone* ➔ *Road / Corridor* ➔ *Intersection / Node*.
 *   **Real-Time Arterial Marker Saturation Coloring**: Dynamically styles the 50 arterial Hot Set camera markers based on continuous 30-second autonomous ONNX PCU saturation indexes: Emerald green (`#10b981`) for Clear ($SI < 0.30$), Amber yellow (`#f59e0b`) for Moderate ($0.30 \le SI < 0.60$), and Rose red (`#ef4444`) for Congested ($SI \ge 0.60$) with subtle pulsating CSS animation, rich tooltip metrics (SI% & PCU), and monochromatic map footer legend `[Xanh: Thông thoáng] [Vàng: Đông xe] [Đỏ: Ùn ứ]`.
+*   **Calibrated Doppler Rain Radar Pipeline (S8-T1)**: RainViewer Doppler radar tiles projected at raw Zoom 8 (`0_0.png`) with true meteorological RGB reflectivity (dBZ) decoding ($18–29\text{ dBZ}$ Light, $30–39\text{ dBZ}$ Moderate, $\ge 40\text{ dBZ}$ Heavy rain), 7-point hexagon spatial contraction sampling with quorum, and surface cross-validation gate with ground cameras, preventing false inundation alarms on clear days.
 *   **Multi-Camera Corridor Tracking Dock**: Pin cameras into the bottom tracking dock with synchronized snapshot refresh.
 *   **Human-in-the-Loop Flood Reporting**: Commuters can report real-time street flooding directly from the camera modal with a 30s rate-limit cooldown and tactile feedback, queuing unverified community reports for model ingestion.
 *   **Directional Multi-Lane Taxonomy & Physical Flood Markers**: Classifies traffic density independently by direction (Direction A approaching vs Direction B receding) to resolve asymmetric divided boulevards, and anchors flood severity strictly to physical tire/wheel depth markers.
@@ -267,6 +268,7 @@ Hệ thống được tổ chức theo mô hình monorepo, tách biệt Web Clie
 *   **Tối ưu trực quan bản đồ & Lọc camera mất tín hiệu**: Mặc định ẩn 135 camera mất tín hiệu hoặc lỗi nguồn (`NOT_IMAGE` / `NO_SIGNAL`), hiển thị huy hiệu đếm camera trực quan (`Đang hiển thị 702 / 837 camera`) kèm nút chuyển đổi tinh tế.
 *   **Bộ lọc sâu liên hoàn (Chained Filter)**: Lọc đa tầng theo *Phường / Khu vực* ➔ *Tuyến đường / Hành lang* ➔ *Giao lộ*.
 *   **Màu sắc Điểm nghẽn Trục chính Thời gian thực**: Tự động tô màu 50 camera Hot Set trục chính theo chu kỳ 30 giây dựa trên chỉ số bão hòa PCU từ OpenVINO: Xanh lục (`#10b981`) khi Thông thoáng ($SI < 0.30$), Vàng hổ phách (`#f59e0b`) khi Đông xe ($0.30 \le SI < 0.60$), và Đỏ hồng (`#ef4444`) khi Ùn ứ ($SI \ge 0.60$) với hiệu ứng xung nhịp tinh tế, tooltip hiển thị phần trăm bão hòa và PCU, cùng thanh chú giải đơn sắc ở chân bản đồ `[Xanh: Thông thoáng] [Vàng: Đông xe] [Đỏ: Ùn ứ]`.
+*   **Đại tu Đường ống Radar Doppler Khí tượng (S8-T1)**: Chiếu tile radar RainViewer ở độ phân giải gốc Zoom 8 (`0_0.png`) không nội suy mờ nhòe, giải mã phản hồi RGB theo ngưỡng phản xạ thực tế dBZ (18–29 dBZ Mưa nhỏ, 30–39 dBZ Mưa vừa, $\ge 40$ dBZ Mưa to), lấy mẫu 7 điểm co rút hình học với cơ chế đồng thuận quorum $\ge 3/7$, kết hợp cổng đối soát thực địa với camera mặt đường giúp triệt tiêu hoàn toàn cảnh báo ngập giả vào ngày nắng ráo.
 *   **Dock theo dõi nhiều camera đồng thời**: Ghim tối đa 12 camera quan trọng vào thanh dock bên dưới với chu kỳ tự động cập nhật snapshot đồng bộ.
 *   **Báo cáo ngập nước cộng đồng (Human-in-the-Loop)**: Cho phép người dân báo cáo ngập thực địa ngay trong modal camera kèm bộ đếm ngược chống spam 30 giây và phản hồi xúc giác tối giản.
 *   **Phân loại đa làn hai chiều & Mốc ngập thực tế**: Phân loại mật độ giao thông độc lập theo hướng (Hướng A xe tiến vs Hướng B xe lùi) xử lý bất đối xứng trên đại lộ phân cách, đồng thời neo mức độ ngập lụt chuẩn hóa theo vạch vành bánh xe máy.
@@ -353,7 +355,7 @@ make dev-all
 | `PORT` | `3000` | Cổng dịch vụ HTTP |
 | `STORAGE_DRIVER` | `local` | Trình điều khiển lưu trữ (`local` cho ổ cứng máy chủ hoặc `r2` / `s3` cho Cloudflare R2) |
 | `STORAGE_LOCAL_ROOT` | `./data/proofs` | Thư mục lưu trữ bằng chứng cục bộ khi dùng driver `local` |
-| `R2_ACCOUNT_ID` | `REDACTED_R2_ACCOUNT_ID` | Định danh tài khoản Cloudflare |
+| `R2_ACCOUNT_ID` | `<your-cloudflare-account-id>` | Định danh tài khoản Cloudflare |
 | `R2_ENDPOINT` | `https://<account_id>.r2.cloudflarestorage.com` | Base endpoint chuẩn S3 REST API cho Cloudflare R2 |
 | `R2_BUCKET_NAME` | `warded-proofs` | Tên bucket lưu trữ đối tượng ảnh |
 | `R2_REGION` | `auto` | Vùng ký xác thực AWS Signature V4 của R2 |

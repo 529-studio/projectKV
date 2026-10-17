@@ -250,11 +250,11 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     assert.ok(enTooltip.includes('Worst rain/flood spot'));
   });
 
-  test('formatRadarHexTooltip explicitly displays forecast-not-observation disclaimer', () => {
+  test('formatRadarHexTooltip explicitly displays forecast-not-observation disclaimer and zero emoji', () => {
     const radarCell: FloodHexCell = {
       h3_id: '8765b18a1ffffff',
       resolution: 7,
-      flood_severity: 'FLOODED_SHALLOW',
+      flood_severity: 'MODERATE_RAIN',
       camera_count: 0,
       worst_camera: 'radar_rainviewer',
       worst_camera_name: 'Dự báo radar thời tiết',
@@ -263,15 +263,17 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
 
     const viTooltip = formatRadarHexTooltip(radarCell, 'vi');
     assert.ok(viTooltip.includes('Dự báo radar'));
-    assert.ok(viTooltip.includes('Dự báo — không phải quan sát thực tế'));
-    assert.ok(viTooltip.includes('Ngập nông mép đường'));
+    assert.ok(viTooltip.includes('Dự báo mây mưa trên không — Không phải ngập mặt đường') || viTooltip.includes('Dự báo — không phải quan sát thực tế'));
+    assert.ok(viTooltip.includes('Mưa vừa'));
     assert.ok(viTooltip.includes('Radar thời tiết RainViewer'));
+    assert.ok(!viTooltip.includes('⚠'));
 
     const enTooltip = formatRadarHexTooltip(radarCell, 'en');
     assert.ok(enTooltip.includes('Radar forecast'));
-    assert.ok(enTooltip.includes('Forecast — not a live observation'));
-    assert.ok(enTooltip.includes('Shallow curbside flood'));
+    assert.ok(enTooltip.includes('Airborne precipitation forecast') || enTooltip.includes('Forecast — not a live observation'));
+    assert.ok(enTooltip.includes('Moderate rain'));
     assert.ok(enTooltip.includes('RainViewer weather radar'));
+    assert.ok(!enTooltip.includes('⚠'));
   });
 
   test('honesty rule: never says "OK to go" or "safe" for unknown/unverified data', () => {
