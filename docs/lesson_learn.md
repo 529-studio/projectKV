@@ -715,8 +715,8 @@
        - $18–29\text{ dBZ}$ (cyan, teal, sky blue) $\rightarrow$ `LIGHT_RAIN`.
        - $30–39\text{ dBZ}$ (saturated yellow/amber or deep navy) $\rightarrow$ `MODERATE_RAIN`.
        - $\ge 40\text{ dBZ}$ (orange, red, purple storm cores) $\rightarrow$ `HEAVY_RAIN`.
-  2. **Non-Interpolated Zoom 8 Raw Tiles**:
-     - Upgraded tile template to `/2/0_0.png` (`smooth=0, snow=0`) at Zoom 8 ($1\text{ px} \approx 600\text{ m}$). Proved that all H3 Resolution 7 cells across Ho Chi Minh City fit cleanly within exactly two Zoom 8 tiles: `(203, 120)` and `(204, 120)`, doubling spatial resolution with zero extra network overhead.
+  2. **Non-Interpolated Raw Tiles**:
+     - Upgraded tile template to `/2/0_0.png` (`smooth=0, snow=0`) at Zoom 7 ($1\text{ px} \approx 1.2\text{ km}$). Note: RainViewer API strictly caps radar tiles at Zoom 7; Zoom 8+ returns a placeholder "Zoom Level Not Supported" image. All H3 Resolution 7 cells across Ho Chi Minh City fit cleanly within exactly two Zoom 7 tiles: `(101, 60)` and `(102, 60)`, doubling spatial resolution with zero extra network overhead.
   3. **7-Point Contraction Sampling with Quorum**:
      - Implemented `getHexSamplingPoints` sampling the centroid + 6 outer vertices contracted to 70% radius.
      - Implemented `evaluateHexRadarIntensity` requiring a quorum of $\ge 3/7$ points to match a rain tier and calculating the median rank, completely eliminating tile boundary bleeding and single-pixel aliasing.
@@ -751,3 +751,28 @@
      - Implement responsive text breakpoints (`sm:hidden` vs `hidden sm:inline`) for toolbar buttons (`[Hiện camera mất tín hiệu]` -> `[Hiện offline]`, `Đang hiển thị 9 / 837 camera` -> `9 / 837 cam`), shrinking control width from 360px to 190px on mobile.
   4. **Dynamic Clearance Elevation**:
      - When floating bottom action bars (like `PinnedDock`'s collapsed pill) become active, sibling footers (like the arterial status legend) must dynamically elevate (e.g. from `bottom-2.5` to `bottom-14 md:bottom-2.5`) via props (`hasPinnedCameras`), maintaining clean clearance and zero occlusion.
+
+---
+
+## Lesson 43: Upstream Tile Server Zoom Ceiling & Silent 200 OK Placeholder Degradation in Web Canvas Decoders
+
+- **Incident & Tracking:** Issue #269 followup / Real-time Rain Verification on 2026-10-17.
+- **Symptom:**
+  During an active afternoon rainstorm in Ho Chi Minh City (Open-Meteo showing `Mưa rào nhẹ`, 88%–100% rain probability, and CCTV at *Điện Biên Phủ - Nguyễn Hữu Cảnh* showing visibly wet roadway pavement), the map's `[Dự báo radar]` lens rendered 0 blue rain hexagons citywide.
+- **Root Cause:**
+  1. **RainViewer Radar Tile Zoom Ceiling**: The RainViewer radar tile endpoint (`/v2/radar/{id}/256/{z}/{x}/{y}/2/0_0.png`) is meteorologically capped at **Zoom 7**. When a client requests Zoom 8 (e.g. `z=8, x=203, y=120`), RainViewer returns HTTP 200 containing a 1,370-byte static PNG image with the rendered text: `"Zoom Level Not Supported"`.
+  2. **Silent Failure in HTML5 Canvas Pipeline**: Because the server responded with HTTP 200, `loadImage` succeeded without error. The offscreen canvas drew the error graphic and extracted gray text pixels ($R=G=B=110$). `mapRadarPixelToRainIntensity` rejected these gray pixels as low-saturation noise, returning `null` for all 129 H3 macro cells across the city. Concurrently, the fallback mechanism was bypassed because the image objects were not `null`.
+  3. **Palette Coverage Gaps**: Scheme 2 (Universal Blue) utilizes deep crimson (`193, 0, 0`), vivid orange (`255, 170, 0`), deep navy (`0, 85, 136`), and tan clutter boundary masks (`206, 192, 135, a=150`). Missing these specific thresholds caused intermittent dropouts in heavy storm cores.
+- **Mandatory Takeaways & Engineering Resolutions:**
+  1. **Enforce Zoom 7 Tile Space**:
+     - Ho Chi Minh City ($10.7^\circ–10.9^\circ\text{N}$, $106.5^\circ–106.9^\circ\text{E}$) maps exactly into two Zoom 7 tiles at latitude row $Y=60$: Tile `(101, 60)` (Western & Central HCMC) and Tile `(102, 60)` (Eastern HCMC / Thu Duc City).
+     - Standardized `latLonToTilePixel(lat, lon, zoom = 7)` across client and unit tests.
+  2. **Calibrated Universal Blue Scheme 2 Palette**:
+     - Explicitly filter tan boundary masks (`r > 180, g > 180, b > 120, a < 200`).
+     - Heavy rain: Violet/pink convective storm cores (`255, 170, 255`), crimson (`193, 0, 0`), vivid red (`255, 68, 0`), and bright orange (`255, 170, 0`).
+     - Moderate rain: Pure yellow/amber (`255, 238, 0`, `255, 197, 0`) and deep navy blue (`0, 85, 136`).
+     - Light rain: Medium sky blue (`0, 119, 170`, `0, 163, 224`) and light cyan/teal (`136, 221, 238`, `54, 186, 229`).
+  3. **End-to-End Verification**:
+     - Verified with live Doppler radar tiles: **85 active rain H3 cells** immediately illuminated across Ho Chi Minh City.
+     - Confirmed CCTV location *Điện Biên Phủ - Nguyễn Hữu Cảnh* (tile 101, pixel 241, 35) maps to active `HEAVY_RAIN` (RGB `193, 0, 0, 255`), matching the wet roadway seen on the camera.
+
