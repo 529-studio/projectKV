@@ -513,16 +513,19 @@ export default function MapComponent({
     <div className="relative w-full h-full overflow-hidden">
       <div ref={containerRef} className="w-full h-full z-0 absolute inset-0 bg-[#09090b]" />
 
-      {/* Left controls: Lens switchers, camera filter toggle & active filter chip */}
-      {/* Desktop (md+): top-3.5 left-14 in flex-row; Mobile (<md): top-16 left-3 in flex-col */}
-      <div className="absolute top-16 left-3 md:top-3.5 md:left-14 z-[800] flex flex-col md:flex-row items-start md:items-center gap-2 pointer-events-none">
-        {children}
-        {cameraFilterControl}
+      {/* Left controls: Lens switchers & camera filter toggle (Row 1), and contextual active filter chip (Row 2) */}
+      {/* Desktop (md+): top-3.5 left-14; Mobile (<md): top-16 left-3 */}
+      <div className="absolute top-16 left-3 md:top-3.5 md:left-14 z-[800] flex flex-col items-start gap-2 pointer-events-none">
+        {/* Row 1: Lens switchers & camera filter toggle */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+          {children}
+          {cameraFilterControl}
+        </div>
 
-        {/* On-map active filter chip (ADR-004 A3 - Issue #65) */}
+        {/* Row 2: On-map active filter chip (ADR-004 A3 - Issue #65 / Layout Deconfliction) */}
         {isFiltered && activeFilterLabel && (
           <div
-            className="pointer-events-auto bg-zinc-950/95 border border-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded-lg shadow-2xl backdrop-blur-md flex items-center gap-2 font-mono text-xs select-none max-w-[calc(100vw-115px)] md:max-w-md transition-all"
+            className="pointer-events-auto bg-zinc-950/95 border border-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded-lg shadow-2xl backdrop-blur-md flex items-center gap-2 font-mono text-xs select-none max-w-[calc(100vw-24px)] md:max-w-xl transition-all"
             role="status"
             aria-live="polite"
           >
