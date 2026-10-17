@@ -462,7 +462,9 @@ export default function Home() {
             setShouldFocusSearch(true);
             setMobileDrawerOpen(true);
           }}
-          className="md:hidden absolute bottom-20 right-3 z-[830] w-11 h-11 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+          className={`md:hidden absolute right-3 z-[830] w-11 h-11 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
+            pinnedCameras.length > 0 ? 'bottom-[4.5rem]' : 'bottom-3.5'
+          }`}
           aria-label={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
           title={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
         >

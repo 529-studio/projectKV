@@ -563,9 +563,11 @@ export default function MapComponent({
             {legendControl}
           </div>
 
-          {/* Mobile view (<md): Legend trigger at bottom-20 left-3 (bottom left corner, opposite to search FAB) */}
+          {/* Mobile view (<md): Legend trigger at bottom left, dynamically aligned with search FAB & bottom legend */}
           {legendControl && (
-            <div className="md:hidden absolute bottom-20 left-3 z-[830] pointer-events-auto">
+            <div className={`md:hidden absolute left-3 z-[830] pointer-events-auto transition-all ${
+              hasPinnedCameras ? 'bottom-[4.5rem]' : 'bottom-3.5'
+            }`}>
               {legendControl}
             </div>
           )}
@@ -578,26 +580,38 @@ export default function MapComponent({
 
       {/* Bottom map footer legend: Minimalist monochromatic arterial status (Issue #251 / S7-T6 / Layout Deconfliction) */}
       <div
-        className={`absolute left-1/2 -translate-x-1/2 z-[700] pointer-events-auto select-none flex items-center gap-2 md:gap-3 px-3 py-1.5 rounded-md bg-zinc-950/95 border border-zinc-800 text-zinc-300 font-mono text-[10px] md:text-[11px] shadow-2xl backdrop-blur-md transition-all ${
-          hasPinnedCameras ? 'bottom-14 md:bottom-2.5' : 'bottom-2.5'
+        className={`absolute left-1/2 -translate-x-1/2 z-[700] pointer-events-auto select-none flex items-center gap-2 md:gap-3 px-2.5 sm:px-3 py-1.5 rounded-md bg-zinc-950/95 border border-zinc-800 text-zinc-300 font-mono text-[9.5px] sm:text-[10px] md:text-[11px] shadow-2xl backdrop-blur-md transition-all whitespace-nowrap ${
+          hasPinnedCameras ? 'bottom-[4.5rem] md:bottom-2.5' : 'bottom-3.5 md:bottom-2.5'
         }`}
         role="region"
         aria-label={lang === 'vi' ? 'Chú giải mật độ điểm nghẽn trục chính' : 'Arterial saturation legend'}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
           <span className="w-2.5 h-2.5 rounded-full border border-black shrink-0" style={{ backgroundColor: '#10b981' }} />
-          <span>{HOTSET_LEGEND_I18N.CLEAR[lang]}</span>
+          <span>
+            <span className="hidden sm:inline">{lang === 'vi' ? '[Xanh: ' : '[Green: '}</span>
+            {lang === 'vi' ? 'Thông thoáng' : 'Clear'}
+            <span className="hidden sm:inline">]</span>
+          </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
           <span className="w-2.5 h-2.5 rounded-full border border-black shrink-0" style={{ backgroundColor: '#f59e0b' }} />
-          <span>{HOTSET_LEGEND_I18N.MODERATE[lang]}</span>
+          <span>
+            <span className="hidden sm:inline">{lang === 'vi' ? '[Vàng: ' : '[Yellow: '}</span>
+            {lang === 'vi' ? 'Đông xe' : 'Moderate'}
+            <span className="hidden sm:inline">]</span>
+          </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
           <span className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-60" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-black" style={{ backgroundColor: '#ef4444' }} />
           </span>
-          <span>{HOTSET_LEGEND_I18N.CONGESTED[lang]}</span>
+          <span>
+            <span className="hidden sm:inline">{lang === 'vi' ? '[Đỏ: ' : '[Red: '}</span>
+            {lang === 'vi' ? 'Ùn ứ' : 'Congested'}
+            <span className="hidden sm:inline">]</span>
+          </span>
         </div>
       </div>
     </div>
