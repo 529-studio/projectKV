@@ -3,6 +3,8 @@ import { test, describe } from 'node:test';
 import {
   normalizeFloodHexCell,
   getFloodHexColorAndOpacity,
+  getVerifiedFloodHexColorAndOpacity,
+  deriveFloodHexCounts,
   isFloodVisibleAtZoom,
   getFloodInteractivityState,
   formatFloodHexTooltip,
@@ -356,5 +358,100 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
       }
     };
     checkNoEmoji(FLOOD_VERIFY_I18N);
+  });
+
+  test('deriveFloodHexCounts separates deep/shallow floods from wet roads across Array and Map structures', () => {
+    const rawCells: FloodHexCell[] = [
+      {
+        h3_id: 'cell1',
+        resolution: 7,
+        flood_severity: 'FLOODED_DEEP',
+        camera_count: 1,
+        worst_camera: 'c1',
+        worst_camera_name: 'Cam 1',
+        polygon: samplePoly,
+      },
+      {
+        h3_id: 'cell2',
+        resolution: 7,
+        flood_severity: 'FLOODED_SHALLOW',
+        camera_count: 2,
+        worst_camera: 'c2',
+        worst_camera_name: 'Cam 2',
+        polygon: samplePoly,
+      },
+      {
+        h3_id: 'cell3',
+        resolution: 7,
+        flood_severity: 'WET',
+        camera_count: 1,
+        worst_camera: 'c3',
+        worst_camera_name: 'Cam 3',
+        polygon: samplePoly,
+      },
+      {
+        h3_id: 'cell4',
+        resolution: 7,
+        flood_severity: 'WET',
+        camera_count: 1,
+        worst_camera: 'c4',
+        worst_camera_name: 'Cam 4',
+        polygon: samplePoly,
+      },
+      {
+        h3_id: 'cell5',
+        resolution: 7,
+        flood_severity: 'DRY',
+        camera_count: 1,
+        worst_camera: 'c5',
+        worst_camera_name: 'Cam 5',
+        polygon: samplePoly,
+      },
+    ];
+
+    // Array input
+    const arrayResult = deriveFloodHexCounts(rawCells);
+    assert.equal(arrayResult.floodedHexCount, 2);
+    assert.equal(arrayResult.wetHexCount, 2);
+    assert.equal(arrayResult.totalHexCount, 4);
+
+    // Map input
+    const cellMap = new Map<string, FloodHexCell>();
+    rawCells.forEach((c) => cellMap.set(c.h3_id, c));
+    const mapResult = deriveFloodHexCounts(cellMap);
+    assert.equal(mapResult.floodedHexCount, 2);
+    assert.equal(mapResult.wetHexCount, 2);
+    assert.equal(mapResult.totalHexCount, 4);
+
+    // Empty / null cases
+    const emptyResult = deriveFloodHexCounts([]);
+    assert.equal(emptyResult.floodedHexCount, 0);
+    assert.equal(emptyResult.wetHexCount, 0);
+    assert.equal(emptyResult.totalHexCount, 0);
+  });
+
+  test('getVerifiedFloodHexColorAndOpacity provides higher visual prominence for camera-verified floods', () => {
+    // FLOODED_DEEP: fillOpacity 0.45, strokeWeight 3.0
+    const deep = getVerifiedFloodHexColorAndOpacity('FLOODED_DEEP');
+    assert.equal(deep.fillColor, '#1d4ed8');
+    assert.equal(deep.fillOpacity, 0.45);
+    assert.equal(deep.strokeWeight, 3.0);
+
+    // FLOODED_SHALLOW: fillOpacity 0.38, strokeWeight 2.5
+    const shallow = getVerifiedFloodHexColorAndOpacity('FLOODED_SHALLOW');
+    assert.equal(shallow.fillColor, '#0369a1');
+    assert.equal(shallow.fillOpacity, 0.38);
+    assert.equal(shallow.strokeWeight, 2.5);
+
+    // WET: fillOpacity 0.28, strokeWeight 2.5
+    const wet = getVerifiedFloodHexColorAndOpacity('WET');
+    assert.equal(wet.fillColor, '#0284c7');
+    assert.equal(wet.fillOpacity, 0.28);
+    assert.equal(wet.strokeWeight, 2.5);
+
+    // Fallback: boosted fillOpacity and strokeWeight 1.75
+    const fallback = getVerifiedFloodHexColorAndOpacity('DRY');
+    assert.ok(fallback.fillOpacity >= 0.08);
+    assert.equal(fallback.strokeWeight, 1.75);
   });
 });

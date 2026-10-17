@@ -17,6 +17,7 @@ export interface PhuongTreeFilterProps {
   cameras: Camera[];
   verdicts?: Map<string, TrafficVerdictLike>;
   floodedCameraIds?: Set<string>;
+  wetCameraIds?: Set<string>;
   wetCameraCount?: number;
   isFloodFilterActive?: boolean;
   onToggleFloodFilter?: () => void;
@@ -113,6 +114,7 @@ export default function PhuongTreeFilter({
   cameras,
   verdicts,
   floodedCameraIds,
+  wetCameraIds,
   wetCameraCount = 0,
   isFloodFilterActive = false,
   onToggleFloodFilter,
@@ -152,13 +154,22 @@ export default function PhuongTreeFilter({
   const [expandedPhuongs, setExpandedPhuongs] = useState<Set<string>>(new Set());
   const [expandedCorridors, setExpandedCorridors] = useState<Set<string>>(new Set());
 
-  // Active cameras taking flood filter into account
+  // Active cameras taking flood/wet filter into account
   const activeCameras = useMemo(() => {
-    if (isFloodFilterActive && floodedCameraIds) {
-      return cameras.filter(c => floodedCameraIds.has(c.id));
+    if (isFloodFilterActive) {
+      const activeIds = new Set<string>();
+      if (floodedCameraIds) {
+        floodedCameraIds.forEach(id => activeIds.add(id));
+      }
+      if (wetCameraIds) {
+        wetCameraIds.forEach(id => activeIds.add(id));
+      }
+      if (activeIds.size > 0) {
+        return cameras.filter(c => activeIds.has(c.id));
+      }
     }
     return cameras;
-  }, [cameras, isFloodFilterActive, floodedCameraIds]);
+  }, [cameras, isFloodFilterActive, floodedCameraIds, wetCameraIds]);
 
   // City-wide corridor grouping with traffic prioritization
   const cityCorridors = useMemo(() => {
@@ -537,11 +548,30 @@ export default function PhuongTreeFilter({
             )}
           </div>
         ) : wetCameraCount > 0 ? (
-          <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-sky-800/60 bg-sky-950/20 text-[11px] text-sky-300">
-            <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
-            <span className="font-medium text-sky-200 truncate">
-              {t.floodStatusWet(wetCameraCount)}
-            </span>
+          <div className="p-2.5 rounded-lg border border-sky-800/60 bg-sky-950/20 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
+              <span className="font-bold text-sky-200">
+                {t.floodStatusWet(wetCameraCount)}
+              </span>
+            </div>
+            {onToggleFloodFilter && (
+              <button
+                type="button"
+                onClick={onToggleFloodFilter}
+                className={`mt-2 w-full py-1 px-2 rounded text-[11px] font-semibold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                  isFloodFilterActive
+                    ? 'bg-sky-500 text-zinc-950 border-sky-400 shadow-sm font-bold'
+                    : 'bg-sky-950/60 hover:bg-sky-900/60 text-sky-200 border-sky-800/60'
+                }`}
+              >
+                <span>
+                  {isFloodFilterActive
+                    ? (lang === 'vi' ? `✕ Bỏ lọc ${wetCameraCount} camera đường ướt` : `✕ Clear ${wetCameraCount} wet cameras`)
+                    : (lang === 'vi' ? `Xem danh sách ${wetCameraCount} camera đường ướt →` : `View ${wetCameraCount} wet cameras →`)}
+                </span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/40 text-[11px] text-zinc-300">

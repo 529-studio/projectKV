@@ -16,6 +16,7 @@ import {
   getFloodInteractivityState,
   formatFloodHexTooltip,
   formatRadarHexTooltip,
+  deriveFloodHexCounts,
   FLOOD_I18N,
 } from '../utils/floodUtils';
 
@@ -381,15 +382,8 @@ export default function HexOverlay({
     return count;
   }, [hexCells]);
 
-  const floodedCameraHexCount = useMemo(() => {
-    let count = 0;
-    floodHexCells.forEach((cell) => {
-      const s = cell.flood_severity.toUpperCase().trim();
-      if (s === 'FLOODED_DEEP' || s === 'FLOODED_SHALLOW' || s === 'WET') {
-        count++;
-      }
-    });
-    return count;
+  const { floodedHexCount, wetHexCount } = useMemo(() => {
+    return deriveFloodHexCounts(floodHexCells);
   }, [floodHexCells]);
 
   const radarRainActive = useMemo(() => {
@@ -454,7 +448,17 @@ export default function HexOverlay({
             ? 'bg-blue-600 text-white border-blue-500 shadow-sm font-bold'
             : 'text-zinc-400 hover:text-blue-300 hover:bg-zinc-900 border-transparent'
         }`}
-        title={`${FLOOD_I18N.LAYER_FLOOD_VERIFIED[lang]} — ${FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE[lang]}`}
+        title={
+          floodedHexCount > 0
+            ? (lang === 'vi'
+                ? `Camera xác nhận ngập: ${floodedHexCount} điểm ngập${wetHexCount > 0 ? `, ${wetHexCount} điểm đường ướt` : ''}`
+                : `Camera verified: ${floodedHexCount} flooded${wetHexCount > 0 ? `, ${wetHexCount} wet` : ''}`)
+            : wetHexCount > 0
+            ? (lang === 'vi'
+                ? `Camera ghi nhận: ${wetHexCount} điểm đường ướt (chưa ngập bánh xe)`
+                : `Camera observed: ${wetHexCount} wet pavement (no deep flooding)`)
+            : `${FLOOD_I18N.LAYER_FLOOD_VERIFIED[lang]} — ${FLOOD_I18N.LAYER_FLOOD_VERIFIED_SUBTITLE[lang]}`
+        }
       >
         <svg
           className={`w-3.5 h-3.5 shrink-0 transition-colors ${
@@ -478,7 +482,17 @@ export default function HexOverlay({
         </span>
         {floodLoading ? (
           <span className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse ml-0.5" />
-        ) : floodedCameraHexCount > 0 ? (
+        ) : floodedHexCount > 0 ? (
+          <span
+            className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[9.5px] font-bold ${
+              currentMode === 'flood'
+                ? 'bg-rose-500 text-white'
+                : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+            }`}
+          >
+            {floodedHexCount}
+          </span>
+        ) : wetHexCount > 0 ? (
           <span
             className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[9.5px] font-bold ${
               currentMode === 'flood'
@@ -486,7 +500,8 @@ export default function HexOverlay({
                 : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
             }`}
           >
-            {floodedCameraHexCount}
+            <span className="hidden sm:inline">{lang === 'vi' ? `${wetHexCount} ướt` : `${wetHexCount}w`}</span>
+            <span className="sm:hidden">{wetHexCount}</span>
           </span>
         ) : null}
       </button>

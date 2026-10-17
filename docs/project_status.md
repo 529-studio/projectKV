@@ -255,6 +255,12 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Fixed Open-Meteo fallback in `generateOpenMeteoFallbackHexCells` to strictly require actual measured precipitation (`rain_mm >= 1.0`).
   - Decoupled radar types from camera flood observations, defaulted initial page load lens to `'traffic'` (real-time arterial saturation dots), applied translucent atmospheric radar styling, and eliminated all graphic emojis (`⚠`, `✓`) across tooltips per AGENTS.md Rule 1.
   - Full test suite verified: 148 web unit tests passing (`npm test`), Next.js static build (6/6 pages), and Go backend tests passing (`make test-go`).
+- **Flood Status Synchronization & Visual Prominence (Lesson 44, Issue #269 followup)**:
+  - Synchronized in-memory spatial hex aggregator with backend TTL: added `staleTTL = 180s`, periodic 30s background reaper (`ReapStaleCells()`), and dynamic pruning in `aggregateCellLocked()`, eliminating stale hex cell leaks indefinitely served to the frontend.
+  - Decoupled semantic navigation badges in `HexOverlay.tsx`: rose badge `[N]` reserved strictly for standing floods (`FLOODED_SHALLOW` / `FLOODED_DEEP`), sky-blue badge `[N ướt]` on desktop (`[N]` on mobile) for wet pavement, completely hidden when count is 0.
+  - Sidebar hero card displays `GHI NHẬN MƯA: N điểm đường ướt (chưa ghi nhận ngập)` with direct action `Xem danh sách N camera đường ướt →`, in 100% synchronization with map verdicts.
+  - Elevated active camera markers on `flood` lens: unaffected cameras dimmed (`opacity: 0.20`, `fillOpacity: 0.15`), active flood/wet cameras highlighted in high-contrast cyan (`#38bdf8`) or crimson (`#dc2626`) with thick white stroke, enlarged radius, and top layer sorting (`zIndexOffset(1000)`).
+  - All automated test suites passing: 151 web unit tests (`npm test --prefix apps/web`), full Go backend test suite (`go test -race ./...`).
 
 ---
 
@@ -276,7 +282,7 @@ make dev-model
 make test-go       # Full Go backend test suite with -race
 make test-pcu      # PCU Saturation Index boundary test suite
 make test-enrich   # Geo-enrichment catalog filter unit tests
-cd apps/web && npm test  # Web client unit test suite (144 tests)
+cd apps/web && npm test  # Web client unit test suite (151 tests)
 ```
 
 ---

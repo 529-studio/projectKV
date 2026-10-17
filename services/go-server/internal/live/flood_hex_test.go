@@ -3,6 +3,7 @@ package live
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
@@ -158,5 +159,74 @@ func TestFloodHexAggregator_StaleAndMockExclusion(t *testing.T) {
 	})
 	if ok || cell != nil {
 		t.Errorf("expected stale verdict to be rejected")
+	}
+}
+
+func TestFloodHexAggregator_ObservationTTL_Reaping(t *testing.T) {
+	cams := []camera.Camera{
+		{ID: "cam-ttl-1", DisplayName: "TTL Bridge", H3Res7: "87654321fffffff"},
+	}
+	broadcaster := &mockFloodBroadcaster{}
+	agg := NewFloodHexAggregator(cams, nil, 7, 1, broadcaster, nil)
+	agg.SetStaleTTL(180 * time.Second)
+
+	// 1. Verdict observed 5 minutes ago -> older than 180s TTL
+	oldObs := time.Now().Add(-5 * time.Minute)
+	cell, ok := agg.ProcessVerdict(hotset.Verdict{
+		CameraID:      "cam-ttl-1",
+		FloodSeverity: hotset.SeverityFloodedShallow,
+		Source:        "vlm",
+		ObservedAt:    oldObs,
+		Stale:         false,
+	})
+	if ok || cell != nil {
+		t.Fatalf("expected observation older than TTL to be excluded")
+	}
+
+	cells := agg.GetAllCells()
+	if len(cells) != 0 {
+		t.Fatalf("expected 0 cells for expired observations, got %d", len(cells))
+	}
+
+	// 2. Verdict observed 5 seconds ago -> fresh -> qualifies
+	freshObs := time.Now().Add(-5 * time.Second)
+	cell, ok = agg.ProcessVerdict(hotset.Verdict{
+		CameraID:      "cam-ttl-1",
+		FloodSeverity: hotset.SeverityFloodedDeep,
+		Source:        "vlm",
+		ObservedAt:    freshObs,
+		Stale:         false,
+	})
+	if !ok || cell == nil {
+		t.Fatalf("expected fresh observation within TTL to qualify")
+	}
+	if cell.FloodSeverity != hotset.SeverityFloodedDeep {
+		t.Errorf("expected FLOODED_DEEP, got %s", cell.FloodSeverity)
+	}
+
+	cells = agg.GetAllCells()
+	if len(cells) != 1 {
+		t.Fatalf("expected 1 active cell, got %d", len(cells))
+	}
+
+	// 3. Shorten TTL to 1 second, sleep 10ms, test ReapStaleCells
+	agg.SetStaleTTL(1 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
+
+	cleared := agg.ReapStaleCells()
+	if len(cleared) != 1 || cleared[0] != "87654321fffffff" {
+		t.Fatalf("expected ReapStaleCells to clear 87654321fffffff, got %v", cleared)
+	}
+
+	cells = agg.GetAllCells()
+	if len(cells) != 0 {
+		t.Fatalf("expected 0 cells after reaping, got %d", len(cells))
+	}
+
+	broadcasts := broadcaster.getCells()
+	// Should contain the fresh event and then the dry clearance event
+	lastEvt := broadcasts[len(broadcasts)-1]
+	if lastEvt.CameraCount != 0 || lastEvt.FloodSeverity != hotset.SeverityDry {
+		t.Errorf("expected clearance broadcast with CameraCount 0 and DRY, got count=%d sev=%s", lastEvt.CameraCount, lastEvt.FloodSeverity)
 	}
 }
