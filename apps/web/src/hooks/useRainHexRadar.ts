@@ -4,10 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import type { FloodHexCell } from '../utils/floodUtils';
 import type { RadarMetadata, WeatherData } from '../utils/weatherUtils';
 import type { Camera } from './useCameras';
+import type { TrafficVerdict } from '../utils/trafficUtils';
 import {
-  getPolygonCentroid,
+  getHexSamplingPoints,
   latLonToTilePixel,
-  mapRadarPixelToSeverity,
+  evaluateHexRadarIntensity,
   buildRadarTileUrl,
   generateOpenMeteoFallbackHexCells,
 } from '../utils/rainHexUtils';
@@ -66,25 +67,33 @@ export interface UseRainHexRadarReturn {
 export function useRainHexRadar(
   radar: RadarMetadata | null,
   weather: WeatherData | null,
-  cameras: Camera[]
+  cameras: Camera[],
+  floodVerdicts?: Map<string, TrafficVerdict>
 ): UseRainHexRadarReturn {
   const [rainRadarHexCells, setRainRadarHexCells] = useState<Map<string, FloodHexCell>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Map camera count by H3 cell ID for richer tooltips
-  const camerasByCellRef = useRef<Map<string, number>>(new Map());
+  // Map cameras by H3 cell ID for richer tooltips and surface cross-validation
+  const camerasByCellRef = useRef<Map<string, Camera[]>>(new Map());
   useEffect(() => {
-    const counts = new Map<string, number>();
+    const map = new Map<string, Camera[]>();
     cameras.forEach((cam) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const h3Id = (cam as any).h3_id || (cam as any).h3_res7 || (cam as any).h3Res7;
+      const h3Id = cam.h3_id || cam.h3_res7 || (cam as any).h3Res7;
       if (h3Id) {
-        counts.set(h3Id, (counts.get(h3Id) || 0) + 1);
+        const list = map.get(h3Id) || [];
+        list.push(cam);
+        map.set(h3Id, list);
       }
     });
-    camerasByCellRef.current = counts;
+    camerasByCellRef.current = map;
   }, [cameras]);
+
+  const floodVerdictsRef = useRef<Map<string, TrafficVerdict> | undefined>(floodVerdicts);
+  useEffect(() => {
+    floodVerdictsRef.current = floodVerdicts;
+  }, [floodVerdicts]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -115,19 +124,19 @@ export function useRainHexRadar(
           return;
         }
 
-        // HCMC & Southeast Vietnam fit inside Zoom 7 tiles: (x=101, y=60) and (x=102, y=60)
-        const tile101Url = buildRadarTileUrl(template, 101, 60, 7);
-        const tile102Url = buildRadarTileUrl(template, 102, 60, 7);
+        // HCMC & Southeast Vietnam fit inside Zoom 8 tiles: (x=203, y=120) and (x=204, y=120)
+        const tile203Url = buildRadarTileUrl(template, 203, 120, 8);
+        const tile204Url = buildRadarTileUrl(template, 204, 120, 8);
 
-        const [img101, img102] = await Promise.all([
-          loadImage(tile101Url),
-          loadImage(tile102Url),
+        const [img203, img204] = await Promise.all([
+          loadImage(tile203Url),
+          loadImage(tile204Url),
         ]);
 
         if (isCancelled) return;
 
         // If both tile images failed (e.g. offline / CORS error), apply Open-Meteo fallback
-        if (!img101 && !img102) {
+        if (!img203 && !img204) {
           if (weather) {
             const monitoredSet = new Set(Object.keys(polygons));
             const fallback = generateOpenMeteoFallbackHexCells(weather, polygons, monitoredSet);
@@ -142,57 +151,88 @@ export function useRainHexRadar(
         canvas.height = 256;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-        let data101: ImageData | null = null;
-        let data102: ImageData | null = null;
+        let data203: ImageData | null = null;
+        let data204: ImageData | null = null;
 
-        if (img101 && ctx) {
+        if (img203 && ctx) {
           ctx.clearRect(0, 0, 256, 256);
-          ctx.drawImage(img101, 0, 0);
-          data101 = ctx.getImageData(0, 0, 256, 256);
+          ctx.drawImage(img203, 0, 0);
+          data203 = ctx.getImageData(0, 0, 256, 256);
         }
 
-        if (img102 && ctx) {
+        if (img204 && ctx) {
           ctx.clearRect(0, 0, 256, 256);
-          ctx.drawImage(img102, 0, 0);
-          data102 = ctx.getImageData(0, 0, 256, 256);
+          ctx.drawImage(img204, 0, 0);
+          data204 = ctx.getImageData(0, 0, 256, 256);
         }
 
         const mappedCells = new Map<string, FloodHexCell>();
+        const currentVerdicts = floodVerdictsRef.current;
+        const currentCamerasMap = camerasByCellRef.current;
 
-        // Sample each H3 cell centroid against the radar tiles (Resolution 7 macro cells only)
+        // Sample each H3 cell using 7-point contraction sampling (Resolution 7 macro cells only)
         for (const [h3Id, pts] of Object.entries(polygons)) {
           if (h3Id.startsWith('89')) continue;
           if (!pts || pts.length < 3) continue;
-          const [lat, lon] = getPolygonCentroid(pts);
-          const { tileX, tileY, pixelX, pixelY } = latLonToTilePixel(lat, lon, 7);
 
-          if (tileY !== 60) continue; // Outside HCMC latitude range
+          const points = getHexSamplingPoints(pts, 0.70);
 
-          let targetData: ImageData | null = null;
-          if (tileX === 101) targetData = data101;
-          else if (tileX === 102) targetData = data102;
+          const sampleFn = (lat: number, lon: number) => {
+            const { tileX, tileY, pixelX, pixelY } = latLonToTilePixel(lat, lon, 8);
+            if (tileY !== 120) return null; // Outside HCMC latitude range
 
-          if (!targetData) continue;
+            let targetData: ImageData | null = null;
+            if (tileX === 203) targetData = data203;
+            else if (tileX === 204) targetData = data204;
 
-          const idx = (pixelY * 256 + pixelX) * 4;
-          const r = targetData.data[idx];
-          const g = targetData.data[idx + 1];
-          const b = targetData.data[idx + 2];
-          const a = targetData.data[idx + 3];
+            if (!targetData) return null;
 
-          const severity = mapRadarPixelToSeverity(r, g, b, a);
-          if (severity) {
-            const camCount = camerasByCellRef.current.get(h3Id) || 0;
-            mappedCells.set(h3Id, {
-              h3_id: h3Id,
-              resolution: 7,
-              flood_severity: severity,
-              camera_count: camCount,
-              worst_camera: 'radar_rainviewer',
-              worst_camera_name: 'Dự báo radar thời tiết',
-              polygon: pts,
-            });
+            const idx = (pixelY * 256 + pixelX) * 4;
+            return {
+              r: targetData.data[idx],
+              g: targetData.data[idx + 1],
+              b: targetData.data[idx + 2],
+              a: targetData.data[idx + 3],
+            };
+          };
+
+          const rawIntensity = evaluateHexRadarIntensity(points, sampleFn);
+          if (!rawIntensity) continue;
+
+          // Surface Cross-Validation Gate:
+          // Cross-reference airborne radar echoes against surface Open-Meteo precipitation
+          // and ground camera observations (DRY vs WET / FLOODED).
+          const cellCameras = currentCamerasMap.get(h3Id) || [];
+          let activeGroundFloodCount = 0;
+          if (currentVerdicts) {
+            for (const cam of cellCameras) {
+              const v = currentVerdicts.get(cam.id);
+              if (v && !v.stale) {
+                const s = (v.flood_severity || '').toUpperCase().trim();
+                if (s === 'WET' || s === 'FLOODED_SHALLOW' || s === 'FLOODED_DEEP') {
+                  activeGroundFloodCount++;
+                }
+              }
+            }
           }
+
+          // If weather gauge shows < 0.2mm rain & sunny/clear weather code,
+          // and no ground cameras observe wet roads, the echo aloft is virga/high clouds.
+          const isSurfaceDry =
+            (!weather || (weather.rain_mm < 0.2 && weather.weather_code <= 3)) &&
+            activeGroundFloodCount === 0;
+
+          const finalSeverity = isSurfaceDry ? 'ADVISORY_CLOUD' : rawIntensity;
+
+          mappedCells.set(h3Id, {
+            h3_id: h3Id,
+            resolution: 7,
+            flood_severity: finalSeverity,
+            camera_count: cellCameras.length,
+            worst_camera: 'radar_rainviewer',
+            worst_camera_name: 'Dự báo radar thời tiết',
+            polygon: pts,
+          });
         }
 
         if (!isCancelled) {

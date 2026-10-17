@@ -236,6 +236,20 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Added configuration keys `HARVESTER_ENABLED`, `HARVESTER_SCHEDULE_HOURS`, `HARVESTER_RAIN_COOLDOWN_MINUTES`, `HARVESTER_CONCURRENCY` in `services/go-server/internal/config/config.go`.
   - Wired into `cmd/server/main.go` with graceful shutdown lifecycle integration.
   - Comprehensive unit and race test suite in `internal/harvester/harvester_test.go` (`go test -race ./internal/harvester/...`).
+- **Doppler Rain Radar Pipeline Overhaul (Sprint 8 Priority 1 S8-T1, Issue #269, ADR-010)**:
+  - Fixed root cause of city-wide false-positive flood/rain overlays on dry sunny days (codified in Lesson 41).
+  - Upgraded RainViewer tile ingestion in `weather.Service` from smoothed Zoom 7 (`/2/1_1.png`) to raw non-interpolated Zoom 8 (`/2/0_0.png`, `smooth=0, snow=0`).
+  - Proved all H3 Resolution 7 cells across Ho Chi Minh City fit cleanly within exactly two Zoom 8 tiles: `(203, 120)` and `(204, 120)`, doubling spatial resolution ($1\text{ px} \approx 600\text{ m}$) with zero extra network overhead.
+  - Replaced broken alpha thresholding with meteorological RGB dBZ decoder in `rainHexUtils.ts`:
+    - $< 18\text{ dBZ}$ (or saturation $< 0.20$, alpha $< 120$): `null` (suppresses ground clutter and virga).
+    - $18–29\text{ dBZ}$ (cyan, vibrant teal): `LIGHT_RAIN`.
+    - $30–39\text{ dBZ}$ (saturated yellow/amber or deep navy): `MODERATE_RAIN`.
+    - $\ge 40\text{ dBZ}$ (orange, red, purple storm cores): `HEAVY_RAIN`.
+  - Replaced single-centroid pixel evaluation with 7-point contraction sampling (`getHexSamplingPoints`, 70% radius) and $\ge 3/7$ point quorum check with median rank derivation (`evaluateHexRadarIntensity`).
+  - Added Surface Cross-Validation Gate: when Open-Meteo measured rain is $< 0.2\text{ mm}$ with clear skies and ground cameras report dry pavement, airborne echoes are demoted to `ADVISORY_CLOUD` (slate gray, fillOpacity 0.04) or suppressed, preventing street inundation false alarms.
+  - Fixed Open-Meteo fallback in `generateOpenMeteoFallbackHexCells` to strictly require actual measured precipitation (`rain_mm >= 1.0`).
+  - Decoupled radar types from camera flood observations, defaulted initial page load lens to `'traffic'` (real-time arterial saturation dots), applied translucent atmospheric radar styling, and eliminated all graphic emojis (`⚠`, `✓`) across tooltips per AGENTS.md Rule 1.
+  - Full test suite verified: 148 web unit tests passing (`npm test`), Next.js static build (6/6 pages), and Go backend tests passing (`make test-go`).
 
 ---
 

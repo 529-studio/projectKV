@@ -42,12 +42,12 @@ export default function Home() {
     loading: floodLoading,
   } = useFlood();
   const { weather, radar, loading: weatherLoading } = useWeather();
-  const { rainRadarHexCells, loading: rainRadarLoading } = useRainHexRadar(radar, weather, cameras);
+  const { rainRadarHexCells, loading: rainRadarLoading } = useRainHexRadar(radar, weather, cameras, floodVerdicts);
 
   const [map, setMap] = useState<L.Map | null>(null);
   // S9 (Issue #144): Independent 1-lens switcher ('flood' | 'radar' | 'traffic' | 'off')
-  // Default to 'radar' as it is driven by real-time rain radar API
-  const [activeLens, setActiveLens] = useState<ActiveLensMode>('radar');
+  // Default to 'traffic' for commuter arterial saturation flow
+  const [activeLens, setActiveLens] = useState<ActiveLensMode>('traffic');
   const [isFloodFilterActive, setIsFloodFilterActive] = useState(false);
   // Store only the selected camera id and derive the live object from the
   // cameras array so runtime updates (e.g. markCameraGhost) propagate instantly.
@@ -344,6 +344,7 @@ export default function Home() {
             appEnv={appEnv}
             onMapReady={setMap}
             hexOverlayEnabled={activeLens !== 'off'}
+            hasPinnedCameras={pinnedCameras.length > 0}
             cameraFilterControl={
               <CameraFilter
                 hideOfflineCameras={hideOfflineCameras}
@@ -409,18 +410,18 @@ export default function Home() {
           lang={lang}
         />
 
-        {/* MOBILE FLOATING QUICK SEARCH BAR (hidden on md+) */}
-        <div className="md:hidden absolute top-3 left-3 right-3 z-[810] pointer-events-auto">
+        {/* MOBILE FLOATING QUICK SEARCH & WEATHER HEADER (hidden on md+) */}
+        <div className="md:hidden absolute top-3 left-3 right-3 z-[810] pointer-events-auto flex items-center gap-2">
           <button
             type="button"
             onClick={() => {
               setShouldFocusSearch(true);
               setMobileDrawerOpen(true);
             }}
-            className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2.5 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-500 rounded-lg text-left shadow-2xl backdrop-blur-md transition-all cursor-pointer group active:scale-[0.99]"
+            className="flex-1 min-w-0 flex items-center justify-between gap-2 px-3 py-2 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-500 rounded-lg text-left shadow-2xl backdrop-blur-md transition-all cursor-pointer group active:scale-[0.99]"
             aria-label={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
           >
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <svg
                 className="w-4 h-4 text-zinc-400 group-hover:text-white shrink-0 transition-colors"
                 fill="none"
@@ -438,12 +439,21 @@ export default function Home() {
                 {searchTerm ? searchTerm : MOBILE_SEARCH_I18N.PLACEHOLDER[lang]}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-[10px] font-mono font-medium text-zinc-400 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded">
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-[10px] font-mono font-medium text-zinc-400 bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded">
                 {MOBILE_SEARCH_I18N.BADGE[lang]}
               </span>
             </div>
           </button>
+
+          {/* Mobile Weather Widget Trigger */}
+          <div className="shrink-0">
+            <WeatherWidget
+              weather={weather}
+              loading={weatherLoading}
+              lang={lang}
+            />
+          </div>
         </div>
 
         {/* MOBILE CAMERA LIST & SEARCH — FAB trigger button (hidden on md+) */}
