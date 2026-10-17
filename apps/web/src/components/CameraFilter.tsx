@@ -18,9 +18,13 @@ export default function CameraFilter({
   lang = 'vi',
 }: CameraFilterProps) {
   const counterText = CAMERA_FILTER_I18N.COUNTER[lang](visibleCount, totalCount);
+  const counterCompactText = CAMERA_FILTER_I18N.COUNTER_COMPACT[lang](visibleCount, totalCount);
   const buttonText = hideOfflineCameras
     ? CAMERA_FILTER_I18N.SHOW_OFFLINE_BTN[lang]
     : CAMERA_FILTER_I18N.HIDE_OFFLINE_BTN[lang];
+  const buttonCompactText = hideOfflineCameras
+    ? CAMERA_FILTER_I18N.SHOW_OFFLINE_BTN_COMPACT[lang]
+    : CAMERA_FILTER_I18N.HIDE_OFFLINE_BTN_COMPACT[lang];
   const tooltipText = CAMERA_FILTER_I18N.TOOLTIP[lang](hideOfflineCameras);
 
   return (
@@ -37,7 +41,8 @@ export default function CameraFilter({
           }`}
         />
         <span className="font-semibold text-zinc-200 text-[11px] md:text-xs whitespace-nowrap">
-          {counterText}
+          <span className="hidden sm:inline">{counterText}</span>
+          <span className="sm:hidden">{counterCompactText}</span>
         </span>
       </div>
 
@@ -54,7 +59,10 @@ export default function CameraFilter({
             : 'bg-zinc-900/90 border-zinc-600 text-zinc-100 hover:bg-zinc-800 hover:border-zinc-400'
         }`}
       >
-        <span className="leading-none">{buttonText}</span>
+        <span className="leading-none">
+          <span className="hidden sm:inline">{buttonText}</span>
+          <span className="sm:hidden">{buttonCompactText}</span>
+        </span>
       </button>
     </div>
   );
