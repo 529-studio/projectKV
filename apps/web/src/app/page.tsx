@@ -42,12 +42,12 @@ export default function Home() {
     loading: floodLoading,
   } = useFlood();
   const { weather, radar, loading: weatherLoading } = useWeather();
-  const { rainRadarHexCells, loading: rainRadarLoading } = useRainHexRadar(radar, weather, cameras);
+  const { rainRadarHexCells, loading: rainRadarLoading } = useRainHexRadar(radar, weather, cameras, floodVerdicts);
 
   const [map, setMap] = useState<L.Map | null>(null);
   // S9 (Issue #144): Independent 1-lens switcher ('flood' | 'radar' | 'traffic' | 'off')
-  // Default to 'radar' as it is driven by real-time rain radar API
-  const [activeLens, setActiveLens] = useState<ActiveLensMode>('radar');
+  // Default to 'traffic' for commuter arterial saturation flow
+  const [activeLens, setActiveLens] = useState<ActiveLensMode>('traffic');
   const [isFloodFilterActive, setIsFloodFilterActive] = useState(false);
   // Store only the selected camera id and derive the live object from the
   // cameras array so runtime updates (e.g. markCameraGhost) propagate instantly.

@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import { test, describe } from 'node:test';
 import {
   getPolygonCentroid,
+  getHexSamplingPoints,
   latLonToTilePixel,
+  mapRadarPixelToRainIntensity,
   mapRadarPixelToSeverity,
+  evaluateHexRadarIntensity,
   buildRadarTileUrl,
   mergeFloodHexCells,
   generateOpenMeteoFallbackHexCells,
@@ -11,7 +14,7 @@ import {
 import type { FloodHexCell } from './floodUtils.ts';
 import type { WeatherData } from './weatherUtils.ts';
 
-describe('Rain Hex Utils (Issue #106 / #120 Restoration)', () => {
+describe('Rain Hex Utils (Issue #106 / #120 Restoration & S8-T1 Pipeline Overhaul)', () => {
   const samplePoly: [number, number][] = [
     [10.0, 106.0],
     [10.0, 107.0],
@@ -28,34 +31,139 @@ describe('Rain Hex Utils (Issue #106 / #120 Restoration)', () => {
     assert.deepEqual(getPolygonCentroid([]), [0, 0]);
   });
 
-  test('latLonToTilePixel converts HCMC coordinates to zoom 7 tile and pixel offset', () => {
-    // Ho Chi Minh City center
-    const coord = latLonToTilePixel(10.7769, 106.7009, 7);
-    assert.equal(coord.tileX, 101);
-    assert.equal(coord.tileY, 60);
-    assert.ok(coord.pixelX >= 0 && coord.pixelX <= 255);
-    assert.ok(coord.pixelY >= 0 && coord.pixelY <= 255);
+  test('getHexSamplingPoints returns 7 points with contraction', () => {
+    const hexVertices: [number, number][] = [
+      [10.8, 106.6],
+      [10.85, 106.65],
+      [10.85, 106.75],
+      [10.8, 106.8],
+      [10.75, 106.75],
+      [10.75, 106.65],
+    ];
+    const points = getHexSamplingPoints(hexVertices, 0.7);
+    assert.equal(points.length, 7);
+    // First point is centroid
+    const centroid = getPolygonCentroid(hexVertices);
+    assert.equal(points[0][0], centroid[0]);
+    assert.equal(points[0][1], centroid[1]);
+
+    // Contracted point is between centroid and vertex
+    const p1 = points[1];
+    const expectedLat = centroid[0] + (hexVertices[0][0] - centroid[0]) * 0.7;
+    const expectedLon = centroid[1] + (hexVertices[0][1] - centroid[1]) * 0.7;
+    assert.ok(Math.abs(p1[0] - expectedLat) < 1e-6);
+    assert.ok(Math.abs(p1[1] - expectedLon) < 1e-6);
+
+    // Empty or small polygon fallback
+    assert.deepEqual(getHexSamplingPoints([]), []);
   });
 
-  test('mapRadarPixelToSeverity maps reflectivity alpha to flood/rain severity', () => {
-    // Below threshold (clear / cloud noise suppressed)
+  test('latLonToTilePixel converts HCMC coordinates to zoom 8 tile and pixel offset', () => {
+    // Ho Chi Minh City center at Zoom 8
+    const coord8 = latLonToTilePixel(10.7769, 106.7009, 8);
+    assert.equal(coord8.tileX, 203);
+    assert.equal(coord8.tileY, 120);
+    assert.ok(coord8.pixelX >= 0 && coord8.pixelX <= 255);
+    assert.ok(coord8.pixelY >= 0 && coord8.pixelY <= 255);
+
+    // At Zoom 7
+    const coord7 = latLonToTilePixel(10.7769, 106.7009, 7);
+    assert.equal(coord7.tileX, 101);
+    assert.equal(coord7.tileY, 60);
+  });
+
+  test('mapRadarPixelToRainIntensity decodes Universal Blue Scheme 2 dBZ palette', () => {
+    // 1. Transparent or feathery border pixels (alpha < 120) -> null
+    assert.equal(mapRadarPixelToRainIntensity(0, 0, 0, 0), null);
+    assert.equal(mapRadarPixelToRainIntensity(0, 163, 224, 80), null);
+    assert.equal(mapRadarPixelToRainIntensity(255, 68, 0, 119), null);
+
+    // 2. Low-saturation gray/brown atmospheric haze and ground clutter (dBZ < 18) -> null
+    // #827b69 (r=130, g=123, b=105, sat=0.19)
+    assert.equal(mapRadarPixelToRainIntensity(130, 123, 105, 255), null);
+    // #9e9375 (r=158, g=147, b=117, sat=0.26, b < 180) -> virga/faint haze
+    assert.equal(mapRadarPixelToRainIntensity(100, 100, 100, 255), null);
+
+    // 3. Light rain (18 - 29 dBZ): Cyan, vibrant teal, sky blue
+    // #36bae5 (r=54, g=186, b=229)
+    assert.equal(mapRadarPixelToRainIntensity(54, 186, 229, 255), 'LIGHT_RAIN');
+    // #00a3e0 (r=0, g=163, b=224)
+    assert.equal(mapRadarPixelToRainIntensity(0, 163, 224, 255), 'LIGHT_RAIN');
+    // #0077aa (r=0, g=119, b=170)
+    assert.equal(mapRadarPixelToRainIntensity(0, 119, 170, 255), 'LIGHT_RAIN');
+
+    // 4. Moderate rain (30 - 39 dBZ): Saturated yellow/amber or deep navy blue
+    // #005588 deep navy blue (r=0, g=85, b=136)
+    assert.equal(mapRadarPixelToRainIntensity(0, 85, 136, 255), 'MODERATE_RAIN');
+    // #ffee00 bright yellow (r=255, g=238, b=0)
+    assert.equal(mapRadarPixelToRainIntensity(255, 238, 0, 255), 'MODERATE_RAIN');
+    // #ffc500 amber (r=255, g=197, b=0)
+    assert.equal(mapRadarPixelToRainIntensity(255, 197, 0, 255), 'MODERATE_RAIN');
+
+    // 5. Heavy rain (>= 40 dBZ): Orange, red, violet/pink storm core
+    // #ffaa00 orange (r=255, g=170, b=0)
+    assert.equal(mapRadarPixelToRainIntensity(255, 170, 0, 255), 'HEAVY_RAIN');
+    // #ff4400 red-orange (r=255, g=68, b=0)
+    assert.equal(mapRadarPixelToRainIntensity(255, 68, 0, 255), 'HEAVY_RAIN');
+    // #c10000 crimson (r=193, g=0, b=0)
+    assert.equal(mapRadarPixelToRainIntensity(193, 0, 0, 255), 'HEAVY_RAIN');
+    // #ffaaff violet/pink core (r=255, g=170, b=255)
+    assert.equal(mapRadarPixelToRainIntensity(255, 170, 255, 255), 'HEAVY_RAIN');
+  });
+
+  test('mapRadarPixelToSeverity preserves backward compatibility by delegating to rain intensity', () => {
+    // Clear / clutter
+    assert.equal(mapRadarPixelToSeverity(100, 100, 100, 255), null);
     assert.equal(mapRadarPixelToSeverity(0, 0, 0, 0), null);
-    assert.equal(mapRadarPixelToSeverity(100, 100, 100, 20), null);
-    assert.equal(mapRadarPixelToSeverity(100, 100, 100, 50), null);
-    assert.equal(mapRadarPixelToSeverity(120, 110, 100, 74), null);
 
-    // Light rain (wet)
-    assert.equal(mapRadarPixelToSeverity(100, 100, 100, 75), 'WET');
-    assert.equal(mapRadarPixelToSeverity(120, 110, 100, 100), 'WET');
-    assert.equal(mapRadarPixelToSeverity(120, 110, 100, 139), 'WET');
+    // Light rain -> WET
+    assert.equal(mapRadarPixelToSeverity(0, 163, 224, 255), 'WET');
 
-    // Moderate rain (shallow flood risk)
-    assert.equal(mapRadarPixelToSeverity(140, 130, 110, 140), 'FLOODED_SHALLOW');
-    assert.equal(mapRadarPixelToSeverity(160, 140, 110, 199), 'FLOODED_SHALLOW');
+    // Moderate rain -> FLOODED_SHALLOW
+    assert.equal(mapRadarPixelToSeverity(255, 238, 0, 255), 'FLOODED_SHALLOW');
 
-    // Heavy rain (deep flood risk)
-    assert.equal(mapRadarPixelToSeverity(200, 180, 120, 200), 'FLOODED_DEEP');
-    assert.equal(mapRadarPixelToSeverity(255, 200, 150, 240), 'FLOODED_DEEP');
+    // Heavy rain -> FLOODED_DEEP
+    assert.equal(mapRadarPixelToSeverity(255, 68, 0, 255), 'FLOODED_DEEP');
+  });
+
+  test('evaluateHexRadarIntensity enforces >= 3/7 quorum and median calculation', () => {
+    const points: [number, number][] = [
+      [10.0, 106.0],
+      [10.1, 106.0],
+      [10.2, 106.0],
+      [10.3, 106.0],
+      [10.4, 106.0],
+      [10.5, 106.0],
+      [10.6, 106.0],
+    ];
+
+    // Case 1: 0, 1, or 2 noisy points -> null (rejected by quorum)
+    const noisyFn = (lat: number) => {
+      if (lat === 10.0 || lat === 10.1) {
+        return { r: 255, g: 68, b: 0, a: 255 }; // Heavy rain, but only 2 points
+      }
+      return { r: 0, g: 0, b: 0, a: 0 };
+    };
+    assert.equal(evaluateHexRadarIntensity(points, noisyFn), null);
+
+    // Case 2: Exactly 3 points light rain -> LIGHT_RAIN
+    const threeLightFn = (lat: number) => {
+      if (lat <= 10.2) {
+        return { r: 0, g: 163, b: 224, a: 255 }; // Light rain (3 points)
+      }
+      return null;
+    };
+    assert.equal(evaluateHexRadarIntensity(points, threeLightFn), 'LIGHT_RAIN');
+
+    // Case 3: Mixed intensities (1 light, 2 moderate, 1 heavy) -> median is MODERATE_RAIN
+    const mixedFn = (lat: number) => {
+      if (lat === 10.0) return { r: 0, g: 163, b: 224, a: 255 }; // LIGHT (score 1)
+      if (lat === 10.1) return { r: 255, g: 238, b: 0, a: 255 }; // MODERATE (score 2)
+      if (lat === 10.2) return { r: 255, g: 238, b: 0, a: 255 }; // MODERATE (score 2)
+      if (lat === 10.3) return { r: 255, g: 68, b: 0, a: 255 }; // HEAVY (score 3)
+      return null;
+    };
+    assert.equal(evaluateHexRadarIntensity(points, mixedFn), 'MODERATE_RAIN');
   });
 
   test('buildRadarTileUrl properly substitutes {z}, {x}, {y}', () => {

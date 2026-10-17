@@ -419,7 +419,7 @@ func TestService_GetRadar(t *testing.T) {
 	if len(radar.PastFrames) != 2 {
 		t.Errorf("expected 2 past frames, got %d", len(radar.PastFrames))
 	}
-	expectedTile := "https://tilecache.rainviewer.com/v2/radar/frame2/256/{z}/{x}/{y}/2/1_1.png"
+	expectedTile := "https://tilecache.rainviewer.com/v2/radar/frame2/256/{z}/{x}/{y}/2/0_0.png"
 	if radar.LatestTileTemplate != expectedTile {
 		t.Errorf("expected tile template %q, got %q", expectedTile, radar.LatestTileTemplate)
 	}
