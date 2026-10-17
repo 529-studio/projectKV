@@ -12,6 +12,7 @@ import {
   type FloodHexCell,
   normalizeFloodHexCell,
   deriveFloodCameraGroups,
+  deriveFloodHexCounts,
 } from '../utils/floodUtils';
 
 export interface UseFloodReturn {
@@ -24,6 +25,8 @@ export interface UseFloodReturn {
   dryCameraIds: Set<string>;
   dryCameraCount: number;
   floodedHexCount: number;
+  wetHexCount: number;
+  totalActiveHexCount: number;
   loading: boolean;
   connected: boolean;
 }
@@ -212,6 +215,7 @@ export function useFlood(): UseFloodReturn {
 
   // Derive cameras with active conditions (strictly excluding stale verdicts > 3 min)
   const { floodedCameraIds, wetCameraIds, dryCameraIds } = deriveFloodCameraGroups(floodVerdicts);
+  const { floodedHexCount, wetHexCount, totalHexCount } = deriveFloodHexCounts(floodHexCells);
 
   return {
     floodVerdicts,
@@ -222,7 +226,9 @@ export function useFlood(): UseFloodReturn {
     wetCameraCount: wetCameraIds.size,
     dryCameraIds,
     dryCameraCount: dryCameraIds.size,
-    floodedHexCount: floodHexCells.size,
+    floodedHexCount,
+    wetHexCount,
+    totalActiveHexCount: totalHexCount,
     loading,
     connected,
   };

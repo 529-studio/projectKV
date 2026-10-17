@@ -600,11 +600,28 @@ func main() {
 	}
 
 	floodHexAggregator := live.NewFloodHexAggregator(allCameras, hexPolygons, cfg.HexResolution, 1, liveHub, nil)
+	floodStaleTTL := time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second
+	if floodStaleTTL <= 0 {
+		floodStaleTTL = 180 * time.Second
+	}
+	floodHexAggregator.SetStaleTTL(floodStaleTTL)
 	if cfg.AppEnv == "dev" && cfg.Analyzer == "mock" {
 		floodHexAggregator.SetAllowMock(true)
 		log.Println("[INIT] Flood hex cell aggregation enabled for mock analyzer in 'dev' environment.")
 	}
 	liveHub.SetFloodHexAggregator(floodHexAggregator)
+
+	// Background stale flood hex cell reaper (runs every 30s)
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			cleared := floodHexAggregator.ReapStaleCells()
+			if len(cleared) > 0 {
+				log.Printf("[LIVE] Reaped %d stale flood hex cells", len(cleared))
+			}
+		}
+	}()
 
 	// Pre-seed in-memory hotset store and aggregators with latest stored verdicts from SQLite so GET /api/v1/cameras/hotset/status,
 	// GET /api/flood-hex, and GET /api/traffic-status return cached data immediately on cold boot with sub-5ms latency.

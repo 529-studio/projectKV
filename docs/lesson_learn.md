@@ -715,8 +715,8 @@
        - $18–29\text{ dBZ}$ (cyan, teal, sky blue) $\rightarrow$ `LIGHT_RAIN`.
        - $30–39\text{ dBZ}$ (saturated yellow/amber or deep navy) $\rightarrow$ `MODERATE_RAIN`.
        - $\ge 40\text{ dBZ}$ (orange, red, purple storm cores) $\rightarrow$ `HEAVY_RAIN`.
-  2. **Non-Interpolated Zoom 8 Raw Tiles**:
-     - Upgraded tile template to `/2/0_0.png` (`smooth=0, snow=0`) at Zoom 8 ($1\text{ px} \approx 600\text{ m}$). Proved that all H3 Resolution 7 cells across Ho Chi Minh City fit cleanly within exactly two Zoom 8 tiles: `(203, 120)` and `(204, 120)`, doubling spatial resolution with zero extra network overhead.
+  2. **Non-Interpolated Raw Tiles**:
+     - Upgraded tile template to `/2/0_0.png` (`smooth=0, snow=0`) at Zoom 7 ($1\text{ px} \approx 1.2\text{ km}$). Note: RainViewer API strictly caps radar tiles at Zoom 7; Zoom 8+ returns a placeholder "Zoom Level Not Supported" image. All H3 Resolution 7 cells across Ho Chi Minh City fit cleanly within exactly two Zoom 7 tiles: `(101, 60)` and `(102, 60)`, doubling spatial resolution with zero extra network overhead.
   3. **7-Point Contraction Sampling with Quorum**:
      - Implemented `getHexSamplingPoints` sampling the centroid + 6 outer vertices contracted to 70% radius.
      - Implemented `evaluateHexRadarIntensity` requiring a quorum of $\ge 3/7$ points to match a rain tier and calculating the median rank, completely eliminating tile boundary bleeding and single-pixel aliasing.
@@ -749,5 +749,56 @@
      - Relocate compact status widgets (like `WeatherWidget`) into the top mobile quick-search header row (`top-3 left-3 right-3`) alongside the search trigger, rather than scattering absolute elements at arbitrary `top-N` offsets across the map canvas.
   3. **Responsive Control Labeling**:
      - Implement responsive text breakpoints (`sm:hidden` vs `hidden sm:inline`) for toolbar buttons (`[Hiện camera mất tín hiệu]` -> `[Hiện offline]`, `Đang hiển thị 9 / 837 camera` -> `9 / 837 cam`), shrinking control width from 360px to 190px on mobile.
-  4. **Dynamic Clearance Elevation**:
-     - When floating bottom action bars (like `PinnedDock`'s collapsed pill) become active, sibling footers (like the arterial status legend) must dynamically elevate (e.g. from `bottom-2.5` to `bottom-14 md:bottom-2.5`) via props (`hasPinnedCameras`), maintaining clean clearance and zero occlusion.
+  4. **Dynamic Clearance Elevation & Framer Motion Centering**:
+      - **Framer Motion Transform Isolation**: When using `left-1/2` with `-translate-x-1/2` on a `<motion.div>`, Framer Motion's `animate={{ y: 0, scale: 1 }}` generates inline `transform: translateY(0px) scale(1)`, completely stripping Tailwind's CSS class `translateX(-50%)` and pushing elements to `left: 50%` (stuck off-center). Centered Framer Motion elements MUST declare `x: '-50%'` directly within `initial`, `animate`, and `exit` props.
+      - **Harmonized Bottom Clearance Row**: When the collapsed dock pill is active (`bottom-3.5`), all sibling floating controls—the `MapLegend` `(?)` trigger on the left, the arterial status legend in the center, and the search FAB on the right—must elevate together to `bottom-[4.5rem]` ($72\text{px}$). This maintains a single, aligned horizontal row with $18\text{px}$ clearance above the dock pill and zero mutual overlap.
+      - **Compact Single-Line Mobile Legends**: Enforce `whitespace-nowrap` and responsive label truncation (`hidden sm:inline` for `[Xanh: ]`, `[Vàng: ]`, `[Đỏ: ]`) so legend indicators render as `● Thông thoáng ● Đông xe ● Ùn ứ` on mobile, preventing awkward word breaks into 3 tall vertical rows.
+
+---
+
+## Lesson 43: Upstream Tile Server Zoom Ceiling & Silent 200 OK Placeholder Degradation in Web Canvas Decoders
+
+- **Incident & Tracking:** Issue #269 followup / Real-time Rain Verification on 2026-10-17.
+- **Symptom:**
+  During an active afternoon rainstorm in Ho Chi Minh City (Open-Meteo showing `Mưa rào nhẹ`, 88%–100% rain probability, and CCTV at *Điện Biên Phủ - Nguyễn Hữu Cảnh* showing visibly wet roadway pavement), the map's `[Dự báo radar]` lens rendered 0 blue rain hexagons citywide.
+- **Root Cause:**
+  1. **RainViewer Radar Tile Zoom Ceiling**: The RainViewer radar tile endpoint (`/v2/radar/{id}/256/{z}/{x}/{y}/2/0_0.png`) is meteorologically capped at **Zoom 7**. When a client requests Zoom 8 (e.g. `z=8, x=203, y=120`), RainViewer returns HTTP 200 containing a 1,370-byte static PNG image with the rendered text: `"Zoom Level Not Supported"`.
+  2. **Silent Failure in HTML5 Canvas Pipeline**: Because the server responded with HTTP 200, `loadImage` succeeded without error. The offscreen canvas drew the error graphic and extracted gray text pixels ($R=G=B=110$). `mapRadarPixelToRainIntensity` rejected these gray pixels as low-saturation noise, returning `null` for all 129 H3 macro cells across the city. Concurrently, the fallback mechanism was bypassed because the image objects were not `null`.
+  3. **Palette Coverage Gaps**: Scheme 2 (Universal Blue) utilizes deep crimson (`193, 0, 0`), vivid orange (`255, 170, 0`), deep navy (`0, 85, 136`), and tan clutter boundary masks (`206, 192, 135, a=150`). Missing these specific thresholds caused intermittent dropouts in heavy storm cores.
+- **Mandatory Takeaways & Engineering Resolutions:**
+  1. **Enforce Zoom 7 Tile Space**:
+     - Ho Chi Minh City ($10.7^\circ–10.9^\circ\text{N}$, $106.5^\circ–106.9^\circ\text{E}$) maps exactly into two Zoom 7 tiles at latitude row $Y=60$: Tile `(101, 60)` (Western & Central HCMC) and Tile `(102, 60)` (Eastern HCMC / Thu Duc City).
+     - Standardized `latLonToTilePixel(lat, lon, zoom = 7)` across client and unit tests.
+  2. **Calibrated Universal Blue Scheme 2 Palette**:
+     - Explicitly filter tan boundary masks (`r > 180, g > 180, b > 120, a < 200`).
+     - Heavy rain: Violet/pink convective storm cores (`255, 170, 255`), crimson (`193, 0, 0`), vivid red (`255, 68, 0`), and bright orange (`255, 170, 0`).
+     - Moderate rain: Pure yellow/amber (`255, 238, 0`, `255, 197, 0`) and deep navy blue (`0, 85, 136`).
+     - Light rain: Medium sky blue (`0, 119, 170`, `0, 163, 224`) and light cyan/teal (`136, 221, 238`, `54, 186, 229`).
+  3. **End-to-End Verification**:
+     - Verified with live Doppler radar tiles: **85 active rain H3 cells** immediately illuminated across Ho Chi Minh City.
+     - Confirmed CCTV location *Điện Biên Phủ - Nguyễn Hữu Cảnh* (tile 101, pixel 241, 35) maps to active `HEAVY_RAIN` (RGB `193, 0, 0, 255`), matching the wet roadway seen on the camera.
+
+---
+
+## Lesson 44: In-Memory Spatial Aggregator TTL Synchronization, Multi-Lens Marker Prominence, and Semantic Navigation Honesty
+
+- **Incident & Tracking:** Issue #269 followup / Real-time Rain Verification on 2026-10-17 (`feat/s8-t1-radar-pipeline-overhaul`, PR #272).
+- **Symptom:**
+  1. **Cross-Component Semantic Desynchronization**: The left sidebar hero card displayed `"TOÀN THÀNH PHỐ: Các tuyến đường khô ráo — Không ghi nhận ngập"`, while the top lens toolbar displayed `"Camera ngập [8]"`.
+  2. **Invisible Incident Locations**: Commuters could not identify which 8 cameras or road segments were affected because camera markers retained generic traffic green/orange/red styling, and `WET` polygons blended into the daylight OpenStreetMap basemap (`fillOpacity: 0.15`).
+- **Root Cause:**
+  1. **In-Memory Aggregator Staleness Leak**: In `services/go-server`, `/api/flood-status` dynamically checked `time.Since(obs) > 180s` and marked aged records as `stale: true`, which the frontend filtered out (`floodedCameraIds.size === 0`, `wetCameraCount === 0`). However, `FloodHexAggregator` (`/api/flood-hex`) stored verdicts in RAM without TTL checks or reaper routines, indefinitely serving 8 stale H3 cells.
+  2. **Badge Semantic Conflation**: All 8 cameras had `flood_severity: "WET"` (light rain on asphalt, zero standing water). Frontend `HexOverlay` lumped `WET` together with `FLOODED_SHALLOW` and `FLOODED_DEEP` under a single red badge `[8]`, misleading users into believing 8 road segments were submerged.
+  3. **Multi-Lens Marker Collision**: Markers rendered traffic colors regardless of active lens. When switching to `flood`, non-affected cameras were not dimmed and flood/wet cameras were not elevated, making them invisible in high-density camera clusters.
+- **Mandatory Takeaways & Engineering Resolutions:**
+  1. **Dual TTL Eviction in Stateful In-Memory Aggregators**:
+     - Any companion in-memory aggregator (`FloodHexAggregator`) serving spatial polygons MUST mirror the TTL rules of endpoint handlers (`staleTTL = 180s`).
+     - Added periodic background reaper (`ReapStaleCells()`) running every 30 seconds to prune aged camera observations, update cell aggregates, and broadcast SSE clearance events (`CameraCount: 0`, `FloodSeverity: DRY`).
+  2. **Semantic Honesty in Navigation Badges**:
+     - Decoupled badge rendering: Rose badge `[N]` reserved strictly for standing floods (`FLOODED_SHALLOW`, `FLOODED_DEEP`). Sky-blue badge `[N ướt]` used on desktop (`[N]` on mobile) when only wet pavement is detected. Badge is completely omitted when count is 0.
+     - Sidebar hero card displays `GHI NHẬN MƯA: N điểm đường ướt (chưa ghi nhận ngập)` with direct action `Xem danh sách N camera đường ướt →`.
+  3. **Contextual Marker Prominence & Dimming**:
+     - When `activeLens === 'flood'`, unaffected cameras are dimmed (`opacity: 0.20`, `fillOpacity: 0.15`).
+     - Cameras with active flood/wet verdicts are highlighted in high-contrast cyan (`#38bdf8` for WET) or crimson (`#dc2626` for DEEP) with thick white borders, enlarged radius, and elevated `zIndexOffset(1000)` so they immediately command visual attention.
+
+

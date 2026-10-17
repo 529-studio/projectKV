@@ -58,18 +58,23 @@ describe('Rain Hex Utils (Issue #106 / #120 Restoration & S8-T1 Pipeline Overhau
     assert.deepEqual(getHexSamplingPoints([]), []);
   });
 
-  test('latLonToTilePixel converts HCMC coordinates to zoom 8 tile and pixel offset', () => {
-    // Ho Chi Minh City center at Zoom 8
+  test('latLonToTilePixel converts HCMC coordinates to zoom 7 tile and pixel offset by default', () => {
+    // Defaults to Zoom 7 (RainViewer maximum supported tile zoom)
+    const coordDefault = latLonToTilePixel(10.7769, 106.7009);
+    assert.equal(coordDefault.tileX, 101);
+    assert.equal(coordDefault.tileY, 60);
+    assert.ok(coordDefault.pixelX >= 0 && coordDefault.pixelX <= 255);
+    assert.ok(coordDefault.pixelY >= 0 && coordDefault.pixelY <= 255);
+
+    // Explicit Zoom 8
     const coord8 = latLonToTilePixel(10.7769, 106.7009, 8);
     assert.equal(coord8.tileX, 203);
     assert.equal(coord8.tileY, 120);
-    assert.ok(coord8.pixelX >= 0 && coord8.pixelX <= 255);
-    assert.ok(coord8.pixelY >= 0 && coord8.pixelY <= 255);
 
-    // At Zoom 7
-    const coord7 = latLonToTilePixel(10.7769, 106.7009, 7);
-    assert.equal(coord7.tileX, 101);
-    assert.equal(coord7.tileY, 60);
+    // Eastern HCMC / Thu Duc at Zoom 7 (Suoi Tien / Long Binh, lon >= 106.875)
+    const coordThuDuc = latLonToTilePixel(10.86, 106.90, 7);
+    assert.equal(coordThuDuc.tileX, 102);
+    assert.equal(coordThuDuc.tileY, 60);
   });
 
   test('mapRadarPixelToRainIntensity decodes Universal Blue Scheme 2 dBZ palette', () => {
@@ -78,13 +83,17 @@ describe('Rain Hex Utils (Issue #106 / #120 Restoration & S8-T1 Pipeline Overhau
     assert.equal(mapRadarPixelToRainIntensity(0, 163, 224, 80), null);
     assert.equal(mapRadarPixelToRainIntensity(255, 68, 0, 119), null);
 
-    // 2. Low-saturation gray/brown atmospheric haze and ground clutter (dBZ < 18) -> null
+    // 2. Tan / brownish boundary mask and terrain clutter (r>180, g>180, b>120, a<200) -> null
+    assert.equal(mapRadarPixelToRainIntensity(206, 192, 135, 150), null);
+    assert.equal(mapRadarPixelToRainIntensity(214, 200, 143, 170), null);
+
+    // 3. Low-saturation gray/brown atmospheric haze and virga (dBZ < 18) -> null
     // #827b69 (r=130, g=123, b=105, sat=0.19)
     assert.equal(mapRadarPixelToRainIntensity(130, 123, 105, 255), null);
     // #9e9375 (r=158, g=147, b=117, sat=0.26, b < 180) -> virga/faint haze
     assert.equal(mapRadarPixelToRainIntensity(100, 100, 100, 255), null);
 
-    // 3. Light rain (18 - 29 dBZ): Cyan, vibrant teal, sky blue
+    // 4. Light rain (18 - 29 dBZ): Cyan, vibrant teal, sky blue, medium blue
     // #36bae5 (r=54, g=186, b=229)
     assert.equal(mapRadarPixelToRainIntensity(54, 186, 229, 255), 'LIGHT_RAIN');
     // #00a3e0 (r=0, g=163, b=224)
@@ -92,7 +101,7 @@ describe('Rain Hex Utils (Issue #106 / #120 Restoration & S8-T1 Pipeline Overhau
     // #0077aa (r=0, g=119, b=170)
     assert.equal(mapRadarPixelToRainIntensity(0, 119, 170, 255), 'LIGHT_RAIN');
 
-    // 4. Moderate rain (30 - 39 dBZ): Saturated yellow/amber or deep navy blue
+    // 5. Moderate rain (30 - 39 dBZ): Saturated yellow/amber or deep navy blue
     // #005588 deep navy blue (r=0, g=85, b=136)
     assert.equal(mapRadarPixelToRainIntensity(0, 85, 136, 255), 'MODERATE_RAIN');
     // #ffee00 bright yellow (r=255, g=238, b=0)
@@ -100,7 +109,7 @@ describe('Rain Hex Utils (Issue #106 / #120 Restoration & S8-T1 Pipeline Overhau
     // #ffc500 amber (r=255, g=197, b=0)
     assert.equal(mapRadarPixelToRainIntensity(255, 197, 0, 255), 'MODERATE_RAIN');
 
-    // 5. Heavy rain (>= 40 dBZ): Orange, red, violet/pink storm core
+    // 6. Heavy rain (>= 40 dBZ): Orange, red, violet/pink storm core
     // #ffaa00 orange (r=255, g=170, b=0)
     assert.equal(mapRadarPixelToRainIntensity(255, 170, 0, 255), 'HEAVY_RAIN');
     // #ff4400 red-orange (r=255, g=68, b=0)

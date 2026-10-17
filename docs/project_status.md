@@ -26,8 +26,8 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **146 Pull Requests** processed across repository history:
-  - **138 Merged** to `dev` (including Sprint 4–6 PRs and Sprint 7 deliverables: PR #256 ADR-008, PR #257 S7-T2 Offline Camera Filtering, PR #258 S7-T8 Multi-Lane Directional Taxonomy, PR #259 S7-T3 Report Flood Affordance, PR #260 Curate 2026-10-16 Dataset, PR #265 S7-T9b ADR-009 Data Flywheel, PR #266 S7-T5 Autonomous Hot Set Poller, PR #267 S7-T6 Arterial Marker Saturation Coloring, and PR #268 S7-T7b Autonomous Harvester & R2 Archiver)
+- **Lifetime PR History**: Exactly **156 Pull Requests** processed across repository history:
+  - **148 Merged** to `dev` (including Sprint 4–6 PRs, Sprint 7 deliverables, PR #270 Sprint 7 Completion Report, and PR #271 S8-T1 Doppler Rain Radar Pipeline Overhaul)
   - **8 Closed** without merging
   - **0 Open** PRs pending
 - **Staging Infrastructure Configuration (Stack 14)**:
@@ -236,10 +236,15 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Added configuration keys `HARVESTER_ENABLED`, `HARVESTER_SCHEDULE_HOURS`, `HARVESTER_RAIN_COOLDOWN_MINUTES`, `HARVESTER_CONCURRENCY` in `services/go-server/internal/config/config.go`.
   - Wired into `cmd/server/main.go` with graceful shutdown lifecycle integration.
   - Comprehensive unit and race test suite in `internal/harvester/harvester_test.go` (`go test -race ./internal/harvester/...`).
-- **Doppler Rain Radar Pipeline Overhaul (Sprint 8 Priority 1 S8-T1, Issue #269, ADR-010)**:
-  - Fixed root cause of city-wide false-positive flood/rain overlays on dry sunny days (codified in Lesson 41).
-  - Upgraded RainViewer tile ingestion in `weather.Service` from smoothed Zoom 7 (`/2/1_1.png`) to raw non-interpolated Zoom 8 (`/2/0_0.png`, `smooth=0, snow=0`).
-  - Proved all H3 Resolution 7 cells across Ho Chi Minh City fit cleanly within exactly two Zoom 8 tiles: `(203, 120)` and `(204, 120)`, doubling spatial resolution ($1\text{ px} \approx 600\text{ m}$) with zero extra network overhead.
+- **Doppler Rain Radar Pipeline Overhaul (Sprint 8 Priority 1 S8-T1, Issue #269, ADR-010, Lessons 41 & 43)**:
+  - Fixed root cause of city-wide false-positive flood/rain overlays on dry sunny days (Lesson 41).
+  - Investigated and resolved live regression where Zoom 8 radar requests returned HTTP 200 with "Zoom Level Not Supported" placeholder graphic, causing 0 rain detections across all cells (Lesson 43).
+  - Standardized tile coordinate space on Zoom 7 ($1\text{ px} \approx 1.2\text{ km}$), mapping the entire Ho Chi Minh City metropolitan area cleanly into two tiles at row $Y=60$: `(101, 60)` (Western/Central HCMC) and `(102, 60)` (Eastern HCMC / Thu Duc City).
+  - Fully calibrated RainViewer Universal Blue (Scheme 2) RGB reflectivity palette across heavy rain (pink convective core `255, 170, 255`, crimson `193, 0, 0`, vivid red `255, 68, 0`, orange `255, 170, 0`), moderate rain (pure yellow `255, 238, 0`, amber `255, 197, 0`, deep navy `0, 85, 136`), and light rain (sky blue `0, 119, 170`, cyan `136, 221, 238`), with explicit filtering of tan boundary clutter (`206, 192, 135, a=150`).
+  - Verified live during real-time rainstorm: restored 85 active rain H3 cells citywide, correctly detecting heavy rain over CCTV *Điện Biên Phủ - Nguyễn Hữu Cảnh* (matching wet roadway pavement).
+- **Map Overlay Layout Deconfliction (Desktop & Mobile, Lesson 42)**:
+  - Desktop View: Relocated active filter breadcrumb chips (`activeFilterLabel`) from the crowded toolbar row into a dedicated sub-row, preventing horizontal collision with top-right WeatherWidget and MapLegend trigger.
+  - Mobile View: Relocated WeatherWidget into the top quick-search header row, eliminated conflicting `top-28 right-3` anchor, added responsive compact button text (`9 / 837 cam`, `[Hiện offline]`), and dynamically elevated bottom arterial status legend when pinned dock is active.
   - Replaced broken alpha thresholding with meteorological RGB dBZ decoder in `rainHexUtils.ts`:
     - $< 18\text{ dBZ}$ (or saturation $< 0.20$, alpha $< 120$): `null` (suppresses ground clutter and virga).
     - $18–29\text{ dBZ}$ (cyan, vibrant teal): `LIGHT_RAIN`.
@@ -250,6 +255,12 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Fixed Open-Meteo fallback in `generateOpenMeteoFallbackHexCells` to strictly require actual measured precipitation (`rain_mm >= 1.0`).
   - Decoupled radar types from camera flood observations, defaulted initial page load lens to `'traffic'` (real-time arterial saturation dots), applied translucent atmospheric radar styling, and eliminated all graphic emojis (`⚠`, `✓`) across tooltips per AGENTS.md Rule 1.
   - Full test suite verified: 148 web unit tests passing (`npm test`), Next.js static build (6/6 pages), and Go backend tests passing (`make test-go`).
+- **Flood Status Synchronization & Visual Prominence (Lesson 44, Issue #269 followup)**:
+  - Synchronized in-memory spatial hex aggregator with backend TTL: added `staleTTL = 180s`, periodic 30s background reaper (`ReapStaleCells()`), and dynamic pruning in `aggregateCellLocked()`, eliminating stale hex cell leaks indefinitely served to the frontend.
+  - Decoupled semantic navigation badges in `HexOverlay.tsx`: rose badge `[N]` reserved strictly for standing floods (`FLOODED_SHALLOW` / `FLOODED_DEEP`), sky-blue badge `[N ướt]` on desktop (`[N]` on mobile) for wet pavement, completely hidden when count is 0.
+  - Sidebar hero card displays `GHI NHẬN MƯA: N điểm đường ướt (chưa ghi nhận ngập)` with direct action `Xem danh sách N camera đường ướt →`, in 100% synchronization with map verdicts.
+  - Elevated active camera markers on `flood` lens: unaffected cameras dimmed (`opacity: 0.20`, `fillOpacity: 0.15`), active flood/wet cameras highlighted in high-contrast cyan (`#38bdf8`) or crimson (`#dc2626`) with thick white stroke, enlarged radius, and top layer sorting (`zIndexOffset(1000)`).
+  - All automated test suites passing: 151 web unit tests (`npm test --prefix apps/web`), full Go backend test suite (`go test -race ./...`).
 
 ---
 
@@ -271,7 +282,7 @@ make dev-model
 make test-go       # Full Go backend test suite with -race
 make test-pcu      # PCU Saturation Index boundary test suite
 make test-enrich   # Geo-enrichment catalog filter unit tests
-cd apps/web && npm test  # Web client unit test suite (144 tests)
+cd apps/web && npm test  # Web client unit test suite (151 tests)
 ```
 
 ---
