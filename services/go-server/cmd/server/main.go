@@ -22,6 +22,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
 	"github.com/529-studio/projectKV/services/go-server/internal/corridor"
 	"github.com/529-studio/projectKV/services/go-server/internal/cvclient"
+	"github.com/529-studio/projectKV/services/go-server/internal/feedback"
 	"github.com/529-studio/projectKV/services/go-server/internal/flood"
 	"github.com/529-studio/projectKV/services/go-server/internal/harvester"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
@@ -253,6 +254,58 @@ func (f *harvesterSnapshotFetcher) FetchSnapshot(ctx context.Context, cam harves
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CameraViewHarvester/1.0)")
+	resp, err := f.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("snapshot returned status %d", resp.StatusCode)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+// feedbackCameraChecker adapts *camera.Catalog to feedback.CameraChecker.
+type feedbackCameraChecker struct {
+	catalog *camera.Catalog
+}
+
+func (c *feedbackCameraChecker) CameraExists(cameraID string) bool {
+	if c.catalog == nil {
+		return false
+	}
+	_, ok := c.catalog.ByID(cameraID)
+	return ok
+}
+
+// feedbackSnapshotFetcher adapts proxycache.Cache and HTTP client to feedback.SnapshotFetcher.
+type feedbackSnapshotFetcher struct {
+	cache        *proxycache.Cache
+	catalog      *camera.Catalog
+	upstreamBase string
+	client       *http.Client
+}
+
+func (f *feedbackSnapshotFetcher) FetchSnapshot(ctx context.Context, cameraID string) ([]byte, error) {
+	if f.cache != nil {
+		if data, ok := f.cache.Get(cameraID); ok && len(data) > 0 {
+			return data, nil
+		}
+	}
+	var snapURL string
+	if f.catalog != nil {
+		if cam, ok := f.catalog.ByID(cameraID); ok && cam.SnapshotURL != "" {
+			snapURL = cam.SnapshotURL
+		}
+	}
+	if snapURL == "" {
+		snapURL = fmt.Sprintf("%s?id=%s", f.upstreamBase, cameraID)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, snapURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CameraViewFeedback/1.0)")
 	resp, err := f.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -753,6 +806,18 @@ func main() {
 		archiverHandler = archiver.NewHandler(storeDriver, cameraTitleAdapter{catalog: camCatalog})
 	}
 
+	// 6d2. Initialize crowdsourced flood feedback handler & R2 ground-truth archiver (Issue #249 / S7-T4 / S8-T2)
+	feedbackChecker := &feedbackCameraChecker{catalog: camCatalog}
+	feedbackFetcher := &feedbackSnapshotFetcher{
+		cache:        proxyCache,
+		catalog:      camCatalog,
+		upstreamBase: upstreamBase,
+		client:       cvclient.SharedClient,
+	}
+	feedbackLimiter := feedback.NewRateLimiter(5 * time.Minute)
+	feedbackArchiver := feedback.NewArchiver(feedbackFetcher, storeDriver, nil)
+	feedbackHandler := feedback.NewHandler(feedbackChecker, feedbackLimiter, feedbackArchiver)
+
 	// 6e. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
 	var hotsetScheduler *hotset.Scheduler
 	if analysisEnabled && analyzer != nil {
@@ -999,6 +1064,10 @@ func main() {
 		if archiverHandler != nil {
 			devAuth := middleware.RequireDevAuth(cfg.DevAccessToken, cfg.AppEnv)
 			archiverHandler.RegisterRoutes(api, devAuth)
+		}
+		// Crowdsourced flood feedback & R2 archiver (Issue #249 / S7-T4 / S8-T2)
+		if feedbackHandler != nil {
+			feedbackHandler.RegisterRoutes(api)
 		}
 		// Legacy alias kept for backward compat with existing FE constants.js
 		api.GET("/cameras/snapshot/:id", proxyHandler.GetSnapshot)

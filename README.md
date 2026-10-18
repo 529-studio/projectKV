@@ -194,7 +194,7 @@ make dev-all
 | Service | Technology | Port | Host & Node Role | Primary Responsibilities |
 |---|---|:---:|---|---|
 | **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `edge host` (Portainer Endpoint 3) | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal corridor dock, bilingual UI (`vi` / `en`). |
-| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` (Portainer Endpoint 3) | Snapshot proxy cache (15s TTL), camera catalog, hotset scheduler (30s cycle), PCU Saturation Index, SSE stream, Cloudflare R2 storage integration. |
+| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` (Portainer Endpoint 3) | Snapshot proxy cache (15s TTL), camera catalog, hotset scheduler (30s cycle), crowdsourced flood report archiver (`internal/feedback`), PCU Saturation Index, SSE stream, Cloudflare R2 storage integration. |
 | **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n FP16 | `8000` | `inference worker` (Portainer Endpoint 4) | High-throughput vehicle detection (`POST /predict`), class counting (motorcycle, car, bus, truck), `GET /healthz` healthchecks (24 FPS, ~18.2ms latency). |
 | **Storage & Edge CDN** | Cloudflare R2, AWS Signature V4 | `443` | Cloudflare Edge (`file.529studio.site`) | S3-compatible snapshot proof repository (`warded-proofs`), Vietnam ICT (`UTC+7`) key hierarchy (`YYYY-MM-DD/<camera_id>/<unix_ts>_<reason>.jpg`). |
 
@@ -331,7 +331,7 @@ make dev-all
 | Dịch vụ | Công nghệ | Cổng | Node & Máy chủ | Vai trò chính |
 |---|---|:---:|---|---|
 | **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `edge host` (Portainer Endpoint 3) | Trực quan hóa bản đồ, điểm tròn camera, H3 hex overlay, dock ghim camera, giao diện song ngữ (`vi` / `en`). |
-| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` (Portainer Endpoint 3) | Proxy cache snapshot (15s TTL), điều phối Hot Set (chu kỳ 30s), tính chỉ số bão hòa PCU, luồng SSE, tích hợp lưu trữ Cloudflare R2. |
+| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` (Portainer Endpoint 3) | Proxy cache snapshot (15s TTL), điều phối Hot Set (chu kỳ 30s), lưu trữ phản ánh ngập từ cộng đồng (`internal/feedback`), tính chỉ số bão hòa PCU, luồng SSE, tích hợp lưu trữ Cloudflare R2. |
 | **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n FP16 | `8000` | `inference worker` (Portainer Endpoint 4) | Nhận diện phương tiện thông lượng cao (`POST /predict`), phân loại đếm xe, kiểm tra sức khỏe `GET /healthz` (24 FPS, ~18.2ms latency). |
 | **Lưu trữ & Edge CDN** | Cloudflare R2, AWS Signature V4 | `443` | Cloudflare Edge (`file.529studio.site`) | Lưu trữ ảnh chụp bằng chứng giao thông (`warded-proofs`), phân cấp ngày theo giờ Việt Nam ICT (`UTC+7`, `YYYY-MM-DD/<camera_id>/<unix_ts>_<reason>.jpg`). |
 
