@@ -185,8 +185,8 @@ The following 5 tickets were planned or spawned during Sprint 7 but remain open 
    - *Current State:* **Completed and verified in Sprint 8** (`feat/s7-t4-feedback-r2-archiver`, Kanban [KV-3]). Built leaf package `internal/feedback` with sliding rate limiter (`sync.RWMutex`), SHA-256 IP hashing, asynchronous frame fetch, and Cloudflare R2 manifest upload under `feedback/<YYYY-MM-DD>/`. Exposed `POST /api/v1/cameras/:id/report-flood` and legacy alias `POST /api/cameras/:id/report-flood`.
    - *Target:* Delivered in Sprint 8 Wave 1.
 3. **S7-T7c (Issue #263) — `[tooling] Standalone Automated Harvester CLI (tools/eval/auto_harvest.py)`**:
-   - *Current State:* The backend Go poller (`internal/harvester`) is fully functional. A Python CLI mirror for offline batch runs was planned but not authored.
-   - *Target:* Sprint 8 evaluation tooling wave.
+   - *Current State:* **Completed and verified in Sprint 8** (`tooling/s7-t7c-auto-harvest-cli`, Kanban [KV-11]). Created standalone Python CLI with `--trigger [scheduled|rain|now]`, `--scope [hotset|flood-prone|all]`, `--weather [auto|dry|rain|heavy_rain]`, `--upload-r2`, `--validate`, and `--dry-run`. Fully conforms to Draft-07 schema (`label_schema.json`) with zero hardcoded credentials and 100% unit test pass rate (`auto_harvest_test.py`).
+   - *Target:* Delivered in Sprint 8 evaluation tooling wave.
 4. **S7-T7d (Issue #264) — `[web] Web Labeler Candidate Review Filter & Auto-Harvest Verification Badges`**:
    - *Current State:* **Completed and verified in Sprint 8** (`feat/s7-t7d-web-labeler-filter`, Kanban **[KV-12]**). Built tri-state candidate review filters (`all`, `pending_auto`, `approved_human`), monochromatic provenance badges, and `Shift + Enter` fast-approval hotkey with 100% test pass rate (155 tests).
    - *Target:* Delivered in Sprint 8 active learning wave.

@@ -845,8 +845,8 @@
      - Implemented `load_dotenv()` and HTTP interactions using standard library `urllib.request` and `json`.
      - Integrated `validate_labels.py` native Draft-07 validator so strict schema validation runs 100% cleanly without external package dependencies.
      - Ensured zero credentials in code; R2 access keys and endpoints are dynamically loaded from environment variables with empty-string fallbacks.
-  3. **Provenance & Active Learning Bridge (S7-T7d Alignment)**:
-     - Tagged auto-generated manifests with `annotator: "harvester/auto"` and structured metadata (`notes: "Auto-harvested via ...; pcu=...; SI=..."`), creating a clean provenance foundation for downstream Web Labeler human-in-the-loop candidate review (S7-T7d / Issue #264).
+   3. **Provenance & Active Learning Bridge (S7-T7d Alignment)**:
+      - Tagged auto-generated manifests with `annotator: "harvester/auto"` and structured metadata (`notes: "Auto-harvested via ...; pcu=...; SI=..."`), creating a clean provenance foundation for downstream Web Labeler human-in-the-loop candidate review (S7-T7d / Issue #264).
 
 ---
 
@@ -872,4 +872,3 @@
      - Extended `handleHotkey` with `HotkeyMeta` support detecting `Shift + Enter` (`action: 'approve'`).
      - Directly promotes candidate parameters to gold standard, stamping `annotator` with current human reviewer nickname, persisting to `/api/archiver/labels`, and advancing the frame queue.
      - In `pending_auto` filter mode, approved frames cleanly transition to `approved_human`, seamlessly advancing to the next pending candidate frame without manual index skipping.
-
