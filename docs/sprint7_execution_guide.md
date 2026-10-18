@@ -29,16 +29,16 @@ Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers 
 | **0** | **S7-T2** | - | [#247](https://github.com/529-studio/projectKV/issues/247) | `[web] Hide Offline / No-Signal Cameras by Default on Map (Map Hygiene)` | epic:dock-ux | `frontend` | Hoàn thành (Merged PR #257) |
 | **0** | **S7-T1** | **[KV-1]** | [#246](https://github.com/529-studio/projectKV/issues/246) | `[ci + ops] Live Staging Telegram Flood Alert Verification & Simulation Deprecation (Stack 14 homesrv)` | epic:infra-resilience | `tooling, cross-cutting` | Nice-to-have (Dời sau Sprint 7) |
 | **1** | **S7-T3** | **[KV-2]** | [#248](https://github.com/529-studio/projectKV/issues/248) | `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback` | epic:dock-ux | `frontend` | Hoàn thành (Merged PR #259) |
-| **1** | **S7-T4** | **[KV-3]** | [#249](https://github.com/529-studio/projectKV/issues/249) | `[go-server] internal/feedback Leaf Package & Cloudflare R2 Ground-Truth Archiver` | epic:flood-integrity | `backend, go` | [#248](https://github.com/529-studio/projectKV/issues/248) (S7-T3) |
-| **2** | **S7-T5** | **[KV-4]** | [#250](https://github.com/529-studio/projectKV/issues/250) | `[go-server + cv-engine] Autonomous 50 Hot Set Traffic Poller & Saturation Cache` | epic:vehicle-detection | `backend, go, epic:vehicle-detection` | None (Backend worker) |
-| **2** | **S7-T6** | **[KV-5]** | [#251](https://github.com/529-studio/projectKV/issues/251) | `[web] Real-Time Arterial Marker Saturation Coloring (Green / Yellow / Red Dots)` | epic:dock-ux | `frontend` | [#250](https://github.com/529-studio/projectKV/issues/250) (S7-T5) |
-| **2** | **S7-T7b** | **[KV-10]** | [#262](https://github.com/529-studio/projectKV/issues/262) | `[go-server] internal/harvester Autonomous Dual-Trigger Poller, Label Generator & Cloudflare R2 Archiver` | epic:flood-integrity | `backend, go, epic:eval-tooling` | [#250](https://github.com/529-studio/projectKV/issues/250) (S7-T5), [#261](https://github.com/529-studio/projectKV/issues/261) |
-| **2** | **S7-T7c** | **[KV-11]** | [#263](https://github.com/529-studio/projectKV/issues/263) | `[tooling] Standalone Automated Harvester CLI (tools/eval/auto_harvest.py)` | epic:eval-tooling | `tooling, epic:eval-tooling` | [#261](https://github.com/529-studio/projectKV/issues/261) (ADR-009) |
-| **2** | **S7-T7d** | **[KV-12]** | [#264](https://github.com/529-studio/projectKV/issues/264) | `[web] Web Labeler Candidate Review Filter & Auto-Harvest Verification Badges` | epic:eval-tooling | `frontend` | [#262](https://github.com/529-studio/projectKV/issues/262) (S7-T7b) |
+| **1** | **S7-T4** | **[KV-3]** | [#249](https://github.com/529-studio/projectKV/issues/249) | `[go-server] internal/feedback Leaf Package & Cloudflare R2 Ground-Truth Archiver` | epic:flood-integrity | `backend, go` | Hoàn thành (Merged PR #272) |
+| **2** | **S7-T5** | **[KV-4]** | [#250](https://github.com/529-studio/projectKV/issues/250) | `[go-server + cv-engine] Autonomous 50 Hot Set Traffic Poller & Saturation Cache` | epic:vehicle-detection | `backend, go, epic:vehicle-detection` | Hoàn thành (Merged PR #266) |
+| **2** | **S7-T6** | **[KV-5]** | [#251](https://github.com/529-studio/projectKV/issues/251) | `[web] Real-Time Arterial Marker Saturation Coloring (Green / Yellow / Red Dots)` | epic:dock-ux | `frontend` | Hoàn thành (Merged PR #267) |
+| **2** | **S7-T7b** | **[KV-10]** | [#262](https://github.com/529-studio/projectKV/issues/262) | `[go-server] internal/harvester Autonomous Dual-Trigger Poller, Label Generator & Cloudflare R2 Archiver` | epic:flood-integrity | `backend, go, epic:eval-tooling` | Hoàn thành (Merged PR #268) |
+| **2** | **S7-T7c** | **[KV-11]** | [#263](https://github.com/529-studio/projectKV/issues/263) | `[tooling] Standalone Automated Harvester CLI (tools/eval/auto_harvest.py)` | epic:eval-tooling | `tooling, epic:eval-tooling` | Hoàn thành (Merged PR #274) |
+| **2** | **S7-T7d** | **[KV-12]** | [#264](https://github.com/529-studio/projectKV/issues/264) | `[web] Web Labeler Candidate Review Filter & Auto-Harvest Verification Badges` | epic:eval-tooling | `frontend` | Hoàn thành (Merged PR #275) |
 | **3** | **S7-T8** | - | [#253](https://github.com/529-studio/projectKV/issues/253) | `[tooling] Multi-Lane Directional Labeling Taxonomy & Toolchain Upgrade` | epic:eval-tooling | `tooling, epic:eval-tooling` | Hoàn thành (Merged PR #258) |
-| **3** | **S7-T9b** | **[KV-9]** | [#261](https://github.com/529-studio/projectKV/issues/261) | `[docs] Revise ADR-009: Autonomous Ground-Truth Data Flywheel & Reconcile S7-T7 VLM Deprecation` | rfc | `documentation, rfc` | Hoàn thành (PR #265) |
-| **3** | **S7-T9** | **[KV-7]** | [#254](https://github.com/529-studio/projectKV/issues/254) | `[docs + spike] ADR-009 Technical Design Spike: Self-Hosted Flood Segmentation (Zero-VLM)` | rfc | `documentation, rfc` | [#261](https://github.com/529-studio/projectKV/issues/261) (ADR-009) |
-| **4** | **S7-T10** | **[KV-8]** | [#255](https://github.com/529-studio/projectKV/issues/255) | `[docs] Holistic Repository Knowledge Synchronization & Sprint 7 Closeout` | rfc | `documentation` | S7-T2 đến S7-T9b |
+| **3** | **S7-T9b** | **[KV-9]** | [#261](https://github.com/529-studio/projectKV/issues/261) | `[docs] Revise ADR-009: Autonomous Ground-Truth Data Flywheel & Reconcile S7-T7 VLM Deprecation` | rfc | `documentation, rfc` | Hoàn thành (Merged PR #265) |
+| **3** | **S7-T9** | **[KV-7]** | [#254](https://github.com/529-studio/projectKV/issues/254) | `[docs + spike] ADR-009 Technical Design Spike: Self-Hosted Flood Segmentation (Zero-VLM)` | rfc | `documentation, rfc` | Hoàn thành (`docs/ADR-009-zero-vlm-flood-segmentation.md`) |
+| **4** | **S7-T10** | **[KV-8]** | [#255](https://github.com/529-studio/projectKV/issues/255) | `[docs] Holistic Repository Knowledge Synchronization & Sprint 7 Closeout` | rfc | `documentation` | S7-T2 đến S7-T9 |
 
 ---
 
@@ -299,26 +299,14 @@ Ticket này đã được hoàn thành trọn vẹn tại PR [#258](https://gith
 ### Terminal 2 — S7-T9b (Bổ sung Đặc tả Data Flywheel vào ADR-009) — ĐÃ HOÀN THÀNH (PR #265)
 Ticket này đã được hoàn thành trọn vẹn tại PR [#265](https://github.com/529-studio/projectKV/pull/265) (`Close #261 closes [KV-9]`), chính thức bãi bỏ cloud VLM bridge và đặc tả kiến trúc Autonomous Data Flywheel (§2.4).
 
-### Terminal 3 — S7-T9 (Đặc tả thiết kế ADR-009: Phân đoạn ảnh ngập nước On-Premise)
+### Terminal 3 — S7-T9 (Đặc tả thiết kế ADR-009: Phân đoạn ảnh ngập nước On-Premise) — ĐÃ HOÀN THÀNH
 
-```bash
-cd ~/repos/projectKV
+Ticket này đã hoàn thành tại branch `docs/s7-t9-adr-009-zero-vlm-flood`:
+- Đã công bố đặc tả kiến trúc toàn diện tại [`docs/ADR-009-zero-vlm-flood-segmentation.md`](ADR-009-zero-vlm-flood-segmentation.md).
+- So sánh định lượng 3 mô hình (YOLOv8n-seg, BiSeNet v2, SegFormer-B0) trên OpenVINO FP16, chọn YOLOv8n-seg (24.6 ms inference, 38.5 ms total cycle, 51.9% headroom dưới ngưỡng 80 ms).
+- Đặc tả cơ chế phân tầng vật lý 2 lớp (Layer 1 tỷ lệ diện tích ngập $\ge 15\%$ + Layer 2 độ ngập bánh xe máy $\ge 20\text{ cm}$).
+- Đã cập nhật bài học Lesson 48 tại [`docs/lesson_learn.md`](lesson_learn.md).
 
-agy "Implement issue #254: [docs + spike] S7-T9 — ADR-009 Technical Design Spike: Self-Hosted Flood Segmentation (Zero-VLM).
-
-Read the full issue at https://github.com/529-studio/projectKV/issues/254 for complete Technical Details, Out of Scope, and Definition of Done.
-
-Key requirements:
-- Author docs/ADR-009-zero-vlm-flood-segmentation.md:
-  - Model selection benchmarks: BiSeNet v2 vs SegFormer-B0 vs YOLOv8n-seg converted to OpenVINO FP16.
-  - Compute latency target: < 80ms per frame on dev-box AMD Ryzen 7 6800HS.
-  - Training dataset acquisition: protocol consuming Cloudflare R2 crowdsourced proofs (warded-proofs/feedback/) and harvested rain frames.
-  - Physical Triangulation Logic: Dual-layer verification combining water puddle segmentation mask (> 15% road surface) with detected motorcycle wheel submergence depth (>= 20cm) per Lesson 37.
-- Zero emojis, 100% English documentation per Rule 1.
-
-Branch: docs/s7-t9-adr-009-zero-vlm-flood
-Open PR targeting dev starting with 'Close #254'. Do NOT merge."
-```
 
 ---
 
