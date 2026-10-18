@@ -6,6 +6,10 @@ import {
   LABELER_I18N,
   formatSnapshotTimestamp,
   buildAuthHeaders,
+  isAutoHarvested,
+  filterSnapshots,
+  type LabelFilterStatus,
+  type LabelPayload,
   type LabelState,
 } from './labelerUtils.ts';
 
@@ -147,6 +151,110 @@ describe('Labeler Utilities & Hotkeys (Issue #214 / S7-T8 Directional Taxonomy)'
       assert.ok(strings.devInvalidToken);
       assert.ok(strings.devLockSession);
       assert.ok(strings.saveError);
+    }
+  });
+
+  test('isAutoHarvested correctly detects pseudo-labels synthesized by automated harvester', () => {
+    assert.equal(isAutoHarvested(undefined), false);
+    assert.equal(isAutoHarvested(null), false);
+    assert.equal(isAutoHarvested({ annotator: '' }), false);
+    assert.equal(isAutoHarvested({ annotator: 'thdat' }), false);
+    assert.equal(isAutoHarvested({ annotator: 'anonymous' }), false);
+    assert.equal(isAutoHarvested({ annotator: 'reviewer_1' }), false);
+    assert.equal(isAutoHarvested({ annotator: 'harvester/auto' }), true);
+    assert.equal(isAutoHarvested({ annotator: 'harvester/cv-engine' }), true);
+    assert.equal(isAutoHarvested({ annotator: 'HARVESTER/AUTO' }), true);
+  });
+
+  test('filterSnapshots partitions queue into all, pending_auto, and approved_human', () => {
+    const snapshots = [
+      { key: 'snap_1.jpg', camera_id: 'cam_1', timestamp: 100, reason: 'scheduled', size: 50000, raw_url: '/raw1' },
+      { key: 'snap_2.jpg', camera_id: 'cam_2', timestamp: 101, reason: 'scheduled', size: 50000, raw_url: '/raw2' },
+      { key: 'snap_3.jpg', camera_id: 'cam_3', timestamp: 102, reason: 'scheduled', size: 50000, raw_url: '/raw3' },
+      { key: 'snap_4.jpg', camera_id: 'cam_4', timestamp: 103, reason: 'scheduled', size: 50000, raw_url: '/raw4' },
+    ];
+
+    const labels: Record<string, LabelPayload> = {
+      'snap_1.jpg': {
+        snapshot_key: 'snap_1.jpg',
+        camera_id: 'cam_1',
+        date: '2026-10-18',
+        annotator: 'harvester/auto',
+        timestamp: 100,
+        flood_level: 'none',
+      },
+      'snap_2.jpg': {
+        snapshot_key: 'snap_2.jpg',
+        camera_id: 'cam_2',
+        date: '2026-10-18',
+        annotator: 'thdat',
+        timestamp: 101,
+        flood_level: 'puddle',
+      },
+      // snap_3 is unlabelled
+      'snap_4.jpg': {
+        snapshot_key: 'snap_4.jpg',
+        camera_id: 'cam_4',
+        date: '2026-10-18',
+        annotator: 'harvester/rain_trigger',
+        timestamp: 103,
+        flood_level: 'deep',
+      },
+    };
+
+    // Filter: all
+    const filterAll: LabelFilterStatus = 'all';
+    const all = filterSnapshots(snapshots, labels, filterAll);
+    assert.equal(all.length, 4);
+
+    // Filter: pending_auto (auto-harvested candidates awaiting human review)
+    const filterPending: LabelFilterStatus = 'pending_auto';
+    const pendingAuto = filterSnapshots(snapshots, labels, filterPending);
+    assert.equal(pendingAuto.length, 2);
+    assert.deepEqual(pendingAuto.map((s) => s.key), ['snap_1.jpg', 'snap_4.jpg']);
+
+    // Filter: approved_human (gold-standard labels reviewed/created by humans)
+    const filterApproved: LabelFilterStatus = 'approved_human';
+    const approvedHuman = filterSnapshots(snapshots, labels, filterApproved);
+    assert.equal(approvedHuman.length, 1);
+    assert.deepEqual(approvedHuman.map((s) => s.key), ['snap_2.jpg']);
+  });
+
+  test('handleHotkey maps Shift + Enter to fast approval action', () => {
+    const s: LabelState = { flood_level: 'none', traffic_level: 'clear', weather: 'clear', time_of_day: 'day' };
+
+    // Standard Enter -> save
+    const rSave = handleHotkey('Enter', s);
+    assert.equal(rSave.action, 'save');
+
+    // Shift + Enter via meta.shiftKey -> approve
+    const rApprove1 = handleHotkey('Enter', s, { shiftKey: true });
+    assert.equal(rApprove1.action, 'approve');
+
+    // Shift + Enter via compound key string -> approve
+    const rApprove2 = handleHotkey('Shift+Enter', s);
+    assert.equal(rApprove2.action, 'approve');
+  });
+
+  test('LABELER_I18N contains candidate review filter and verification badge strings without emojis', () => {
+    const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u;
+
+    for (const locale of ['vi', 'en'] as const) {
+      const strings = LABELER_I18N[locale];
+      assert.ok(strings.filterAll);
+      assert.ok(strings.filterPendingAuto);
+      assert.ok(strings.filterApprovedHuman);
+      assert.ok(strings.badgeAutoHarvester);
+      assert.ok(strings.badgeHumanReviewer);
+      assert.ok(strings.badgeUnlabeled);
+      assert.ok(strings.fastApproveAction);
+      assert.ok(strings.fastApproveTooltip);
+
+      for (const [key, val] of Object.entries(strings)) {
+        if (typeof val === 'string') {
+          assert.equal(emojiRegex.test(val), false, `Emoji found in ${locale}.${key}: ${val}`);
+        }
+      }
     }
   });
 });

@@ -160,7 +160,7 @@ make dev-all
 | Service | Port | Endpoint URL | Verification Check |
 |---|:---:|---|---|
 | **Web Map Explorer** | `3001` | http://localhost:3001 | Interactive Leaflet map, corridor dock |
-| **Collaborative Labeler** | `3001` | http://localhost:3001/labeler | Team snapshot labeling tool |
+| **Collaborative Labeler** | `3001` | http://localhost:3001/labeler | Snapshot labeling tool with auto-harvest review filters & Shift+Enter fast approval |
 | **Go Backend API** | `3000` | http://localhost:3000 | Core Gin HTTP REST server |
 | **Subscription API** | `3000` | http://localhost:3000/api/subscriptions | `POST`, `GET`, `DELETE` flood alert subscriptions |
 | **Swagger UI** | `3000` | http://localhost:3000/swagger/index.html | Interactive OpenAPI documentation |
@@ -313,7 +313,7 @@ make dev-all
 | Dịch vụ | Cổng | Địa chỉ truy cập | Mục đích kiểm tra |
 |---|:---:|---|---|
 | **Giao diện Bản đồ** | `3001` | http://localhost:3001 | Bản đồ camera, dock theo dõi hành lang |
-| **Gán nhãn Labeler** | `3001` | http://localhost:3001/labeler | Công cụ dán nhãn bằng chứng tập trung |
+| **Gán nhãn Labeler** | `3001` | http://localhost:3001/labeler | Công cụ dán nhãn tập trung với bộ lọc duyệt nhãn tự động & phím tắt duyệt nhanh Shift+Enter |
 | **Go Backend API** | `3000` | http://localhost:3000 | Máy chủ API Gin |
 | **API Đăng ký Cảnh báo** | `3000` | http://localhost:3000/api/subscriptions | `POST`, `GET`, `DELETE` đăng ký cảnh báo ngập |
 | **Tài liệu Swagger** | `3000` | http://localhost:3000/swagger/index.html | Tài liệu API tương tác |
