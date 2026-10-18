@@ -48,16 +48,31 @@ export interface SnapshotItem {
   public_url?: string;
 }
 
+export type LabelFilterStatus = 'all' | 'pending_auto' | 'approved_human';
+
 export interface HotkeyResult {
   state: LabelState;
-  action?: 'prev' | 'next' | 'save';
+  action?: 'prev' | 'next' | 'save' | 'approve';
+}
+
+export interface HotkeyMeta {
+  shiftKey?: boolean;
 }
 
 /**
  * Maps single keypresses to label selections or UI navigation actions.
  */
-export function handleHotkey(key: string, current: LabelState): HotkeyResult {
+export function handleHotkey(
+  key: string,
+  current: LabelState,
+  meta?: HotkeyMeta
+): HotkeyResult {
   const next: LabelState = { ...current };
+
+  // Fast-Approval Hotkey: Shift + Enter
+  if ((key === 'Enter' && meta?.shiftKey) || key === 'Shift+Enter') {
+    return { state: next, action: 'approve' };
+  }
 
   // Navigation & Submission
   if (key === 'ArrowLeft') {
@@ -194,6 +209,39 @@ export function formatSnapshotTimestamp(timestamp: number): string {
 }
 
 /**
+ * Returns true if a label was synthesized by an automated harvester agent or pipeline.
+ */
+export function isAutoHarvested(label?: Partial<LabelPayload> | null): boolean {
+  if (!label || !label.annotator) return false;
+  const annotator = label.annotator.trim().toLowerCase();
+  return annotator.startsWith('harvester/') || annotator === 'harvester/auto';
+}
+
+/**
+ * Filters snapshot queue by provenance: all, pending_auto, or approved_human.
+ */
+export function filterSnapshots(
+  snapshots: SnapshotItem[],
+  labels: Record<string, LabelPayload>,
+  filter: LabelFilterStatus
+): SnapshotItem[] {
+  if (filter === 'all') return snapshots;
+  if (filter === 'pending_auto') {
+    return snapshots.filter((s) => {
+      const l = labels[s.key];
+      return Boolean(l && isAutoHarvested(l));
+    });
+  }
+  if (filter === 'approved_human') {
+    return snapshots.filter((s) => {
+      const l = labels[s.key];
+      return Boolean(l && !isAutoHarvested(l));
+    });
+  }
+  return snapshots;
+}
+
+/**
  * Zero-emoji bilingual dictionary adhering to AGENTS.md Rule 1.
  */
 export const LABELER_I18N = {
@@ -244,6 +292,14 @@ export const LABELER_I18N = {
     notesLabel: 'Ghi chú thêm',
     notesPlaceholder: 'Nhập ghi chú quan sát...',
     saveAndNext: 'Lưu & Kế Tiếp (Enter)',
+    fastApproveAction: 'Duyệt Nhanh (Shift + Enter)',
+    fastApproveTooltip: 'Xác nhận gán nhãn tự động và chuyển sang ảnh kế tiếp',
+    filterAll: 'Tất cả',
+    filterPendingAuto: 'Chờ duyệt (Auto)',
+    filterApprovedHuman: 'Đã duyệt (Human)',
+    badgeAutoHarvester: 'Tự động: Harvester',
+    badgeHumanReviewer: 'Người duyệt',
+    badgeUnlabeled: 'Chưa gán nhãn',
     prev: 'Ảnh Trước (Mũi tên Trái)',
     next: 'Ảnh Kế (Mũi tên Phải)',
     savedBadge: 'Đã lưu',
@@ -305,6 +361,14 @@ export const LABELER_I18N = {
     notesLabel: 'Notes',
     notesPlaceholder: 'Optional observations...',
     saveAndNext: 'Save & Next (Enter)',
+    fastApproveAction: 'Fast Approve (Shift + Enter)',
+    fastApproveTooltip: 'Confirm auto-harvested label and advance to next frame',
+    filterAll: 'All',
+    filterPendingAuto: 'Pending (Auto)',
+    filterApprovedHuman: 'Approved (Human)',
+    badgeAutoHarvester: 'Auto: Harvester',
+    badgeHumanReviewer: 'Reviewer',
+    badgeUnlabeled: 'Unlabeled',
     prev: 'Previous (Left Arrow)',
     next: 'Next (Right Arrow)',
     savedBadge: 'Saved',
