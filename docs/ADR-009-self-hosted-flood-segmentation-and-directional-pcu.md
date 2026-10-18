@@ -60,6 +60,9 @@ For flood detection, the system transitions from synthetic corridor heuristics t
 3. **Execution Runtime**:
    - Runs on the existing `inference worker` node (2 vCPU / 2 GB RAM capped) at $>20\text{ FPS}$ with $<30\text{ ms}$ latency per frame, fully decoupling from cloud APIs.
 
+> [!NOTE]
+> For the comprehensive model selection benchmarks (YOLOv8n-seg vs BiSeNet v2 vs SegFormer-B0), compute budget profiling (< 80ms on AMD Ryzen 7 6800HS), training dataset acquisition protocols, and dual-layer physical triangulation mathematics, see [`docs/ADR-009-zero-vlm-flood-segmentation.md`](ADR-009-zero-vlm-flood-segmentation.md) (Issue #254, S7-T9).
+
 ### 2.3. Crowdsourced Feedback Ingestion Pipeline
 
 ```mermaid
