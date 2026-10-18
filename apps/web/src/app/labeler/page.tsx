@@ -6,11 +6,14 @@ import {
   handleHotkey,
   isLabelComplete,
   formatSnapshotTimestamp,
+  isAutoHarvested,
+  filterSnapshots,
   LABELER_I18N,
   getStoredDevToken,
   setStoredDevToken,
   clearStoredDevToken,
   buildAuthHeaders,
+  type LabelFilterStatus,
   type FloodLevel,
   type TrafficLevel,
   type DirectionalTrafficLevel,
@@ -38,6 +41,7 @@ export default function LabelerPage() {
   const [dates, setDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [annotator, setAnnotator] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<LabelFilterStatus>('all');
   const [snapshots, setSnapshots] = useState<SnapshotItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [labels, setLabels] = useState<Record<string, LabelPayload>>({});
@@ -161,7 +165,43 @@ export default function LabelerPage() {
     };
   }, [isAuthenticated, devToken, selectedDate, t.devInvalidToken]);
 
-  const currentSnapshot: SnapshotItem | undefined = snapshots[currentIndex];
+  const filteredSnapshots = useMemo(() => {
+    return filterSnapshots(snapshots, labels, filterStatus);
+  }, [snapshots, labels, filterStatus]);
+
+  const counts = useMemo(() => {
+    let pendingAuto = 0;
+    let approvedHuman = 0;
+    snapshots.forEach((s) => {
+      const l = labels[s.key];
+      if (l) {
+        if (isAutoHarvested(l)) {
+          pendingAuto++;
+        } else {
+          approvedHuman++;
+        }
+      }
+    });
+    return {
+      all: snapshots.length,
+      pendingAuto,
+      approvedHuman,
+    };
+  }, [snapshots, labels]);
+
+  // Clamp currentIndex if filteredSnapshots shrinks or changes
+  useEffect(() => {
+    if (filteredSnapshots.length > 0 && currentIndex >= filteredSnapshots.length) {
+      setCurrentIndex(filteredSnapshots.length - 1);
+    }
+  }, [filteredSnapshots.length, currentIndex]);
+
+  const handleFilterChange = (status: LabelFilterStatus) => {
+    setFilterStatus(status);
+    setCurrentIndex(0);
+  };
+
+  const currentSnapshot: SnapshotItem | undefined = filteredSnapshots[currentIndex];
 
   // Sync draft state with existing label or reset on snapshot change
   useEffect(() => {
@@ -189,6 +229,90 @@ export default function LabelerPage() {
     }
     setSaveStatus(null);
   }, [currentSnapshot, labels]);
+
+  // Fast-approve candidate label and advance
+  const handleFastApprove = useCallback(async () => {
+    if (!currentSnapshot || !selectedDate) return;
+
+    const reviewer = annotator.trim() || 'reviewer';
+    const existing = labels[currentSnapshot.key];
+    const payload: LabelPayload = {
+      date: selectedDate,
+      camera_id: currentSnapshot.camera_id,
+      snapshot_key: currentSnapshot.key,
+      annotator: reviewer,
+      flood_level: currentDraft.flood_level || existing?.flood_level || 'none',
+      traffic_level: currentDraft.traffic_level || existing?.traffic_level || 'clear',
+      traffic_dir_a:
+        currentDraft.traffic_dir_a ||
+        existing?.traffic_dir_a ||
+        (currentDraft.traffic_level as DirectionalTrafficLevel) ||
+        'clear',
+      traffic_dir_b: currentDraft.traffic_dir_b || existing?.traffic_dir_b || 'not_applicable',
+      queue_reason: currentDraft.queue_reason || existing?.queue_reason || 'free_flow',
+      flood_submersion_anchor:
+        currentDraft.flood_submersion_anchor ||
+        existing?.flood_submersion_anchor ||
+        (currentDraft.flood_level === 'deep'
+          ? 'exhaust_hub_over_15cm'
+          : currentDraft.flood_level === 'puddle'
+          ? 'tire_base_under_10cm'
+          : 'dry'),
+      quality_tags: currentDraft.quality_tags || existing?.quality_tags || [],
+      weather: currentDraft.weather || existing?.weather || 'clear',
+      time_of_day: currentDraft.time_of_day || existing?.time_of_day || 'day',
+      notes: currentDraft.notes || existing?.notes || '',
+      timestamp: Math.floor(Date.now() / 1000),
+    };
+
+    setIsSaving(true);
+    try {
+      const res = await fetch(getApiUrl('/api/archiver/labels'), {
+        method: 'POST',
+        headers: buildAuthHeaders(devToken, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        clearStoredDevToken();
+        setIsAuthenticated(false);
+        setDevToken('');
+        setAuthError(t.devInvalidToken);
+        return;
+      }
+
+      if (res.ok) {
+        setLabels((prev) => ({
+          ...prev,
+          [currentSnapshot.key]: payload,
+        }));
+        setSaveStatus('saved');
+        if (filterStatus !== 'pending_auto') {
+          if (currentIndex < filteredSnapshots.length - 1) {
+            setCurrentIndex((i) => i + 1);
+          }
+        }
+      } else {
+        setSaveStatus('error');
+      }
+    } catch (err) {
+      console.error('Failed to fast-approve label', err);
+      setSaveStatus('error');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    currentSnapshot,
+    selectedDate,
+    annotator,
+    labels,
+    currentDraft,
+    currentIndex,
+    filteredSnapshots.length,
+    filterStatus,
+    devToken,
+    t.devInvalidToken,
+  ]);
 
   // Save current label and optionally advance
   const saveCurrent = useCallback(
@@ -235,8 +359,12 @@ export default function LabelerPage() {
             [currentSnapshot.key]: payload,
           }));
           setSaveStatus('saved');
-          if (advance && currentIndex < snapshots.length - 1) {
-            setCurrentIndex((i) => i + 1);
+          if (advance) {
+            if (filterStatus !== 'pending_auto') {
+              if (currentIndex < filteredSnapshots.length - 1) {
+                setCurrentIndex((i) => i + 1);
+              }
+            }
           }
         } else {
           setSaveStatus('error');
@@ -248,7 +376,17 @@ export default function LabelerPage() {
         setIsSaving(false);
       }
     },
-    [currentSnapshot, selectedDate, annotator, currentDraft, currentIndex, snapshots.length, devToken, t.devInvalidToken]
+    [
+      currentSnapshot,
+      selectedDate,
+      annotator,
+      currentDraft,
+      currentIndex,
+      filteredSnapshots.length,
+      filterStatus,
+      devToken,
+      t.devInvalidToken,
+    ]
   );
 
   // Global keyboard shortcuts
@@ -266,13 +404,16 @@ export default function LabelerPage() {
         return;
       }
 
-      const res = handleHotkey(e.key, currentDraft);
+      const res = handleHotkey(e.key, currentDraft, { shiftKey: e.shiftKey });
       if (res.action === 'prev') {
         e.preventDefault();
         setCurrentIndex((i) => Math.max(0, i - 1));
       } else if (res.action === 'next') {
         e.preventDefault();
-        setCurrentIndex((i) => Math.min(snapshots.length - 1, i + 1));
+        setCurrentIndex((i) => Math.min(filteredSnapshots.length - 1, i + 1));
+      } else if (res.action === 'approve') {
+        e.preventDefault();
+        handleFastApprove();
       } else if (res.action === 'save') {
         e.preventDefault();
         saveCurrent(true);
@@ -284,7 +425,7 @@ export default function LabelerPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentDraft, snapshots.length, saveCurrent]);
+  }, [currentDraft, filteredSnapshots.length, saveCurrent, handleFastApprove]);
 
   const handleExportJson = () => {
     const exportData = {
@@ -489,9 +630,9 @@ export default function LabelerPage() {
         </div>
       </header>
 
-      {/* Control Bar: Date Selector, Annotator Name, Progress Counter */}
+      {/* Control Bar: Date Selector, Annotator Name, Status Filter Pills, Progress Counter */}
       <div className="border-b border-zinc-800 bg-zinc-900/60 px-4 py-2.5 flex flex-wrap items-center justify-between gap-4 text-xs">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-zinc-400">
             <span>{t.dateSelect}:</span>
             <select
@@ -517,6 +658,43 @@ export default function LabelerPage() {
               className="bg-black border border-zinc-700 text-zinc-100 px-2 py-1 rounded w-36 focus:outline-none focus:border-zinc-500"
             />
           </label>
+
+          {/* Status Filter Pills */}
+          <div className="flex items-center gap-1 font-mono text-xs border border-zinc-800 rounded p-0.5 bg-black">
+            <button
+              type="button"
+              onClick={() => handleFilterChange('all')}
+              className={`px-2 py-1 rounded transition ${
+                filterStatus === 'all'
+                  ? 'bg-zinc-100 text-black font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              {t.filterAll} ({counts.all})
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFilterChange('pending_auto')}
+              className={`px-2 py-1 rounded transition ${
+                filterStatus === 'pending_auto'
+                  ? 'bg-zinc-100 text-black font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              {t.filterPendingAuto} ({counts.pendingAuto})
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFilterChange('approved_human')}
+              className={`px-2 py-1 rounded transition ${
+                filterStatus === 'approved_human'
+                  ? 'bg-zinc-100 text-black font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              {t.filterApprovedHuman} ({counts.approvedHuman})
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-4 text-zinc-400 font-mono">
@@ -559,6 +737,30 @@ export default function LabelerPage() {
                   </span>
                   <span className="text-zinc-600">|</span>
                   <span className="text-zinc-400">{currentSnapshot.camera_id}</span>
+                  <span className="text-zinc-600">|</span>
+                  {/* Provenance Badge */}
+                  {(() => {
+                    const currentLabel = labels[currentSnapshot.key];
+                    if (!currentLabel) {
+                      return (
+                        <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded border border-zinc-800 bg-zinc-900/60 text-zinc-500">
+                          {t.badgeUnlabeled}
+                        </span>
+                      );
+                    }
+                    if (isAutoHarvested(currentLabel)) {
+                      return (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-zinc-700 bg-zinc-900 text-zinc-200">
+                          [{t.badgeAutoHarvester}]
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-zinc-700 bg-zinc-900 text-zinc-200">
+                        [{t.badgeHumanReviewer}: {currentLabel.annotator}]
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-3 font-mono text-[11px]">
                   <span>{formatSnapshotTimestamp(currentSnapshot.timestamp)}</span>
@@ -594,12 +796,12 @@ export default function LabelerPage() {
                   ← {t.prev}
                 </button>
                 <span className="text-xs font-mono text-zinc-500">
-                  {currentIndex + 1} / {snapshots.length}
+                  {filteredSnapshots.length > 0 ? currentIndex + 1 : 0} / {filteredSnapshots.length}
                 </span>
                 <button
                   type="button"
-                  onClick={() => setCurrentIndex((i) => Math.min(snapshots.length - 1, i + 1))}
-                  disabled={currentIndex >= snapshots.length - 1}
+                  onClick={() => setCurrentIndex((i) => Math.min(filteredSnapshots.length - 1, i + 1))}
+                  disabled={currentIndex >= filteredSnapshots.length - 1}
                   className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed rounded text-xs text-zinc-300 font-mono transition"
                 >
                   {t.next} →
@@ -869,15 +1071,30 @@ export default function LabelerPage() {
             />
           </div>
 
-          {/* Save & Advance Action Button */}
+          {/* Save & Advance Action Buttons */}
           <div className="mt-auto pt-4 flex flex-col gap-2 border-t border-zinc-800/80">
+            {currentSnapshot && labels[currentSnapshot.key] && isAutoHarvested(labels[currentSnapshot.key]) && (
+              <button
+                type="button"
+                onClick={handleFastApprove}
+                disabled={isSaving}
+                title={t.fastApproveTooltip}
+                className="w-full py-2.5 px-4 bg-zinc-100 hover:bg-white text-black font-semibold rounded text-xs uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed shadow border border-white"
+              >
+                {isSaving ? '...' : t.fastApproveAction}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => saveCurrent(true)}
               disabled={isSaving || !currentSnapshot || !isLabelComplete(currentDraft)}
-              className="w-full py-2.5 px-4 bg-zinc-100 hover:bg-white text-black font-semibold rounded text-xs uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed shadow"
+              className={`w-full py-2.5 px-4 font-semibold rounded text-xs uppercase tracking-wider transition disabled:opacity-30 disabled:cursor-not-allowed ${
+                currentSnapshot && labels[currentSnapshot.key] && isAutoHarvested(labels[currentSnapshot.key])
+                  ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700'
+                  : 'bg-zinc-100 hover:bg-white text-black shadow'
+              }`}
             >
-              {isSaving ? 'Đang lưu...' : t.saveAndNext}
+              {isSaving ? '...' : t.saveAndNext}
             </button>
           </div>
         </div>

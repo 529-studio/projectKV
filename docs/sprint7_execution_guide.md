@@ -262,7 +262,9 @@ Branch: tooling/s7-t7c-auto-harvest-cli
 Open PR targeting dev starting with 'Close #263 closes [KV-11]'. Do NOT merge."
 ```
 
-### Terminal 5 — S7-T7d (Bộ lọc Thẩm định Nhãn Tự động trên Web Labeler)
+### Terminal 5 — S7-T7d (Bộ lọc Thẩm định Nhãn Tự động trên Web Labeler) — ĐÃ HOÀN THÀNH
+
+Ticket này đã được hoàn thành trọn vẹn tại nhánh `feat/s7-t7d-web-labeler-filter` (Issue [#264](https://github.com/529-studio/projectKV/issues/264), Kanban **[KV-12]**), bổ sung bộ lọc `[Tất cả]`, `[Chờ duyệt (Auto)]`, `[Đã duyệt (Human)]`, huy hiệu nguồn monochromatic `[Tự động: Harvester]` vs `[Người duyệt: <tên>]`, và hotkey `Shift + Enter` phê duyệt nhanh.
 
 ```bash
 cd ~/repos/projectKV

@@ -26,10 +26,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **156 Pull Requests** processed across repository history:
-  - **148 Merged** to `dev` (including Sprint 4–6 PRs, Sprint 7 deliverables, PR #270 Sprint 7 Completion Report, and PR #271 S8-T1 Doppler Rain Radar Pipeline Overhaul)
+- **Lifetime PR History**: Exactly **157 Pull Requests** processed across repository history:
+  - **149 Merged** to `dev` (including Sprint 4–6 PRs, Sprint 7 deliverables, PR #270 Sprint 7 Completion Report, PR #271 S8-T1 Doppler Rain Radar Pipeline Overhaul, and PR #273 S7-T4 / S8-T2 Feedback R2 Archiver)
   - **8 Closed** without merging
-  - **0 Open** PRs pending
+  - **1 Open** PR (#274 S7-T7c Standalone Automated Harvester CLI) awaiting review
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
@@ -264,6 +264,11 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Sidebar hero card displays `GHI NHẬN MƯA: N điểm đường ướt (chưa ghi nhận ngập)` with direct action `Xem danh sách N camera đường ướt →`, in 100% synchronization with map verdicts.
   - Elevated active camera markers on `flood` lens: unaffected cameras dimmed (`opacity: 0.20`, `fillOpacity: 0.15`), active flood/wet cameras highlighted in high-contrast cyan (`#38bdf8`) or crimson (`#dc2626`) with thick white stroke, enlarged radius, and top layer sorting (`zIndexOffset(1000)`).
   - All automated test suites passing: 151 web unit tests (`npm test --prefix apps/web`), full Go backend test suite (`go test -race ./...`).
+- **Web Labeler Candidate Review Filter & Auto-Harvest Verification Badges (Lesson 47, Issue #264, Kanban [KV-12])**:
+  - Tri-state review filtering in `apps/web/src/app/labeler`: added `filterSnapshots()` and `isAutoHarvested()` partitioning frames into `[Tất cả]`, `[Chờ duyệt (Auto)]`, and `[Đã duyệt (Human)]` with live count chips.
+  - High-contrast monochromatic provenance badges in metadata header: `[Tự động: Harvester]` for pseudo-labels vs. `[Người duyệt: <tên>]` for human-certified gold standard vs. `[Chưa gán nhãn]` for unannotated frames.
+  - Fast-approval hotkey ergonomics: `Shift + Enter` (and primary button) promotes auto-harvested candidate parameters directly to gold standard, stamps annotator attribution with reviewer nickname, persists to `/api/archiver/labels`, and smoothly advances the queue.
+  - 100% test pass rate: 155 web unit tests (`npm test --prefix apps/web`), zero ESLint errors, Next.js static production export (6/6 pages).
 
 ---
 
@@ -285,7 +290,7 @@ make dev-model
 make test-go       # Full Go backend test suite with -race
 make test-pcu      # PCU Saturation Index boundary test suite
 make test-enrich   # Geo-enrichment catalog filter unit tests
-cd apps/web && npm test  # Web client unit test suite (151 tests)
+cd apps/web && npm test  # Web client unit test suite (155 tests)
 ```
 
 ---
