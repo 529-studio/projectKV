@@ -191,7 +191,8 @@ The following 5 tickets were planned or spawned during Sprint 7 but remain open 
    - *Current State:* **Completed and verified in Sprint 8** (`feat/s7-t7d-web-labeler-filter`, Kanban **[KV-12]**). Built tri-state candidate review filters (`all`, `pending_auto`, `approved_human`), monochromatic provenance badges, and `Shift + Enter` fast-approval hotkey with 100% test pass rate (155 tests).
    - *Target:* Delivered in Sprint 8 active learning wave.
 5. **S7-T9 (Issue #254) — `[docs + spike] ADR-009 Design Spike: Self-Hosted Flood Segmentation (Zero-VLM)`**:
-   - *Current State:* The architectural design spike was completed and merged as ADR-009 (PR #265 / S7-T9b). The model training and evaluation spike (training BiSeNet / YOLOv8-seg on road water masks) was partitioned to Sprint 8 model development.
+   - *Current State:* **Completed and verified** (`docs/s7-t9-adr-009-zero-vlm-flood`, Kanban **[KV-7]**). Authored comprehensive architectural specification in [`docs/ADR-009-zero-vlm-flood-segmentation.md`](ADR-009-zero-vlm-flood-segmentation.md) benchmarking YOLOv8n-seg, BiSeNet v2, and SegFormer-B0 on OpenVINO FP16, compute headroom (24.6 ms inference / 38.5 ms frame cycle vs. 80 ms budget on AMD Ryzen 7 6800HS 2 vCPU), polygon training pipeline from R2 crowdsourced proofs, and dual-layer physical triangulation ($R_{\text{water}} \ge 15\%$ + motorcycle wheel depth $\ge 20\text{ cm}$). Codified Lesson 48 in [`docs/lesson_learn.md`](lesson_learn.md).
+   - *Target:* Delivered in Sprint 7 Wave 3 / Sprint 8 model architecture wave.
 
 ---
 
