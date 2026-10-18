@@ -92,6 +92,7 @@ hcm-traffic-cameras/
 │
 ├── tools/
 │   ├── eval/                          # [EVALUATION] Ground-truth benchmarks & label curation
+│   │   ├── auto_harvest.py            # Standalone automated frame harvester & Draft-07 labeler CLI
 │   │   ├── label_curator.py           # Taxonomy curation and legacy label cleansing
 │   │   └── benchmark.py               # PCU & flood accuracy evaluation harness
 │   ├── storage/                       # [OBJECT STORAGE] Cloudflare R2 verification tooling
