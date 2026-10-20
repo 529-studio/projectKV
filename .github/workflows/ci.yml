@@ -101,6 +101,8 @@ jobs:
           cache-dependency-path: 'services/go-server/go.sum'
 
       - name: Verify and Test Go Backend
+        env:
+          CGO_ENABLED: 1
         run: |
           cd services/go-server
           go vet ./...
