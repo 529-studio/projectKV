@@ -8,9 +8,9 @@ name: Camera Health Audit
 # (AGENTS.md §5). Automated PRs are never auto-merged.
 
 on:
-  schedule:
-    # Daily at 01:00 UTC (08:00 Asia/Ho_Chi_Minh).
-    - cron: '0 1 * * *'
+  # Temporarily paused daily schedule to conserve GitHub Actions minutes quota until Nov 01 reset.
+  # schedule:
+  #   - cron: '0 1 * * *'
   workflow_dispatch:
 
 concurrency:
