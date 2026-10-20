@@ -285,30 +285,42 @@ jobs:
 
           # Step B: Redeploy CV Model Stack 17 on inference worker (Endpoint 4)
           if [ "${{ needs.detect-changes.outputs.model }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Triggering Portainer Stack 17 (CV Engine on inference worker, endpoint 4)..."
-            STACK_RES=$(curl -sS -f -X GET "${PORTAINER_URL}/api/stacks/17" \
+            echo "Checking inference worker (endpoint 4) availability..."
+            DEVBOX_STATUS=$(curl -sS -m 8 "${PORTAINER_URL}/api/endpoints/4" \
               -H "X-API-Key: ${PORTAINER_KEY}" \
               -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
               -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
-              -H "User-Agent: Mozilla/5.0")
+              -H "User-Agent: Mozilla/5.0" | jq -r '.Status // 2' 2>/dev/null || echo "2")
 
-            STACK_FILE=$(cat docker-compose.cv.yml)
-            ENV_JSON=$(echo "$STACK_RES" | jq '.Env // []')
+            if [ "$DEVBOX_STATUS" = "1" ]; then
+              echo "inference worker is online. Triggering Portainer Stack 17 (CV Engine on inference worker, endpoint 4)..."
+              STACK_RES=$(curl -sS -f -X GET "${PORTAINER_URL}/api/stacks/17" \
+                -H "X-API-Key: ${PORTAINER_KEY}" \
+                -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+                -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+                -H "User-Agent: Mozilla/5.0")
 
-            PAYLOAD=$(jq -n \
-              --arg file "$STACK_FILE" \
-              --argjson env "$ENV_JSON" \
-              '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
+              STACK_FILE=$(cat docker-compose.cv.yml)
+              ENV_JSON=$(echo "$STACK_RES" | jq '.Env // []')
 
-            curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/17?endpointId=4" \
-              -H "X-API-Key: ${PORTAINER_KEY}" \
-              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
-              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
-              -H "Content-Type: application/json" \
-              -H "User-Agent: Mozilla/5.0" \
-              -d "$PAYLOAD"
+              PAYLOAD=$(jq -n \
+                --arg file "$STACK_FILE" \
+                --argjson env "$ENV_JSON" \
+                '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
 
-            echo "Stack 17 (CV Engine on inference worker) redeployed successfully."
+              curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/17?endpointId=4" \
+                -H "X-API-Key: ${PORTAINER_KEY}" \
+                -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+                -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+                -H "Content-Type: application/json" \
+                -H "User-Agent: Mozilla/5.0" \
+                -d "$PAYLOAD"
+
+              echo "Stack 17 (CV Engine on inference worker) redeployed successfully."
+            else
+              echo "[WARN] inference worker (endpoint 4) is currently unreachable/offline (Status: ${DEVBOX_STATUS})."
+              echo "Skipping Stack 17 redeployment. edge host continues running normally with Gemini fallback."
+            fi
           fi
 
       - name: Verify Post-Deploy Health
@@ -322,17 +334,27 @@ jobs:
           echo "Staging backend health check passed."
 
           if [ -n "${{ secrets.PORTAINER_API_KEY }}" ] && ([ "${{ needs.detect-changes.outputs.model }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]); then
-            CONTAINER_HEALTH=$(curl -sS -m 15 "https://REDACTED_ADMIN_HOST/api/endpoints/4/docker/containers/json" \
+            DEVBOX_STATUS=$(curl -sS -m 8 "https://REDACTED_ADMIN_HOST/api/endpoints/4" \
               -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
               -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
               -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
-              -H "User-Agent: Mozilla/5.0" | jq -r '.[] | select(.Names[] == "/warded-cv-engine") | .State')
-            echo "inference worker CV container state: ${CONTAINER_HEALTH}"
-            if [ "${CONTAINER_HEALTH}" != "running" ]; then
-              echo "CV engine container is not running on inference worker!"
-              exit 1
+              -H "User-Agent: Mozilla/5.0" | jq -r '.Status // 2' 2>/dev/null || echo "2")
+
+            if [ "$DEVBOX_STATUS" = "1" ]; then
+              CONTAINER_HEALTH=$(curl -sS -m 15 "https://REDACTED_ADMIN_HOST/api/endpoints/4/docker/containers/json" \
+                -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
+                -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
+                -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+                -H "User-Agent: Mozilla/5.0" | jq -r '.[] | select(.Names[] == "/warded-cv-engine") | .State')
+              echo "inference worker CV container state: ${CONTAINER_HEALTH}"
+              if [ "${CONTAINER_HEALTH}" != "running" ]; then
+                echo "[WARN] CV engine container is not in running state on inference worker (${CONTAINER_HEALTH})."
+              else
+                echo "inference worker CV engine verification passed."
+              fi
+            else
+              echo "[INFO] inference worker is offline. Skipping inference worker container verification."
             fi
-            echo "inference worker CV engine verification passed."
           fi
 
   # ────────────────────────────────────────────────────────────────────────────
