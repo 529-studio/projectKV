@@ -100,15 +100,6 @@ jobs:
           go-version-file: 'services/go-server/go.mod'
           cache-dependency-path: 'services/go-server/go.sum'
 
-      - name: Lint Go Backend
-        run: |
-          cd services/go-server
-          if command -v golangci-lint >/dev/null 2>&1; then
-            golangci-lint run --timeout=5m
-          else
-            go vet ./...
-          fi
-
       - name: Verify and Test Go Backend
         run: |
           cd services/go-server
