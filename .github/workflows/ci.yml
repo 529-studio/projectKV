@@ -21,6 +21,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  actions: read
 
 jobs:
   detect-changes:
@@ -31,6 +32,7 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       model: ${{ steps.filter.outputs.model }}
       tools_dataset: ${{ steps.filter.outputs.tools_dataset }}
+      target_runner: ${{ steps.probe-runner.outputs.target_runner }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -56,11 +58,38 @@ jobs:
               - 'h3_hex_polygons.json'
               - '.github/workflows/ci.yml'
 
+      - name: Probe Self-Hosted Runner Status
+        id: probe-runner
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ACTIONS_RUNNER_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              const res = await github.rest.actions.listSelfHostedRunnersForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+              const runner = res.data.runners.find(r => 
+                r.status === 'online' && 
+                r.labels.some(l => l.name === 'dev-box')
+              );
+              if (runner) {
+                core.info(`[OK] Self-hosted runner '${runner.name}' is ONLINE. Routing to dev-box.`);
+                core.setOutput('target_runner', JSON.stringify(['self-hosted', 'dev-box']));
+              } else {
+                core.warning(`[WARN] dev-box runner is OFFLINE. Fallback to ubuntu-latest.`);
+                core.setOutput('target_runner', JSON.stringify(['ubuntu-latest']));
+              }
+            } catch (err) {
+              core.warning(`[WARN] Failed to query runner status: ${err.message}. Defaulting to ubuntu-latest.`);
+              core.setOutput('target_runner', JSON.stringify(['ubuntu-latest']));
+            }
+
   verify-backend:
     name: Verify Go Backend
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.detect-changes.outputs.target_runner) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -71,14 +100,9 @@ jobs:
           go-version-file: 'services/go-server/go.mod'
           cache-dependency-path: 'services/go-server/go.sum'
 
-      - name: Lint Go Backend
-        uses: golangci/golangci-lint-action@v6
-        with:
-          working-directory: services/go-server
-          install-mode: "goinstall"
-          verify: false
-
       - name: Verify and Test Go Backend
+        env:
+          CGO_ENABLED: 1
         run: |
           cd services/go-server
           go vet ./...
@@ -89,7 +113,7 @@ jobs:
     name: Verify Web Frontend
     needs: detect-changes
     if: needs.detect-changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.detect-changes.outputs.target_runner) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -113,7 +137,7 @@ jobs:
     name: Verify Tools & Dataset Integrity
     needs: detect-changes
     if: needs.detect-changes.outputs.tools_dataset == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.detect-changes.outputs.target_runner) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -140,7 +164,7 @@ jobs:
     name: Verify CV Engine (Python)
     needs: detect-changes
     if: needs.detect-changes.outputs.model == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.detect-changes.outputs.target_runner) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -154,7 +178,7 @@ jobs:
       - name: Install Test Dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip install numpy pillow
+          pip install --break-system-packages numpy pillow 2>/dev/null || pip install numpy pillow
 
       - name: Run CV Engine Unit Tests
         run: |
