@@ -313,6 +313,8 @@ export const LABELER_I18N = {
     devUnlock: 'Mở Khóa (Enter)',
     devInvalidToken: 'Mã xác thực không hợp lệ hoặc chưa được cấp quyền',
     devLockSession: 'Khóa Phiên',
+    badgeCfAccess: 'Cloudflare Zero Trust',
+    badgeDevToken: 'Dev Token (Fallback)',
   },
   en: {
     title: 'Snapshot Dataset Labeler',
@@ -382,8 +384,18 @@ export const LABELER_I18N = {
     devUnlock: 'Unlock (Enter)',
     devInvalidToken: 'Invalid or unauthorized developer token',
     devLockSession: 'Lock Session',
+    badgeCfAccess: 'Cloudflare Zero Trust',
+    badgeDevToken: 'Dev Token (Fallback)',
   },
 } as const;
+
+export type AuthMethod = 'cloudflare_access' | 'dev_token' | 'none';
+
+export interface AuthInfo {
+  authenticated: boolean;
+  authMethod: AuthMethod;
+  userEmail?: string;
+}
 
 export const DEV_TOKEN_STORAGE_KEY = 'labeler_dev_token';
 
