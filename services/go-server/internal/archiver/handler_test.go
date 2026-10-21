@@ -47,6 +47,11 @@ func TestHandler_ListDates(t *testing.T) {
 	_ = store.Put(ctx, "2026-10-10/cam1/1791550000_sample.jpg", bytes.NewReader([]byte("sample1")))
 	_ = store.Put(ctx, "2026-10-11/cam1/1791560000_sample.jpg", bytes.NewReader([]byte("sample2")))
 	_ = store.Put(ctx, "2026-10-09/cam2/1791540000_state_change.jpg", bytes.NewReader([]byte("sample3")))
+	// Seed non-date directories and root files that should be ignored
+	_ = store.Put(ctx, "feedback/report1.json", bytes.NewReader([]byte("{}")))
+	_ = store.Put(ctx, "labels/2026-10-10/label1.json", bytes.NewReader([]byte("{}")))
+	_ = store.Put(ctx, "arbitrary_folder/file.txt", bytes.NewReader([]byte("text")))
+	_ = store.Put(ctx, "root_file.jpg", bytes.NewReader([]byte("img")))
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/api/archiver/dates", nil)

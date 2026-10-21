@@ -41,4 +41,8 @@ type Storage interface {
 	// List lists all objects matching the specified prefix.
 	// If prefix is empty, all objects are listed.
 	List(ctx context.Context, prefix string) ([]Item, error)
+
+	// ListDirectories returns top-level directory names or prefixes matching the given prefix without recursing.
+	// If prefix is empty, top-level directories under storage root are listed.
+	ListDirectories(ctx context.Context, prefix string) ([]string, error)
 }

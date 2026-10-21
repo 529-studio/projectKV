@@ -110,9 +110,21 @@ func (m *mockS3Client) ListObjectsV2(ctx context.Context, params *s3.ListObjects
 	defer m.mu.Unlock()
 
 	prefix := aws.ToString(params.Prefix)
+	delimiter := aws.ToString(params.Delimiter)
 	var contents []types.Object
+	commonPrefixMap := make(map[string]struct{})
+
 	for k, v := range m.objects {
 		if prefix == "" || strings.HasPrefix(k, prefix) {
+			if delimiter != "" {
+				rest := strings.TrimPrefix(k, prefix)
+				idx := strings.Index(rest, delimiter)
+				if idx >= 0 {
+					cp := prefix + rest[:idx+len(delimiter)]
+					commonPrefixMap[cp] = struct{}{}
+					continue
+				}
+			}
 			contents = append(contents, types.Object{
 				Key:  aws.String(k),
 				Size: aws.Int64(int64(len(v))),
@@ -123,8 +135,19 @@ func (m *mockS3Client) ListObjectsV2(ctx context.Context, params *s3.ListObjects
 		return *contents[i].Key < *contents[j].Key
 	})
 
+	var commonPrefixes []types.CommonPrefix
+	for cp := range commonPrefixMap {
+		commonPrefixes = append(commonPrefixes, types.CommonPrefix{
+			Prefix: aws.String(cp),
+		})
+	}
+	sort.Slice(commonPrefixes, func(i, j int) bool {
+		return *commonPrefixes[i].Prefix < *commonPrefixes[j].Prefix
+	})
+
 	return &s3.ListObjectsV2Output{
-		Contents: contents,
+		Contents:       contents,
+		CommonPrefixes: commonPrefixes,
 	}, nil
 }
 
@@ -349,6 +372,87 @@ func TestR2Storage_List(t *testing.T) {
 		cancelCtx, cancel := context.WithCancel(context.Background())
 		cancel()
 		_, err := store.List(cancelCtx, "")
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("expected context.Canceled, got %v", err)
+		}
+	})
+}
+
+func TestR2Storage_ListDirectories(t *testing.T) {
+	mockClient := newMockS3Client()
+	store := NewR2StorageWithClient(mockClient, "warded-proofs", "https://file.529studio.site")
+	ctx := context.Background()
+
+	files := map[string][]byte{
+		"2026-10-10/cam1/frame1.jpg": []byte("sample1"),
+		"2026-10-10/cam2/frame2.jpg": []byte("sample2"),
+		"2026-10-11/cam1/frame3.jpg": []byte("sample3"),
+		"feedback/report1.json":      []byte("{}"),
+		"root_file.txt":              []byte("root"),
+	}
+
+	for p, data := range files {
+		if err := store.Put(ctx, p, bytes.NewReader(data)); err != nil {
+			t.Fatalf("Put %s failed: %v", p, err)
+		}
+	}
+
+	t.Run("List root directories with empty prefix", func(t *testing.T) {
+		dirs, err := store.ListDirectories(ctx, "")
+		if err != nil {
+			t.Fatalf("ListDirectories empty prefix failed: %v", err)
+		}
+		expected := []string{"2026-10-10", "2026-10-11", "feedback"}
+		if len(dirs) != len(expected) {
+			t.Fatalf("expected %d dirs, got %d: %v", len(expected), len(dirs), dirs)
+		}
+		for i, exp := range expected {
+			if dirs[i] != exp {
+				t.Errorf("index %d: expected %q, got %q", i, exp, dirs[i])
+			}
+		}
+	})
+
+	t.Run("List subdirectories under 2026-10-10", func(t *testing.T) {
+		dirs, err := store.ListDirectories(ctx, "2026-10-10")
+		if err != nil {
+			t.Fatalf("ListDirectories sub prefix failed: %v", err)
+		}
+		expected := []string{"2026-10-10/cam1", "2026-10-10/cam2"}
+		if len(dirs) != len(expected) {
+			t.Fatalf("expected %d subdirs, got %d: %v", len(expected), len(dirs), dirs)
+		}
+		for i, exp := range expected {
+			if dirs[i] != exp {
+				t.Errorf("index %d: expected %q, got %q", i, exp, dirs[i])
+			}
+		}
+	})
+
+	t.Run("List invalid path traversals", func(t *testing.T) {
+		bad := []string{"../", "../../etc", "/absolute/path", "path\x00null"}
+		for _, b := range bad {
+			_, err := store.ListDirectories(ctx, b)
+			if !errors.Is(err, ErrInvalidPath) {
+				t.Errorf("expected ErrInvalidPath for %q, got %v", b, err)
+			}
+		}
+	})
+
+	t.Run("List non-existent prefix returns empty slice", func(t *testing.T) {
+		dirs, err := store.ListDirectories(ctx, "nonexistent-date")
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+		if len(dirs) != 0 {
+			t.Errorf("expected 0 dirs, got %d: %v", len(dirs), dirs)
+		}
+	})
+
+	t.Run("ListDirectories context canceled", func(t *testing.T) {
+		cancelCtx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := store.ListDirectories(cancelCtx, "")
 		if !errors.Is(err, context.Canceled) {
 			t.Errorf("expected context.Canceled, got %v", err)
 		}

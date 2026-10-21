@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -262,4 +263,62 @@ func (s *LocalStorage) List(ctx context.Context, prefix string) ([]Item, error) 
 		items = []Item{}
 	}
 	return items, nil
+}
+
+// ListDirectories returns top-level directory names or prefixes matching the given prefix without recursing.
+func (s *LocalStorage) ListDirectories(ctx context.Context, prefix string) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	trimmed := strings.TrimSpace(prefix)
+	if strings.ContainsRune(trimmed, 0) || filepath.IsAbs(trimmed) || strings.HasPrefix(trimmed, "/") || strings.HasPrefix(trimmed, "\\") || strings.Contains(trimmed, ":") {
+		return nil, ErrInvalidPath
+	}
+
+	cleaned := filepath.Clean(trimmed)
+	if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+		return nil, ErrInvalidPath
+	}
+	if cleaned == "." {
+		cleaned = ""
+	}
+
+	target := s.root
+	if cleaned != "" {
+		target = filepath.Join(s.root, cleaned)
+	}
+
+	entries, err := os.ReadDir(target)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("storage: failed to read directory: %w", err)
+	}
+
+	var dirs []string
+	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasPrefix(name, ".tmp.") {
+			continue
+		}
+		rel := name
+		if cleaned != "" {
+			rel = filepath.ToSlash(filepath.Join(cleaned, name))
+		}
+		dirs = append(dirs, rel)
+	}
+
+	if dirs == nil {
+		dirs = []string{}
+	}
+	sort.Strings(dirs)
+	return dirs, nil
 }
