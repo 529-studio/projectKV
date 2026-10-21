@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -359,4 +360,76 @@ func (s *R2Storage) List(ctx context.Context, prefix string) ([]Item, error) {
 		items = []Item{}
 	}
 	return items, nil
+}
+
+// ListDirectories returns top-level directory names or prefixes matching the given prefix without recursing.
+func (s *R2Storage) ListDirectories(ctx context.Context, prefix string) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	trimmed := strings.TrimSpace(prefix)
+	if strings.ContainsRune(trimmed, 0) || strings.Contains(trimmed, ":") || strings.Contains(trimmed, "\\") || strings.HasPrefix(trimmed, "/") {
+		return nil, ErrInvalidPath
+	}
+
+	var cleaned string
+	if trimmed != "" {
+		cleaned = path.Clean(trimmed)
+		if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+			return nil, ErrInvalidPath
+		}
+		if cleaned == "." {
+			cleaned = ""
+		}
+	}
+
+	s3Prefix := ""
+	if cleaned != "" {
+		s3Prefix = cleaned + "/"
+	}
+
+	var dirs []string
+	var continuationToken *string
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		input := &s3.ListObjectsV2Input{
+			Bucket:            aws.String(s.bucketName),
+			Delimiter:         aws.String("/"),
+			ContinuationToken: continuationToken,
+		}
+		if s3Prefix != "" {
+			input.Prefix = aws.String(s3Prefix)
+		}
+
+		output, err := s.client.ListObjectsV2(ctx, input)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return nil, fmt.Errorf("storage: R2 ListObjectsV2 failed: %w", err)
+		}
+
+		for _, cp := range output.CommonPrefixes {
+			p := aws.ToString(cp.Prefix)
+			p = strings.TrimSuffix(p, "/")
+			if p != "" {
+				dirs = append(dirs, p)
+			}
+		}
+
+		if !aws.ToBool(output.IsTruncated) {
+			break
+		}
+		continuationToken = output.NextContinuationToken
+	}
+
+	if dirs == nil {
+		dirs = []string{}
+	}
+	sort.Strings(dirs)
+	return dirs, nil
 }
