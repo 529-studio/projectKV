@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/storage"
 	"github.com/gin-gonic/gin"
 )
@@ -97,7 +98,19 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, middlewares ...gin.Handler
 		archiverGroup.HEAD("/snapshots/raw", h.GetSnapshotRaw)
 		archiverGroup.GET("/labels", h.GetLabels)
 		archiverGroup.POST("/labels", h.SaveLabel)
+		archiverGroup.GET("/auth/me", h.GetAuthMe)
 	}
+}
+
+// GetAuthMe returns the current identity and authentication mechanism.
+func (h *Handler) GetAuthMe(c *gin.Context) {
+	email, _ := c.Get(middleware.ContextUserEmailKey)
+	method, _ := c.Get(middleware.ContextAuthMethodKey)
+	c.JSON(http.StatusOK, gin.H{
+		"authenticated": true,
+		"auth_method":   method,
+		"user_email":    email,
+	})
 }
 
 // ListDates godoc
@@ -329,6 +342,13 @@ func (h *Handler) SaveLabel(c *gin.Context) {
 	}
 
 	annotator := strings.TrimSpace(payload.Annotator)
+	if annotator == "" || annotator == "anonymous" {
+		if ctxEmail, exists := c.Get(middleware.ContextUserEmailKey); exists {
+			if emailStr, ok := ctxEmail.(string); ok && emailStr != "" && emailStr != "dev-token-user" && emailStr != "dev-bypass" {
+				annotator = emailStr
+			}
+		}
+	}
 	if annotator == "" {
 		annotator = "anonymous"
 	}

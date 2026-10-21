@@ -33,6 +33,8 @@ export default function LabelerPage() {
   const t = useMemo(() => LABELER_I18N[locale], [locale]);
 
   const [devToken, setDevToken] = useState<string>('');
+  const [authMethod, setAuthMethod] = useState<'cloudflare_access' | 'dev_token' | 'none'>('none');
+  const [userEmail, setUserEmail] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [inputToken, setInputToken] = useState<string>('');
   const [authError, setAuthError] = useState<string | null>(null);
@@ -50,13 +52,45 @@ export default function LabelerPage() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
-  // Initialize dev auth token on mount
+  // Initialize auth on mount: Probe Cloudflare Zero Trust first, fallback to stored dev token
   useEffect(() => {
-    const stored = getStoredDevToken();
-    if (stored) {
-      setDevToken(stored);
-      setIsAuthenticated(true);
+    let isMounted = true;
+
+    async function checkInitialAuth() {
+      // 1. Probe Cloudflare Zero Trust session
+      try {
+        const probeRes = await fetch(getApiUrl('/api/archiver/auth/me'), {
+          credentials: 'include',
+        });
+        if (probeRes.ok) {
+          const authData = await probeRes.json();
+          if (isMounted && authData.authenticated) {
+            setIsAuthenticated(true);
+            setAuthMethod(authData.auth_method || 'cloudflare_access');
+            if (authData.user_email && authData.user_email !== 'cf-access-user' && authData.user_email !== 'dev-token-user' && authData.user_email !== 'dev-bypass') {
+              setUserEmail(authData.user_email);
+              setAnnotator((prev) => prev || authData.user_email);
+            }
+            return;
+          }
+        }
+      } catch {
+        // Probe endpoint unauthenticated; fall through to dev token
+      }
+
+      // 2. Fallback: Check if dev token was stored in sessionStorage
+      const stored = getStoredDevToken();
+      if (stored && isMounted) {
+        setDevToken(stored);
+        setAuthMethod('dev_token');
+        setIsAuthenticated(true);
+      }
     }
+
+    checkInitialAuth();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Load annotator nickname from localStorage
@@ -84,6 +118,7 @@ export default function LabelerPage() {
       try {
         const res = await fetch(getApiUrl('/api/archiver/dates'), {
           headers: buildAuthHeaders(devToken),
+          credentials: 'include',
         });
         if (res.status === 401 || res.status === 403) {
           clearStoredDevToken();
@@ -118,9 +153,11 @@ export default function LabelerPage() {
         const [snapRes, labelRes] = await Promise.all([
           fetch(getApiUrl(`/api/archiver/snapshots?date=${selectedDate}&limit=200`), {
             headers: buildAuthHeaders(devToken),
+            credentials: 'include',
           }),
           fetch(getApiUrl(`/api/archiver/labels?date=${selectedDate}`), {
             headers: buildAuthHeaders(devToken),
+            credentials: 'include',
           }),
         ]);
 
@@ -270,6 +307,7 @@ export default function LabelerPage() {
       const res = await fetch(getApiUrl('/api/archiver/labels'), {
         method: 'POST',
         headers: buildAuthHeaders(devToken, { 'Content-Type': 'application/json' }),
+        credentials: 'include',
         body: JSON.stringify(payload),
       });
 
@@ -342,6 +380,7 @@ export default function LabelerPage() {
         const res = await fetch(getApiUrl('/api/archiver/labels'), {
           method: 'POST',
           headers: buildAuthHeaders(devToken, { 'Content-Type': 'application/json' }),
+          credentials: 'include',
           body: JSON.stringify(payload),
         });
 
@@ -456,11 +495,13 @@ export default function LabelerPage() {
     try {
       const res = await fetch(getApiUrl('/api/archiver/dates'), {
         headers: buildAuthHeaders(token),
+        credentials: 'include',
       });
 
       if (res.ok) {
         setStoredDevToken(token);
         setDevToken(token);
+        setAuthMethod('dev_token');
         setIsAuthenticated(true);
         setAuthError(null);
         const data: string[] = await res.json();
@@ -497,6 +538,8 @@ export default function LabelerPage() {
   const handleLockSession = () => {
     clearStoredDevToken();
     setDevToken('');
+    setAuthMethod('none');
+    setUserEmail('');
     setIsAuthenticated(false);
     setInputToken('');
     setAuthError(null);
@@ -596,6 +639,22 @@ export default function LabelerPage() {
           </h1>
           <span className="text-xs text-zinc-500 hidden sm:inline">|</span>
           <span className="text-xs text-zinc-400 hidden sm:inline">{t.subtitle}</span>
+          {authMethod === 'cloudflare_access' && (
+            <span
+              className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800 text-emerald-300 hidden sm:inline"
+              title={userEmail ? `Authenticated via Cloudflare Zero Trust (${userEmail})` : 'Authenticated via Cloudflare Zero Trust'}
+            >
+              [CF ACCESS{userEmail ? `: ${userEmail}` : ''}]
+            </span>
+          )}
+          {authMethod === 'dev_token' && (
+            <span
+              className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800 text-amber-300 hidden sm:inline"
+              title="Authenticated via Developer Access Token Fallback"
+            >
+              [DEV TOKEN]
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
