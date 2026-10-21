@@ -183,6 +183,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
     - Backend: Supports `X-Dev-Token`, `Authorization: Bearer`, and `?token=` / `?dev_token=` query params (for raw `<img>` binary streaming), validated via `crypto/subtle.ConstantTimeCompare`.
     - Fail-Closed: Automatically returns `503 Service Unavailable` on production/staging if `DEV_ACCESS_TOKEN` is unset or blank.
     - Frontend: In-place monochromatic lock screen at `/labeler`, session persistence via `sessionStorage`, and automatic token eviction upon receiving `401 Unauthorized`.
+  - **Partition Discovery Delimiter Optimization (Issue #279, KV-14)**:
+    - Extended core `storage.Storage` interface with shallow `ListDirectories(ctx, prefix) ([]string, error)` implemented across `LocalStorage` (`os.ReadDir`) and `R2Storage` (`s3.ListObjectsV2` with `Delimiter: "/"` and `CommonPrefixes` pagination).
+    - Refactored `archiver.Handler.ListDates` to invoke `ListDirectories` instead of full-bucket `List`, slashing API latency from ~160 seconds (186+ sequential HTTP requests across 186k+ objects) down to < 800ms (single S3 request) and eliminating Cloudflare 524 timeouts.
+    - Enhanced standalone verification tool `cmd/verify-r2` (Test 7/7) confirming sub-second partition directory discovery against live Cloudflare R2 bucket `warded-proofs`.
 - **Offline Camera Map Hygiene & Live Counter Badge (Sprint 7 Task S7-T2, Issue #247)**:
   - Implemented client-side filtering in `apps/web/src/components/CameraFilter.tsx` and `apps/web/src/app/page.tsx` hiding 135 offline / no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default on the interactive Leaflet map.
   - Added monochromatic toggle control (`[Ẩn camera mất tín hiệu]` / `[Hiện camera mất tín hiệu]`) and live dynamic counter badge (`Đang hiển thị 702 / 837 camera`).

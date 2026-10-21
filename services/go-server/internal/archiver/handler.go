@@ -109,17 +109,19 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, middlewares ...gin.Handler
 // @Failure 500 {object} map[string]string
 // @Router /api/archiver/dates [get]
 func (h *Handler) ListDates(c *gin.Context) {
-	items, err := h.store.List(c.Request.Context(), "")
+	dirs, err := h.store.ListDirectories(c.Request.Context(), "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list storage items"})
 		return
 	}
 
 	dateSet := make(map[string]struct{})
-	for _, it := range items {
-		parts := strings.Split(it.Key, "/")
-		if len(parts) >= 2 && datePattern.MatchString(parts[0]) {
-			dateSet[parts[0]] = struct{}{}
+	for _, dir := range dirs {
+		trimmed := strings.Trim(dir, "/")
+		parts := strings.Split(trimmed, "/")
+		top := parts[0]
+		if datePattern.MatchString(top) {
+			dateSet[top] = struct{}{}
 		}
 	}
 
