@@ -551,8 +551,8 @@ export default function LabelerPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-black text-zinc-100 flex flex-col font-sans select-none">
-        <header className="border-b border-zinc-800 bg-zinc-950 px-4 py-3 flex items-center justify-between">
+      <div className="h-screen w-full overflow-hidden bg-black text-zinc-100 flex flex-col font-sans select-none">
+        <header className="shrink-0 border-b border-zinc-800 bg-zinc-950 px-4 py-3 flex items-center justify-between">
           <Link
             href="/"
             className="text-xs uppercase tracking-wider px-2 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded transition"
@@ -568,7 +568,7 @@ export default function LabelerPage() {
           </button>
         </header>
 
-        <main className="flex-1 flex items-center justify-center p-4">
+        <main className="flex-1 overflow-y-auto flex items-center justify-center p-4">
           <div className="w-full max-w-md border border-zinc-800 bg-zinc-950 p-6 rounded shadow-xl">
             <div className="text-[10px] font-mono tracking-widest text-zinc-500 uppercase mb-2">
               [TRUY CẬP NỘI BỘ | DEV ONLY]
@@ -624,9 +624,9 @@ export default function LabelerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 flex flex-col font-sans select-none">
+    <div className="h-screen w-full overflow-hidden bg-black text-zinc-100 flex flex-col font-sans select-none">
       {/* Top Header */}
-      <header className="border-b border-zinc-800 bg-zinc-950 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      <header className="shrink-0 border-b border-zinc-800 bg-zinc-950 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link
             href="/"
@@ -690,7 +690,7 @@ export default function LabelerPage() {
       </header>
 
       {/* Control Bar: Date Selector, Annotator Name, Status Filter Pills, Progress Counter */}
-      <div className="border-b border-zinc-800 bg-zinc-900/60 px-4 py-2.5 flex flex-wrap items-center justify-between gap-4 text-xs">
+      <div className="shrink-0 border-b border-zinc-800 bg-zinc-900/60 px-4 py-2.5 flex flex-wrap items-center justify-between gap-4 text-xs">
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-zinc-400">
             <span>{t.dateSelect}:</span>
@@ -775,9 +775,9 @@ export default function LabelerPage() {
       </div>
 
       {/* Main Work Area */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
         {/* Left / Center: Main Snapshot Image & Viewer */}
-        <div className="flex-1 flex flex-col bg-zinc-950 p-4 overflow-y-auto">
+        <div className="w-full shrink-0 flex flex-col bg-zinc-950 p-3 lg:p-4 lg:flex-1 lg:min-h-0 lg:overflow-hidden">
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
               {t.loading}
@@ -787,9 +787,9 @@ export default function LabelerPage() {
               {t.noSnapshots}
             </div>
           ) : (
-            <div className="flex flex-col h-full gap-3">
+            <div className="flex flex-col h-full gap-3 min-h-0">
               {/* Snapshot Metadata Bar */}
-              <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 border-b border-zinc-800/80 pb-2">
+              <div className="shrink-0 flex flex-wrap items-center justify-between text-xs text-zinc-400 border-b border-zinc-800/80 pb-2">
                 <div className="flex items-center gap-2 font-mono">
                   <span className="text-zinc-100 font-semibold">
                     {currentSnapshot.camera_name || currentSnapshot.camera_id}
@@ -831,7 +831,7 @@ export default function LabelerPage() {
               </div>
 
               {/* High-res Image View */}
-              <div className="flex-1 relative flex items-center justify-center bg-black border border-zinc-800 rounded min-h-[360px] overflow-hidden">
+              <div className="w-full h-[260px] sm:h-[340px] lg:h-auto lg:flex-1 lg:min-h-0 relative flex items-center justify-center bg-black border border-zinc-800 rounded overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={(() => {
@@ -848,7 +848,7 @@ export default function LabelerPage() {
               </div>
 
               {/* Navigation Bar */}
-              <div className="flex items-center justify-between pt-2">
+              <div className="shrink-0 flex items-center justify-between pt-2">
                 <button
                   type="button"
                   onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
@@ -874,7 +874,7 @@ export default function LabelerPage() {
         </div>
 
         {/* Right: Annotation Controls & Hotkey Panels */}
-        <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-zinc-800 bg-zinc-900/40 p-4 flex flex-col gap-5 overflow-y-auto">
+        <div className="w-full shrink-0 border-t lg:border-t-0 lg:border-l border-zinc-800 bg-zinc-900/40 p-4 flex flex-col gap-5 lg:w-96 lg:min-h-0 lg:overflow-y-auto">
           {/* Dimension 1: Flood Level & Physical Anchor */}
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
