@@ -35,8 +35,8 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
 - **Camera Catalog**:
   - **837 total cameras** loaded in `cameras_enriched.json`
-  - **712 online cameras** (status `UP`, `isOnline: true`) and **125 offline** (status `NOT_IMAGE`) as of the latest city-wide health audit (2026-10-06)
-  - Static liveness (`isOnline` / `status`) is verified by live upstream probing; runtime placeholder detection runs in `proxycache` and surfaces `503 GHOST_CAMERA`
+  - **711 online roadway cameras** (status `UP`, `isOnline: true`), **123 offline** (status `NOT_IMAGE`), and **3 excluded bridge footing waterway sensors** (status `WATERWAY_MONITOR`, `isWaterway: true`, Issue #283) as of 2026-10-22
+  - Static liveness (`isOnline` / `status`) is verified by live upstream probing; non-road river/waterway cameras are strictly excluded from map rendering and flood perception pipelines; runtime placeholder detection runs in `proxycache` and surfaces `503 GHOST_CAMERA`
   - **57 curated intersection cameras (Hot Set)** across 4 priority commuter corridors:
     1. Võ Văn Kiệt (`vo_van_kiet`): 23 cameras
     2. Mai Chí Thọ (`mai_chi_tho`): 13 cameras

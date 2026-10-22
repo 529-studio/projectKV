@@ -1359,6 +1359,9 @@ const docTemplate = `{
                 "isOnline": {
                     "type": "boolean"
                 },
+                "isWaterway": {
+                    "type": "boolean"
+                },
                 "latitude": {
                     "type": "number"
                 },
@@ -1700,7 +1703,8 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
