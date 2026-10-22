@@ -2,12 +2,21 @@ import type { Camera } from '../hooks/useCameras';
 
 /**
  * Checks whether a camera is considered offline / no-signal.
- * Specifically checks for 'NOT_IMAGE' or 'NO_SIGNAL' status, which represent
- * non-functional cameras causing 503 ghost modals.
+ * Specifically checks for 'NOT_IMAGE', 'NO_SIGNAL', or non-road waterway monitors.
  */
 export const isCameraOffline = (cam: Camera | null | undefined): boolean => {
   if (!cam) return false;
-  return cam.status === 'NOT_IMAGE' || cam.status === 'NO_SIGNAL';
+  return cam.status === 'NOT_IMAGE' || cam.status === 'NO_SIGNAL' || cam.status === 'WATERWAY_MONITOR' || Boolean(cam.isWaterway);
+};
+
+/**
+ * Checks whether a camera is a non-road waterway / navigation clearance monitoring sensor.
+ * These cameras point directly at river water beneath bridge footings and must be permanently
+ * excluded from road traffic maps and commuter navigation layers.
+ */
+export const isWaterwayCamera = (cam: Camera | null | undefined): boolean => {
+  if (!cam) return false;
+  return Boolean(cam.isWaterway) || cam.status === 'WATERWAY_MONITOR';
 };
 
 export const CAMERA_FILTER_I18N = Object.freeze({

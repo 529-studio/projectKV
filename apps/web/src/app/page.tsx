@@ -24,7 +24,7 @@ import PhuongTreeFilter, {
 import { getCameraSequence } from '../utils/cameraSequence';
 import type { ActiveLensMode } from '../components/HexOverlay';
 import CameraFilter from '../components/CameraFilter';
-import { isCameraOffline } from '../utils/cameraFilterUtils';
+import { isCameraOffline, isWaterwayCamera } from '../utils/cameraFilterUtils';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
@@ -215,10 +215,12 @@ export default function Home() {
     return baseLabel;
   }, [selectedPhuong, selectedCorridor, lang, isFloodFilterActive, floodedCameraCount, wetCameraCount]);
 
-  // Filter out offline / no-signal cameras by default for map hygiene (S7-T2 / Issue #247)
+  // Filter out offline / no-signal cameras by default for map hygiene (S7-T2 / Issue #247).
+  // Non-road waterway monitoring cameras beneath bridge footings are permanently excluded.
   const displayCameras = useMemo(() => {
-    if (!hideOfflineCameras) return cameras;
-    return cameras.filter(c => !isCameraOffline(c));
+    const roadCameras = cameras.filter(c => !isWaterwayCamera(c));
+    if (!hideOfflineCameras) return roadCameras;
+    return roadCameras.filter(c => !isCameraOffline(c));
   }, [cameras, hideOfflineCameras]);
 
   const visibleCameraCount = useMemo(() => {

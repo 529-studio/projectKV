@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { isCameraOffline, CAMERA_FILTER_I18N } from './cameraFilterUtils.ts';
+import { isCameraOffline, isWaterwayCamera, CAMERA_FILTER_I18N } from './cameraFilterUtils.ts';
 import type { Camera } from '../hooks/useCameras.ts';
 
 describe('Camera Filter Utilities (S7-T2 / Issue #247)', () => {
@@ -24,13 +24,53 @@ describe('Camera Filter Utilities (S7-T2 / Issue #247)', () => {
       id: 'cam-4',
       isOnline: true,
     };
+    const waterwayCam: Camera = {
+      id: 'cam-5',
+      isOnline: false,
+      status: 'WATERWAY_MONITOR',
+      isWaterway: true,
+    };
 
     assert.equal(isCameraOffline(notImageCam), true);
     assert.equal(isCameraOffline(noSignalCam), true);
+    assert.equal(isCameraOffline(waterwayCam), true);
     assert.equal(isCameraOffline(onlineCam), false);
     assert.equal(isCameraOffline(undefinedStatusCam), false);
     assert.equal(isCameraOffline(null), false);
     assert.equal(isCameraOffline(undefined), false);
+  });
+
+  it('isWaterwayCamera identifies non-road waterway cameras correctly', () => {
+    const waterwayCam1: Camera = {
+      id: '589d0bceb3bf7600110283d6',
+      displayName: 'Cầu Sài Gòn 2 (dạ cầu)',
+      status: 'WATERWAY_MONITOR',
+      isWaterway: true,
+      isOnline: false,
+    };
+    const waterwayCam2: Camera = {
+      id: 'cam-w2',
+      isOnline: false,
+      isWaterway: true,
+    };
+    const roadCamUnderBridge: Camera = {
+      id: '58abbee5bd82540010390ba2',
+      displayName: 'Cầu Sài Gòn 5 (dạ cầu Thủ Đức)',
+      status: 'UP',
+      isOnline: true,
+    };
+    const regularCam: Camera = {
+      id: 'cam-reg',
+      status: 'UP',
+      isOnline: true,
+    };
+
+    assert.equal(isWaterwayCamera(waterwayCam1), true);
+    assert.equal(isWaterwayCamera(waterwayCam2), true);
+    assert.equal(isWaterwayCamera(roadCamUnderBridge), false);
+    assert.equal(isWaterwayCamera(regularCam), false);
+    assert.equal(isWaterwayCamera(null), false);
+    assert.equal(isWaterwayCamera(undefined), false);
   });
 
   it('CAMERA_FILTER_I18N contains bilingual translations without emojis', () => {
@@ -103,20 +143,27 @@ describe('Camera Filter Utilities (S7-T2 / Issue #247)', () => {
     });
   });
 
-  it('filters out offline cameras accurately from a collection', () => {
+  it('filters out offline and waterway cameras accurately from a collection', () => {
     const cameras: Camera[] = [
       { id: 'c1', status: 'UP', isOnline: true },
       { id: 'c2', status: 'NOT_IMAGE', isOnline: false },
       { id: 'c3', status: 'UP', isOnline: true },
       { id: 'c4', status: 'NO_SIGNAL', isOnline: false },
       { id: 'c5', status: 'UP', isOnline: true },
+      { id: 'c6', status: 'WATERWAY_MONITOR', isWaterway: true, isOnline: false },
     ];
 
-    const filtered = cameras.filter(c => !isCameraOffline(c));
-    assert.equal(filtered.length, 3);
+    // Regular offline filter
+    const onlineOnly = cameras.filter(c => !isCameraOffline(c));
+    assert.equal(onlineOnly.length, 3);
     assert.deepEqual(
-      filtered.map(c => c.id),
+      onlineOnly.map(c => c.id),
       ['c1', 'c3', 'c5']
     );
+
+    // Map display filter: permanently excludes waterway cameras even if offline cameras are shown
+    const roadCameras = cameras.filter(c => !isWaterwayCamera(c));
+    assert.equal(roadCameras.length, 5);
+    assert.equal(roadCameras.some(c => c.id === 'c6'), false);
   });
 });

@@ -98,3 +98,27 @@ func TestSecretSanitizer_BypassesImageStreams(t *testing.T) {
 		t.Errorf("expected byte length %d, got %d", len(imageData), w.Body.Len())
 	}
 }
+
+func TestSecretSanitizer_PreservesStorageObjectKeys(t *testing.T) {
+	r := gin.New()
+	r.Use(middleware.SecretSanitizer())
+
+	r.GET("/snapshots", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"raw_url": "/api/archiver/snapshots/raw?key=2026-10-21%2Fcam1%2F123_sample.jpg",
+			"key":     "2026-10-21/cam1/123_sample.jpg",
+		})
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/snapshots", nil)
+	r.ServeHTTP(w, req)
+
+	body := w.Body.String()
+	if strings.Contains(body, "[REDACTED]") {
+		t.Errorf("expected storage object key in raw_url to NOT be redacted, got: %s", body)
+	}
+	if !strings.Contains(body, "2026-10-21%2Fcam1%2F123_sample.jpg") {
+		t.Errorf("expected original storage object key preserved, got: %s", body)
+	}
+}

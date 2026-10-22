@@ -1473,8 +1473,9 @@
     "id": "589d0bceb3bf7600110283d6",
     "title": "TTH 49.2",
     "displayName": "Cầu Sài Gòn 2 (dạ cầu)",
-    "status": "UP",
-    "isOnline": true,
+    "status": "WATERWAY_MONITOR",
+    "isOnline": false,
+    "isWaterway": true,
     "latitude": 10.7990303873734,
     "longitude": 106.727387309074,
     "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=589d0bceb3bf7600110283d6"
@@ -7443,8 +7444,9 @@
     "id": "5b6c155aca0577001163fe36",
     "title": "TTH 135.1",
     "displayName": "Nguyễn Hữu Cảnh 1 (Dạ cầu)",
-    "status": "NOT_IMAGE",
+    "status": "WATERWAY_MONITOR",
     "isOnline": false,
+    "isWaterway": true,
     "latitude": 10.7974969832732,
     "longitude": 106.720730066299,
     "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5b6c155aca0577001163fe36"
@@ -8023,8 +8025,9 @@
     "id": "5b6c1618ca0577001163fe3c",
     "title": "TTH 135.3",
     "displayName": "Nguyễn Hữu Cảnh 2 (Chân cầu)",
-    "status": "NOT_IMAGE",
+    "status": "WATERWAY_MONITOR",
     "isOnline": false,
+    "isWaterway": true,
     "latitude": 10.795078299042,
     "longitude": 106.718080043793,
     "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5b6c1618ca0577001163fe3c"
