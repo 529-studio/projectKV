@@ -37,6 +37,15 @@ const CATALOG_PATHS = [
 
 const UP = 'UP';
 const NOT_IMAGE = 'NOT_IMAGE';
+const WATERWAY_MONITOR = 'WATERWAY_MONITOR';
+
+// Waterway / river-level monitoring cameras beneath bridge footings that have no roadway traffic.
+// These are permanently excluded from traffic catalogs and must never be flipped online by probe audits.
+const WATERWAY_CAMERAS = new Set([
+  '589d0bceb3bf7600110283d6', // Cầu Sài Gòn 2 (dạ cầu) - Saigon River pier clearance
+  '5b6c155aca0577001163fe36', // Nguyễn Hữu Cảnh 1 (Dạ cầu) - Canal footing
+  '5b6c1618ca0577001163fe3c', // Nguyễn Hữu Cảnh 2 (Chân cầu) - Canal footing
+]);
 
 // Upstream probe outcomes that deterministically mean "no live frame".
 const OFFLINE_STATUSES = new Set(['GHOST_PLACEHOLDER', 'EMPTY_BODY']);
@@ -52,7 +61,10 @@ function fail(message) {
  * Derives the desired catalog state for a given audit outcome.
  * Returns null when the outcome is transient and the catalog must stay as-is.
  */
-function desiredState(auditStatus) {
+function desiredState(auditStatus, camId) {
+  if (camId && WATERWAY_CAMERAS.has(camId)) {
+    return { isOnline: false, status: WATERWAY_MONITOR, isWaterway: true };
+  }
   if (ONLINE_STATUSES.has(auditStatus)) {
     return { isOnline: true, status: UP };
   }
@@ -108,20 +120,25 @@ function syncCatalog(catalogPath, auditById) {
       continue;
     }
 
-    const desired = desiredState(auditStatus);
+    const desired = desiredState(auditStatus, cam.id);
     if (desired === null) {
       transient.push({ id: cam.id, status: auditStatus, catalogIsOnline: cam.isOnline });
       continue;
     }
 
     const wasOnline = Boolean(cam.isOnline);
-    if (wasOnline === desired.isOnline && cam.status === desired.status) {
+    const wasWaterway = Boolean(cam.isWaterway);
+    const desiredWaterway = Boolean(desired.isWaterway);
+    if (wasOnline === desired.isOnline && cam.status === desired.status && wasWaterway === desiredWaterway) {
       unchanged.push(cam.id);
       continue;
     }
 
     cam.isOnline = desired.isOnline;
     cam.status = desired.status;
+    if (desired.isWaterway) {
+      cam.isWaterway = true;
+    }
 
     if (desired.isOnline) {
       flippedToOnline.push(cam.id);
