@@ -567,3 +567,52 @@ func TestLoadCatalog_GracefulFallback(t *testing.T) {
 		t.Errorf("expected empty phuong fields in fallback, got id=%v name=%v", cams[0].PhuongID, cams[0].PhuongName)
 	}
 }
+
+func TestCatalog_WaterwayCameras(t *testing.T) {
+	cams := []Camera{
+		{
+			ID:          "589d0bceb3bf7600110283d6",
+			DisplayName: "Cầu Sài Gòn 2 (dạ cầu)",
+			Status:      StatusOnline,
+			IsOnline:    true,
+		},
+		{
+			ID:          "regular-cam",
+			DisplayName: "Nguyễn Huệ - Lê Lợi",
+			Status:      StatusOnline,
+			IsOnline:    true,
+		},
+	}
+
+	cat := NewCatalog(cams)
+
+	// Waterway camera should be marked offline and WATERWAY_MONITOR
+	waterwayCam, ok := cat.ByID("589d0bceb3bf7600110283d6")
+	if !ok {
+		t.Fatalf("expected waterway camera to be present in catalog dict")
+	}
+	if !waterwayCam.IsWaterway {
+		t.Errorf("expected IsWaterway=true, got false")
+	}
+	if waterwayCam.IsOnline {
+		t.Errorf("expected IsOnline=false for waterway camera, got true")
+	}
+	if waterwayCam.Status != "WATERWAY_MONITOR" {
+		t.Errorf("expected Status=WATERWAY_MONITOR, got %q", waterwayCam.Status)
+	}
+
+	// Regular camera should remain unaffected
+	regularCam, ok := cat.ByID("regular-cam")
+	if !ok {
+		t.Fatalf("expected regular camera to be present in catalog dict")
+	}
+	if regularCam.IsWaterway {
+		t.Errorf("expected IsWaterway=false for regular camera, got true")
+	}
+	if !regularCam.IsOnline {
+		t.Errorf("expected IsOnline=true for regular camera, got false")
+	}
+	if regularCam.Status != StatusOnline {
+		t.Errorf("expected Status=%q, got %q", StatusOnline, regularCam.Status)
+	}
+}

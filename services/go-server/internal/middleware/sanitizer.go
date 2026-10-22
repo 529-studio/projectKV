@@ -14,18 +14,32 @@ var (
 	googleAPIKeyRegex = regexp.MustCompile(`AIza[0-9A-Za-z-_]{35}`)
 	// awsAccessKeyRegex matches AWS / Cloudflare R2 standard 20-character Access Key IDs.
 	awsAccessKeyRegex = regexp.MustCompile(`\b(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b`)
-	// queryKeyRegex matches URL query parameter keys (e.g., ?key=SECRET or &key=SECRET).
-	queryKeyRegex = regexp.MustCompile(`(?i)([?&](?:key|api_key|token|secret)=)[^&\s"\'\\}]+`)
+	// queryKeyRegex matches URL query parameter credentials (e.g., ?api_key=SECRET or ?key=AIza...).
+	queryKeyRegex = regexp.MustCompile(`(?i)([?&](?:key|api_key|token|secret|access_token)=)[^&\s"\'\\}]+`)
 )
 
 // SanitizeBytes scrubs all known API key and credential patterns from b.
+// Object/storage keys containing path slashes or image extensions are preserved.
 func SanitizeBytes(b []byte) []byte {
 	if len(b) == 0 {
 		return b
 	}
 	out := googleAPIKeyRegex.ReplaceAll(b, []byte("[REDACTED_KEY]"))
 	out = awsAccessKeyRegex.ReplaceAll(out, []byte("[REDACTED_KEY]"))
-	out = queryKeyRegex.ReplaceAll(out, []byte("${1}[REDACTED]"))
+	out = queryKeyRegex.ReplaceAllFunc(out, func(match []byte) []byte {
+		str := string(match)
+		idx := strings.Index(str, "=")
+		if idx == -1 {
+			return match
+		}
+		prefix := str[:idx+1]
+		val := str[idx+1:]
+		// If the query value contains slashes or file extensions, it is a storage object key, not a secret.
+		if strings.Contains(val, "/") || strings.Contains(val, "%2F") || strings.Contains(val, ".jpg") || strings.Contains(val, ".png") || strings.Contains(val, ".json") {
+			return match
+		}
+		return []byte(prefix + "[REDACTED]")
+	})
 	return out
 }
 

@@ -40,6 +40,7 @@ type Camera struct {
 	Zone         string   `json:"zone,omitempty"`
 	DuplicateOf  string   `json:"duplicateOf,omitempty"`
 	IsGhost      bool     `json:"isGhost,omitempty"`
+	IsWaterway   bool     `json:"isWaterway,omitempty"`
 	PhuongID     *string  `json:"phuong_id,omitempty"`
 	PhuongType   string   `json:"phuong_type,omitempty"`
 	PhuongName   string   `json:"phuong_name,omitempty"`
@@ -60,6 +61,15 @@ var KnownDuplicateStreams = map[string]string{
 	"665861d864f11e00173c73a9": "662a8e121afb9c00172d2a3f",
 	// Thanh Niên - gần chùa Liên Hoa (TTH 454) -> Thanh Niên - Phạm Văn Hai (TTH 453)
 	"68188e466dfb4b0018f902f2": "68188d586dfb4b0018f9018d",
+}
+
+// KnownWaterwayCameras defines cameras positioned beneath bridge footings / piers to monitor
+// river navigation clearance or waterway levels rather than roadway vehicular traffic.
+// These cameras have zero road surface and are permanently excluded from traffic and flood perception.
+var KnownWaterwayCameras = map[string]bool{
+	"589d0bceb3bf7600110283d6": true, // Cầu Sài Gòn 2 (dạ cầu) - Saigon River pier clearance
+	"5b6c155aca0577001163fe36": true, // Nguyễn Hữu Cảnh 1 (Dạ cầu) - Canal footing
+	"5b6c1618ca0577001163fe3c": true, // Nguyễn Hữu Cảnh 2 (Chân cầu) - Canal footing
 }
 
 // Static camera liveness (isOnline/status) is sourced exclusively from the
@@ -110,6 +120,11 @@ func NewCatalogWithClassifier(cameras []Camera, classifier ZoneClassifier) *Cata
 		}
 		if primaryID, isDup := KnownDuplicateStreams[cam.ID]; isDup {
 			cam.DuplicateOf = primaryID
+		}
+		if cam.IsWaterway || KnownWaterwayCameras[cam.ID] {
+			cam.IsWaterway = true
+			cam.IsOnline = false
+			cam.Status = "WATERWAY_MONITOR"
 		}
 		c.dict[cam.ID] = cam
 		if cam.Zone != "" {

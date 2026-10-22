@@ -11,6 +11,7 @@ export interface Camera {
   isOnline: boolean;
   duplicateOf?: string;
   isGhost?: boolean;
+  isWaterway?: boolean;
   phuong_id?: string | null;
   phuong_type?: string | null;
   phuong_name?: string | null;
@@ -37,20 +38,24 @@ export function useCameras() {
         const list = Array.isArray(data) ? data : (data.cameras || []);
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const parsed = list.map((c: any) => ({
-          ...c,
-          id: c.id || c._id,
-          duplicateOf: c.duplicateOf,
-          isGhost: Boolean(c.isGhost),
-          isOnline: (c.status === 'UP' || c.isOnline === true) && !c.isGhost,
-          phuong_id: c.phuong_id ?? null,
-          phuong_type: c.phuong_type ?? null,
-          phuong_name: c.phuong_name ?? null,
-          road_type: c.road_type ?? null,
-          road_name: c.road_name ?? null,
-          road_key: c.road_key ?? null,
-          road_keys: Array.isArray(c.road_keys) ? c.road_keys : [],
-        }));
+        const parsed = list.map((c: any) => {
+          const isWaterway = Boolean(c.isWaterway || c.status === 'WATERWAY_MONITOR');
+          return {
+            ...c,
+            id: c.id || c._id,
+            duplicateOf: c.duplicateOf,
+            isGhost: Boolean(c.isGhost),
+            isWaterway,
+            isOnline: (c.status === 'UP' || c.isOnline === true) && !c.isGhost && !isWaterway,
+            phuong_id: c.phuong_id ?? null,
+            phuong_type: c.phuong_type ?? null,
+            phuong_name: c.phuong_name ?? null,
+            road_type: c.road_type ?? null,
+            road_name: c.road_name ?? null,
+            road_key: c.road_key ?? null,
+            road_keys: Array.isArray(c.road_keys) ? c.road_keys : [],
+          };
+        });
         setCameras(parsed);
       } catch (err) {
         setError(err instanceof Error ? err : new Error(String(err)));
