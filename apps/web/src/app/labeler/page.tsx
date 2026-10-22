@@ -834,11 +834,14 @@ export default function LabelerPage() {
               <div className="flex-1 relative flex items-center justify-center bg-black border border-zinc-800 rounded min-h-[360px] overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={
-                    devToken
-                      ? `${getApiUrl(currentSnapshot.raw_url)}&token=${encodeURIComponent(devToken)}`
-                      : getApiUrl(currentSnapshot.raw_url)
-                  }
+                  src={(() => {
+                    const baseUrl = currentSnapshot.key
+                      ? `/api/archiver/snapshots/raw?key=${encodeURIComponent(currentSnapshot.key)}`
+                      : currentSnapshot.raw_url;
+                    return devToken
+                      ? `${getApiUrl(baseUrl)}&token=${encodeURIComponent(devToken)}`
+                      : getApiUrl(baseUrl);
+                  })()}
                   alt={`Snapshot from camera ${currentSnapshot.camera_id}`}
                   className="max-h-full max-w-full object-contain"
                 />
