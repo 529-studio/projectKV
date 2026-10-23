@@ -2,8 +2,8 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.3.0  
-**Last Updated:** 2026-10-17  
+**Document Version:** 1.3.1  
+**Last Updated:** 2026-10-23  
 
 
 ---
@@ -26,8 +26,8 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **159 Pull Requests** processed across repository history:
-  - **151 Merged** to `dev` (including Sprint 4–6 PRs, Sprint 7 deliverables, PR #270 Sprint 7 Completion Report, PR #272 S8-T1 Doppler Rain Radar Pipeline Overhaul, PR #273 S7-T4 Feedback R2 Archiver, PR #274 S7-T7c Standalone Harvester CLI, and PR #275 S7-T7d Web Labeler Candidate Review)
+- **Lifetime PR History**: Exactly **161 Pull Requests** processed across repository history:
+  - **153 Merged** to `dev` (including Sprint 4–6 PRs, Sprint 7 deliverables, PR #270 Sprint 7 Completion Report, PR #272 S8-T1 Doppler Rain Radar Pipeline Overhaul, PR #273 S7-T4 Feedback R2 Archiver, PR #274 S7-T7c Standalone Harvester CLI, PR #275 S7-T7d Web Labeler Candidate Review, PR #280 S8 Optimize ListDates, PR #282 Cloudflare Zero Trust Dev Token Fallback, and PR #284 Waterway Bridge Footing Camera Exclusion)
   - **8 Closed** without merging
   - **0 Open** PRs pending
 - **Staging Infrastructure Configuration (Stack 14)**:

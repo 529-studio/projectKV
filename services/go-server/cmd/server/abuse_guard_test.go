@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"bytes"
 	"net/http"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +18,9 @@ func TestServer_RateLimiting_BlocksBurstAndExemptsHealth(t *testing.T) {
 
 	cmd := exec.Command("go", "run", "./main.go")
 	cmd.Dir = "."
+	var outputBuf bytes.Buffer
+	cmd.Stdout = &outputBuf
+	cmd.Stderr = &outputBuf
 	cmd.Env = append(cmd.Environ(),
 		"PORT="+port,
 		"ANALYZER=none",
@@ -36,9 +40,9 @@ func TestServer_RateLimiting_BlocksBurstAndExemptsHealth(t *testing.T) {
 
 	baseURL := "http://localhost:" + port
 
-	// Wait for server ready
+	// Wait for server ready (allow up to 15s for compilation under -race on CI)
 	ready := false
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 150; i++ {
 		time.Sleep(100 * time.Millisecond)
 		resp, err := http.Get(baseURL + "/health")
 		if err == nil && resp.StatusCode == http.StatusOK {
@@ -48,7 +52,7 @@ func TestServer_RateLimiting_BlocksBurstAndExemptsHealth(t *testing.T) {
 		}
 	}
 	if !ready {
-		t.Fatalf("server failed to become ready on %s", baseURL)
+		t.Fatalf("server failed to become ready on %s; output:\n%s", baseURL, outputBuf.String())
 	}
 
 	client := &http.Client{Timeout: 2 * time.Second}
