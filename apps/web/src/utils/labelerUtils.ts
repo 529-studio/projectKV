@@ -216,33 +216,103 @@ export function isAutoHarvested(label?: Partial<LabelPayload> | null): boolean {
   const annotator = label.annotator.trim().toLowerCase();
   return (
     annotator.startsWith('harvester/') ||
-    annotator === 'harvester/auto' ||
+    annotator.startsWith('auto_') ||
+    annotator.endsWith('_auto') ||
+    annotator.includes('/auto') ||
+    annotator.includes('opencode') ||
     annotator === 'auto_harvester' ||
     annotator === 'auto'
   );
 }
 
 /**
+ * Synthesizes a SnapshotItem from a LabelPayload if the raw snapshot is not present in the current page.
+ */
+export function snapshotFromLabel(
+  label: LabelPayload,
+  existingSnapshot?: SnapshotItem,
+  cameraNameLookup?: (id: string) => string | undefined
+): SnapshotItem {
+  if (existingSnapshot) {
+    return existingSnapshot;
+  }
+  const key = label.snapshot_key;
+  const parts = key.split('/');
+  const camID = label.camera_id || (parts.length >= 2 ? parts[1] : '');
+  const camName = (cameraNameLookup ? cameraNameLookup(camID) : undefined) || camID;
+
+  return {
+    key,
+    camera_id: camID,
+    camera_name: camName,
+    timestamp: label.timestamp || 0,
+    reason: 'harvest',
+    size: 0,
+    raw_url: `/api/archiver/snapshots/raw?key=${encodeURIComponent(key)}`,
+    public_url: `https://file.529studio.site/${key}`,
+  };
+}
+
+/**
  * Filters snapshot queue by provenance: all, pending_auto, or approved_human.
+ * When filtering for candidates (pending_auto or approved_human), it merges items
+ * from both the loaded snapshots and the full labels catalog so candidates are never dropped.
  */
 export function filterSnapshots(
   snapshots: SnapshotItem[],
   labels: Record<string, LabelPayload>,
-  filter: LabelFilterStatus
+  filter: LabelFilterStatus,
+  cameraNameLookup?: (id: string) => string | undefined
 ): SnapshotItem[] {
   if (filter === 'all') return snapshots;
+
+  const snapMap = new Map<string, SnapshotItem>();
+  snapshots.forEach((s) => snapMap.set(s.key, s));
+
   if (filter === 'pending_auto') {
-    return snapshots.filter((s) => {
+    const seen = new Set<string>();
+    const list: SnapshotItem[] = [];
+    snapshots.forEach((s) => {
       const l = labels[s.key];
-      return Boolean(l && isAutoHarvested(l));
+      if (l && isAutoHarvested(l)) {
+        list.push(s);
+        seen.add(s.key);
+      }
     });
+
+    const extra: SnapshotItem[] = [];
+    Object.values(labels).forEach((l) => {
+      if (l.snapshot_key && isAutoHarvested(l) && !seen.has(l.snapshot_key)) {
+        extra.push(snapshotFromLabel(l, snapMap.get(l.snapshot_key), cameraNameLookup));
+        seen.add(l.snapshot_key);
+      }
+    });
+    extra.sort((a, b) => b.timestamp - a.timestamp);
+    return [...list, ...extra];
   }
+
   if (filter === 'approved_human') {
-    return snapshots.filter((s) => {
+    const seen = new Set<string>();
+    const list: SnapshotItem[] = [];
+    snapshots.forEach((s) => {
       const l = labels[s.key];
-      return Boolean(l && !isAutoHarvested(l));
+      if (l && !isAutoHarvested(l)) {
+        list.push(s);
+        seen.add(s.key);
+      }
     });
+
+    const extra: SnapshotItem[] = [];
+    Object.values(labels).forEach((l) => {
+      if (l.snapshot_key && !isAutoHarvested(l) && !seen.has(l.snapshot_key)) {
+        extra.push(snapshotFromLabel(l, snapMap.get(l.snapshot_key), cameraNameLookup));
+        seen.add(l.snapshot_key);
+      }
+    });
+    extra.sort((a, b) => b.timestamp - a.timestamp);
+    return [...list, ...extra];
   }
+
   return snapshots;
 }
 
@@ -312,6 +382,9 @@ export const LABELER_I18N = {
     saveError: 'Lỗi Lưu',
     exportJson: 'Xuất Dữ Liệu JSON',
     refreshData: 'Làm Mới',
+    prevPage: 'Trang trước',
+    nextPage: 'Trang kế',
+    pageDisplay: 'Trang',
     backToMap: 'Về Bản Đồ',
     devAuthRequired: 'Yêu Cầu Quyền Truy Cập Developer',
     devAuthSubtitle: 'Khu vực gán nhãn dữ liệu nội bộ. Vui lòng nhập Developer Access Token để tiếp tục.',
@@ -384,6 +457,9 @@ export const LABELER_I18N = {
     saveError: 'Save Error',
     exportJson: 'Export JSON',
     refreshData: 'Refresh',
+    prevPage: 'Prev Page',
+    nextPage: 'Next Page',
+    pageDisplay: 'Page',
     backToMap: 'Back to Map',
     devAuthRequired: 'Developer Access Required',
     devAuthSubtitle: 'Internal ground truth labeling workspace. Please enter Developer Access Token to continue.',
