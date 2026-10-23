@@ -57,6 +57,9 @@ func TestStartup_AnalyzerNone_EmptyVerdictsAndNoSSE(t *testing.T) {
 
 	cmd := exec.Command("go", "run", "./main.go")
 	cmd.Dir = "."
+	var outputBuf bytes.Buffer
+	cmd.Stdout = &outputBuf
+	cmd.Stderr = &outputBuf
 	cmd.Env = append(cmd.Environ(),
 		"PORT="+port,
 		"ANALYZER=none",
@@ -74,9 +77,9 @@ func TestStartup_AnalyzerNone_EmptyVerdictsAndNoSSE(t *testing.T) {
 
 	baseURL := "http://localhost:" + port
 
-	// Wait for server to be ready
+	// Wait for server to be ready (allow up to 15s for compilation under -race on CI)
 	ready := false
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 150; i++ {
 		time.Sleep(100 * time.Millisecond)
 		resp, err := http.Get(baseURL + "/health")
 		if err == nil && resp.StatusCode == http.StatusOK {
@@ -86,7 +89,7 @@ func TestStartup_AnalyzerNone_EmptyVerdictsAndNoSSE(t *testing.T) {
 		}
 	}
 	if !ready {
-		t.Fatalf("server failed to become ready on %s", baseURL)
+		t.Fatalf("server failed to become ready on %s; output:\n%s", baseURL, outputBuf.String())
 	}
 
 	// 1. Verify /api/traffic-status
@@ -180,9 +183,9 @@ func TestStartup_HotsetStatusEndpoint_ServesCachedState(t *testing.T) {
 
 	baseURL := "http://localhost:" + port
 
-	// Wait for server readiness
+	// Wait for server readiness (allow up to 15s for compilation under -race on CI)
 	ready := false
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 150; i++ {
 		time.Sleep(100 * time.Millisecond)
 		resp, err := http.Get(baseURL + "/health")
 		if err == nil && resp.StatusCode == http.StatusOK {
@@ -192,7 +195,7 @@ func TestStartup_HotsetStatusEndpoint_ServesCachedState(t *testing.T) {
 		}
 	}
 	if !ready {
-		t.Fatalf("server failed to become ready on %s", baseURL)
+		t.Fatalf("server failed to become ready on %s: %s", baseURL, serverBuf.String())
 	}
 
 	// Give the mock scheduler a moment to run the initial cycle and populate hotset.Store

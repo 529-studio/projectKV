@@ -214,7 +214,12 @@ export function formatSnapshotTimestamp(timestamp: number): string {
 export function isAutoHarvested(label?: Partial<LabelPayload> | null): boolean {
   if (!label || !label.annotator) return false;
   const annotator = label.annotator.trim().toLowerCase();
-  return annotator.startsWith('harvester/') || annotator === 'harvester/auto';
+  return (
+    annotator.startsWith('harvester/') ||
+    annotator === 'harvester/auto' ||
+    annotator === 'auto_harvester' ||
+    annotator === 'auto'
+  );
 }
 
 /**
@@ -306,6 +311,7 @@ export const LABELER_I18N = {
     unsavedBadge: 'Chưa lưu',
     saveError: 'Lỗi Lưu',
     exportJson: 'Xuất Dữ Liệu JSON',
+    refreshData: 'Làm Mới',
     backToMap: 'Về Bản Đồ',
     devAuthRequired: 'Yêu Cầu Quyền Truy Cập Developer',
     devAuthSubtitle: 'Khu vực gán nhãn dữ liệu nội bộ. Vui lòng nhập Developer Access Token để tiếp tục.',
@@ -377,6 +383,7 @@ export const LABELER_I18N = {
     unsavedBadge: 'Unsaved',
     saveError: 'Save Error',
     exportJson: 'Export JSON',
+    refreshData: 'Refresh',
     backToMap: 'Back to Map',
     devAuthRequired: 'Developer Access Required',
     devAuthSubtitle: 'Internal ground truth labeling workspace. Please enter Developer Access Token to continue.',

@@ -997,8 +997,16 @@ func main() {
 			defer cancelHarvester()
 			if err := harvesterCoord.Start(harvesterCtx); err != nil {
 				log.Printf("[WARN] Failed to start autonomous harvester: %v", err)
+			} else {
+				log.Printf("[INIT] Autonomous harvester enabled (scheduleSlots=%s, rainCooldown=%dm, concurrency=%d, hotsetCams=%d, rainCams=%d)",
+					cfg.HarvesterScheduleHours, cfg.HarvesterRainCooldownMinutes, cfg.HarvesterConcurrency,
+					len(harvesterHotsetCams), len(harvesterRainCams))
 			}
+		} else {
+			log.Printf("[INIT] Autonomous harvester disabled via configuration (HARVESTER_ENABLED=false)")
 		}
+	} else {
+		log.Printf("[INIT] Autonomous harvester disabled: storage driver is uninitialized")
 	}
 
 	// 8. Setup Gin Engine

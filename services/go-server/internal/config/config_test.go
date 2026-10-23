@@ -558,3 +558,30 @@ func TestLoadConfig_HarvesterCustomValues(t *testing.T) {
 		t.Errorf("expected HarvesterConcurrency=10, got %d", cfg.HarvesterConcurrency)
 	}
 }
+
+func TestLoadConfig_HarvesterWhitespaceAndQuotes(t *testing.T) {
+	_ = os.Setenv("HARVESTER_ENABLED", " true \t  ")
+	_ = os.Setenv("HARVESTER_SCHEDULE_HOURS", " \"07:30,12:00,13:00\" \t ")
+	_ = os.Setenv("HARVESTER_RAIN_COOLDOWN_MINUTES", " 60 \t  ")
+	_ = os.Setenv("HARVESTER_CONCURRENCY", " 15   ")
+	defer func() {
+		_ = os.Unsetenv("HARVESTER_ENABLED")
+		_ = os.Unsetenv("HARVESTER_SCHEDULE_HOURS")
+		_ = os.Unsetenv("HARVESTER_RAIN_COOLDOWN_MINUTES")
+		_ = os.Unsetenv("HARVESTER_CONCURRENCY")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.HarvesterEnabled != true {
+		t.Errorf("expected HarvesterEnabled=true, got %v", cfg.HarvesterEnabled)
+	}
+	if cfg.HarvesterScheduleHours != "07:30,12:00,13:00" {
+		t.Errorf("expected HarvesterScheduleHours='07:30,12:00,13:00', got %q", cfg.HarvesterScheduleHours)
+	}
+	if cfg.HarvesterRainCooldownMinutes != 60 {
+		t.Errorf("expected HarvesterRainCooldownMinutes=60, got %d", cfg.HarvesterRainCooldownMinutes)
+	}
+	if cfg.HarvesterConcurrency != 15 {
+		t.Errorf("expected HarvesterConcurrency=15, got %d", cfg.HarvesterConcurrency)
+	}
+}
