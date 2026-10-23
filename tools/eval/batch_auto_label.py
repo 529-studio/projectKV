@@ -92,7 +92,7 @@ def send_http_request_with_retry(
     req: urllib.request.Request,
     limiter: Optional[TokenBucketRateLimiter] = None,
     max_retries: int = 5,
-    timeout: float = 12.0,
+    timeout: float = 60.0,
 ) -> Tuple[int, bytes, Dict[str, str]]:
     """
     Executes an HTTP request with pacing and exponential backoff retry on HTTP 429.
@@ -266,7 +266,7 @@ def main():
     snaps_url = f"{args.api_url.rstrip('/')}/api/archiver/snapshots?date={args.date}&limit={args.limit}"
     req = urllib.request.Request(snaps_url, headers=headers)
     try:
-        _, body, _ = send_http_request_with_retry(req, limiter=limiter)
+        _, body, _ = send_http_request_with_retry(req, limiter=limiter, timeout=60.0)
         data = json.loads(body.decode("utf-8"))
         snapshots = data.get("snapshots", [])
     except Exception as e:
