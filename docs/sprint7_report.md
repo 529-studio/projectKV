@@ -239,3 +239,18 @@ Sprint 7 codified **3 authoritative lessons** in [`docs/lesson_learn.md`](lesson
    - Evaluate integrating Open-Meteo or RainViewer radar reflectivity tiles onto the Leaflet map explorer, empowering commuters to track incoming storm fronts in real time.
 5. **Live Staging Telegram Deployment (Issue #246)**:
    - Configure active `TELEGRAM_BOT_TOKEN` in Portainer Stack 14 environment and verify live alert delivery on staging.
+
+---
+
+## 8. Audit Certification & Transition to Sprint 8 (ADR-010)
+
+On 2026-10-23, an independent architectural and operational audit was executed to formally certify the completion of Sprint 7 and transition the repository into Sprint 8:
+
+1. **Formal Closure of Sprint 7**:
+   - Sprint 7 successfully delivered the foundation of ProjectKV's continuous data flywheel: offline camera map hygiene (S7-T2, PR #257), multi-lane directional Draft-07 schema (S7-T8, PR #258), tactile commuter feedback affordance (S7-T3, PR #259), gold-standard dataset expansion to 207 certified labels (PR #260), autonomous 57 Hot Set traffic poller (S7-T5, PR #266), dynamic arterial saturation marker coloring (S7-T6, PR #267), autonomous dual-trigger harvester (S7-T7b, PR #268), and Zero-VLM architecture specification (ADR-009, PR #265 & #276).
+2. **Transitioned Carryover Delivery in Early Sprint 8**:
+   - The deferred Sprint 7 backlog items were completed in early Sprint 8: S7-T4 feedback archiver (PR #273), S7-T7c standalone harvester CLI (PR #274), S7-T7d web labeler candidate review queue (PR #275), and S7-T9 Zero-VLM segmentation design spike (PR #276).
+3. **Audit Reckoning & Hand-off to ADR-010**:
+   - The unvarnished audit identified critical operational realities: deployed CV engine has 0% live flood perception, waterline depth calculation in harvester relies on weather lookup heuristics, and `pipeline.go` contains a semaphore break bug under context cancellation.
+   - These findings, along with the operational Doppler radar overhaul (Issue #269, PR #272) and Cloudflare R2 performance hardening (PR #280, #282, #286), are formally codified into [`docs/ADR-010-sprint7-audit-and-sprint8-plan.md`](ADR-010-sprint7-audit-and-sprint8-plan.md) as the authoritative architecture and execution roadmap for Sprint 8.
+
