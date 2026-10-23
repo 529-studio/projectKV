@@ -75,17 +75,25 @@ type LabelListResponse struct {
 	Labels []LabelPayload `json:"labels"`
 }
 
+type labelCacheEntry struct {
+	labels   []LabelPayload
+	cachedAt time.Time
+}
+
 // Handler handles HTTP requests for archiver snapshot browsing, streaming, and labeling.
 type Handler struct {
-	store     storage.Storage
-	camLookup CameraLookup
+	store      storage.Storage
+	camLookup  CameraLookup
+	cacheMu    sync.RWMutex
+	labelCache map[string]labelCacheEntry
 }
 
 // NewHandler creates a new archiver Handler.
 func NewHandler(store storage.Storage, camLookup CameraLookup) *Handler {
 	return &Handler{
-		store:     store,
-		camLookup: camLookup,
+		store:      store,
+		camLookup:  camLookup,
+		labelCache: make(map[string]labelCacheEntry),
 	}
 }
 
@@ -377,6 +385,12 @@ func (h *Handler) SaveLabel(c *gin.Context) {
 		return
 	}
 
+	h.cacheMu.Lock()
+	if h.labelCache != nil {
+		delete(h.labelCache, payload.Date)
+	}
+	h.cacheMu.Unlock()
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "ok",
 		"path":   labelKey,
@@ -401,136 +415,162 @@ func (h *Handler) GetLabels(c *gin.Context) {
 	}
 
 	camFilter := strings.TrimSpace(c.Query("camera_id"))
-	prefix := "labels/" + date
 
-	items, err := h.store.List(c.Request.Context(), prefix)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list labels"})
-		return
-	}
+	// Fast path: Check in-memory cache first (TTL: 60s, invalidated on SaveLabel)
+	h.cacheMu.RLock()
+	cached, hasCache := h.labelCache[date]
+	h.cacheMu.RUnlock()
 
-	var jsonKeys []string
-	for _, it := range items {
-		if strings.HasSuffix(it.Key, ".json") {
-			jsonKeys = append(jsonKeys, it.Key)
+	var allLabels []LabelPayload
+	if hasCache && time.Since(cached.cachedAt) < 60*time.Second {
+		allLabels = cached.labels
+	} else {
+		prefix := "labels/" + date
+
+		items, err := h.store.List(c.Request.Context(), prefix)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list labels"})
+			return
 		}
-	}
 
-	results := make([]*LabelPayload, len(jsonKeys))
-	concurrency := 25
-	if len(jsonKeys) < concurrency {
-		concurrency = len(jsonKeys)
-	}
+		var jsonKeys []string
+		for _, it := range items {
+			if strings.HasSuffix(it.Key, ".json") {
+				jsonKeys = append(jsonKeys, it.Key)
+			}
+		}
 
-	if concurrency > 0 {
-		var wg sync.WaitGroup
-		sem := make(chan struct{}, concurrency)
+		results := make([]*LabelPayload, len(jsonKeys))
+		concurrency := 25
+		if len(jsonKeys) < concurrency {
+			concurrency = len(jsonKeys)
+		}
 
-		for i, key := range jsonKeys {
-			wg.Add(1)
-			sem <- struct{}{}
-			go func(idx int, objKey string) {
-				defer wg.Done()
-				defer func() { <-sem }()
+		if concurrency > 0 {
+			var wg sync.WaitGroup
+			sem := make(chan struct{}, concurrency)
 
-				rc, err := h.store.Get(c.Request.Context(), objKey)
-				if err != nil {
-					return
-				}
-				data, err := io.ReadAll(rc)
-				_ = rc.Close()
-				if err != nil {
-					return
-				}
+			for i, key := range jsonKeys {
+				wg.Add(1)
+				sem <- struct{}{}
+				go func(idx int, objKey string) {
+					defer wg.Done()
+					defer func() { <-sem }()
 
-				var lp LabelPayload
-				if err := json.Unmarshal(data, &lp); err == nil && lp.SnapshotKey != "" {
-					if camFilter == "" || lp.CameraID == camFilter {
+					rc, err := h.store.Get(c.Request.Context(), objKey)
+					if err != nil {
+						return
+					}
+					data, err := io.ReadAll(rc)
+					_ = rc.Close()
+					if err != nil {
+						return
+					}
+
+					var lp LabelPayload
+					if err := json.Unmarshal(data, &lp); err == nil && lp.SnapshotKey != "" {
 						results[idx] = &lp
-					}
-					return
-				}
-
-				// Support autonomous harvester Draft-07 GroundTruthManifest
-				var manifest struct {
-					FrameID     string `json:"frame_id"`
-					CameraID    string `json:"camera_id"`
-					CameraName  string `json:"camera_name"`
-					ImagePath   string `json:"image_path"`
-					Annotator   string `json:"annotator"`
-					AnnotatedAt string `json:"annotated_at"`
-					Notes       string `json:"notes"`
-					Labels      struct {
-						Traffic               string   `json:"traffic"`
-						CarriagewayDirection  string   `json:"carriageway_direction"`
-						TrafficDirA           string   `json:"traffic_dir_a"`
-						TrafficDirB           string   `json:"traffic_dir_b"`
-						IsWaitingRedLight     bool     `json:"is_waiting_red_light"`
-						QueueReason           string   `json:"queue_reason"`
-						Flood                 string   `json:"flood"`
-						WaterlineDepth        string   `json:"waterline_depth"`
-						FloodSubmersionAnchor string   `json:"flood_submersion_anchor"`
-						TimeOfDay             string   `json:"time_of_day"`
-						Weather               string   `json:"weather"`
-						QualityTags           []string `json:"quality_tags"`
-					} `json:"labels"`
-				}
-				if err := json.Unmarshal(data, &manifest); err == nil && manifest.CameraID != "" {
-					snapKey := strings.TrimPrefix(manifest.ImagePath, "proofs/")
-					var ts int64
-					if t, err := time.Parse(time.RFC3339, manifest.AnnotatedAt); err == nil {
-						ts = t.Unix()
+						return
 					}
 
-					floodLevel := "none"
-					switch strings.ToUpper(manifest.Labels.Flood) {
-					case "SHALLOW":
-						floodLevel = "puddle"
-					case "DEEP":
-						floodLevel = "deep"
+					// Support autonomous harvester Draft-07 GroundTruthManifest
+					var manifest struct {
+						FrameID     string `json:"frame_id"`
+						CameraID    string `json:"camera_id"`
+						CameraName  string `json:"camera_name"`
+						ImagePath   string `json:"image_path"`
+						Annotator   string `json:"annotator"`
+						AnnotatedAt string `json:"annotated_at"`
+						Notes       string `json:"notes"`
+						Labels      struct {
+							Traffic               string   `json:"traffic"`
+							CarriagewayDirection  string   `json:"carriageway_direction"`
+							TrafficDirA           string   `json:"traffic_dir_a"`
+							TrafficDirB           string   `json:"traffic_dir_b"`
+							IsWaitingRedLight     bool     `json:"is_waiting_red_light"`
+							QueueReason           string   `json:"queue_reason"`
+							Flood                 string   `json:"flood"`
+							WaterlineDepth        string   `json:"waterline_depth"`
+							FloodSubmersionAnchor string   `json:"flood_submersion_anchor"`
+							TimeOfDay             string   `json:"time_of_day"`
+							Weather               string   `json:"weather"`
+							QualityTags           []string `json:"quality_tags"`
+						} `json:"labels"`
 					}
+					if err := json.Unmarshal(data, &manifest); err == nil && manifest.CameraID != "" {
+						snapKey := strings.TrimPrefix(manifest.ImagePath, "proofs/")
+						var ts int64
+						if t, err := time.Parse(time.RFC3339, manifest.AnnotatedAt); err == nil {
+							ts = t.Unix()
+						}
 
-					mapped := LabelPayload{
-						Date:                  date,
-						CameraID:              manifest.CameraID,
-						SnapshotKey:           snapKey,
-						Annotator:             manifest.Annotator,
-						FloodLevel:            floodLevel,
-						TrafficLevel:          strings.ToLower(manifest.Labels.Traffic),
-						TrafficDirA:           strings.ToLower(manifest.Labels.TrafficDirA),
-						TrafficDirB:           strings.ToLower(manifest.Labels.TrafficDirB),
-						QueueReason:           manifest.Labels.QueueReason,
-						FloodSubmersionAnchor: manifest.Labels.FloodSubmersionAnchor,
-						Weather:               strings.ToLower(manifest.Labels.Weather),
-						TimeOfDay:             strings.ToLower(manifest.Labels.TimeOfDay),
-						QualityTags:           manifest.Labels.QualityTags,
-						Notes:                 manifest.Notes,
-						Timestamp:             ts,
-					}
+						floodLevel := "none"
+						switch strings.ToUpper(manifest.Labels.Flood) {
+						case "SHALLOW":
+							floodLevel = "puddle"
+						case "DEEP":
+							floodLevel = "deep"
+						}
 
-					if camFilter == "" || mapped.CameraID == camFilter {
+						mapped := LabelPayload{
+							Date:                  date,
+							CameraID:              manifest.CameraID,
+							SnapshotKey:           snapKey,
+							Annotator:             manifest.Annotator,
+							FloodLevel:            floodLevel,
+							TrafficLevel:          strings.ToLower(manifest.Labels.Traffic),
+							TrafficDirA:           strings.ToLower(manifest.Labels.TrafficDirA),
+							TrafficDirB:           strings.ToLower(manifest.Labels.TrafficDirB),
+							QueueReason:           manifest.Labels.QueueReason,
+							FloodSubmersionAnchor: manifest.Labels.FloodSubmersionAnchor,
+							Weather:               strings.ToLower(manifest.Labels.Weather),
+							TimeOfDay:             strings.ToLower(manifest.Labels.TimeOfDay),
+							QualityTags:           manifest.Labels.QualityTags,
+							Notes:                 manifest.Notes,
+							Timestamp:             ts,
+						}
+
 						results[idx] = &mapped
 					}
-				}
-			}(i, key)
+				}(i, key)
+			}
+			wg.Wait()
 		}
-		wg.Wait()
+
+		var fetched []LabelPayload
+		for _, res := range results {
+			if res != nil {
+				fetched = append(fetched, *res)
+			}
+		}
+		if fetched == nil {
+			fetched = []LabelPayload{}
+		}
+		allLabels = fetched
+
+		h.cacheMu.Lock()
+		if h.labelCache != nil {
+			h.labelCache[date] = labelCacheEntry{
+				labels:   allLabels,
+				cachedAt: time.Now(),
+			}
+		}
+		h.cacheMu.Unlock()
 	}
 
-	var labels []LabelPayload
-	for _, res := range results {
-		if res != nil {
-			labels = append(labels, *res)
+	var filtered []LabelPayload
+	for _, lp := range allLabels {
+		if camFilter == "" || lp.CameraID == camFilter {
+			filtered = append(filtered, lp)
 		}
 	}
-
-	if labels == nil {
-		labels = []LabelPayload{}
+	if filtered == nil {
+		filtered = []LabelPayload{}
 	}
 
 	c.JSON(http.StatusOK, LabelListResponse{
 		Date:   date,
-		Total:  len(labels),
-		Labels: labels,
+		Total:  len(filtered),
+		Labels: filtered,
 	})
 }
