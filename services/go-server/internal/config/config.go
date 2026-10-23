@@ -262,23 +262,26 @@ func LoadFromEnv() (*Config, error) {
 	}
 
 	if val := os.Getenv("HARVESTER_ENABLED"); val != "" {
-		if b, err := strconv.ParseBool(val); err == nil {
+		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
+		if b, err := strconv.ParseBool(cleanVal); err == nil {
 			cfg.HarvesterEnabled = b
 		}
 	}
 
 	if val := os.Getenv("HARVESTER_SCHEDULE_HOURS"); val != "" {
-		cfg.HarvesterScheduleHours = strings.TrimSpace(val)
+		cfg.HarvesterScheduleHours = strings.Trim(strings.TrimSpace(val), `"'`)
 	}
 
 	if val := os.Getenv("HARVESTER_RAIN_COOLDOWN_MINUTES"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
+		if v, err := strconv.Atoi(cleanVal); err == nil && v > 0 {
 			cfg.HarvesterRainCooldownMinutes = v
 		}
 	}
 
 	if val := os.Getenv("HARVESTER_CONCURRENCY"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
+		if v, err := strconv.Atoi(cleanVal); err == nil && v > 0 {
 			cfg.HarvesterConcurrency = v
 		}
 	}
@@ -660,7 +663,8 @@ func LoadConfig() *ServerConfig {
 
 	harvesterEnabled := false
 	if val := os.Getenv("HARVESTER_ENABLED"); val != "" {
-		if b, err := strconv.ParseBool(val); err == nil {
+		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
+		if b, err := strconv.ParseBool(cleanVal); err == nil {
 			harvesterEnabled = b
 		}
 	}
@@ -672,14 +676,16 @@ func LoadConfig() *ServerConfig {
 
 	harvesterRainCooldownMinutes := 60
 	if val := os.Getenv("HARVESTER_RAIN_COOLDOWN_MINUTES"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
+		if v, err := strconv.Atoi(cleanVal); err == nil && v > 0 {
 			harvesterRainCooldownMinutes = v
 		}
 	}
 
 	harvesterConcurrency := 15
 	if val := os.Getenv("HARVESTER_CONCURRENCY"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
+		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
+		if v, err := strconv.Atoi(cleanVal); err == nil && v > 0 {
 			harvesterConcurrency = v
 		}
 	}
