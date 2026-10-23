@@ -80,20 +80,27 @@ type labelCacheEntry struct {
 	cachedAt time.Time
 }
 
+type snapshotCacheEntry struct {
+	snapshots []SnapshotItem
+	cachedAt  time.Time
+}
+
 // Handler handles HTTP requests for archiver snapshot browsing, streaming, and labeling.
 type Handler struct {
-	store      storage.Storage
-	camLookup  CameraLookup
-	cacheMu    sync.RWMutex
-	labelCache map[string]labelCacheEntry
+	store         storage.Storage
+	camLookup     CameraLookup
+	cacheMu       sync.RWMutex
+	labelCache    map[string]labelCacheEntry
+	snapshotCache map[string]snapshotCacheEntry
 }
 
 // NewHandler creates a new archiver Handler.
 func NewHandler(store storage.Storage, camLookup CameraLookup) *Handler {
 	return &Handler{
-		store:      store,
-		camLookup:  camLookup,
-		labelCache: make(map[string]labelCacheEntry),
+		store:         store,
+		camLookup:     camLookup,
+		labelCache:    make(map[string]labelCacheEntry),
+		snapshotCache: make(map[string]snapshotCacheEntry),
 	}
 }
 
@@ -185,8 +192,8 @@ func (h *Handler) ListSnapshots(c *gin.Context) {
 	if l := c.Query("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
 			limit = parsed
-			if limit > 200 {
-				limit = 200
+			if limit > 50000 {
+				limit = 50000
 			}
 		}
 	}
@@ -198,78 +205,102 @@ func (h *Handler) ListSnapshots(c *gin.Context) {
 		}
 	}
 
-	items, err := h.store.List(c.Request.Context(), date)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list snapshots"})
-		return
-	}
-
 	var snapshots []SnapshotItem
-	for _, it := range items {
-		lower := strings.ToLower(it.Key)
-		if !strings.HasSuffix(lower, ".jpg") && !strings.HasSuffix(lower, ".jpeg") && !strings.HasSuffix(lower, ".png") {
-			continue
+	var total int
+
+	// Check in-memory cache when no camera filter is specified (TTL: 60s)
+	h.cacheMu.RLock()
+	cachedSnap, hasSnapCache := h.snapshotCache[date]
+	h.cacheMu.RUnlock()
+
+	if camFilter == "" && hasSnapCache && time.Since(cachedSnap.cachedAt) < 60*time.Second {
+		snapshots = cachedSnap.snapshots
+		total = len(snapshots)
+	} else {
+		items, err := h.store.List(c.Request.Context(), date)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list snapshots"})
+			return
 		}
 
-		parts := strings.Split(it.Key, "/")
-		if len(parts) < 3 {
-			continue
+		for _, it := range items {
+			lower := strings.ToLower(it.Key)
+			if !strings.HasSuffix(lower, ".jpg") && !strings.HasSuffix(lower, ".jpeg") && !strings.HasSuffix(lower, ".png") {
+				continue
+			}
+
+			parts := strings.Split(it.Key, "/")
+			if len(parts) < 3 {
+				continue
+			}
+
+			camID := parts[1]
+			if camFilter != "" && camID != camFilter {
+				continue
+			}
+
+			filename := parts[2]
+			dotIdx := strings.LastIndex(filename, ".")
+			nameNoExt := filename
+			if dotIdx != -1 {
+				nameNoExt = filename[:dotIdx]
+			}
+
+			fileParts := strings.SplitN(nameNoExt, "_", 2)
+			var ts int64
+			var reason string
+			if len(fileParts) >= 1 {
+				ts, _ = strconv.ParseInt(fileParts[0], 10, 64)
+			}
+			if len(fileParts) >= 2 {
+				reason = fileParts[1]
+			}
+
+			camName := ""
+			if h.camLookup != nil {
+				camName = h.camLookup.GetCameraTitle(camID)
+			}
+
+			rawURL := "/api/archiver/snapshots/raw?key=" + url.QueryEscape(it.Key)
+			var publicURL string
+			type publicURLProvider interface {
+				PublicURL(relPath string) string
+			}
+			if p, ok := h.store.(publicURLProvider); ok {
+				publicURL = p.PublicURL(it.Key)
+			}
+
+			snapshots = append(snapshots, SnapshotItem{
+				Key:        it.Key,
+				CameraID:   camID,
+				CameraName: camName,
+				Timestamp:  ts,
+				Reason:     reason,
+				Size:       it.Size,
+				RawURL:     rawURL,
+				PublicURL:  publicURL,
+			})
 		}
 
-		camID := parts[1]
-		if camFilter != "" && camID != camFilter {
-			continue
-		}
-
-		filename := parts[2]
-		dotIdx := strings.LastIndex(filename, ".")
-		nameNoExt := filename
-		if dotIdx != -1 {
-			nameNoExt = filename[:dotIdx]
-		}
-
-		fileParts := strings.SplitN(nameNoExt, "_", 2)
-		var ts int64
-		var reason string
-		if len(fileParts) >= 1 {
-			ts, _ = strconv.ParseInt(fileParts[0], 10, 64)
-		}
-		if len(fileParts) >= 2 {
-			reason = fileParts[1]
-		}
-
-		camName := ""
-		if h.camLookup != nil {
-			camName = h.camLookup.GetCameraTitle(camID)
-		}
-
-		rawURL := "/api/archiver/snapshots/raw?key=" + url.QueryEscape(it.Key)
-		var publicURL string
-		type publicURLProvider interface {
-			PublicURL(relPath string) string
-		}
-		if p, ok := h.store.(publicURLProvider); ok {
-			publicURL = p.PublicURL(it.Key)
-		}
-
-		snapshots = append(snapshots, SnapshotItem{
-			Key:        it.Key,
-			CameraID:   camID,
-			CameraName: camName,
-			Timestamp:  ts,
-			Reason:     reason,
-			Size:       it.Size,
-			RawURL:     rawURL,
-			PublicURL:  publicURL,
+		// Sort newest frames first
+		sort.Slice(snapshots, func(i, j int) bool {
+			return snapshots[i].Timestamp > snapshots[j].Timestamp
 		})
+
+		total = len(snapshots)
+
+		// Populate cache if camFilter is empty
+		if camFilter == "" {
+			h.cacheMu.Lock()
+			if h.snapshotCache != nil {
+				h.snapshotCache[date] = snapshotCacheEntry{
+					snapshots: snapshots,
+					cachedAt:  time.Now(),
+				}
+			}
+			h.cacheMu.Unlock()
+		}
 	}
-
-	// Sort newest frames first
-	sort.Slice(snapshots, func(i, j int) bool {
-		return snapshots[i].Timestamp > snapshots[j].Timestamp
-	})
-
-	total := len(snapshots)
 	pageSnapshots := []SnapshotItem{}
 	if offset < total {
 		end := offset + limit
@@ -307,6 +338,15 @@ func (h *Handler) GetSnapshotRaw(c *gin.Context) {
 	}
 
 	rc, err := h.store.Get(c.Request.Context(), key)
+	if err != nil && errors.Is(err, storage.ErrNotFound) {
+		// Dual-prefix fallback: Harvester uploads frames under "proofs/YYYY-MM-DD/...",
+		// while regular snapshot archiver uploads directly under "YYYY-MM-DD/...".
+		if !strings.HasPrefix(key, "proofs/") {
+			rc, err = h.store.Get(c.Request.Context(), "proofs/"+key)
+		} else {
+			rc, err = h.store.Get(c.Request.Context(), strings.TrimPrefix(key, "proofs/"))
+		}
+	}
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "snapshot not found"})

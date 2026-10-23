@@ -289,14 +289,14 @@ func TestDetermineWaterlineDepth(t *testing.T) {
 
 	t.Run("Light rain (< 5.0 mm/h)", func(t *testing.T) {
 		f, d, a, w := harvester.DetermineWaterlineDepth(&harvester.WeatherInfo{RainfallMm: 2.5, WeatherCode: 61})
-		if f != "NONE" || d != "WET_SURFACE" || a != "wet_asphalt_no_standing" || w != "rain" {
+		if f != "UNKNOWN" || d != "UNKNOWN" || a != "unknown" || w != "rain" {
 			t.Errorf("unexpected light rain values: f=%s d=%s a=%s w=%s", f, d, a, w)
 		}
 	})
 
 	t.Run("Heavy rain (>= 5.0 mm/h)", func(t *testing.T) {
 		f, d, a, w := harvester.DetermineWaterlineDepth(&harvester.WeatherInfo{RainfallMm: 12.0, WeatherCode: 65})
-		if f != "SHALLOW" || d != "TIRE_QUARTER_SUBMERGED" || a != "tire_base_under_10cm" || w != "heavy_rain" {
+		if f != "UNKNOWN" || d != "UNKNOWN" || a != "unknown" || w != "heavy_rain" {
 			t.Errorf("unexpected heavy rain values: f=%s d=%s a=%s w=%s", f, d, a, w)
 		}
 	})
@@ -485,8 +485,11 @@ func TestPipeline_HarvestCameras(t *testing.T) {
 	if manifest.Annotator != "auto_harvester" {
 		t.Errorf("expected annotator 'auto_harvester', got %q", manifest.Annotator)
 	}
-	if manifest.Labels.FloodSubmersionAnchor != "wet_asphalt_no_standing" {
-		t.Errorf("expected anchor 'wet_asphalt_no_standing', got %q", manifest.Labels.FloodSubmersionAnchor)
+	if manifest.Labels.FloodSubmersionAnchor != "unknown" {
+		t.Errorf("expected anchor 'unknown', got %q", manifest.Labels.FloodSubmersionAnchor)
+	}
+	if manifest.Labels.Flood != "UNKNOWN" {
+		t.Errorf("expected flood 'UNKNOWN', got %q", manifest.Labels.Flood)
 	}
 }
 
@@ -577,5 +580,63 @@ func TestCameraFiltering(t *testing.T) {
 	// cam_hotset (vo_van_kiet), cam_not_hotset (vo_van_kiet), and cam_flood (huynh_tan_phat)
 	if len(flood) != 3 {
 		t.Errorf("expected 3 flood corridor cameras, got %d", len(flood))
+	}
+}
+
+type slowSnapshotFetcher struct {
+	delay time.Duration
+}
+
+func (s *slowSnapshotFetcher) FetchSnapshot(ctx context.Context, cam harvester.Camera) ([]byte, error) {
+	select {
+	case <-time.After(s.delay):
+		return generateMockJPEG(25000), nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func TestHarvester_ContextCancellationCleanShutdown(t *testing.T) {
+	loc := time.FixedZone("ICT", 7*3600)
+
+	// Fetcher takes 20ms per snapshot to simulate network delay
+	fetcher := &slowSnapshotFetcher{delay: 20 * time.Millisecond}
+	predictor := &mockVisionPredictor{}
+	storage := newMockStorageUploader()
+
+	// Concurrency = 2, total cameras = 20
+	pipeline := harvester.NewPipeline(fetcher, predictor, storage, 2, loc)
+
+	cameras := make([]harvester.Camera, 20)
+	for i := 0; i < 20; i++ {
+		cameras[i] = harvester.Camera{
+			ID:          fmt.Sprintf("cam_%d", i),
+			DisplayName: fmt.Sprintf("Camera %d", i),
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel context after 15ms while workers are active and others are queued on semaphore
+	go func() {
+		time.Sleep(15 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	successCount, err := pipeline.HarvestCameras(ctx, cameras, harvester.ScopeScheduled, nil)
+	duration := time.Since(start)
+
+	if err == nil || err != context.Canceled {
+		t.Errorf("expected context.Canceled, got %v", err)
+	}
+
+	// Must exit promptly (< 200ms) rather than running all 20 cameras sequentially/concurrently
+	if duration > 200*time.Millisecond {
+		t.Errorf("shutdown took too long: %v (expected < 200ms)", duration)
+	}
+
+	if successCount >= 20 {
+		t.Errorf("expected fewer than 20 successful harvests, got %d", successCount)
 	}
 }

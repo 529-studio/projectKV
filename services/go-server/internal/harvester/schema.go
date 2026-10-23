@@ -55,6 +55,7 @@ var (
 		"NONE":    {},
 		"SHALLOW": {},
 		"DEEP":    {},
+		"UNKNOWN": {},
 	}
 
 	validCarriageway = map[string]struct{}{
@@ -77,6 +78,7 @@ var (
 		"TIRE_QUARTER_SUBMERGED": {},
 		"TIRE_HALF_SUBMERGED":    {},
 		"IMPASSABLE":             {},
+		"UNKNOWN":                {},
 	}
 
 	validFloodSubmersionAnchor = map[string]struct{}{
@@ -84,6 +86,7 @@ var (
 		"wet_asphalt_no_standing": {},
 		"tire_base_under_10cm":    {},
 		"exhaust_hub_over_15cm":   {},
+		"unknown":                 {},
 	}
 
 	validTimeOfDay = map[string]struct{}{

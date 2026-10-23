@@ -147,12 +147,12 @@ def determine_time_of_day(dt: datetime) -> str:
 def determine_waterline_depth(weather: str, rainfall_mm: float = 0.0) -> Tuple[str, str, str]:
     """
     Maps meteorological condition and rainfall amount to physical waterline depth anchors.
+    Deprecated: weather-based flood/depth guessing causes answer key pollution (Lesson 39).
+    When active rain is detected, flood and depth default to UNKNOWN pending vision/human verification.
     Returns: (flood_severity, waterline_depth, flood_submersion_anchor).
     """
-    if weather == "heavy_rain" or rainfall_mm >= 5.0:
-        return "SHALLOW", "TIRE_QUARTER_SUBMERGED", "tire_base_under_10cm"
-    elif weather == "rain" or rainfall_mm >= 0.10:
-        return "NONE", "WET_SURFACE", "wet_asphalt_no_standing"
+    if weather == "heavy_rain" or rainfall_mm >= 5.0 or weather == "rain" or rainfall_mm >= 0.10:
+        return "UNKNOWN", "UNKNOWN", "unknown"
     return "NONE", "DRY", "dry"
 
 

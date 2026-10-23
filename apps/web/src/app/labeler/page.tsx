@@ -27,6 +27,7 @@ import {
   type SnapshotItem,
 } from '@/utils/labelerUtils';
 import { getApiUrl } from '@/config/constants';
+import { useCameras } from '@/hooks/useCameras';
 
 export default function LabelerPage() {
   const [locale, setLocale] = useState<'vi' | 'en'>('vi');
@@ -42,6 +43,8 @@ export default function LabelerPage() {
 
   const [dates, setDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
+  const [page, setPage] = useState<number>(1);
+  const [totalSnapshots, setTotalSnapshots] = useState<number>(0);
   const [annotator, setAnnotator] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<LabelFilterStatus>('all');
   const [snapshots, setSnapshots] = useState<SnapshotItem[]>([]);
@@ -52,6 +55,15 @@ export default function LabelerPage() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  const { cameras } = useCameras();
+  const cameraMap = useMemo(() => {
+    const map = new Map<string, string>();
+    cameras.forEach((c) => {
+      map.set(c.id, c.displayName || c.title || c.id);
+    });
+    return map;
+  }, [cameras]);
 
   // Initialize auth on mount: Probe Cloudflare Zero Trust first, fallback to stored dev token
   useEffect(() => {
@@ -142,7 +154,7 @@ export default function LabelerPage() {
     loadDates();
   }, [isAuthenticated, devToken, selectedDate, t.devInvalidToken]);
 
-  // Fetch snapshots and existing labels when selectedDate changes (only when authenticated)
+  // Fetch snapshots and existing labels when selectedDate or page changes (only when authenticated)
   useEffect(() => {
     if (!isAuthenticated || !selectedDate) return;
 
@@ -151,8 +163,9 @@ export default function LabelerPage() {
 
     async function loadCatalog() {
       try {
+        const offset = (page - 1) * 200;
         const [snapRes, labelRes] = await Promise.all([
-          fetch(getApiUrl(`/api/archiver/snapshots?date=${selectedDate}&limit=200`), {
+          fetch(getApiUrl(`/api/archiver/snapshots?date=${selectedDate}&offset=${offset}&limit=200`), {
             headers: buildAuthHeaders(devToken),
             credentials: 'include',
           }),
@@ -175,6 +188,9 @@ export default function LabelerPage() {
         if (snapRes.ok) {
           const snapData = await snapRes.json();
           setSnapshots(snapData.snapshots || []);
+          if (typeof snapData.total === 'number') {
+            setTotalSnapshots(snapData.total);
+          }
           setCurrentIndex(0);
         }
 
@@ -201,31 +217,36 @@ export default function LabelerPage() {
     return () => {
       isSubscribed = false;
     };
-  }, [isAuthenticated, devToken, selectedDate, t.devInvalidToken, refreshTrigger]);
+  }, [isAuthenticated, devToken, selectedDate, page, t.devInvalidToken, refreshTrigger]);
 
   const filteredSnapshots = useMemo(() => {
-    return filterSnapshots(snapshots, labels, filterStatus);
-  }, [snapshots, labels, filterStatus]);
+    return filterSnapshots(snapshots, labels, filterStatus, (id) => cameraMap.get(id));
+  }, [snapshots, labels, filterStatus, cameraMap]);
 
   const counts = useMemo(() => {
     let pendingAuto = 0;
     let approvedHuman = 0;
-    snapshots.forEach((s) => {
-      const l = labels[s.key];
-      if (l) {
-        if (isAutoHarvested(l)) {
-          pendingAuto++;
-        } else {
-          approvedHuman++;
-        }
+    Object.values(labels).forEach((l) => {
+      if (isAutoHarvested(l)) {
+        pendingAuto++;
+      } else {
+        approvedHuman++;
       }
     });
     return {
-      all: snapshots.length,
+      all: totalSnapshots || snapshots.length,
       pendingAuto,
       approvedHuman,
     };
-  }, [snapshots, labels]);
+  }, [totalSnapshots, snapshots.length, labels]);
+
+  const totalPages = Math.max(1, Math.ceil((totalSnapshots || snapshots.length) / 200));
+
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
+    setPage(1);
+    setCurrentIndex(0);
+  };
 
   // Clamp currentIndex if filteredSnapshots shrinks or changes
   useEffect(() => {
@@ -546,10 +567,6 @@ export default function LabelerPage() {
     setAuthError(null);
   };
 
-  const labeledCount = useMemo(() => {
-    return snapshots.filter((s) => labels[s.key]).length;
-  }, [snapshots, labels]);
-
   if (!isAuthenticated) {
     return (
       <div className="h-screen w-full overflow-hidden bg-black text-zinc-100 flex flex-col font-sans select-none">
@@ -707,7 +724,7 @@ export default function LabelerPage() {
             <span>{t.dateSelect}:</span>
             <select
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => handleDateChange(e.target.value)}
               className="bg-black border border-zinc-700 text-zinc-100 px-2 py-1 rounded focus:outline-none focus:border-zinc-500"
             >
               {dates.map((d) => (
@@ -740,7 +757,7 @@ export default function LabelerPage() {
                   : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              {t.filterAll} ({counts.all})
+              {t.filterAll} ({counts.all.toLocaleString()})
             </button>
             <button
               type="button"
@@ -751,7 +768,7 @@ export default function LabelerPage() {
                   : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              {t.filterPendingAuto} ({counts.pendingAuto})
+              {t.filterPendingAuto} ({counts.pendingAuto.toLocaleString()})
             </button>
             <button
               type="button"
@@ -762,15 +779,52 @@ export default function LabelerPage() {
                   : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              {t.filterApprovedHuman} ({counts.approvedHuman})
+              {t.filterApprovedHuman} ({counts.approvedHuman.toLocaleString()})
             </button>
           </div>
+
+          {/* Pagination for All Snapshots */}
+          {filterStatus === 'all' && totalPages > 1 && (
+            <div className="flex items-center gap-1 font-mono text-xs border border-zinc-800 rounded px-1.5 py-0.5 bg-black">
+              <button
+                type="button"
+                onClick={() => {
+                  setPage((p) => Math.max(1, p - 1));
+                  setCurrentIndex(0);
+                }}
+                disabled={page <= 1 || isLoading}
+                className="px-1.5 py-0.5 text-zinc-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded"
+                title={t.prevPage}
+              >
+                ← {t.prevPage}
+              </button>
+              <span className="text-zinc-400 px-1 text-[11px]">
+                {t.pageDisplay} {page}/{totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setPage((p) => Math.min(totalPages, p + 1));
+                  setCurrentIndex(0);
+                }}
+                disabled={page >= totalPages || isLoading}
+                className="px-1.5 py-0.5 text-zinc-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded"
+                title={t.nextPage}
+              >
+                {t.nextPage} →
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-4 text-zinc-400 font-mono">
           <span>
-            {t.progress}: {labeledCount} / {snapshots.length} (
-            {snapshots.length > 0 ? Math.round((labeledCount / snapshots.length) * 100) : 0}%)
+            {t.progress}:{' '}
+            {filterStatus === 'pending_auto'
+              ? `${filteredSnapshots.length > 0 ? currentIndex + 1 : 0} / ${filteredSnapshots.length.toLocaleString()}`
+              : `${counts.approvedHuman.toLocaleString()} / ${counts.all.toLocaleString()} (${
+                  counts.all > 0 ? Math.round((counts.approvedHuman / counts.all) * 100) : 0
+                }%)`}
           </span>
           {saveStatus === 'saved' && (
             <span className="text-zinc-200 bg-zinc-800 px-2 py-0.5 rounded text-[11px]">

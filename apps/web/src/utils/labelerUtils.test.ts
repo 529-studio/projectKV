@@ -164,6 +164,9 @@ describe('Labeler Utilities & Hotkeys (Issue #214 / S7-T8 Directional Taxonomy)'
     assert.equal(isAutoHarvested({ annotator: 'harvester/auto' }), true);
     assert.equal(isAutoHarvested({ annotator: 'harvester/cv-engine' }), true);
     assert.equal(isAutoHarvested({ annotator: 'HARVESTER/AUTO' }), true);
+    assert.equal(isAutoHarvested({ annotator: 'opencode_auto' }), true);
+    assert.equal(isAutoHarvested({ annotator: 'auto_harvester' }), true);
+    assert.equal(isAutoHarvested({ annotator: 'auto' }), true);
   });
 
   test('filterSnapshots partitions queue into all, pending_auto, and approved_human', () => {
@@ -200,6 +203,15 @@ describe('Labeler Utilities & Hotkeys (Issue #214 / S7-T8 Directional Taxonomy)'
         timestamp: 103,
         flood_level: 'deep',
       },
+      // snap_5 is NOT in loaded snapshots page but present in labels catalog (Issue #289 / Queue Desync)
+      'snap_5.jpg': {
+        snapshot_key: 'snap_5.jpg',
+        camera_id: 'cam_5',
+        date: '2026-10-18',
+        annotator: 'opencode_auto',
+        timestamp: 105,
+        flood_level: 'none',
+      },
     };
 
     // Filter: all
@@ -207,11 +219,16 @@ describe('Labeler Utilities & Hotkeys (Issue #214 / S7-T8 Directional Taxonomy)'
     const all = filterSnapshots(snapshots, labels, filterAll);
     assert.equal(all.length, 4);
 
-    // Filter: pending_auto (auto-harvested candidates awaiting human review)
+    // Filter: pending_auto (merges auto candidates from snapshots + labels catalog)
     const filterPending: LabelFilterStatus = 'pending_auto';
-    const pendingAuto = filterSnapshots(snapshots, labels, filterPending);
-    assert.equal(pendingAuto.length, 2);
-    assert.deepEqual(pendingAuto.map((s) => s.key), ['snap_1.jpg', 'snap_4.jpg']);
+    const pendingAuto = filterSnapshots(snapshots, labels, filterPending, (id) => `Camera ${id}`);
+    assert.equal(pendingAuto.length, 3);
+    assert.deepEqual(pendingAuto.map((s) => s.key), ['snap_1.jpg', 'snap_4.jpg', 'snap_5.jpg']);
+    // Verify synthesized snapshot has valid raw_url and camera name
+    const extraSnap = pendingAuto.find((s) => s.key === 'snap_5.jpg');
+    assert.ok(extraSnap);
+    assert.equal(extraSnap.camera_name, 'Camera cam_5');
+    assert.equal(extraSnap.raw_url, '/api/archiver/snapshots/raw?key=snap_5.jpg');
 
     // Filter: approved_human (gold-standard labels reviewed/created by humans)
     const filterApproved: LabelFilterStatus = 'approved_human';
