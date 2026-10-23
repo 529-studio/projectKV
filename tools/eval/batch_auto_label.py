@@ -88,6 +88,31 @@ def load_dotenv_fallback():
             break
 
 
+def get_r2_client():
+    """Initializes and returns boto3 S3 client for Cloudflare R2 if available."""
+    try:
+        import boto3
+        from botocore.config import Config
+    except ImportError:
+        return None
+
+    endpoint = os.getenv("R2_ENDPOINT", "")
+    access_key = os.getenv("R2_ACCESS_KEY_ID", "")
+    secret_key = os.getenv("R2_SECRET_ACCESS_KEY", "")
+
+    if not endpoint or not access_key or not secret_key:
+        return None
+
+    return boto3.client(
+        service_name="s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name="auto",
+        config=Config(s3={"addressing_style": "path"}, max_pool_connections=50),
+    )
+
+
 def send_http_request_with_retry(
     req: urllib.request.Request,
     limiter: Optional[TokenBucketRateLimiter] = None,
@@ -235,8 +260,27 @@ def main():
         action="store_true",
         help="Deduplicate by camera_id, labeling only the latest snapshot per camera",
     )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Process ALL remaining unlabeled snapshots for the date (equivalent to --limit 0)",
+    )
+    parser.add_argument(
+        "--direct-r2",
+        action="store_true",
+        default=True,
+        help="Use direct Cloudflare R2 listing, streaming, and uploading when credentials are present (default: True)",
+    )
+    parser.add_argument(
+        "--no-direct-r2",
+        action="store_false",
+        dest="direct_r2",
+        help="Force using Go Backend HTTP API instead of direct Cloudflare R2",
+    )
 
     args = parser.parse_args()
+    if args.all:
+        args.limit = 0
 
     headers = {}
     if args.dev_token:
@@ -244,7 +288,13 @@ def main():
 
     limiter = TokenBucketRateLimiter(rps=args.rps, burst=15.0)
 
-    logging.info(f"Connecting to API at {args.api_url} for date {args.date} (Pacing: {args.rps} RPS)...")
+    s3_client = get_r2_client() if args.direct_r2 else None
+    bucket = os.getenv("R2_BUCKET", "warded-proofs")
+
+    if s3_client:
+        logging.info(f"Direct Cloudflare R2 acceleration active (bucket={bucket})...")
+    else:
+        logging.info(f"Connecting to API at {args.api_url} for date {args.date} (Pacing: {args.rps} RPS)...")
 
     # 1. Fetch existing labels
     labels_url = f"{args.api_url.rstrip('/')}/api/archiver/labels?date={args.date}"
@@ -258,20 +308,47 @@ def main():
             if key:
                 existing_labeled_keys.add(key)
     except Exception as e:
-        logging.warning(f"Could not fetch existing labels: {e}")
+        logging.warning(f"Could not fetch existing labels via API: {e}")
 
     logging.info(f"Found {len(existing_labeled_keys)} already labeled snapshots for {args.date}.")
 
     # 2. Fetch raw snapshots
-    snaps_url = f"{args.api_url.rstrip('/')}/api/archiver/snapshots?date={args.date}&limit={args.limit}"
-    req = urllib.request.Request(snaps_url, headers=headers)
-    try:
-        _, body, _ = send_http_request_with_retry(req, limiter=limiter, timeout=60.0)
-        data = json.loads(body.decode("utf-8"))
-        snapshots = data.get("snapshots", [])
-    except Exception as e:
-        logging.error(f"Failed to fetch snapshots from {snaps_url}: {e}")
-        sys.exit(1)
+    snapshots: List[Dict[str, Any]] = []
+    if s3_client:
+        logging.info(f"Listing raw snapshots directly from Cloudflare R2 under prefix '{args.date}/'...")
+        paginator = s3_client.get_paginator("list_objects_v2")
+        for prefix in [f"{args.date}/", f"proofs/{args.date}/"]:
+            for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+                for obj in page.get("Contents", []):
+                    k = obj["Key"]
+                    if not k.lower().endswith((".jpg", ".jpeg", ".png")):
+                        continue
+                    parts = k.split("/")
+                    if len(parts) >= 3:
+                        cam_id = parts[1] if parts[0] != "proofs" else parts[2]
+                        filename = parts[-1]
+                        name_no_ext = os.path.splitext(filename)[0]
+                        file_parts = name_no_ext.split("_", 1)
+                        ts = int(file_parts[0]) if file_parts[0].isdigit() else int(time.time())
+                        reason = file_parts[1] if len(file_parts) > 1 else "sample"
+                        snapshots.append({
+                            "key": k,
+                            "camera_id": cam_id,
+                            "timestamp": ts,
+                            "reason": reason,
+                            "size": obj["Size"],
+                        })
+        snapshots.sort(key=lambda s: s.get("timestamp", 0), reverse=True)
+    else:
+        snaps_url = f"{args.api_url.rstrip('/')}/api/archiver/snapshots?date={args.date}&limit={args.limit if args.limit > 0 else 50000}"
+        req = urllib.request.Request(snaps_url, headers=headers)
+        try:
+            _, body, _ = send_http_request_with_retry(req, limiter=limiter, timeout=60.0)
+            data = json.loads(body.decode("utf-8"))
+            snapshots = data.get("snapshots", [])
+        except Exception as e:
+            logging.error(f"Failed to fetch snapshots from {snaps_url}: {e}")
+            sys.exit(1)
 
     unlabeled = [s for s in snapshots if s.get("key") not in existing_labeled_keys]
 
@@ -287,6 +364,9 @@ def main():
             f"Deduplicated to {len(deduped)} unique camera snapshot(s) from {len(unlabeled)} candidates."
         )
         unlabeled = deduped
+
+    if args.limit > 0:
+        unlabeled = unlabeled[:args.limit]
 
     logging.info(
         f"Retrieved {len(snapshots)} snapshots ({len(unlabeled)} pending labeling, {len(snapshots) - len(unlabeled)} already labeled)."
@@ -310,14 +390,27 @@ def main():
         if not key or not cam_id:
             return False
 
-        # Download raw frame with rate-limiting and retry
-        raw_url = f"{args.api_url.rstrip('/')}/api/archiver/snapshots/raw?key={urllib.parse.quote(key)}"
-        req_raw = urllib.request.Request(raw_url, headers=headers)
-        try:
-            _, frame_bytes, _ = send_http_request_with_retry(req_raw, limiter=limiter)
-        except Exception as e:
-            logging.warning(f"Failed to fetch raw image {key}: {e}")
-            return False
+        # Download raw frame
+        if s3_client:
+            frame_bytes = None
+            for attempt in range(3):
+                try:
+                    resp = s3_client.get_object(Bucket=bucket, Key=key)
+                    frame_bytes = resp["Body"].read()
+                    break
+                except Exception as e:
+                    if attempt == 2:
+                        logging.warning(f"Failed to read image {key} from R2: {e}")
+                        return False
+                    time.sleep(0.5 * (attempt + 1))
+        else:
+            raw_url = f"{args.api_url.rstrip('/')}/api/archiver/snapshots/raw?key={urllib.parse.quote(key)}"
+            req_raw = urllib.request.Request(raw_url, headers=headers)
+            try:
+                _, frame_bytes, _ = send_http_request_with_retry(req_raw, limiter=limiter)
+            except Exception as e:
+                logging.warning(f"Failed to fetch raw image {key}: {e}")
+                return False
 
         # Send to OpenVINO CV engine
         pred = detect_vehicles(frame_bytes, cv_engine_url=args.cv_engine_url)
@@ -327,6 +420,7 @@ def main():
         cur_hour = time.localtime().tm_hour
         tod = "day" if 6 <= cur_hour < 18 else "night"
 
+        ts = snap.get("timestamp") or int(time.time())
         payload = {
             "date": args.date,
             "camera_id": cam_id,
@@ -341,22 +435,42 @@ def main():
             "weather": "dry",
             "time_of_day": tod,
             "notes": f"Auto-labeled by {args.annotator} (OpenVINO detected {pred['vehicles_detected']} vehicles)",
-            "timestamp": int(time.time()),
+            "timestamp": ts,
         }
 
-        # Save label via API with rate-limiting and retry
-        req_post = urllib.request.Request(
-            post_url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={**headers, "Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            status, _, _ = send_http_request_with_retry(req_post, limiter=limiter)
-            return status in (200, 201)
-        except Exception as e:
-            logging.warning(f"Failed to save label for {key}: {e}")
-            return False
+        # Save label
+        if s3_client:
+            clean_cam = os.path.basename(cam_id.strip()).replace("/", "_").replace("\\", "_")
+            clean_annotator = os.path.basename(args.annotator.strip()).replace("/", "_").replace("\\", "_")
+            label_key = f"labels/{args.date}/{clean_cam}_{clean_annotator}_{ts}.json"
+            label_bytes = json.dumps(payload, indent=2).encode("utf-8")
+            for attempt in range(3):
+                try:
+                    s3_client.put_object(
+                        Bucket=bucket,
+                        Key=label_key,
+                        Body=label_bytes,
+                        ContentType="application/json",
+                    )
+                    return True
+                except Exception as e:
+                    if attempt == 2:
+                        logging.warning(f"Failed to upload label to R2 for {key}: {e}")
+                        return False
+                    time.sleep(0.5 * (attempt + 1))
+        else:
+            req_post = urllib.request.Request(
+                post_url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={**headers, "Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                status, _, _ = send_http_request_with_retry(req_post, limiter=limiter)
+                return status in (200, 201)
+            except Exception as e:
+                logging.warning(f"Failed to save label for {key}: {e}")
+                return False
 
     start_time = time.time()
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency) as executor:
@@ -368,9 +482,14 @@ def main():
             else:
                 fail_count += 1
 
-            if processed_count % 25 == 0 or processed_count == total_unlabeled:
+            if processed_count % 100 == 0 or processed_count == total_unlabeled:
+                elapsed_now = max(0.01, time.time() - start_time)
+                rate = processed_count / elapsed_now
+                eta_sec = (total_unlabeled - processed_count) / max(0.1, rate)
                 logging.info(
-                    f"Progress: {processed_count}/{total_unlabeled} processed ({success_count} succeeded, {fail_count} failed)..."
+                    f"Progress: {processed_count}/{total_unlabeled} ({processed_count*100//total_unlabeled}%) | "
+                    f"Speed: {rate:.1f} snaps/sec | ETA: {int(eta_sec//60)}m{int(eta_sec%60):02d}s | "
+                    f"Success: {success_count}, Failed: {fail_count}"
                 )
 
     elapsed = time.time() - start_time
