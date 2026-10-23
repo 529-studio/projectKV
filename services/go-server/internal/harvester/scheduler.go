@@ -26,6 +26,7 @@ func (ts TimeSlot) String() string {
 // Integer hours automatically default to calibrated peak commuter minutes (07:30, 12:00, 17:30).
 func ParseScheduleSlots(raw string) []TimeSlot {
 	raw = strings.TrimSpace(raw)
+	raw = strings.Trim(raw, `"'`)
 	if raw == "" {
 		raw = "07:30,12:00,17:30"
 	}
@@ -35,6 +36,7 @@ func ParseScheduleSlots(raw string) []TimeSlot {
 
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
+		p = strings.Trim(p, `"'`)
 		if p == "" {
 			continue
 		}

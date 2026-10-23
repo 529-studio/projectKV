@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label
 
 help:
 	@echo "========================================================"
@@ -21,6 +21,7 @@ help:
 	@echo "  make install         - Install dependencies & activate git hooks"
 	@echo "  make setup-hooks     - Activate git pre-push hook (blocks direct push to main/dev)"
 	@echo "  make auto-harvest    - Run automated frame harvester CLI (S7-T7c)"
+	@echo "  make batch-auto-label - Auto-label raw archiver snapshots via OpenVINO"
 	@echo "  make crawl           - Update camera dataset from traffic portal"
 	@echo "  make geo-enrich      - Run batch Phường point-in-polygon enrichment"
 	@echo "  make normalize-roads - Run road name normalization (road_key)"
@@ -123,6 +124,10 @@ dataset-progress:
 
 auto-harvest:
 	python3 tools/eval/auto_harvest.py --scope hotset --weather auto
+
+batch-auto-label:
+	python3 tools/eval/batch_auto_label.py --limit 200
+
 
 docker-build:
 	docker build -t warded-stg:latest .

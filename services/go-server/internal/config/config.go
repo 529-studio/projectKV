@@ -667,7 +667,7 @@ func LoadConfig() *ServerConfig {
 
 	harvesterScheduleHours := "7,12,17"
 	if val := os.Getenv("HARVESTER_SCHEDULE_HOURS"); val != "" {
-		harvesterScheduleHours = strings.TrimSpace(val)
+		harvesterScheduleHours = strings.Trim(strings.TrimSpace(val), `"'`)
 	}
 
 	harvesterRainCooldownMinutes := 60

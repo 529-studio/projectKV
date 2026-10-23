@@ -382,7 +382,7 @@ def synthesize_label(
         quality_tags.append("rain_on_lens")
 
     date_str = dt.strftime("%Y-%m-%d")
-    image_rel_path = f"feedback/{date_str}/{camera_id}_{ts}.jpg"
+    image_rel_path = f"{date_str}/{camera_id}/{ts}_sample.jpg"
 
     return {
         "frame_id": f"{camera_id}_{ts}",
