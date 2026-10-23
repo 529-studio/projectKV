@@ -307,6 +307,15 @@ func (h *Handler) GetSnapshotRaw(c *gin.Context) {
 	}
 
 	rc, err := h.store.Get(c.Request.Context(), key)
+	if err != nil && errors.Is(err, storage.ErrNotFound) {
+		// Dual-prefix fallback: Harvester uploads frames under "proofs/YYYY-MM-DD/...",
+		// while regular snapshot archiver uploads directly under "YYYY-MM-DD/...".
+		if !strings.HasPrefix(key, "proofs/") {
+			rc, err = h.store.Get(c.Request.Context(), "proofs/"+key)
+		} else {
+			rc, err = h.store.Get(c.Request.Context(), strings.TrimPrefix(key, "proofs/"))
+		}
+	}
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "snapshot not found"})

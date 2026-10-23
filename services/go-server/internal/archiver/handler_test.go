@@ -181,6 +181,40 @@ func TestHandler_GetSnapshotRaw(t *testing.T) {
 			t.Fatalf("expected 400 for path traversal, got %d", w.Code)
 		}
 	})
+
+	t.Run("Dual Prefix Fallback - Harvester Frame with proofs/", func(t *testing.T) {
+		harvesterContent := []byte("HARVESTER_FRAME_JPEG")
+		_ = store.Put(ctx, "proofs/2026-10-11/cam_harvester/1791560000_sample.jpg", bytes.NewReader(harvesterContent))
+
+		// Client queries without proofs/ prefix
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/api/archiver/snapshots/raw?key=2026-10-11/cam_harvester/1791560000_sample.jpg", nil)
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 via fallback, got %d", w.Code)
+		}
+		if !bytes.Equal(w.Body.Bytes(), harvesterContent) {
+			t.Errorf("body mismatch: expected %q, got %q", harvesterContent, w.Body.Bytes())
+		}
+	})
+
+	t.Run("Dual Prefix Fallback - Archiver Frame queried with proofs/", func(t *testing.T) {
+		archiverContent := []byte("ARCHIVER_FRAME_JPEG")
+		_ = store.Put(ctx, "2026-10-11/cam_archiver/1791560000_sample.jpg", bytes.NewReader(archiverContent))
+
+		// Client queries with proofs/ prefix
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/api/archiver/snapshots/raw?key=proofs/2026-10-11/cam_archiver/1791560000_sample.jpg", nil)
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 via reverse fallback, got %d", w.Code)
+		}
+		if !bytes.Equal(w.Body.Bytes(), archiverContent) {
+			t.Errorf("body mismatch: expected %q, got %q", archiverContent, w.Body.Bytes())
+		}
+	})
 }
 
 func TestHandler_SaveAndGetLabels(t *testing.T) {

@@ -2,7 +2,7 @@
 
 **Project:** ProjectKV (Ho Chi Minh City Real-Time Urban Traffic & Flood Monitoring)  
 **System Name:** Warded (`warded-backend`, `warded-frontend`, `warded-model`)  
-**Document Version:** 1.3.1  
+**Document Version:** 1.3.2  
 **Last Updated:** 2026-10-23  
 
 
@@ -26,10 +26,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Current Operational Metrics & Repository Status
 
-- **Lifetime PR History**: Exactly **161 Pull Requests** processed across repository history:
-  - **153 Merged** to `dev` (including Sprint 4–6 PRs, Sprint 7 deliverables, PR #270 Sprint 7 Completion Report, PR #272 S8-T1 Doppler Rain Radar Pipeline Overhaul, PR #273 S7-T4 Feedback R2 Archiver, PR #274 S7-T7c Standalone Harvester CLI, PR #275 S7-T7d Web Labeler Candidate Review, PR #280 S8 Optimize ListDates, PR #282 Cloudflare Zero Trust Dev Token Fallback, and PR #284 Waterway Bridge Footing Camera Exclusion)
+- **Lifetime PR History**: Exactly **163 Pull Requests** processed across repository history:
+  - **153 Merged** to `dev` (including Sprint 4–6 PRs, Sprint 7 deliverables, PR #270 Sprint 7 Completion Report, PR #272 S8-T1 Doppler Rain Radar Pipeline Overhaul, PR #273 S7-T4 Feedback R2 Archiver, PR #274 S7-T7c Standalone Harvester CLI, PR #275 S7-T7d Web Labeler Candidate Review, PR #280 S8 Optimize ListDates, PR #282 Cloudflare Zero Trust Dev Token Fallback, PR #284 Waterway Bridge Footing Camera Exclusion, PR #286 Archiver/Labeler In-Memory Cache and Resilient Batch Auto-Labeler)
   - **8 Closed** without merging
-  - **0 Open** PRs pending
+  - **2 Open** PRs pending: PR #291 (`docs/s8-adr-010-and-execution-guide`) and PR #292 (`fix/s8-t5-harvester-semaphore-deadlock`, S8-T5 deadlock fix, weather guessing deprecation, and web labeler candidate review queue desync resolution)
 - **Staging Infrastructure Configuration (Stack 14)**:
   - `docker-compose.stg.yml` explicitly parameterizes `APP_ENV=${APP_ENV:-staging}` to prevent `GIN_MODE=release` from defaulting environment to `production` and triggering safety crashes during mock/staging runs.
   - Aligned with `.env.stg.example` template as the authoritative single source of truth for Portainer CD redeploy jobs.
