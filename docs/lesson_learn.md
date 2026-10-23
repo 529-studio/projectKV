@@ -972,9 +972,12 @@
   2. **Client-Side Token Bucket Rate Limiting**:
      - Upgraded `tools/eval/batch_auto_label.py` with an 8.0 RPS Token Bucket rate limiter, exponential backoff respecting HTTP 429 `Retry-After` headers, and frame deduplication (`--unique-cameras`).
      - Exposed standard shortcut `make batch-auto-label` in root `Makefile`.
-  3. **Config Quote Sanitization**:
+  3. **Config Quote & Whitespace Sanitization**:
      - Added `strings.Trim(slot, "\"' \t")` in `internal/harvester/scheduler.go` and `internal/config/config.go` with unit test validation.
-  4. **Ergonomic Web Labeler UI**:
+     - Stripped trailing whitespace in `config.go` before `strconv.ParseBool` and `strconv.Atoi`, preventing invisible trailing spaces in `.env` from silently discarding `HARVESTER_ENABLED=true` into `false`.
+  4. **Boot Visibility & Observability**:
+     - Added explicit `[INIT] Autonomous harvester enabled (...)` and `[INIT] Autonomous harvester disabled (...)` logging in `cmd/server/main.go` on server boot, eliminating silent subsystems.
+  5. **Ergonomic Web Labeler UI**:
      - Constrained layout to `100vh - 49px` with independent sidebar scrolling in `apps/web/src/app/labeler/page.tsx`.
      - Added dedicated "Làm Mới (Refresh)" button allowing instant catalog reload without browser F5.
 
