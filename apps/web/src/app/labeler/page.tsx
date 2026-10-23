@@ -51,6 +51,7 @@ export default function LabelerPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   // Initialize auth on mount: Probe Cloudflare Zero Trust first, fallback to stored dev token
   useEffect(() => {
@@ -200,7 +201,7 @@ export default function LabelerPage() {
     return () => {
       isSubscribed = false;
     };
-  }, [isAuthenticated, devToken, selectedDate, t.devInvalidToken]);
+  }, [isAuthenticated, devToken, selectedDate, t.devInvalidToken, refreshTrigger]);
 
   const filteredSnapshots = useMemo(() => {
     return filterSnapshots(snapshots, labels, filterStatus);
@@ -665,6 +666,16 @@ export default function LabelerPage() {
             className="text-xs font-mono px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 hover:text-white hover:border-zinc-500 transition"
           >
             {locale.toUpperCase()}
+          </button>
+
+          {/* Refresh Data Button */}
+          <button
+            type="button"
+            onClick={() => setRefreshTrigger((c) => c + 1)}
+            disabled={isLoading}
+            className="text-xs font-medium px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-zinc-200 transition"
+          >
+            {isLoading ? '...' : t.refreshData}
           </button>
 
           {/* Export JSON Button */}
