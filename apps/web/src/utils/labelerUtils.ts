@@ -214,7 +214,12 @@ export function formatSnapshotTimestamp(timestamp: number): string {
 export function isAutoHarvested(label?: Partial<LabelPayload> | null): boolean {
   if (!label || !label.annotator) return false;
   const annotator = label.annotator.trim().toLowerCase();
-  return annotator.startsWith('harvester/') || annotator === 'harvester/auto';
+  return (
+    annotator.startsWith('harvester/') ||
+    annotator === 'harvester/auto' ||
+    annotator === 'auto_harvester' ||
+    annotator === 'auto'
+  );
 }
 
 /**

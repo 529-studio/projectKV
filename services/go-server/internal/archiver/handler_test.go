@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -232,5 +233,76 @@ func TestHandler_SaveAndGetLabels(t *testing.T) {
 	}
 	if labelsResp.Labels[0].TrafficLevel != "heavy" {
 		t.Errorf("expected traffic_level heavy, got %s", labelsResp.Labels[0].TrafficLevel)
+	}
+}
+
+func TestHandler_GetLabels_WithHarvesterGroundTruthManifest(t *testing.T) {
+	router, store := setupTestRouter(t)
+
+	// Save GroundTruthManifest as produced by auto_harvester
+	manifestJSON := `{
+		"frame_id": "cam_auto_1791560000",
+		"camera_id": "cam_auto",
+		"camera_name": "Test Camera Auto",
+		"image_path": "proofs/2026-10-12/cam_auto/1791560000_sample.jpg",
+		"annotator": "auto_harvester",
+		"annotated_at": "2026-10-12T10:00:00Z",
+		"notes": "Auto-harvested via scheduled trigger",
+		"labels": {
+			"traffic": "CONGESTED",
+			"carriageway_direction": "bidirectional",
+			"traffic_dir_a": "HEAVY",
+			"traffic_dir_b": "MODERATE",
+			"is_waiting_red_light": false,
+			"queue_reason": "bottleneck",
+			"flood": "SHALLOW",
+			"waterline_depth": "TIRE_QUARTER_SUBMERGED",
+			"flood_submersion_anchor": "tire_base_under_10cm",
+			"time_of_day": "day",
+			"weather": "rain",
+			"quality_tags": ["rain_on_lens"]
+		}
+	}`
+
+	labelKey := "labels/2026-10-12/cam_auto_auto_harvester_1791560000.json"
+	if err := store.Put(context.Background(), labelKey, strings.NewReader(manifestJSON)); err != nil {
+		t.Fatalf("failed to put test manifest: %v", err)
+	}
+
+	wGet := httptest.NewRecorder()
+	reqGet, _ := http.NewRequest("GET", "/api/archiver/labels?date=2026-10-12", nil)
+	router.ServeHTTP(wGet, reqGet)
+
+	if wGet.Code != http.StatusOK {
+		t.Fatalf("expected 200 on GetLabels, got %d: %s", wGet.Code, wGet.Body.String())
+	}
+
+	var labelsResp LabelListResponse
+	if err := json.Unmarshal(wGet.Body.Bytes(), &labelsResp); err != nil {
+		t.Fatalf("failed to unmarshal labels response: %v", err)
+	}
+
+	if labelsResp.Total != 1 {
+		t.Fatalf("expected 1 label, got %d", labelsResp.Total)
+	}
+
+	l := labelsResp.Labels[0]
+	if l.CameraID != "cam_auto" {
+		t.Errorf("expected CameraID cam_auto, got %s", l.CameraID)
+	}
+	if l.SnapshotKey != "2026-10-12/cam_auto/1791560000_sample.jpg" {
+		t.Errorf("expected SnapshotKey 2026-10-12/cam_auto/1791560000_sample.jpg, got %s", l.SnapshotKey)
+	}
+	if l.Annotator != "auto_harvester" {
+		t.Errorf("expected Annotator auto_harvester, got %s", l.Annotator)
+	}
+	if l.TrafficLevel != "congested" {
+		t.Errorf("expected TrafficLevel congested, got %s", l.TrafficLevel)
+	}
+	if l.FloodLevel != "puddle" {
+		t.Errorf("expected FloodLevel puddle (mapped from SHALLOW), got %s", l.FloodLevel)
+	}
+	if l.Weather != "rain" {
+		t.Errorf("expected Weather rain, got %s", l.Weather)
 	}
 }
