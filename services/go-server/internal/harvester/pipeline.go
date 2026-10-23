@@ -48,16 +48,20 @@ func DetermineTimeOfDay(t time.Time) string {
 }
 
 // DetermineWaterlineDepth maps meteorological condition to physical waterline depth anchors.
+// Deprecated: weather-based flood/depth guessing causes answer key pollution (Lesson 39).
+// When rain is active without computer vision puddle segmentation, flood and depth
+// default to UNKNOWN pending human certification or vision segmentation.
 func DetermineWaterlineDepth(weather *WeatherInfo) (flood, depth, anchor, weatherCond string) {
 	if weather == nil || (weather.RainfallMm < 0.10 && !IsRainWeatherCode(weather.WeatherCode)) {
 		return "NONE", "DRY", "dry", "dry"
 	}
 
-	if weather.RainfallMm < 5.0 {
-		return "NONE", "WET_SURFACE", "wet_asphalt_no_standing", "rain"
+	weatherCond = "rain"
+	if weather.RainfallMm >= 5.0 || weather.WeatherCode >= 65 {
+		weatherCond = "heavy_rain"
 	}
 
-	return "SHALLOW", "TIRE_QUARTER_SUBMERGED", "tire_base_under_10cm", "heavy_rain"
+	return "UNKNOWN", "UNKNOWN", "unknown", weatherCond
 }
 
 // DetermineTrafficSeverity maps inference prediction to traffic density and queue reason.
@@ -208,15 +212,12 @@ func (p *Pipeline) HarvestCameras(ctx context.Context, cameras []Camera, scope S
 	var wg sync.WaitGroup
 	var successCount int64
 
+harvestLoop:
 	for _, cam := range cameras {
-		if ctx.Err() != nil {
-			break
-		}
-
 		select {
 		case sem <- struct{}{}:
 		case <-ctx.Done():
-			break
+			break harvestLoop
 		}
 
 		wg.Add(1)

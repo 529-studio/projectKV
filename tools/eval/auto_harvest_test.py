@@ -237,17 +237,17 @@ class TestAutoHarvest(unittest.TestCase):
         self.assertEqual(depth, "DRY")
         self.assertEqual(anchor, "dry")
 
-        # Rain
+        # Rain (deprecated heuristic: defaults to UNKNOWN pending vision/human review)
         flood, depth, anchor = determine_waterline_depth("rain", 1.5)
-        self.assertEqual(flood, "NONE")
-        self.assertEqual(depth, "WET_SURFACE")
-        self.assertEqual(anchor, "wet_asphalt_no_standing")
+        self.assertEqual(flood, "UNKNOWN")
+        self.assertEqual(depth, "UNKNOWN")
+        self.assertEqual(anchor, "unknown")
 
-        # Heavy rain
+        # Heavy rain (deprecated heuristic: defaults to UNKNOWN pending vision/human review)
         flood, depth, anchor = determine_waterline_depth("heavy_rain", 8.0)
-        self.assertEqual(flood, "SHALLOW")
-        self.assertEqual(depth, "TIRE_QUARTER_SUBMERGED")
-        self.assertEqual(anchor, "tire_base_under_10cm")
+        self.assertEqual(flood, "UNKNOWN")
+        self.assertEqual(depth, "UNKNOWN")
+        self.assertEqual(anchor, "unknown")
 
     # 7. Traffic Severity Calculation Tests
     def test_calculate_traffic_severity(self):
@@ -300,13 +300,13 @@ class TestAutoHarvest(unittest.TestCase):
         self.assertTrue(is_valid, f"Schema validation failed: {errors}")
         self.assertEqual(len(errors), 0)
 
-        # Label-specific assertions
+        # Label-specific assertions (rain defaults to UNKNOWN for flood/depth per Lesson 39)
         labels = manifest["labels"]
         self.assertEqual(labels["carriageway_direction"], "bidirectional")
         self.assertEqual(labels["weather"], "rain")
-        self.assertEqual(labels["flood"], "NONE")
-        self.assertEqual(labels["waterline_depth"], "WET_SURFACE")
-        self.assertEqual(labels["flood_submersion_anchor"], "wet_asphalt_no_standing")
+        self.assertEqual(labels["flood"], "UNKNOWN")
+        self.assertEqual(labels["waterline_depth"], "UNKNOWN")
+        self.assertEqual(labels["flood_submersion_anchor"], "unknown")
         self.assertIn("rain_on_lens", labels["quality_tags"])
 
     # 9. Dry Run Pipeline Execution Test

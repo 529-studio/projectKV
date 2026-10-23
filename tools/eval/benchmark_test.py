@@ -31,7 +31,7 @@ class TestLabelSchemaAndParser(unittest.TestCase):
         self.assertIn("time_of_day", self.schema)
         self.assertIn("weather", self.schema)
         self.assertEqual(self.schema["traffic"], ["CLEAR", "MODERATE", "HEAVY", "CONGESTED"])
-        self.assertEqual(self.schema["flood"], ["NONE", "SHALLOW", "DEEP"])
+        self.assertEqual(self.schema["flood"], ["NONE", "SHALLOW", "DEEP", "UNKNOWN"])
 
     def test_parse_valid_fixture_labels(self):
         fixtures_dir = EVAL_DIR / "fixtures" / "labels"
