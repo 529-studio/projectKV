@@ -78,8 +78,8 @@
         },
         "flood": {
           "type": "string",
-          "enum": ["NONE", "SHALLOW", "DEEP"],
-          "description": "Standard 3-tier severity classification for UI markers."
+          "enum": ["NONE", "SHALLOW", "DEEP", "UNKNOWN"],
+          "description": "Standard 3-tier severity classification for UI markers (plus UNKNOWN for uncertified frames)."
         },
         "waterline_depth": {
           "type": "string",
@@ -88,7 +88,8 @@
             "WET_SURFACE",
             "TIRE_QUARTER_SUBMERGED",
             "TIRE_HALF_SUBMERGED",
-            "IMPASSABLE"
+            "IMPASSABLE",
+            "UNKNOWN"
           ],
           "description": "Physical motorcycle wheel submersion depth anchor."
         },
@@ -98,7 +99,8 @@
             "dry",
             "wet_asphalt_no_standing",
             "tire_base_under_10cm",
-            "exhaust_hub_over_15cm"
+            "exhaust_hub_over_15cm",
+            "unknown"
           ],
           "description": "Granular anchor mapped to physical motorcycle wheel landmarks."
         },
