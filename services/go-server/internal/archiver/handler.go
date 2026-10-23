@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
@@ -408,33 +409,119 @@ func (h *Handler) GetLabels(c *gin.Context) {
 		return
 	}
 
-	var labels []LabelPayload
+	var jsonKeys []string
 	for _, it := range items {
-		if !strings.HasSuffix(it.Key, ".json") {
-			continue
+		if strings.HasSuffix(it.Key, ".json") {
+			jsonKeys = append(jsonKeys, it.Key)
 		}
+	}
 
-		rc, err := h.store.Get(c.Request.Context(), it.Key)
-		if err != nil {
-			continue
+	results := make([]*LabelPayload, len(jsonKeys))
+	concurrency := 25
+	if len(jsonKeys) < concurrency {
+		concurrency = len(jsonKeys)
+	}
+
+	if concurrency > 0 {
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, concurrency)
+
+		for i, key := range jsonKeys {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(idx int, objKey string) {
+				defer wg.Done()
+				defer func() { <-sem }()
+
+				rc, err := h.store.Get(c.Request.Context(), objKey)
+				if err != nil {
+					return
+				}
+				data, err := io.ReadAll(rc)
+				_ = rc.Close()
+				if err != nil {
+					return
+				}
+
+				var lp LabelPayload
+				if err := json.Unmarshal(data, &lp); err == nil && lp.SnapshotKey != "" {
+					if camFilter == "" || lp.CameraID == camFilter {
+						results[idx] = &lp
+					}
+					return
+				}
+
+				// Support autonomous harvester Draft-07 GroundTruthManifest
+				var manifest struct {
+					FrameID     string `json:"frame_id"`
+					CameraID    string `json:"camera_id"`
+					CameraName  string `json:"camera_name"`
+					ImagePath   string `json:"image_path"`
+					Annotator   string `json:"annotator"`
+					AnnotatedAt string `json:"annotated_at"`
+					Notes       string `json:"notes"`
+					Labels      struct {
+						Traffic               string   `json:"traffic"`
+						CarriagewayDirection  string   `json:"carriageway_direction"`
+						TrafficDirA           string   `json:"traffic_dir_a"`
+						TrafficDirB           string   `json:"traffic_dir_b"`
+						IsWaitingRedLight     bool     `json:"is_waiting_red_light"`
+						QueueReason           string   `json:"queue_reason"`
+						Flood                 string   `json:"flood"`
+						WaterlineDepth        string   `json:"waterline_depth"`
+						FloodSubmersionAnchor string   `json:"flood_submersion_anchor"`
+						TimeOfDay             string   `json:"time_of_day"`
+						Weather               string   `json:"weather"`
+						QualityTags           []string `json:"quality_tags"`
+					} `json:"labels"`
+				}
+				if err := json.Unmarshal(data, &manifest); err == nil && manifest.CameraID != "" {
+					snapKey := strings.TrimPrefix(manifest.ImagePath, "proofs/")
+					var ts int64
+					if t, err := time.Parse(time.RFC3339, manifest.AnnotatedAt); err == nil {
+						ts = t.Unix()
+					}
+
+					floodLevel := "none"
+					switch strings.ToUpper(manifest.Labels.Flood) {
+					case "SHALLOW":
+						floodLevel = "puddle"
+					case "DEEP":
+						floodLevel = "deep"
+					}
+
+					mapped := LabelPayload{
+						Date:                  date,
+						CameraID:              manifest.CameraID,
+						SnapshotKey:           snapKey,
+						Annotator:             manifest.Annotator,
+						FloodLevel:            floodLevel,
+						TrafficLevel:          strings.ToLower(manifest.Labels.Traffic),
+						TrafficDirA:           strings.ToLower(manifest.Labels.TrafficDirA),
+						TrafficDirB:           strings.ToLower(manifest.Labels.TrafficDirB),
+						QueueReason:           manifest.Labels.QueueReason,
+						FloodSubmersionAnchor: manifest.Labels.FloodSubmersionAnchor,
+						Weather:               strings.ToLower(manifest.Labels.Weather),
+						TimeOfDay:             strings.ToLower(manifest.Labels.TimeOfDay),
+						QualityTags:           manifest.Labels.QualityTags,
+						Notes:                 manifest.Notes,
+						Timestamp:             ts,
+					}
+
+					if camFilter == "" || mapped.CameraID == camFilter {
+						results[idx] = &mapped
+					}
+				}
+			}(i, key)
 		}
+		wg.Wait()
+	}
 
-		data, err := io.ReadAll(rc)
-		_ = rc.Close()
-		if err != nil {
-			continue
+	var labels []LabelPayload
+	for _, res := range results {
+		if res != nil {
+			labels = append(labels, *res)
 		}
-
-		var lp LabelPayload
-		if err := json.Unmarshal(data, &lp); err != nil {
-			continue
-		}
-
-		if camFilter != "" && lp.CameraID != camFilter {
-			continue
-		}
-
-		labels = append(labels, lp)
 	}
 
 	if labels == nil {

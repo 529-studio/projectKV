@@ -356,6 +356,16 @@ func TestParseScheduleSlots(t *testing.T) {
 			t.Errorf("unexpected slots: %+v", slots)
 		}
 	})
+
+	t.Run("Quoted string from env file", func(t *testing.T) {
+		slots := harvester.ParseScheduleSlots(`"07:30,12:00,15:00,16:00,17:30"`)
+		if len(slots) != 5 {
+			t.Fatalf("expected 5 slots, got %d", len(slots))
+		}
+		if slots[0].String() != "07:30" || slots[1].String() != "12:00" || slots[4].String() != "17:30" {
+			t.Errorf("unexpected slots: %+v", slots)
+		}
+	})
 }
 
 func TestScheduler_Deduplication(t *testing.T) {
