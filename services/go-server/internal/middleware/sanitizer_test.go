@@ -122,3 +122,59 @@ func TestSecretSanitizer_PreservesStorageObjectKeys(t *testing.T) {
 		t.Errorf("expected original storage object key preserved, got: %s", body)
 	}
 }
+
+// TestSecretSanitizer_RedactsTelegramBotToken verifies the Issue #246 / S8-T9
+// defense-in-depth requirement: a Telegram bot token echoed back in any HTTP
+// response body (e.g. a misconfigured upstream error) is scrubbed to
+// [REDACTED_BOT_TOKEN] before the bytes leave the server.
+func TestSecretSanitizer_RedactsTelegramBotToken(t *testing.T) {
+	r := gin.New()
+	r.Use(middleware.SecretSanitizer())
+
+	rawToken := "7359930142:ZHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
+	r.GET("/notify-status", func(c *gin.Context) {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "telegram http post: dial tcp: lookup api.telegram.org: Post /bot" + rawToken + "/sendMessage failed",
+		})
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/notify-status", nil)
+	r.ServeHTTP(w, req)
+
+	body := w.Body.String()
+	if strings.Contains(body, rawToken) {
+		t.Fatalf("expected Telegram bot token to be redacted, got raw body: %s", body)
+	}
+	if !strings.Contains(body, "[REDACTED_BOT_TOKEN]") {
+		t.Errorf("expected [REDACTED_BOT_TOKEN] marker in response, got: %s", body)
+	}
+}
+
+// TestSecretSanitizer_PreservesClockTimes guards against false positives: the
+// token pattern requires 8-10 digits followed by a 35-character base64url tail,
+// so ordinary clock times, ratios, and short tails must survive untouched.
+func TestSecretSanitizer_PreservesClockTimes(t *testing.T) {
+	r := gin.New()
+	r.Use(middleware.SecretSanitizer())
+
+	r.GET("/timings", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"observed_at": "12:34:56",
+			"ratio":       "10:1",
+			"duration":    "12345678:shorttail",
+			"message_id":  7359930142,
+		})
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/timings", nil)
+	r.ServeHTTP(w, req)
+
+	body := w.Body.String()
+	for _, want := range []string{"12:34:56", "10:1", "12345678:shorttail", "7359930142"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected benign value %q preserved, got: %s", want, body)
+		}
+	}
+}

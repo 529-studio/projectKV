@@ -198,7 +198,9 @@ PR Description: Must strictly start with 'Close #290 closes [KV-20]' per AGENTS.
 
 ---
 
-## Wave 3 — Nghiệm Thu Staging & Vận Hành Thực Tế (S8-T9)
+## Wave 3 — Nghiệm Thu Staging & Vận Hành Thực Tế (S8-T9) [COMPLETED]
+
+Script verify ops (`scripts/verify_staging_telegram.sh`), runbook vận hành (`docs/runbooks/telegram_staging_verification.md`), regex scrub token Telegram trong response sanitizer, và bộ deterministic acceptance tests (debounce 5 phút, format contract, token redaction) đã hoàn thành và kiểm thử 100% (Issue #246, PR branch `ops/s8-t9-staging-verification`). Bước cấu hình token live trên Portainer Stack 14 do operator thực hiện theo runbook.
 
 Triển khai token và kiểm thử cảnh báo live trên môi trường staging Portainer Stack 14.
 
