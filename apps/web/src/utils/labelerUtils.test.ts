@@ -7,6 +7,7 @@ import {
   formatSnapshotTimestamp,
   buildAuthHeaders,
   isAutoHarvested,
+  resolveCanonicalLabels,
   filterSnapshots,
   type LabelFilterStatus,
   type LabelPayload,
@@ -273,5 +274,78 @@ describe('Labeler Utilities & Hotkeys (Issue #214 / S7-T8 Directional Taxonomy)'
         }
       }
     }
+  });
+
+  test('resolveCanonicalLabels prioritizes human labels over auto candidates and sorts by latest timestamp', () => {
+    const rawLabels: LabelPayload[] = [
+      // Auto candidate for snap_1
+      {
+        snapshot_key: 'snap_1.jpg',
+        camera_id: 'cam_1',
+        date: '2026-10-23',
+        annotator: 'opencode_auto',
+        timestamp: 100,
+        flood_level: 'none',
+        traffic_level: 'moderate',
+        weather: 'clear',
+        time_of_day: 'day',
+      },
+      // Human approval for snap_1 with reviewer name alphabetically before 'opencode'
+      {
+        snapshot_key: 'snap_1.jpg',
+        camera_id: 'cam_1',
+        date: '2026-10-23',
+        annotator: 'alice',
+        timestamp: 105,
+        flood_level: 'puddle',
+        traffic_level: 'heavy',
+        weather: 'rain',
+        time_of_day: 'day',
+      },
+      // Auto candidate for snap_2
+      {
+        snapshot_key: 'snap_2.jpg',
+        camera_id: 'cam_2',
+        date: '2026-10-23',
+        annotator: 'harvester/auto',
+        timestamp: 200,
+        flood_level: 'none',
+        traffic_level: 'clear',
+        weather: 'clear',
+        time_of_day: 'day',
+      },
+      // Older human approval for snap_3
+      {
+        snapshot_key: 'snap_3.jpg',
+        camera_id: 'cam_3',
+        date: '2026-10-23',
+        annotator: 'reviewer_1',
+        timestamp: 300,
+        flood_level: 'none',
+        traffic_level: 'clear',
+        weather: 'clear',
+        time_of_day: 'day',
+      },
+      // Newer human approval for snap_3 by thdat-bot
+      {
+        snapshot_key: 'snap_3.jpg',
+        camera_id: 'cam_3',
+        date: '2026-10-23',
+        annotator: 'thdat-bot',
+        timestamp: 350,
+        flood_level: 'deep',
+        traffic_level: 'gridlock',
+        weather: 'rain',
+        time_of_day: 'night',
+      },
+    ];
+
+    const resolved = resolveCanonicalLabels(rawLabels);
+    assert.equal(Object.keys(resolved).length, 3);
+    assert.equal(resolved['snap_1.jpg'].annotator, 'alice');
+    assert.equal(resolved['snap_1.jpg'].flood_level, 'puddle');
+    assert.equal(resolved['snap_2.jpg'].annotator, 'harvester/auto');
+    assert.equal(resolved['snap_3.jpg'].annotator, 'thdat-bot');
+    assert.equal(resolved['snap_3.jpg'].flood_level, 'deep');
   });
 });

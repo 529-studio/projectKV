@@ -226,6 +226,39 @@ export function isAutoHarvested(label?: Partial<LabelPayload> | null): boolean {
 }
 
 /**
+ * Resolves canonical labels for snapshot frames from an array of labels.
+ * Strictly prioritizes human-reviewed labels over AI candidate labels,
+ * and breaks ties by selecting the label with the latest timestamp.
+ */
+export function resolveCanonicalLabels(labels: LabelPayload[]): Record<string, LabelPayload> {
+  const result: Record<string, LabelPayload> = {};
+  for (const label of labels) {
+    if (!label.snapshot_key) continue;
+    const existing = result[label.snapshot_key];
+    if (!existing) {
+      result[label.snapshot_key] = label;
+      continue;
+    }
+    const existingIsAuto = isAutoHarvested(existing);
+    const newIsAuto = isAutoHarvested(label);
+
+    // Rule 1: Human-approved label strictly overrides AI auto candidate
+    if (existingIsAuto && !newIsAuto) {
+      result[label.snapshot_key] = label;
+    } else if (!existingIsAuto && newIsAuto) {
+      // Keep existing human label
+      continue;
+    } else {
+      // Both are human or both are auto: latest timestamp wins
+      if ((label.timestamp || 0) >= (existing.timestamp || 0)) {
+        result[label.snapshot_key] = label;
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Synthesizes a SnapshotItem from a LabelPayload if the raw snapshot is not present in the current page.
  */
 export function snapshotFromLabel(

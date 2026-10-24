@@ -7,6 +7,7 @@ import {
   isLabelComplete,
   formatSnapshotTimestamp,
   isAutoHarvested,
+  resolveCanonicalLabels,
   filterSnapshots,
   LABELER_I18N,
   getStoredDevToken,
@@ -196,12 +197,9 @@ export default function LabelerPage() {
 
         if (labelRes.ok) {
           const labelData = await labelRes.json();
-          const labelMap: Record<string, LabelPayload> = {};
-          if (Array.isArray(labelData.labels)) {
-            labelData.labels.forEach((lp: LabelPayload) => {
-              labelMap[lp.snapshot_key] = lp;
-            });
-          }
+          const labelMap = Array.isArray(labelData.labels)
+            ? resolveCanonicalLabels(labelData.labels)
+            : {};
           setLabels(labelMap);
         }
       } catch (err) {
