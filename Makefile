@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval test-train export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label
 
 help:
 	@echo "========================================================"
@@ -106,6 +106,15 @@ test-enrich:
 
 test-eval:
 	python3 -m unittest discover -s tools/eval -p "*_test.py"
+
+test-train:
+	python3 -m unittest discover -s tools/train -p "*_test.py"
+
+export-seg:
+	python3 tools/eval/export_yolo_seg.py --labels-dir tools/eval/labels_gold_standard --output-dir data/yolo_seg --verify
+
+train-seg:
+	python3 tools/train/train_yolov8_seg.py --data data/yolo_seg/dataset.yaml --export-openvino models/yolov8n_seg_openvino_416 --dry-run
 
 benchmark-mock:
 	python3 tools/eval/benchmark.py --analyzer mock
