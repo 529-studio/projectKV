@@ -18,7 +18,12 @@ import {
   VERDICT_I18N,
 } from '../config/constants';
 import { isHexVisibleAtZoom } from '../utils/hexUtils';
-import { isFloodVerdictStale } from '../utils/floodUtils';
+import {
+  isFloodVerdictStale,
+  type UserFloodReport,
+  isUserReportActive,
+  getUserReportRemainingMinutes,
+} from '../utils/floodUtils';
 import type { ActiveLensMode } from './HexOverlay';
 
 interface CustomCircleMarker extends L.CircleMarker {
@@ -27,6 +32,7 @@ interface CustomCircleMarker extends L.CircleMarker {
   hasAIVerdict?: boolean;
   isHotset?: boolean;
   isFloodProminent?: boolean;
+  isUserReported?: boolean;
   camId?: string;
 }
 
@@ -35,6 +41,7 @@ interface MapComponentProps {
   cameras: Camera[];
   verdicts: Map<string, TrafficVerdict>;
   floodVerdicts?: Map<string, TrafficVerdict>;
+  userFloodReports?: Map<string, UserFloodReport>;
   activeLens?: ActiveLensMode;
   hotsetStatus?: Map<string, HotsetCameraStatus>;
   selectedCamera?: Camera | null;
@@ -58,6 +65,7 @@ export default function MapComponent({
   cameras,
   verdicts,
   floodVerdicts = new Map(),
+  userFloodReports = new Map(),
   activeLens = 'traffic',
   hotsetStatus: propHotsetStatus,
   onCameraClick,
@@ -90,6 +98,7 @@ export default function MapComponent({
   const hotsetStatus = propHotsetStatus ?? internalHotset.hotsetStatus;
   const hotsetStatusRef = useRef(hotsetStatus);
   const floodVerdictsRef = useRef(floodVerdicts);
+  const userFloodReportsRef = useRef(userFloodReports);
   const activeLensRef = useRef(activeLens);
 
   useEffect(() => {
@@ -107,6 +116,10 @@ export default function MapComponent({
   useEffect(() => {
     floodVerdictsRef.current = floodVerdicts;
   }, [floodVerdicts]);
+
+  useEffect(() => {
+    userFloodReportsRef.current = userFloodReports;
+  }, [userFloodReports]);
 
   useEffect(() => {
     activeLensRef.current = activeLens;
@@ -156,9 +169,21 @@ export default function MapComponent({
     verdict: TrafficVerdict | undefined,
     hotset: HotsetCameraStatus | undefined,
     fillColor: string,
-    floodVerdict?: TrafficVerdict
+    floodVerdict?: TrafficVerdict,
+    userReport?: UserFloodReport
   ) => {
     let trafficInfo = '';
+    if (userReport && isUserReportActive(userReport)) {
+      const remainingMinutes = getUserReportRemainingMinutes(userReport);
+      const remainingText = lang === 'vi' ? `(còn ${remainingMinutes} phút)` : `(${remainingMinutes}m remaining)`;
+      if (userReport.escalated) {
+        const label = lang === 'vi' ? 'Báo cáo từ người dân: Có ngập (Nhiều nguồn xác nhận)' : 'Crowdsourced: Flooding reported (Multiple confirmations)';
+        trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">[${label}] ${remainingText}</span>`;
+      } else {
+        const label = lang === 'vi' ? 'Báo cáo từ người dân: Có ngập' : 'Crowdsourced: Flooding reported';
+        trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">[${label}] ${remainingText}</span>`;
+      }
+    }
     if (floodVerdict && !isFloodVerdictStale(floodVerdict)) {
       const s = (floodVerdict.flood_severity || '').toUpperCase().trim();
       if (s === 'FLOODED_DEEP') {
@@ -382,6 +407,7 @@ export default function MapComponent({
     const currentHotset = hotsetStatusRef.current;
     const isFloodLens = activeLens === 'flood';
     const currentFloodVerdicts = floodVerdictsRef.current;
+    const currentUserReports = userFloodReportsRef.current;
 
     const getCameraFloodInfo = (camId: string) => {
       const fv = currentFloodVerdicts.get(camId);
@@ -393,8 +419,17 @@ export default function MapComponent({
       return null;
     };
 
+    const getCameraUserReport = (camId: string) => {
+      const rep = currentUserReports.get(camId);
+      return isUserReportActive(rep) ? rep : null;
+    };
+
     // Render dimmed markers first, then matching/active markers so matching markers appear on top
     const sortedCameras = [...cameras].sort((a, b) => {
+      const aUser = getCameraUserReport(a.id) !== null;
+      const bUser = getCameraUserReport(b.id) !== null;
+      if (aUser !== bUser) return aUser ? 1 : -1;
+
       if (isFloodLens) {
         const aFlood = getCameraFloodInfo(a.id) !== null;
         const bFlood = getCameraFloodInfo(b.id) !== null;
@@ -421,6 +456,8 @@ export default function MapComponent({
       const verdict = currentVerdicts.get(cam.id);
       const hotset = currentHotset.get(cam.id);
       const floodInfo = getCameraFloodInfo(cam.id);
+      const userReport = getCameraUserReport(cam.id);
+      const hasUserReport = userReport !== null;
       const hasAIVerdict = isVerdictValid(verdict) || isHotsetStatusValid(hotset);
       const baseR = getRadius(zoom, isFew);
 
@@ -437,16 +474,30 @@ export default function MapComponent({
       let isHotset = false;
 
       if (isFloodLens) {
-        if (floodInfo) {
+        if (floodInfo && floodInfo.severity === 'FLOODED_DEEP') {
           isFloodProminent = true;
           isDimmed = false;
-          if (floodInfo.severity === 'FLOODED_DEEP') {
-            fillColor = '#dc2626';
-            strokeColor = '#ffffff';
-            weight = 2.5;
-            radius = baseR + 2.5;
-            className = 'marker-congested-pulse';
-          } else if (floodInfo.severity === 'FLOODED_SHALLOW') {
+          fillColor = '#dc2626';
+          strokeColor = '#ffffff';
+          weight = 2.5;
+          radius = baseR + 2.5;
+          className = 'marker-congested-pulse';
+          opacity = 1;
+          fillOpacity = 0.95;
+        } else if (hasUserReport && userReport) {
+          isFloodProminent = true;
+          isDimmed = false;
+          fillColor = '#f59e0b';
+          strokeColor = userReport.escalated ? '#ffffff' : '#d97706';
+          weight = userReport.escalated ? 2.5 : 2.0;
+          radius = userReport.escalated ? baseR + 2.5 : baseR + 2.0;
+          className = userReport.escalated ? 'marker-congested-pulse' : '';
+          opacity = 1;
+          fillOpacity = 0.95;
+        } else if (floodInfo) {
+          isFloodProminent = true;
+          isDimmed = false;
+          if (floodInfo.severity === 'FLOODED_SHALLOW') {
             fillColor = '#0284c7';
             strokeColor = '#ffffff';
             weight = 2.5;
@@ -473,18 +524,30 @@ export default function MapComponent({
           isHotset = visual.isHotset;
         }
       } else {
-        isFilteredDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(cam.id));
-        const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !hasAIVerdict);
-        isDimmed = isFilteredDimmed || isMacroHexDimmed;
-        radius = isDimmed ? Math.max(4.0, Math.round(baseR * 0.7)) : baseR;
-        const visual = getCameraMarkerVisual(cam.id, cam.isOnline, currentVerdicts, currentHotset);
-        fillColor = visual.fillColor;
-        strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
-        weight = isDimmed ? 1 : (zoom >= 14 ? 2 : 1.5);
-        opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
-        fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
-        className = visual.isCongested ? 'marker-congested-pulse' : '';
-        isHotset = visual.isHotset;
+        if (hasUserReport && userReport) {
+          // Highlight user flood report with amber marker even in traffic lens
+          fillColor = '#f59e0b';
+          strokeColor = userReport.escalated ? '#ffffff' : '#d97706';
+          weight = userReport.escalated ? 2.5 : 2.0;
+          radius = userReport.escalated ? baseR + 2.5 : baseR + 2.0;
+          className = userReport.escalated ? 'marker-congested-pulse' : '';
+          opacity = 1;
+          fillOpacity = 0.95;
+          isDimmed = false;
+        } else {
+          isFilteredDimmed = Boolean(isFiltered && filteredCameraIds && !filteredCameraIds.has(cam.id));
+          const isMacroHexDimmed = Boolean(isMacro && !isFilteredDimmed && !hasAIVerdict);
+          isDimmed = isFilteredDimmed || isMacroHexDimmed;
+          radius = isDimmed ? Math.max(4.0, Math.round(baseR * 0.7)) : baseR;
+          const visual = getCameraMarkerVisual(cam.id, cam.isOnline, currentVerdicts, currentHotset);
+          fillColor = visual.fillColor;
+          strokeColor = isFilteredDimmed ? '#27272a' : (isMacroHexDimmed ? '#3f3f46' : FUNCTIONAL_COLORS.MAP_STROKE);
+          weight = isDimmed ? 1 : (zoom >= 14 ? 2 : 1.5);
+          opacity = isFilteredDimmed ? 0.25 : (isMacroHexDimmed ? 0.35 : 1);
+          fillOpacity = isFilteredDimmed ? 0.2 : (isMacroHexDimmed ? 0.25 : 0.95);
+          className = visual.isCongested ? 'marker-congested-pulse' : '';
+          isHotset = visual.isHotset;
+        }
       }
 
       const marker = L.circleMarker([cam.latitude, cam.longitude], {
@@ -503,11 +566,12 @@ export default function MapComponent({
       customMarker.isFilteredDimmed = isFilteredDimmed;
       customMarker.hasAIVerdict = hasAIVerdict;
       customMarker.isFloodProminent = isFloodProminent;
+      customMarker.isUserReported = hasUserReport;
       customMarker.isHotset = isHotset;
       customMarker.camId = cam.id;
       markersMapRef.current.set(cam.id, customMarker);
 
-      marker.bindTooltip(buildTooltipHtml(cam, verdict, hotset, fillColor, floodInfo?.verdict), {
+      marker.bindTooltip(buildTooltipHtml(cam, verdict, hotset, fillColor, floodInfo?.verdict, userReport ?? undefined), {
         direction: 'top',
         offset: [0, -4]
       });
@@ -538,6 +602,21 @@ export default function MapComponent({
 
         const curZ = mapRef.current ? mapRef.current.getZoom() : zoom;
         const curBase = getRadius(curZ, isFew);
+
+        if (customMarker.isUserReported) {
+          const userReport = userFloodReportsRef.current.get(cam.id);
+          const isEscalated = userReport?.escalated ?? false;
+          marker.setRadius(isEscalated ? curBase + 2.5 : curBase + 2.0);
+          marker.setStyle({
+            fillColor: '#f59e0b',
+            color: isEscalated ? '#ffffff' : '#d97706',
+            weight: isEscalated ? 2.5 : 2.0,
+            opacity: 1,
+            fillOpacity: 0.95,
+            className: isEscalated ? 'marker-congested-pulse' : '',
+          });
+          return;
+        }
 
         if (activeLensRef.current === 'flood') {
           const isProminent = customMarker.isFloodProminent === true;
@@ -593,7 +672,7 @@ export default function MapComponent({
 
       markersLayerRef.current?.addLayer(marker);
     });
-  }, [cameras, getCameraMarkerVisual, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled, activeLens, floodVerdicts, buildTooltipHtml]);
+  }, [cameras, getCameraMarkerVisual, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled, activeLens, floodVerdicts, userFloodReports, buildTooltipHtml]);
 
   // In-place marker style and tooltip updates on SSE live verdict streams or Hot Set status updates without tearing down DOM layers
   useEffect(() => {

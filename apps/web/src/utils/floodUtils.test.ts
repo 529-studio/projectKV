@@ -19,8 +19,11 @@ import {
   FLOOD_MODAL_I18N,
   type FloodHexCell,
   type FloodVerdictLike,
+  type UserFloodReport,
+  isUserReportActive,
+  getUserReportRemainingMinutes,
 } from './floodUtils.ts';
-import { FLOOD_VERIFY_I18N } from '../config/constants.ts';
+import { FLOOD_VERIFY_I18N, USER_FLOOD_REPORT_I18N } from '../config/constants.ts';
 
 describe('Flood Hex Overlay Utilities (Issue #106)', () => {
   const samplePoly: [number, number][] = [
@@ -453,5 +456,88 @@ describe('Flood Hex Overlay Utilities (Issue #106)', () => {
     const fallback = getVerifiedFloodHexColorAndOpacity('DRY');
     assert.ok(fallback.fillOpacity >= 0.08);
     assert.equal(fallback.strokeWeight, 1.75);
+  });
+
+  describe('Crowdsourced Flood Reports (S8-T7 / Issue #289)', () => {
+    test('isUserReportActive correctly enforces 15-minute sliding TTL', () => {
+      const now = 1729780000000;
+
+      // 1. Fresh report within 15 min (5 min ago)
+      const freshReport: UserFloodReport = {
+        camera_id: 'cam-01',
+        timestamp: new Date(now - 5 * 60 * 1000).toISOString(),
+        report_count: 1,
+        escalated: false,
+        ttl_seconds: 900,
+      };
+      assert.equal(isUserReportActive(freshReport, now), true);
+
+      // 2. Report with explicit expires_at in the future
+      const futureExpiryReport: UserFloodReport = {
+        camera_id: 'cam-02',
+        timestamp: new Date(now - 20 * 60 * 1000).toISOString(),
+        report_count: 2,
+        escalated: true,
+        expires_at: now + 30000,
+      };
+      assert.equal(isUserReportActive(futureExpiryReport, now), true);
+
+      // 3. Expired report (16 min ago)
+      const expiredReport: UserFloodReport = {
+        camera_id: 'cam-03',
+        timestamp: new Date(now - 16 * 60 * 1000).toISOString(),
+        report_count: 1,
+        escalated: false,
+        ttl_seconds: 900,
+      };
+      assert.equal(isUserReportActive(expiredReport, now), false);
+
+      // 4. Null / undefined safety
+      assert.equal(isUserReportActive(null, now), false);
+      assert.equal(isUserReportActive(undefined, now), false);
+    });
+
+    test('getUserReportRemainingMinutes calculates correct ceiling remaining time', () => {
+      const now = 1729780000000;
+
+      // 14.2 minutes remaining -> rounds up to 15m
+      const rep1: UserFloodReport = {
+        camera_id: 'cam-01',
+        timestamp: new Date(now - 48 * 1000).toISOString(), // 48s ago
+        report_count: 1,
+        escalated: false,
+        ttl_seconds: 900,
+      };
+      assert.equal(getUserReportRemainingMinutes(rep1, now), 15);
+
+      // 2.5 minutes remaining -> rounds up to 3m
+      const rep2: UserFloodReport = {
+        camera_id: 'cam-02',
+        timestamp: new Date(now - 12.5 * 60 * 1000).toISOString(),
+        report_count: 3,
+        escalated: true,
+        ttl_seconds: 900,
+      };
+      assert.equal(getUserReportRemainingMinutes(rep2, now), 3);
+
+      // Already expired -> 0m
+      const repExpired: UserFloodReport = {
+        camera_id: 'cam-03',
+        timestamp: new Date(now - 16 * 60 * 1000).toISOString(),
+        report_count: 1,
+        escalated: false,
+        ttl_seconds: 900,
+      };
+      assert.equal(getUserReportRemainingMinutes(repExpired, now), 0);
+    });
+
+    test('bilingual i18n badge text conforms to zero-emoji and expected formats', () => {
+      assert.equal(USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE.vi, '[Báo cáo từ người dân: Có ngập]');
+      assert.equal(USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE.en, '[Crowdsourced: Flooding reported]');
+      assert.equal(USER_FLOOD_REPORT_I18N.BADGE_ESCALATED.vi, '[Báo cáo từ người dân: Có ngập (Nhiều nguồn xác nhận)]');
+      assert.equal(USER_FLOOD_REPORT_I18N.BADGE_ESCALATED.en, '[Crowdsourced: Flooding reported (Multiple confirmations)]');
+      assert.equal(USER_FLOOD_REPORT_I18N.REMAINING_MINUTES.vi(12), '(còn 12 phút)');
+      assert.equal(USER_FLOOD_REPORT_I18N.REMAINING_MINUTES.en(12), '(12m remaining)');
+    });
   });
 });

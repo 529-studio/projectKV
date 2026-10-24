@@ -10,14 +10,18 @@ import {
 } from '../utils/trafficUtils';
 import {
   type FloodHexCell,
+  type UserFloodReport,
   normalizeFloodHexCell,
   deriveFloodCameraGroups,
   deriveFloodHexCounts,
+  isUserReportActive,
 } from '../utils/floodUtils';
 
 export interface UseFloodReturn {
   floodVerdicts: Map<string, TrafficVerdict>;
   floodHexCells: Map<string, FloodHexCell>;
+  userFloodReports: Map<string, UserFloodReport>;
+  userFloodReportCount: number;
   floodedCameraIds: Set<string>;
   floodedCameraCount: number;
   wetCameraIds: Set<string>;
@@ -34,6 +38,7 @@ export interface UseFloodReturn {
 export function useFlood(): UseFloodReturn {
   const [floodVerdicts, setFloodVerdicts] = useState<Map<string, TrafficVerdict>>(new Map());
   const [floodHexCells, setFloodHexCells] = useState<Map<string, FloodHexCell>>(new Map());
+  const [userFloodReports, setUserFloodReports] = useState<Map<string, UserFloodReport>>(new Map());
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [appEnv, setAppEnv] = useState<string>('production');
@@ -94,7 +99,15 @@ export function useFlood(): UseFloodReturn {
             return null;
           });
 
-        const [statusData, hexData] = await Promise.all([statusPromise, hexPromise]);
+        // 3. Fetch initial crowdsourced user flood reports (S8-T7)
+        const userReportsPromise = fetch(getApiUrl(API_ENDPOINTS.FLOOD_USER_REPORTS))
+          .then((res) => (res.ok ? res.json() : null))
+          .catch((err) => {
+            console.warn('Failed to fetch initial user flood reports:', err);
+            return null;
+          });
+
+        const [statusData, hexData, userReportsData] = await Promise.all([statusPromise, hexPromise, userReportsPromise]);
         if (isCancelled) return;
 
         let currentEnv = 'production';
@@ -129,6 +142,28 @@ export function useFlood(): UseFloodReturn {
             }
           });
           setFloodHexCells(initialHex);
+        }
+
+        if (Array.isArray(userReportsData)) {
+          const initialUserReports = new Map<string, UserFloodReport>();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          userReportsData.forEach((item: any) => {
+            if (item && item.camera_id) {
+              const expiresAt = item.expires_at ? new Date(item.expires_at).getTime() : Date.now() + 900000;
+              if (Date.now() < expiresAt) {
+                initialUserReports.set(item.camera_id, {
+                  camera_id: item.camera_id,
+                  client_ip_hash: item.client_ip_hash,
+                  timestamp: item.latest_at || item.timestamp || new Date().toISOString(),
+                  report_count: item.report_count || 1,
+                  escalated: Boolean(item.escalated),
+                  ttl_seconds: 900,
+                  expires_at: expiresAt,
+                });
+              }
+            }
+          });
+          setUserFloodReports(initialUserReports);
         }
       } finally {
         const elapsed = Date.now() - startTime;
@@ -188,6 +223,34 @@ export function useFlood(): UseFloodReturn {
           }
         });
 
+        // S8-T7: Crowdsourced user flood report SSE broadcast listener
+        es.addEventListener('user_flood_report', (event: MessageEvent) => {
+          setConnected(true);
+          try {
+            const payload = JSON.parse(event.data);
+            const id = payload.camera_id;
+            if (!id) return;
+            const ttlSec = payload.ttl_seconds || 900;
+            const expiresAt = Date.now() + ttlSec * 1000;
+            const report: UserFloodReport = {
+              camera_id: id,
+              client_ip_hash: payload.client_ip_hash,
+              timestamp: payload.timestamp || new Date().toISOString(),
+              report_count: payload.report_count || 1,
+              escalated: Boolean(payload.escalated),
+              ttl_seconds: ttlSec,
+              expires_at: expiresAt,
+            };
+            setUserFloodReports((prev) => {
+              const next = new Map(prev);
+              next.set(id, report);
+              return next;
+            });
+          } catch (err) {
+            console.warn('Failed to parse SSE user_flood_report message:', err);
+          }
+        });
+
         es.onerror = (err) => {
           setConnected(false);
           if (es?.readyState === EventSource.CLOSED) {
@@ -213,6 +276,32 @@ export function useFlood(): UseFloodReturn {
     };
   }, [updateVerdict, updateFloodHexCell]);
 
+  // Periodic pruning of expired user flood reports (sliding 15-minute TTL)
+  useEffect(() => {
+    const pruneTimer = setInterval(() => {
+      const now = Date.now();
+      setUserFloodReports((prev) => {
+        let hasExpired = false;
+        for (const report of prev.values()) {
+          if (!isUserReportActive(report, now)) {
+            hasExpired = true;
+            break;
+          }
+        }
+        if (!hasExpired) return prev;
+        const next = new Map<string, UserFloodReport>();
+        for (const [id, report] of prev.entries()) {
+          if (isUserReportActive(report, now)) {
+            next.set(id, report);
+          }
+        }
+        return next;
+      });
+    }, 15000);
+
+    return () => clearInterval(pruneTimer);
+  }, []);
+
   // Derive cameras with active conditions (strictly excluding stale verdicts > 3 min)
   const { floodedCameraIds, wetCameraIds, dryCameraIds } = deriveFloodCameraGroups(floodVerdicts);
   const { floodedHexCount, wetHexCount, totalHexCount } = deriveFloodHexCounts(floodHexCells);
@@ -220,6 +309,8 @@ export function useFlood(): UseFloodReturn {
   return {
     floodVerdicts,
     floodHexCells,
+    userFloodReports,
+    userFloodReportCount: userFloodReports.size,
     floodedCameraIds,
     floodedCameraCount: floodedCameraIds.size,
     wetCameraIds,

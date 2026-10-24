@@ -230,3 +230,80 @@ func TestFloodHexAggregator_ObservationTTL_Reaping(t *testing.T) {
 		t.Errorf("expected clearance broadcast with CameraCount 0 and DRY, got count=%d sev=%s", lastEvt.CameraCount, lastEvt.FloodSeverity)
 	}
 }
+
+func TestFloodHexAggregator_OnUserReport_EscalationAndTTL(t *testing.T) {
+	cams := []camera.Camera{
+		{ID: "cam-usr-1", DisplayName: "Nga 4 Hang Xanh", H3Res7: "87654321fffffff"},
+	}
+	polys := map[string][][]float64{
+		"87654321fffffff": {{10.8, 106.7}, {10.81, 106.71}},
+	}
+	broadcaster := &mockFloodBroadcaster{}
+	agg := NewFloodHexAggregator(cams, polys, 7, 1, broadcaster, nil)
+
+	now := time.Now()
+
+	// 1. First report from IP 1 -> reportCount=1, escalated=false
+	count, escalated := agg.OnUserReport("cam-usr-1", "hash_ip_1", now)
+	if count != 1 {
+		t.Errorf("expected count=1, got %d", count)
+	}
+	if escalated {
+		t.Errorf("expected escalated=false with single reporter")
+	}
+
+	// 2. Second report from same IP within 10m -> reportCount=2, escalated=false (still 1 distinct IP)
+	count, escalated = agg.OnUserReport("cam-usr-1", "hash_ip_1", now.Add(2*time.Minute))
+	if count != 2 {
+		t.Errorf("expected count=2, got %d", count)
+	}
+	if escalated {
+		t.Errorf("expected escalated=false with same IP repeated")
+	}
+
+	// 3. Third report from distinct IP 2 within 10m -> reportCount=3, escalated=true (>= 2 distinct IPs)
+	count, escalated = agg.OnUserReport("cam-usr-1", "hash_ip_2", now.Add(3*time.Minute))
+	if count != 3 {
+		t.Errorf("expected count=3, got %d", count)
+	}
+	if !escalated {
+		t.Errorf("expected escalated=true with 2 distinct IPs within 10m")
+	}
+
+	// 4. Verify GetActiveUserReports returns active summary
+	summaries := agg.GetActiveUserReports()
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 active user report summary, got %d", len(summaries))
+	}
+	if summaries[0].CameraID != "cam-usr-1" {
+		t.Errorf("expected CameraID cam-usr-1, got %s", summaries[0].CameraID)
+	}
+	if !summaries[0].Escalated {
+		t.Errorf("expected Escalated=true in summary")
+	}
+
+	// 5. Test 10-minute window escalation expiry:
+	// A new aggregator where IP 1 reported 12 minutes ago, and IP 2 reports now.
+	// IP 1 is outside the 10-minute escalation window -> escalated should be false!
+	agg2 := NewFloodHexAggregator(cams, polys, 7, 1, broadcaster, nil)
+	agg2.OnUserReport("cam-usr-1", "hash_old_ip", now.Add(-12*time.Minute))
+	count, escalated = agg2.OnUserReport("cam-usr-1", "hash_new_ip", now)
+	if count != 2 { // both within 15m sliding TTL
+		t.Errorf("expected count=2 within 15m TTL, got %d", count)
+	}
+	if escalated {
+		t.Errorf("expected escalated=false because hash_old_ip is outside the 10-minute escalation window")
+	}
+
+	// 6. Test 15-minute sliding TTL pruning
+	agg3 := NewFloodHexAggregator(cams, polys, 7, 1, broadcaster, nil)
+	agg3.OnUserReport("cam-usr-1", "hash_expired", now.Add(-16*time.Minute))
+	count, escalated = agg3.OnUserReport("cam-usr-1", "hash_fresh", now)
+	if count != 1 {
+		t.Errorf("expected count=1 after pruning >15m report, got %d", count)
+	}
+	if escalated {
+		t.Errorf("expected escalated=false")
+	}
+}
+
