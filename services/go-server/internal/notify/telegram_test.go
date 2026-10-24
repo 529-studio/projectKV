@@ -159,7 +159,7 @@ func TestFormatTelegramMessage_StagingChokepointFixture(t *testing.T) {
 		CameraID:       "586e2995f9fab7001111b0b5",
 		CameraName:     "Ung Văn Khiêm - Nguyễn Gia Trí (D2)",
 		Ward:           "Thạnh Mỹ Tây",
-		District:       "Bình Thạnh",
+		District:       "Khu vực Nội thành TP.HCM", // production cam.Zone for this camera (default ZoneNoiThanh classification)
 		FloodSeverity:  "FLOODED_DEEP",
 		TypicalDepthCm: 35,
 		ObservedAt:     time.Date(2026, 10, 24, 14, 15, 0, 0, time.UTC),
@@ -177,7 +177,7 @@ func TestFormatTelegramMessage_StagingChokepointFixture(t *testing.T) {
 	// Exact canonical rendering: 14:15 UTC + 7 = 21:15 ICT same day.
 	want := "<b>[CẢNH BÁO NGẬP NƯỚC / FLOOD ALERT]</b>\n\n" +
 		"<b>Điểm ngập / Chokepoint:</b> Ung Văn Khiêm - Nguyễn Gia Trí (D2)\n" +
-		"<b>Khu vực / Area:</b> Thạnh Mỹ Tây, Bình Thạnh\n" +
+		"<b>Khu vực / Area:</b> Thạnh Mỹ Tây, Khu vực Nội thành TP.HCM\n" +
 		"<b>Mức độ / Severity:</b> [NGẬP SÂU / DEEP FLOOD]\n" +
 		"<b>Độ sâu ước lượng / Depth:</b> ~35 cm\n" +
 		"<b>Thời gian / Time:</b> 21:15 24/10/2026 (ICT)\n" +
