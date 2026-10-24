@@ -40,10 +40,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Staging verification camera (authentic municipal flood chokepoint fixture).
+# CAMERA_DISTRICT mirrors the production dispatchFloodAlert value for this
+# camera: district = cam.Zone, which resolves to the default traffic zone
+# "Khu vực Nội thành TP.HCM" (ZoneNoiThanh) — NOT the administrative district
+# from the chokepoints fixture. Pinned by TestFormatTelegramMessage_StagingChokepointFixture.
 CAMERA_ID="586e2995f9fab7001111b0b5"
 CAMERA_NAME="Ung Văn Khiêm - Nguyễn Gia Trí (D2)"
 CAMERA_WARD="Thạnh Mỹ Tây"
-CAMERA_DISTRICT="Bình Thạnh"
+CAMERA_DISTRICT="Khu vực Nội thành TP.HCM"
 CAMERA_DEPTH_CM=35
 SEVERITY_VI="NGẬP SÂU"
 SEVERITY_EN="DEEP FLOOD"

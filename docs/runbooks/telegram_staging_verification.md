@@ -90,9 +90,15 @@ a live `sendMessage` delivery to the staging group (HTTP 200, `ok=true`).
 
 Expected output: `Result: PASSED.` — then visually confirm in the Telegram
 group that the message renders as bold HTML with both Vietnamese and English
-lines and contains no emojis. The composed message mirrors
-`notify.FormatTelegramMessage`; parity is pinned by
-`TestFormatTelegramMessage_StagingChokepointFixture`.
+lines and contains no emojis. The composed message mirrors the production
+`dispatchFloodAlert` → `notify.FormatTelegramMessage` output for this camera;
+parity is pinned by `TestFormatTelegramMessage_StagingChokepointFixture`.
+
+Note on the Area line: production renders `district = cam.Zone`, a **traffic
+zone** — for this camera `Khu vực Nội thành TP.HCM` (default `ZoneNoiThanh`
+classification), not the administrative district (`Bình Thạnh`) listed in the
+chokepoints fixture. Expect `Khu vực / Area: Thạnh Mỹ Tây, Khu vực Nội thành
+TP.HCM`; that value is correct, not a bug.
 
 Optional staging liveness probe (chokepoints endpoint serving the camera):
 

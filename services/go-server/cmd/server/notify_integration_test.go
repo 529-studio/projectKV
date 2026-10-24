@@ -260,7 +260,7 @@ func TestNotifyIntegration_DebounceFiveMinuteWindow(t *testing.T) {
 		CameraID:       "586e2995f9fab7001111b0b5",
 		CameraName:     "Ung Văn Khiêm - Nguyễn Gia Trí (D2)",
 		Ward:           "Thạnh Mỹ Tây",
-		District:       "Bình Thạnh",
+		District:       "Khu vực Nội thành TP.HCM", // production cam.Zone (traffic zone, not administrative district)
 		FloodSeverity:  "FLOODED_DEEP",
 		TypicalDepthCm: 35,
 	}
