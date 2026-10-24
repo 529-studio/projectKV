@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -48,6 +50,173 @@ type Config struct {
 	HarvesterConcurrency          int
 }
 
+// CleanEnv returns the environment variable value with surrounding whitespace and quotes (`"`, `'`) stripped.
+func CleanEnv(key string) string {
+	val := os.Getenv(key)
+	return strings.Trim(strings.TrimSpace(val), `"'`)
+}
+
+// parseEnvInt reads an int environment variable, trimming quotes and whitespace.
+// If unset or empty, it returns fallback. If parsing fails, it logs a structured warning and returns fallback.
+// If min is specified and parsed value < min[0], it logs a structured warning and returns fallback.
+func parseEnvInt(key string, fallback int, min ...int) int {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
+	}
+	clean := strings.Trim(strings.TrimSpace(val), `"'`)
+	if clean == "" {
+		return fallback
+	}
+	v, err := strconv.Atoi(clean)
+	if err != nil {
+		slog.Warn("config: invalid numeric format, using fallback default",
+			"key", key,
+			"raw_value", val,
+			"default", fallback,
+			"error", err,
+		)
+		return fallback
+	}
+	if len(min) > 0 && v < min[0] {
+		slog.Warn("config: numeric value below minimum allowed, using fallback default",
+			"key", key,
+			"raw_value", val,
+			"min", min[0],
+			"default", fallback,
+		)
+		return fallback
+	}
+	return v
+}
+
+// parseEnvInt64 reads an int64 environment variable, trimming quotes and whitespace.
+func parseEnvInt64(key string, fallback int64, min ...int64) int64 {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
+	}
+	clean := strings.Trim(strings.TrimSpace(val), `"'`)
+	if clean == "" {
+		return fallback
+	}
+	v, err := strconv.ParseInt(clean, 10, 64)
+	if err != nil {
+		slog.Warn("config: invalid numeric format, using fallback default",
+			"key", key,
+			"raw_value", val,
+			"default", fallback,
+			"error", err,
+		)
+		return fallback
+	}
+	if len(min) > 0 && v < min[0] {
+		slog.Warn("config: numeric value below minimum allowed, using fallback default",
+			"key", key,
+			"raw_value", val,
+			"min", min[0],
+			"default", fallback,
+		)
+		return fallback
+	}
+	return v
+}
+
+// parseEnvFloat reads a float64 environment variable, trimming quotes and whitespace.
+func parseEnvFloat(key string, fallback float64, min ...float64) float64 {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
+	}
+	clean := strings.Trim(strings.TrimSpace(val), `"'`)
+	if clean == "" {
+		return fallback
+	}
+	v, err := strconv.ParseFloat(clean, 64)
+	if err != nil {
+		slog.Warn("config: invalid float format, using fallback default",
+			"key", key,
+			"raw_value", val,
+			"default", fallback,
+			"error", err,
+		)
+		return fallback
+	}
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		slog.Warn("config: invalid float value (NaN or Inf), using fallback default",
+			"key", key,
+			"raw_value", val,
+			"default", fallback,
+		)
+		return fallback
+	}
+	if len(min) > 0 && v < min[0] {
+		slog.Warn("config: float value below minimum allowed, using fallback default",
+			"key", key,
+			"raw_value", val,
+			"min", min[0],
+			"default", fallback,
+		)
+		return fallback
+	}
+	return v
+}
+
+// parseEnvBool reads a boolean environment variable, trimming quotes and whitespace.
+func parseEnvBool(key string, fallback bool) bool {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
+	}
+	clean := strings.Trim(strings.TrimSpace(val), `"'`)
+	if clean == "" {
+		return fallback
+	}
+	b, err := strconv.ParseBool(clean)
+	if err != nil {
+		slog.Warn("config: invalid boolean format, using fallback default",
+			"key", key,
+			"raw_value", val,
+			"default", fallback,
+			"error", err,
+		)
+		return fallback
+	}
+	return b
+}
+
+// parseEnvDuration reads a duration environment variable, trimming quotes and whitespace.
+func parseEnvDuration(key string, fallback time.Duration) time.Duration {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
+	}
+	clean := strings.Trim(strings.TrimSpace(val), `"'`)
+	if clean == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(clean)
+	if err != nil {
+		slog.Warn("config: invalid duration format, using fallback default",
+			"key", key,
+			"raw_value", val,
+			"default", fallback.String(),
+			"error", err,
+		)
+		return fallback
+	}
+	return d
+}
+
+// parseEnvString reads a string environment variable, trimming quotes and whitespace.
+func parseEnvString(key string, fallback string) string {
+	clean := CleanEnv(key)
+	if clean == "" {
+		return fallback
+	}
+	return clean
+}
+
 func loadDotEnv() {
 	paths := []string{".env", "../../.env", "../.env"}
 	for _, p := range paths {
@@ -82,208 +251,56 @@ func LoadFromEnv() (*Config, error) {
 
 	var errs []error
 	cfg := &Config{
-		Port:                          3000,
-		SnapshotCacheTTLSeconds:       10,
-		HotsetIntervalSeconds:         30,
-		HotsetMaxParallel:             10,
-		HotsetActiveTTLSeconds:        120,
-		CVEngineURL:                   "http://localhost:8001",
-		SQLitePath:                    "./data/camera-view.db",
-		DedupeCooldownMinutes:         15,
-		LogLevel:                      "info",
-		StorageDriver:                 "local",
-		StorageLocalRoot:              "./data/proofs",
-		R2BucketName:                  "warded-proofs",
-		R2Region:                      "auto",
-		R2PublicURL:                   "https://file.529studio.site",
-		ArchiveSampleIntervalSeconds:  300,
-		ArchiveRetentionDays:          14,
-		ArchiveMaxDiskMB:              20000,
-		ArchiveRetentionCheckInterval: 1 * time.Hour,
-		VerdictStaleTTLSeconds:        180,
-		FrozenFrameThreshold:          3,
-		HexResolution:                 7,
-		HexMinCameras:                 3,
-		HarvesterEnabled:              false,
-		HarvesterScheduleHours:        "7,12,17",
-		HarvesterRainCooldownMinutes:  60,
-		HarvesterConcurrency:          15,
+		Port:                          parseEnvInt("PORT", 3000, 1),
+		SnapshotCacheTTLSeconds:       parseEnvInt("SNAPSHOT_CACHE_TTL_SECONDS", 10, 1),
+		HotsetIntervalSeconds:         parseEnvInt("HOTSET_INTERVAL_SECONDS", 30, 1),
+		HotsetMaxParallel:             parseEnvInt("HOTSET_MAX_PARALLEL", 10, 1),
+		HotsetActiveTTLSeconds:        parseEnvInt("HOTSET_ACTIVE_TTL_SECONDS", 120, 1),
+		CVEngineURL:                   parseEnvString("CV_ENGINE_URL", "http://localhost:8001"),
+		SQLitePath:                    parseEnvString("SQLITE_PATH", "./data/camera-view.db"),
+		DedupeCooldownMinutes:         parseEnvInt("DEDUPE_COOLDOWN_MINUTES", 15, 1),
+		LogLevel:                      parseEnvString("LOG_LEVEL", "info"),
+		StorageDriver:                 parseEnvString("STORAGE_DRIVER", "local"),
+		StorageLocalRoot:              parseEnvString("STORAGE_LOCAL_ROOT", "./data/proofs"),
+		R2AccountID:                   parseEnvString("R2_ACCOUNT_ID", ""),
+		R2Endpoint:                    parseEnvString("R2_ENDPOINT", ""),
+		R2BucketName:                  parseEnvString("R2_BUCKET_NAME", "warded-proofs"),
+		R2Region:                      parseEnvString("R2_REGION", "auto"),
+		R2AccessKeyID:                 parseEnvString("R2_ACCESS_KEY_ID", ""),
+		R2SecretAccessKey:             parseEnvString("R2_SECRET_ACCESS_KEY", ""),
+		R2PublicURL:                   parseEnvString("R2_PUBLIC_URL", "https://file.529studio.site"),
+		ArchiveSampleIntervalSeconds:  parseEnvInt("ARCHIVE_SAMPLE_INTERVAL_SECONDS", 300, 1),
+		ArchiveRetentionDays:          parseEnvInt("ARCHIVE_RETENTION_DAYS", 14, 1),
+		ArchiveMaxDiskMB:              parseEnvInt64("ARCHIVE_MAX_DISK_MB", 20000, 1),
+		ArchiveRetentionCheckInterval: parseEnvDuration("ARCHIVE_RETENTION_CHECK_INTERVAL", 1*time.Hour),
+		VerdictStaleTTLSeconds:        parseEnvInt("VERDICT_STALE_TTL_SECONDS", 180, 1),
+		FrozenFrameThreshold:          parseEnvInt("FROZEN_FRAME_THRESHOLD", 3, 1),
+		HexResolution:                 parseEnvInt("HEX_RESOLUTION", 7, 1),
+		HexMinCameras:                 parseEnvInt("HEX_MIN_CAMERAS", 3, 1),
+		HarvesterEnabled:              parseEnvBool("HARVESTER_ENABLED", false),
+		HarvesterScheduleHours:        parseEnvString("HARVESTER_SCHEDULE_HOURS", "7,12,17"),
+		HarvesterRainCooldownMinutes:  parseEnvInt("HARVESTER_RAIN_COOLDOWN_MINUTES", 60, 1),
+		HarvesterConcurrency:          parseEnvInt("HARVESTER_CONCURRENCY", 15, 1),
 	}
 
-	if portStr := os.Getenv("PORT"); portStr != "" {
-		if p, err := strconv.Atoi(portStr); err == nil {
-			cfg.Port = p
-		}
-	}
-
-	cfg.SnapshotUpstreamBaseURL = os.Getenv("SNAPSHOT_UPSTREAM_BASE_URL")
+	cfg.SnapshotUpstreamBaseURL = parseEnvString("SNAPSHOT_UPSTREAM_BASE_URL", "")
 	if cfg.SnapshotUpstreamBaseURL == "" {
 		errs = append(errs, errors.New("SNAPSHOT_UPSTREAM_BASE_URL is required"))
 	}
 
-	if ttlStr := os.Getenv("SNAPSHOT_CACHE_TTL_SECONDS"); ttlStr != "" {
-		if t, err := strconv.Atoi(ttlStr); err == nil {
-			cfg.SnapshotCacheTTLSeconds = t
-		}
-	}
-
-	if val := os.Getenv("HOTSET_INTERVAL_SECONDS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			cfg.HotsetIntervalSeconds = v
-		}
-	}
-
-	if val := os.Getenv("HOTSET_MAX_PARALLEL"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			cfg.HotsetMaxParallel = v
-		}
-	}
-
-	if val := os.Getenv("HOTSET_ACTIVE_TTL_SECONDS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			cfg.HotsetActiveTTLSeconds = v
-		}
-	}
-
-	cfg.TelegramBotToken = os.Getenv("TELEGRAM_BOT_TOKEN")
-	cfg.CloudVisionAPIKey = os.Getenv("CLOUD_VISION_API_KEY")
+	cfg.TelegramBotToken = parseEnvString("TELEGRAM_BOT_TOKEN", "")
+	cfg.CloudVisionAPIKey = parseEnvString("CLOUD_VISION_API_KEY", "")
 	if cfg.CloudVisionAPIKey == "" {
-		cfg.CloudVisionAPIKey = os.Getenv("GEMINI_API_KEY")
+		cfg.CloudVisionAPIKey = parseEnvString("GEMINI_API_KEY", "")
 	}
 
-	if val := os.Getenv("CV_ENGINE_URL"); val != "" {
-		cfg.CVEngineURL = val
-	}
-
-	if val := os.Getenv("SQLITE_PATH"); val != "" {
-		cfg.SQLitePath = val
-	}
-
-	if val := os.Getenv("DEDUPE_COOLDOWN_MINUTES"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			cfg.DedupeCooldownMinutes = v
-		}
-	}
-
-	if val := os.Getenv("LOG_LEVEL"); val != "" {
-		cfg.LogLevel = val
-	}
-
-	if val := os.Getenv("STORAGE_DRIVER"); val != "" {
-		cfg.StorageDriver = val
-	}
-
-	if val := os.Getenv("STORAGE_LOCAL_ROOT"); val != "" {
-		cfg.StorageLocalRoot = val
-	}
-
-	if val := os.Getenv("R2_ACCOUNT_ID"); val != "" {
-		cfg.R2AccountID = strings.TrimSpace(val)
-	}
-
-	if val := os.Getenv("R2_ENDPOINT"); val != "" {
-		cfg.R2Endpoint = strings.TrimSpace(val)
-	} else if cfg.R2AccountID != "" {
+	if cfg.R2Endpoint == "" && cfg.R2AccountID != "" {
 		cfg.R2Endpoint = fmt.Sprintf("https://%s.r2.cloudflarestorage.com", cfg.R2AccountID)
 	}
 
-	if val := os.Getenv("R2_BUCKET_NAME"); val != "" {
-		cfg.R2BucketName = strings.TrimSpace(val)
-	}
-
-	if val := os.Getenv("R2_REGION"); val != "" {
-		cfg.R2Region = strings.TrimSpace(val)
-	}
-
-	if val := os.Getenv("R2_ACCESS_KEY_ID"); val != "" {
-		cfg.R2AccessKeyID = strings.TrimSpace(val)
-	}
-
-	if val := os.Getenv("R2_SECRET_ACCESS_KEY"); val != "" {
-		cfg.R2SecretAccessKey = strings.TrimSpace(val)
-	}
-
-	if val := os.Getenv("R2_PUBLIC_URL"); val != "" {
-		cfg.R2PublicURL = strings.TrimSpace(val)
-	}
-
-	if val := os.Getenv("ARCHIVE_SAMPLE_INTERVAL_SECONDS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			cfg.ArchiveSampleIntervalSeconds = v
-		}
-	}
-
-	if val := os.Getenv("ARCHIVE_RETENTION_DAYS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			cfg.ArchiveRetentionDays = v
-		}
-	}
-
-	if val := os.Getenv("ARCHIVE_MAX_DISK_MB"); val != "" {
-		if v, err := strconv.ParseInt(val, 10, 64); err == nil {
-			cfg.ArchiveMaxDiskMB = v
-		}
-	}
-
-	if val := os.Getenv("ARCHIVE_RETENTION_CHECK_INTERVAL"); val != "" {
-		if d, err := time.ParseDuration(val); err == nil {
-			cfg.ArchiveRetentionCheckInterval = d
-		}
-	}
-
-	if val := os.Getenv("VERDICT_STALE_TTL_SECONDS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			cfg.VerdictStaleTTLSeconds = v
-		}
-	}
-
-	if val := os.Getenv("FROZEN_FRAME_THRESHOLD"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			cfg.FrozenFrameThreshold = v
-		}
-	}
-
-	if val := os.Getenv("HEX_RESOLUTION"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			cfg.HexResolution = v
-		}
-	}
-
-	if val := os.Getenv("HEX_MIN_CAMERAS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			cfg.HexMinCameras = v
-		}
-	}
-
-	if val := os.Getenv("DEV_ACCESS_TOKEN"); val != "" {
-		cfg.DevAccessToken = strings.TrimSpace(val)
-	} else if val := os.Getenv("LABELER_SECRET_TOKEN"); val != "" {
-		cfg.DevAccessToken = strings.TrimSpace(val)
-	}
-
-	if val := os.Getenv("HARVESTER_ENABLED"); val != "" {
-		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
-		if b, err := strconv.ParseBool(cleanVal); err == nil {
-			cfg.HarvesterEnabled = b
-		}
-	}
-
-	if val := os.Getenv("HARVESTER_SCHEDULE_HOURS"); val != "" {
-		cfg.HarvesterScheduleHours = strings.Trim(strings.TrimSpace(val), `"'`)
-	}
-
-	if val := os.Getenv("HARVESTER_RAIN_COOLDOWN_MINUTES"); val != "" {
-		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
-		if v, err := strconv.Atoi(cleanVal); err == nil && v > 0 {
-			cfg.HarvesterRainCooldownMinutes = v
-		}
-	}
-
-	if val := os.Getenv("HARVESTER_CONCURRENCY"); val != "" {
-		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
-		if v, err := strconv.Atoi(cleanVal); err == nil && v > 0 {
-			cfg.HarvesterConcurrency = v
-		}
+	cfg.DevAccessToken = parseEnvString("DEV_ACCESS_TOKEN", "")
+	if cfg.DevAccessToken == "" {
+		cfg.DevAccessToken = parseEnvString("LABELER_SECRET_TOKEN", "")
 	}
 
 	if len(errs) > 0 {
@@ -377,12 +394,9 @@ func resolvePath(rel string) string {
 func LoadConfig() *ServerConfig {
 	loadDotEnv()
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3000"
-	}
+	port := parseEnvString("PORT", "3000")
 
-	camerasPath := os.Getenv("CAMERAS_FILE_PATH")
+	camerasPath := CleanEnv("CAMERAS_FILE_PATH")
 	if camerasPath == "" || filepath.Base(camerasPath) == "cameras_all.json" {
 		// Prefer enriched catalog if available (ADR-003 Decision 3), otherwise fall back to base catalog
 		enrichedPath := resolvePath("cameras_enriched.json")
@@ -393,176 +407,75 @@ func LoadConfig() *ServerConfig {
 		}
 	}
 
-	staticDir := os.Getenv("STATIC_WEB_DIR")
-	if staticDir == "" {
-		staticDir = resolvePath("apps/web")
-	}
+	staticDir := parseEnvString("STATIC_WEB_DIR", resolvePath("apps/web"))
+	sqlitePath := parseEnvString("SQLITE_PATH", resolvePath("data/camera-view.db"))
+	tileCacheDir := parseEnvString("TILE_CACHE_DIR", resolvePath("data/tiles"))
 
-	sqlitePath := os.Getenv("SQLITE_PATH")
-	if sqlitePath == "" {
-		sqlitePath = resolvePath("data/camera-view.db")
-	}
+	analyzer := strings.ToLower(parseEnvString("ANALYZER", "none"))
 
-	tileCacheDir := os.Getenv("TILE_CACHE_DIR")
-	if tileCacheDir == "" {
-		tileCacheDir = resolvePath("data/tiles")
-	}
-
-	analyzer := strings.ToLower(strings.TrimSpace(os.Getenv("ANALYZER")))
-	if analyzer == "" {
-		analyzer = "none"
-	}
-
-	cloudVisionAPIKey := strings.TrimSpace(os.Getenv("CLOUD_VISION_API_KEY"))
+	cloudVisionAPIKey := parseEnvString("CLOUD_VISION_API_KEY", "")
 	if cloudVisionAPIKey == "" {
-		cloudVisionAPIKey = strings.TrimSpace(os.Getenv("GEMINI_API_KEY"))
+		cloudVisionAPIKey = parseEnvString("GEMINI_API_KEY", "")
 	}
 
-	geminiModel := strings.TrimSpace(os.Getenv("GEMINI_MODEL"))
-	if geminiModel == "" {
-		geminiModel = "gemini-3.5-flash-lite"
-	}
+	geminiModel := parseEnvString("GEMINI_MODEL", "gemini-3.5-flash-lite")
+	cvEngineURL := parseEnvString("CV_ENGINE_URL", "")
 
-	cvEngineURL := strings.TrimSpace(os.Getenv("CV_ENGINE_URL"))
-
-	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	appEnv := strings.ToLower(parseEnvString("APP_ENV", ""))
 	if appEnv == "" {
-		if os.Getenv("GIN_MODE") == "release" {
+		if CleanEnv("GIN_MODE") == "release" {
 			appEnv = "production"
 		} else {
 			appEnv = "dev"
 		}
 	}
 
-	devAccessToken := strings.TrimSpace(os.Getenv("DEV_ACCESS_TOKEN"))
+	devAccessToken := parseEnvString("DEV_ACCESS_TOKEN", "")
 	if devAccessToken == "" {
-		devAccessToken = strings.TrimSpace(os.Getenv("LABELER_SECRET_TOKEN"))
+		devAccessToken = parseEnvString("LABELER_SECRET_TOKEN", "")
 	}
 
-	telegramBotToken := strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN"))
-	telegramDebounceMinutes := 30
-	if val := os.Getenv("TELEGRAM_DEBOUNCE_MINUTES"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			telegramDebounceMinutes = v
-		}
-	}
+	telegramBotToken := parseEnvString("TELEGRAM_BOT_TOKEN", "")
+	telegramDebounceMinutes := parseEnvInt("TELEGRAM_DEBOUNCE_MINUTES", 30, 1)
 
-	storageDriver := strings.ToLower(strings.TrimSpace(os.Getenv("STORAGE_DRIVER")))
-	if storageDriver == "" {
-		storageDriver = "local"
-	}
+	storageDriver := strings.ToLower(parseEnvString("STORAGE_DRIVER", "local"))
+	storageLocalRoot := parseEnvString("STORAGE_LOCAL_ROOT", resolvePath("data/proofs"))
 
-	storageLocalRoot := os.Getenv("STORAGE_LOCAL_ROOT")
-	if storageLocalRoot == "" {
-		storageLocalRoot = resolvePath("data/proofs")
-	}
-
-	r2AccountID := strings.TrimSpace(os.Getenv("R2_ACCOUNT_ID"))
-	r2Endpoint := strings.TrimSpace(os.Getenv("R2_ENDPOINT"))
+	r2AccountID := parseEnvString("R2_ACCOUNT_ID", "")
+	r2Endpoint := parseEnvString("R2_ENDPOINT", "")
 	if r2Endpoint == "" && r2AccountID != "" {
 		r2Endpoint = fmt.Sprintf("https://%s.r2.cloudflarestorage.com", r2AccountID)
 	}
 
-	r2BucketName := strings.TrimSpace(os.Getenv("R2_BUCKET_NAME"))
-	if r2BucketName == "" {
-		r2BucketName = "warded-proofs"
-	}
+	r2BucketName := parseEnvString("R2_BUCKET_NAME", "warded-proofs")
+	r2Region := parseEnvString("R2_REGION", "auto")
+	r2AccessKeyID := parseEnvString("R2_ACCESS_KEY_ID", "")
+	r2SecretAccessKey := parseEnvString("R2_SECRET_ACCESS_KEY", "")
+	r2PublicURL := parseEnvString("R2_PUBLIC_URL", "https://file.529studio.site")
 
-	r2Region := strings.TrimSpace(os.Getenv("R2_REGION"))
-	if r2Region == "" {
-		r2Region = "auto"
-	}
+	sampleInterval := parseEnvInt("ARCHIVE_SAMPLE_INTERVAL_SECONDS", 300, 1)
+	retentionDays := parseEnvInt("ARCHIVE_RETENTION_DAYS", 14, 1)
+	maxDiskMB := parseEnvInt64("ARCHIVE_MAX_DISK_MB", 20000, 1)
+	retentionCheckInterval := parseEnvDuration("ARCHIVE_RETENTION_CHECK_INTERVAL", 1*time.Hour)
 
-	r2AccessKeyID := strings.TrimSpace(os.Getenv("R2_ACCESS_KEY_ID"))
-	r2SecretAccessKey := strings.TrimSpace(os.Getenv("R2_SECRET_ACCESS_KEY"))
-
-	r2PublicURL := strings.TrimSpace(os.Getenv("R2_PUBLIC_URL"))
-	if r2PublicURL == "" {
-		r2PublicURL = "https://file.529studio.site"
-	}
-	sampleInterval := 300
-	if val := os.Getenv("ARCHIVE_SAMPLE_INTERVAL_SECONDS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			sampleInterval = v
-		}
-	}
-
-	retentionDays := 14
-	if val := os.Getenv("ARCHIVE_RETENTION_DAYS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			retentionDays = v
-		}
-	}
-
-	maxDiskMB := int64(20000)
-	if val := os.Getenv("ARCHIVE_MAX_DISK_MB"); val != "" {
-		if v, err := strconv.ParseInt(val, 10, 64); err == nil {
-			maxDiskMB = v
-		}
-	}
-
-	retentionCheckInterval := 1 * time.Hour
-	if val := os.Getenv("ARCHIVE_RETENTION_CHECK_INTERVAL"); val != "" {
-		if d, err := time.ParseDuration(val); err == nil {
-			retentionCheckInterval = d
-		}
-	}
-
-	rateLimitRPS := 10
-	if val := os.Getenv("RATE_LIMIT_RPS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			rateLimitRPS = v
-		}
-	}
-
-	rateLimitBurst := 30
-	if val := os.Getenv("RATE_LIMIT_BURST"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			rateLimitBurst = v
-		}
-	}
-
-	analyzerDailyBudget := 5000
-	if val := os.Getenv("ANALYZER_DAILY_BUDGET"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			analyzerDailyBudget = v
-		}
-	}
-
-	verdictStaleTTLSeconds := 180
-	if val := os.Getenv("VERDICT_STALE_TTL_SECONDS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			verdictStaleTTLSeconds = v
-		}
-	}
-
-	frozenFrameThreshold := 3
-	if val := os.Getenv("FROZEN_FRAME_THRESHOLD"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			frozenFrameThreshold = v
-		}
-	}
+	rateLimitRPS := parseEnvInt("RATE_LIMIT_RPS", 10, 1)
+	rateLimitBurst := parseEnvInt("RATE_LIMIT_BURST", 30, 1)
+	analyzerDailyBudget := parseEnvInt("ANALYZER_DAILY_BUDGET", 5000, 1)
+	verdictStaleTTLSeconds := parseEnvInt("VERDICT_STALE_TTL_SECONDS", 180, 1)
+	frozenFrameThreshold := parseEnvInt("FROZEN_FRAME_THRESHOLD", 3, 1)
 
 	hotsetIntervalSeconds := 30
 	if analyzer == "vlm" {
 		hotsetIntervalSeconds = 60 // safe default for free tier
 	}
 	// onnx: 30s cycle matches S1 Option 1b capacity arithmetic (25.1s used, 16% headroom).
-	if val := os.Getenv("HOTSET_INTERVAL_SECONDS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			hotsetIntervalSeconds = v
-		}
-	}
+	hotsetIntervalSeconds = parseEnvInt("HOTSET_INTERVAL_SECONDS", hotsetIntervalSeconds, 1)
 
 	hotsetMaxParallel := 10
 	if analyzer == "vlm" {
 		hotsetMaxParallel = 1 // 1 worker avoids concurrent burst calls against 15 RPM limit
 	}
-	if val := os.Getenv("HOTSET_MAX_PARALLEL"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			hotsetMaxParallel = v
-		}
-	}
+	hotsetMaxParallel = parseEnvInt("HOTSET_MAX_PARALLEL", hotsetMaxParallel, 1)
 
 	hotsetFixedMaxCameras := 40
 	if analyzer == "vlm" {
@@ -572,123 +485,27 @@ func LoadConfig() *ServerConfig {
 	} else if analyzer == "none" || analyzer == "" {
 		hotsetFixedMaxCameras = 0
 	}
-	if val := os.Getenv("HOTSET_FIXED_MAX_CAMERAS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v >= 0 {
-			hotsetFixedMaxCameras = v
-		}
-	}
+	hotsetFixedMaxCameras = parseEnvInt("HOTSET_FIXED_MAX_CAMERAS", hotsetFixedMaxCameras, 0)
 
-	hexResolution := 7
-	if val := os.Getenv("HEX_RESOLUTION"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			hexResolution = v
-		}
-	}
+	hexResolution := parseEnvInt("HEX_RESOLUTION", 7, 1)
+	hexMinCameras := parseEnvInt("HEX_MIN_CAMERAS", 3, 1)
+	hexPolygonFilePath := parseEnvString("HEX_POLYGON_FILE_PATH", resolvePath("h3_hex_polygons.json"))
 
-	hexMinCameras := 3
-	if val := os.Getenv("HEX_MIN_CAMERAS"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil && v > 0 {
-			hexMinCameras = v
-		}
-	}
+	pcuWeightMotorcycle := parseEnvFloat("PCU_WEIGHT_MOTORCYCLE", 0.3, 0.0)
+	pcuWeightCar := parseEnvFloat("PCU_WEIGHT_CAR", 1.0, 0.0)
+	pcuWeightBus := parseEnvFloat("PCU_WEIGHT_BUS", 2.5, 0.0)
+	pcuWeightTruck := parseEnvFloat("PCU_WEIGHT_TRUCK", 2.0, 0.0)
+	pcuWeightContainer := parseEnvFloat("PCU_WEIGHT_CONTAINER", pcuWeightTruck, 0.0)
 
-	hexPolygonFilePath := os.Getenv("HEX_POLYGON_FILE_PATH")
-	if hexPolygonFilePath == "" {
-		hexPolygonFilePath = resolvePath("h3_hex_polygons.json")
-	}
+	pcuCapacityFloor := parseEnvFloat("PCU_CAPACITY_FLOOR", 15.0, 0.0001)
+	pcuThresholdModerate := parseEnvFloat("PCU_THRESHOLD_MODERATE", 0.30, 0.0001)
+	pcuThresholdHeavy := parseEnvFloat("PCU_THRESHOLD_HEAVY", 0.60, 0.0001)
+	pcuThresholdCongested := parseEnvFloat("PCU_THRESHOLD_CONGESTED", 0.80, 0.0001)
 
-	pcuWeightMotorcycle := 0.3
-	if val := os.Getenv("PCU_WEIGHT_MOTORCYCLE"); val != "" {
-		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
-			pcuWeightMotorcycle = v
-		}
-	}
-
-	pcuWeightCar := 1.0
-	if val := os.Getenv("PCU_WEIGHT_CAR"); val != "" {
-		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
-			pcuWeightCar = v
-		}
-	}
-
-	pcuWeightBus := 2.5
-	if val := os.Getenv("PCU_WEIGHT_BUS"); val != "" {
-		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
-			pcuWeightBus = v
-		}
-	}
-
-	pcuWeightTruck := 2.0
-	if val := os.Getenv("PCU_WEIGHT_TRUCK"); val != "" {
-		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
-			pcuWeightTruck = v
-		}
-	}
-
-	// Default PCUWeightContainer matches PCUWeightTruck (2.0) per ADR-005 T6 / decision-container-class-gap.md.
-	pcuWeightContainer := pcuWeightTruck
-	if val := os.Getenv("PCU_WEIGHT_CONTAINER"); val != "" {
-		if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
-			pcuWeightContainer = v
-		}
-	}
-
-	pcuCapacityFloor := 15.0
-	if val := os.Getenv("PCU_CAPACITY_FLOOR"); val != "" {
-		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
-			pcuCapacityFloor = v
-		}
-	}
-
-	pcuThresholdModerate := 0.30
-	if val := os.Getenv("PCU_THRESHOLD_MODERATE"); val != "" {
-		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
-			pcuThresholdModerate = v
-		}
-	}
-
-	pcuThresholdHeavy := 0.60
-	if val := os.Getenv("PCU_THRESHOLD_HEAVY"); val != "" {
-		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
-			pcuThresholdHeavy = v
-		}
-	}
-
-	pcuThresholdCongested := 0.80
-	if val := os.Getenv("PCU_THRESHOLD_CONGESTED"); val != "" {
-		if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
-			pcuThresholdCongested = v
-		}
-	}
-
-	harvesterEnabled := false
-	if val := os.Getenv("HARVESTER_ENABLED"); val != "" {
-		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
-		if b, err := strconv.ParseBool(cleanVal); err == nil {
-			harvesterEnabled = b
-		}
-	}
-
-	harvesterScheduleHours := "7,12,17"
-	if val := os.Getenv("HARVESTER_SCHEDULE_HOURS"); val != "" {
-		harvesterScheduleHours = strings.Trim(strings.TrimSpace(val), `"'`)
-	}
-
-	harvesterRainCooldownMinutes := 60
-	if val := os.Getenv("HARVESTER_RAIN_COOLDOWN_MINUTES"); val != "" {
-		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
-		if v, err := strconv.Atoi(cleanVal); err == nil && v > 0 {
-			harvesterRainCooldownMinutes = v
-		}
-	}
-
-	harvesterConcurrency := 15
-	if val := os.Getenv("HARVESTER_CONCURRENCY"); val != "" {
-		cleanVal := strings.Trim(strings.TrimSpace(val), `"'`)
-		if v, err := strconv.Atoi(cleanVal); err == nil && v > 0 {
-			harvesterConcurrency = v
-		}
-	}
+	harvesterEnabled := parseEnvBool("HARVESTER_ENABLED", false)
+	harvesterScheduleHours := parseEnvString("HARVESTER_SCHEDULE_HOURS", "7,12,17")
+	harvesterRainCooldownMinutes := parseEnvInt("HARVESTER_RAIN_COOLDOWN_MINUTES", 60, 1)
+	harvesterConcurrency := parseEnvInt("HARVESTER_CONCURRENCY", 15, 1)
 
 	return &ServerConfig{
 		Port:                          port,
