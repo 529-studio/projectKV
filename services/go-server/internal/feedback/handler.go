@@ -13,10 +13,11 @@ import (
 
 // Handler processes crowd-sourced flood feedback submissions.
 type Handler struct {
-	checker  CameraChecker
-	limiter  *RateLimiter
-	archiver *Archiver
-	loc      *time.Location
+	checker          CameraChecker
+	limiter          *RateLimiter
+	archiver         *Archiver
+	loc              *time.Location
+	onReportAccepted func(cameraID string, report Report)
 }
 
 // NewHandler constructs a feedback Handler with injected dependencies.
@@ -30,6 +31,11 @@ func NewHandler(checker CameraChecker, limiter *RateLimiter, archiver *Archiver)
 		archiver: archiver,
 		loc:      time.FixedZone("ICT", 7*3600),
 	}
+}
+
+// SetOnReportAccepted registers an observer callback triggered whenever a flood report is accepted.
+func (h *Handler) SetOnReportAccepted(fn func(cameraID string, report Report)) {
+	h.onReportAccepted = fn
 }
 
 // RegisterRoutes mounts the feedback submission endpoints onto the provided Gin router group.
@@ -90,9 +96,19 @@ func (h *Handler) ReportFlood(c *gin.Context) {
 
 	ts := time.Now().In(h.loc)
 	userAgent := c.GetHeader("User-Agent")
+	clientIPHash := HashClientIP(clientIP)
 
 	if h.archiver != nil {
 		h.archiver.ArchiveAsync(cameraID, clientIP, userAgent, ts)
+	}
+
+	if h.onReportAccepted != nil {
+		h.onReportAccepted(cameraID, Report{
+			CameraID:     cameraID,
+			ClientIPHash: clientIPHash,
+			UserAgent:    userAgent,
+			Timestamp:    ts,
+		})
 	}
 
 	c.JSON(http.StatusOK, ReportResponse{

@@ -66,6 +66,13 @@ function LegendContent({
           {lang === 'vi' ? 'Camera mất tín hiệu' : 'Offline camera'}
         </span>
       </div>
+      <div className="flex items-center gap-2.5">
+        <span
+          className="w-3 h-3 rounded-full border border-amber-600 shrink-0"
+          style={{ backgroundColor: FUNCTIONAL_COLORS.AMBER_CANDIDATE }}
+        />
+        <span>{lang === 'vi' ? 'Báo cáo từ người dân (Có ngập)' : 'Crowdsourced report (Flooded)'}</span>
+      </div>
 
       {/* Category 2: Hot Set cameras with real-time AI verdict (Only rendered when analysisEnabled is true) */}
       {analysisEnabled && (

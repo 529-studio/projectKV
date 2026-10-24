@@ -298,3 +298,68 @@ func TestHandler_ReportFlood_LegacyAliasRoute(t *testing.T) {
 		t.Fatalf("expected legacy alias route to return 200, got %d", w.Code)
 	}
 }
+
+func TestHandler_OnReportAccepted_Callback(t *testing.T) {
+	checker := &mockCameraChecker{
+		existingIDs: map[string]bool{"cam_accepted": true},
+	}
+	limiter := NewRateLimiter(5 * time.Minute)
+	handler := NewHandler(checker, limiter, nil)
+
+	var receivedCamID string
+	var receivedReport Report
+	callbackCount := 0
+
+	handler.SetOnReportAccepted(func(cameraID string, report Report) {
+		callbackCount++
+		receivedCamID = cameraID
+		receivedReport = report
+	})
+
+	router := gin.New()
+	handler.RegisterRoutes(router.Group("/api"))
+
+	// 1. Valid request triggers callback
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/cameras/cam_accepted/report-flood", nil)
+	req.RemoteAddr = "10.0.0.1:12345"
+	req.Header.Set("User-Agent", "Mozilla/5.0 AgentTest")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if callbackCount != 1 {
+		t.Fatalf("expected callbackCount = 1, got %d", callbackCount)
+	}
+	if receivedCamID != "cam_accepted" {
+		t.Errorf("expected receivedCamID = cam_accepted, got %s", receivedCamID)
+	}
+	if receivedReport.CameraID != "cam_accepted" {
+		t.Errorf("expected report.CameraID = cam_accepted, got %s", receivedReport.CameraID)
+	}
+	expectedIPHash := HashClientIP("10.0.0.1")
+	if receivedReport.ClientIPHash != expectedIPHash {
+		t.Errorf("expected report.ClientIPHash = %s, got %s", expectedIPHash, receivedReport.ClientIPHash)
+	}
+	if receivedReport.UserAgent != "Mozilla/5.0 AgentTest" {
+		t.Errorf("expected report.UserAgent = Mozilla/5.0 AgentTest, got %s", receivedReport.UserAgent)
+	}
+	if receivedReport.Timestamp.IsZero() {
+		t.Errorf("expected report.Timestamp to be set")
+	}
+
+	// 2. Immediate second request from same IP is rate limited -> callback MUST NOT be invoked again
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/cameras/cam_accepted/report-flood", nil)
+	req2.RemoteAddr = "10.0.0.1:12346"
+	router.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status 429, got %d", w2.Code)
+	}
+	if callbackCount != 1 {
+		t.Errorf("expected callbackCount to remain 1 after rate limited request, got %d", callbackCount)
+	}
+}
+

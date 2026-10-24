@@ -76,10 +76,45 @@ func (h *Hub) SetFloodHexAggregator(agg *FloodHexAggregator) {
 }
 
 // RegisterRoutes mounts the SSE stream endpoint and flood hex snapshot onto the given Gin router.
-// Registers GET /api/live/stream and GET /api/flood-hex.
+// Registers GET /api/live/stream, GET /api/flood-hex, and GET /api/flood/user-reports.
 func (h *Hub) RegisterRoutes(r gin.IRouter) {
 	r.GET(RouteStream, h.HandleSSE)
 	r.GET("/api/flood-hex", h.HandleFloodHex)
+	r.GET("/api/flood/user-reports", h.HandleActiveUserReports)
+	r.GET("/api/live/user-reports", h.HandleActiveUserReports)
+}
+
+// UserFloodReport represents a crowdsourced flood report event broadcast to SSE clients.
+type UserFloodReport struct {
+	CameraID     string    `json:"camera_id"`
+	ClientIPHash string    `json:"client_ip_hash,omitempty"`
+	Timestamp    time.Time `json:"timestamp"`
+	ReportCount  int       `json:"report_count"`
+	Escalated    bool      `json:"escalated"`
+	TTLSeconds   int       `json:"ttl_seconds"`
+}
+
+// HandleActiveUserReports godoc
+// @Summary Snapshot of all active crowdsourced user flood reports
+// @Description Returns the snapshot of all cameras currently having active user flood reports within the 15-minute sliding window.
+// @Tags Flood
+// @Produce json
+// @Success 200 {array} live.UserReportSummary
+// @Router /api/flood/user-reports [get]
+func (h *Hub) HandleActiveUserReports(c *gin.Context) {
+	h.mu.RLock()
+	agg := h.floodAgg
+	h.mu.RUnlock()
+
+	if agg == nil {
+		c.JSON(http.StatusOK, []UserReportSummary{})
+		return
+	}
+	reports := agg.GetActiveUserReports()
+	if reports == nil {
+		reports = []UserReportSummary{}
+	}
+	c.JSON(http.StatusOK, reports)
 }
 
 // HandleFloodHex godoc
@@ -241,6 +276,30 @@ func (h *Hub) BroadcastFloodHex(cell FloodHexCell) {
 	}
 
 	frame := fmt.Sprintf("event: %s\ndata: %s\n\n", EventFloodHexUpdate, data)
+	frameBytes := []byte(frame)
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for cl := range h.clients {
+		select {
+		case cl.send <- frameBytes:
+		default:
+			// Buffer full — drop this frame for this slow client.
+		}
+	}
+}
+
+// BroadcastUserFloodReport serialises report as a named SSE event (user_flood_report) and delivers it
+// to all connected clients.
+func (h *Hub) BroadcastUserFloodReport(report UserFloodReport) {
+	data, err := json.Marshal(report)
+	if err != nil {
+		h.log.Error("live: failed to marshal user flood report", "error", err)
+		return
+	}
+
+	frame := fmt.Sprintf("event: %s\ndata: %s\n\n", EventUserFloodReport, data)
 	frameBytes := []byte(frame)
 
 	h.mu.RLock()

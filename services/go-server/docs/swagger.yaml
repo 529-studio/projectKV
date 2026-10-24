@@ -354,6 +354,19 @@ definitions:
         description: display name
         type: string
     type: object
+  live.UserReportSummary:
+    properties:
+      camera_id:
+        type: string
+      escalated:
+        type: boolean
+      expires_at:
+        type: string
+      latest_at:
+        type: string
+      report_count:
+        type: integer
+    type: object
   subscription.SubscribeRequest:
     properties:
       channel_name:
@@ -757,6 +770,22 @@ paths:
               type: string
             type: object
       summary: Get latest flood-detection verdicts
+      tags:
+      - Flood
+  /api/flood/user-reports:
+    get:
+      description: Returns the snapshot of all cameras currently having active user
+        flood reports within the 15-minute sliding window.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/live.UserReportSummary'
+            type: array
+      summary: Snapshot of all active crowdsourced user flood reports
       tags:
       - Flood
   /api/live/stream:
