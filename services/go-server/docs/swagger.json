@@ -455,6 +455,29 @@
                 }
             }
         },
+        "/api/flood/user-reports": {
+            "get": {
+                "description": "Returns the snapshot of all cameras currently having active user flood reports within the 15-minute sliding window.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Flood"
+                ],
+                "summary": "Snapshot of all active crowdsourced user flood reports",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/live.UserReportSummary"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/live/stream": {
             "get": {
                 "description": "Server-Sent Events (SSE) stream delivering real-time Hot Set verdict updates and H3 hex cell aggregations. Emits 'camera_update' and 'hex_update' events with JSON payloads and periodic heartbeat comments (: heartbeat).",
@@ -1711,6 +1734,26 @@
                 "worst_camera_name": {
                     "description": "display name",
                     "type": "string"
+                }
+            }
+        },
+        "live.UserReportSummary": {
+            "type": "object",
+            "properties": {
+                "camera_id": {
+                    "type": "string"
+                },
+                "escalated": {
+                    "type": "boolean"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "latest_at": {
+                    "type": "string"
+                },
+                "report_count": {
+                    "type": "integer"
                 }
             }
         },

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -817,6 +818,30 @@ func main() {
 	feedbackLimiter := feedback.NewRateLimiter(5 * time.Minute)
 	feedbackArchiver := feedback.NewArchiver(feedbackFetcher, storeDriver, nil)
 	feedbackHandler := feedback.NewHandler(feedbackChecker, feedbackLimiter, feedbackArchiver)
+
+	// S8-T7 (Issue #289 / [KV-19]): Wire crowdsourced flood reports to liveHub and floodHexAggregator
+	if feedbackHandler != nil {
+		feedbackHandler.SetOnReportAccepted(func(cameraID string, report feedback.Report) {
+			reportCount, escalated := 1, false
+			if floodHexAggregator != nil {
+				reportCount, escalated = floodHexAggregator.OnUserReport(cameraID, report.ClientIPHash, report.Timestamp)
+			}
+			if liveHub != nil {
+				liveHub.BroadcastUserFloodReport(live.UserFloodReport{
+					CameraID:     cameraID,
+					ClientIPHash: report.ClientIPHash,
+					Timestamp:    report.Timestamp,
+					ReportCount:  reportCount,
+					Escalated:    escalated,
+					TTLSeconds:   900,
+				})
+			}
+			slog.Info("feedback: crowdsource flood report bridged to live stream",
+				"camera_id", cameraID,
+				"report_count", reportCount,
+				"escalated", escalated)
+		})
+	}
 
 	// 6e. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
 	var hotsetScheduler *hotset.Scheduler

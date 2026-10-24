@@ -357,3 +357,45 @@ func TestHub_ConcurrentBroadcast(t *testing.T) {
 	wg.Wait()
 	// No deadlock, no panic = pass.
 }
+
+func TestHub_BroadcastUserFloodReport(t *testing.T) {
+	hub := newTestHub()
+	defer hub.Close()
+
+	srv := newTestServer(hub)
+	defer srv.Close()
+
+	resp := openSSE(t, srv.URL)
+	defer resp.Body.Close()
+
+	time.Sleep(30 * time.Millisecond)
+
+	now := time.Now().Truncate(time.Second).UTC()
+	report := live.UserFloodReport{
+		CameraID:     "cam-user-report-99",
+		ClientIPHash: "abcdef123456",
+		Timestamp:    now,
+		ReportCount:  3,
+		Escalated:    true,
+		TTLSeconds:   900,
+	}
+	hub.BroadcastUserFloodReport(report)
+
+	ev, data, err := readEvent(resp, 2*time.Second)
+	if err != nil {
+		t.Fatalf("read SSE event: %v", err)
+	}
+	if ev != live.EventUserFloodReport {
+		t.Errorf("expected event name %q, got %q", live.EventUserFloodReport, ev)
+	}
+	if !strings.Contains(data, "cam-user-report-99") {
+		t.Errorf("expected camera_id in data, got %q", data)
+	}
+	if !strings.Contains(data, `"escalated":true`) {
+		t.Errorf("expected escalated:true in data, got %q", data)
+	}
+	if !strings.Contains(data, `"report_count":3`) {
+		t.Errorf("expected report_count:3 in data, got %q", data)
+	}
+}
+
