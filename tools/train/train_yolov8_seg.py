@@ -30,6 +30,8 @@ Usage:
   python3 tools/train/train_yolov8_seg.py --dry-run
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging

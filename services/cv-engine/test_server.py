@@ -4,6 +4,8 @@ Unit and integration tests for services/cv-engine/server.py.
 Verifies ThreadingHTTPServer concurrency, healthchecks, and resilient disconnect handling.
 """
 
+from __future__ import annotations
+
 import socket
 import struct
 import sys

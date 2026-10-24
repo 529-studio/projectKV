@@ -22,6 +22,8 @@ Usage:
   python3 tools/eval/export_yolo_seg.py --labels-dir tools/eval/labels_gold_standard --output-dir data/yolo_seg --verify
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging
