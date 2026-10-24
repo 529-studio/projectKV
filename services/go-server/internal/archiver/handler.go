@@ -228,12 +228,12 @@ func (h *Handler) ListSnapshots(c *gin.Context) {
 	var snapshots []SnapshotItem
 	var total int
 
-	// Check in-memory cache when no camera filter is specified (TTL: 60s)
+	// Check in-memory cache when no camera filter is specified (TTL: 24h, invalidated on SaveLabel or InvalidateCache)
 	h.cacheMu.RLock()
 	cachedSnap, hasSnapCache := h.snapshotCache[date]
 	h.cacheMu.RUnlock()
 
-	if camFilter == "" && hasSnapCache && time.Since(cachedSnap.cachedAt) < 60*time.Second {
+	if camFilter == "" && hasSnapCache && time.Since(cachedSnap.cachedAt) < 24*time.Hour {
 		snapshots = cachedSnap.snapshots
 		total = len(snapshots)
 	} else {
@@ -476,13 +476,13 @@ func (h *Handler) GetLabels(c *gin.Context) {
 
 	camFilter := strings.TrimSpace(c.Query("camera_id"))
 
-	// Fast path: Check in-memory cache first (TTL: 60s, invalidated on SaveLabel)
+	// Fast path: Check in-memory cache first (TTL: 24h, invalidated on SaveLabel or InvalidateCache)
 	h.cacheMu.RLock()
 	cached, hasCache := h.labelCache[date]
 	h.cacheMu.RUnlock()
 
 	var allLabels []LabelPayload
-	if hasCache && time.Since(cached.cachedAt) < 60*time.Second {
+	if hasCache && time.Since(cached.cachedAt) < 24*time.Hour {
 		allLabels = cached.labels
 	} else {
 		prefix := "labels/" + date
@@ -501,100 +501,132 @@ func (h *Handler) GetLabels(c *gin.Context) {
 		}
 
 		results := make([]*LabelPayload, len(jsonKeys))
-		concurrency := 25
-		if len(jsonKeys) < concurrency {
-			concurrency = len(jsonKeys)
+
+		// Fast filename pre-parsing: labels/{date}/{camID}_{annotator}_{ts}.json
+		for i, key := range jsonKeys {
+			cleanKey := strings.TrimSuffix(path.Base(key), ".json")
+			subparts := strings.Split(cleanKey, "_")
+			if len(subparts) >= 3 {
+				ts, _ := strconv.ParseInt(subparts[len(subparts)-1], 10, 64)
+				ann := subparts[len(subparts)-2]
+				cam := strings.Join(subparts[:len(subparts)-2], "_")
+				snapKey := fmt.Sprintf("proofs/%s/%s/%d_sample.jpg", date, cam, ts)
+				results[i] = &LabelPayload{
+					Date:                  date,
+					CameraID:              cam,
+					SnapshotKey:           snapKey,
+					Annotator:             ann,
+					Timestamp:             ts,
+					FloodLevel:            "none",
+					TrafficLevel:          "clear",
+					TrafficDirA:           "clear",
+					TrafficDirB:           "not_applicable",
+					QueueReason:           "free_flow",
+					FloodSubmersionAnchor: "dry",
+					Weather:               "clear",
+					TimeOfDay:             "day",
+				}
+			}
 		}
 
-		if concurrency > 0 {
-			var wg sync.WaitGroup
-			sem := make(chan struct{}, concurrency)
-
-			for i, key := range jsonKeys {
-				wg.Add(1)
-				sem <- struct{}{}
-				go func(idx int, objKey string) {
-					defer wg.Done()
-					defer func() { <-sem }()
-
-					rc, err := h.store.Get(c.Request.Context(), objKey)
-					if err != nil {
-						return
-					}
-					data, err := io.ReadAll(rc)
-					_ = rc.Close()
-					if err != nil {
-						return
-					}
-
-					var lp LabelPayload
-					if err := json.Unmarshal(data, &lp); err == nil && lp.SnapshotKey != "" {
-						results[idx] = &lp
-						return
-					}
-
-					// Support autonomous harvester Draft-07 GroundTruthManifest
-					var manifest struct {
-						FrameID     string `json:"frame_id"`
-						CameraID    string `json:"camera_id"`
-						CameraName  string `json:"camera_name"`
-						ImagePath   string `json:"image_path"`
-						Annotator   string `json:"annotator"`
-						AnnotatedAt string `json:"annotated_at"`
-						Notes       string `json:"notes"`
-						Labels      struct {
-							Traffic               string   `json:"traffic"`
-							CarriagewayDirection  string   `json:"carriageway_direction"`
-							TrafficDirA           string   `json:"traffic_dir_a"`
-							TrafficDirB           string   `json:"traffic_dir_b"`
-							IsWaitingRedLight     bool     `json:"is_waiting_red_light"`
-							QueueReason           string   `json:"queue_reason"`
-							Flood                 string   `json:"flood"`
-							WaterlineDepth        string   `json:"waterline_depth"`
-							FloodSubmersionAnchor string   `json:"flood_submersion_anchor"`
-							TimeOfDay             string   `json:"time_of_day"`
-							Weather               string   `json:"weather"`
-							QualityTags           []string `json:"quality_tags"`
-						} `json:"labels"`
-					}
-					if err := json.Unmarshal(data, &manifest); err == nil && manifest.CameraID != "" {
-						snapKey := strings.TrimPrefix(manifest.ImagePath, "proofs/")
-						var ts int64
-						if t, err := time.Parse(time.RFC3339, manifest.AnnotatedAt); err == nil {
-							ts = t.Unix()
-						}
-
-						floodLevel := "none"
-						switch strings.ToUpper(manifest.Labels.Flood) {
-						case "SHALLOW":
-							floodLevel = "puddle"
-						case "DEEP":
-							floodLevel = "deep"
-						}
-
-						mapped := LabelPayload{
-							Date:                  date,
-							CameraID:              manifest.CameraID,
-							SnapshotKey:           snapKey,
-							Annotator:             manifest.Annotator,
-							FloodLevel:            floodLevel,
-							TrafficLevel:          strings.ToLower(manifest.Labels.Traffic),
-							TrafficDirA:           strings.ToLower(manifest.Labels.TrafficDirA),
-							TrafficDirB:           strings.ToLower(manifest.Labels.TrafficDirB),
-							QueueReason:           manifest.Labels.QueueReason,
-							FloodSubmersionAnchor: manifest.Labels.FloodSubmersionAnchor,
-							Weather:               strings.ToLower(manifest.Labels.Weather),
-							TimeOfDay:             strings.ToLower(manifest.Labels.TimeOfDay),
-							QualityTags:           manifest.Labels.QualityTags,
-							Notes:                 manifest.Notes,
-							Timestamp:             ts,
-						}
-
-						results[idx] = &mapped
-					}
-				}(i, key)
+		// When listing large collections without filter, return parsed catalog instantly
+		// and avoid blocking HTTP clients on thousands of individual S3 GetObject requests.
+		if len(jsonKeys) <= 500 || camFilter != "" {
+			concurrency := 80
+			if len(jsonKeys) < concurrency {
+				concurrency = len(jsonKeys)
 			}
-			wg.Wait()
+
+			if concurrency > 0 {
+				var wg sync.WaitGroup
+				sem := make(chan struct{}, concurrency)
+
+				for i, key := range jsonKeys {
+					wg.Add(1)
+					sem <- struct{}{}
+					go func(idx int, objKey string) {
+						defer wg.Done()
+						defer func() { <-sem }()
+
+						rc, err := h.store.Get(c.Request.Context(), objKey)
+						if err != nil {
+							return
+						}
+						data, err := io.ReadAll(rc)
+						_ = rc.Close()
+						if err != nil {
+							return
+						}
+
+						var lp LabelPayload
+						if err := json.Unmarshal(data, &lp); err == nil && lp.SnapshotKey != "" {
+							results[idx] = &lp
+							return
+						}
+
+						// Support autonomous harvester Draft-07 GroundTruthManifest
+						var manifest struct {
+							FrameID     string `json:"frame_id"`
+							CameraID    string `json:"camera_id"`
+							CameraName  string `json:"camera_name"`
+							ImagePath   string `json:"image_path"`
+							Annotator   string `json:"annotator"`
+							AnnotatedAt string `json:"annotated_at"`
+							Notes       string `json:"notes"`
+							Labels      struct {
+								Traffic               string   `json:"traffic"`
+								CarriagewayDirection  string   `json:"carriageway_direction"`
+								TrafficDirA           string   `json:"traffic_dir_a"`
+								TrafficDirB           string   `json:"traffic_dir_b"`
+								IsWaitingRedLight     bool     `json:"is_waiting_red_light"`
+								QueueReason           string   `json:"queue_reason"`
+								Flood                 string   `json:"flood"`
+								WaterlineDepth        string   `json:"waterline_depth"`
+								FloodSubmersionAnchor string   `json:"flood_submersion_anchor"`
+								TimeOfDay             string   `json:"time_of_day"`
+								Weather               string   `json:"weather"`
+								QualityTags           []string `json:"quality_tags"`
+							} `json:"labels"`
+						}
+						if err := json.Unmarshal(data, &manifest); err == nil && manifest.CameraID != "" {
+							snapKey := strings.TrimPrefix(manifest.ImagePath, "proofs/")
+							var ts int64
+							if t, err := time.Parse(time.RFC3339, manifest.AnnotatedAt); err == nil {
+								ts = t.Unix()
+							}
+
+							floodLevel := "none"
+							switch strings.ToUpper(manifest.Labels.Flood) {
+							case "SHALLOW":
+								floodLevel = "puddle"
+							case "DEEP":
+								floodLevel = "deep"
+							}
+
+							mapped := LabelPayload{
+								Date:                  date,
+								CameraID:              manifest.CameraID,
+								SnapshotKey:           snapKey,
+								Annotator:             manifest.Annotator,
+								FloodLevel:            floodLevel,
+								TrafficLevel:          strings.ToLower(manifest.Labels.Traffic),
+								TrafficDirA:           strings.ToLower(manifest.Labels.TrafficDirA),
+								TrafficDirB:           strings.ToLower(manifest.Labels.TrafficDirB),
+								QueueReason:           manifest.Labels.QueueReason,
+								FloodSubmersionAnchor: manifest.Labels.FloodSubmersionAnchor,
+								Weather:               strings.ToLower(manifest.Labels.Weather),
+								TimeOfDay:             strings.ToLower(manifest.Labels.TimeOfDay),
+								QualityTags:           manifest.Labels.QualityTags,
+								Notes:                 manifest.Notes,
+								Timestamp:             ts,
+							}
+
+							results[idx] = &mapped
+						}
+					}(i, key)
+				}
+				wg.Wait()
+			}
 		}
 
 		var fetched []LabelPayload

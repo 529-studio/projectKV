@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"path"
 	"sort"
@@ -73,6 +74,23 @@ func NewR2Storage(ctx context.Context, cfg R2Config) (*R2Storage, error) {
 		publicURL = "https://file.529studio.site"
 	}
 
+	customTransport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   15 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          500,
+		MaxIdleConnsPerHost:   100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	customHTTPClient := &http.Client{
+		Transport: customTransport,
+	}
+
 	awsCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
@@ -80,6 +98,7 @@ func NewR2Storage(ctx context.Context, cfg R2Config) (*R2Storage, error) {
 			cfg.SecretAccessKey,
 			"",
 		)),
+		config.WithHTTPClient(customHTTPClient),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("storage: failed to initialize AWS config: %w", err)
