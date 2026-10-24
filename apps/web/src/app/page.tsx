@@ -36,6 +36,7 @@ export default function Home() {
   const {
     floodVerdicts,
     floodHexCells,
+    userFloodReports,
     floodedCameraIds,
     floodedCameraCount,
     wetCameraIds,
@@ -344,6 +345,7 @@ export default function Home() {
             cameras={displayCameras}
             verdicts={verdicts}
             floodVerdicts={floodVerdicts}
+            userFloodReports={userFloodReports}
             activeLens={activeLens}
             hotsetStatus={hotsetStatus}
             onCameraClick={handleSelectCamera}
@@ -528,6 +530,7 @@ export default function Home() {
       <CameraModal 
         camera={selectedCamera} 
         verdict={selectedCameraVerdict} 
+        userFloodReport={selectedCameraId ? userFloodReports.get(selectedCameraId) : undefined}
         onClose={() => handleSelectCamera(null)} 
         isPinned={selectedCamera ? pinnedCameraIds.includes(selectedCamera.id) : false}
         onTogglePin={() => selectedCamera && togglePin(selectedCamera.id)}

@@ -32,6 +32,14 @@ type ReportResponse struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+// Report represents a validated crowd-sourced flood submission accepted by the handler.
+type Report struct {
+	CameraID     string    `json:"camera_id"`
+	ClientIPHash string    `json:"client_ip_hash"`
+	UserAgent    string    `json:"user_agent"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
 // ErrorResponse represents an error response payload.
 type ErrorResponse struct {
 	Error             string `json:"error" example:"rate_limited"`

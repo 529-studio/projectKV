@@ -33,6 +33,7 @@ export const API_ENDPOINTS = Object.freeze({
   WEATHER_RADAR: '/api/weather/radar',
   FLOOD_VERIFY: '/api/flood/verify',
   REPORT_FLOOD: (id: string) => `/api/v1/cameras/${encodeURIComponent(id)}/report-flood`,
+  FLOOD_USER_REPORTS: '/api/flood/user-reports',
   FLOOD_CHOKEPOINTS: '/api/flood/chokepoints',
   FLOOD_QUOTA: '/api/flood/quota',
   SSE_LIVE: '/api/live/stream',
@@ -90,6 +91,8 @@ export const FUNCTIONAL_COLORS = Object.freeze({
   ONLINE_DEFAULT: '#ffffff',
   OFFLINE_DEFAULT: '#52525b',
   MAP_STROKE: '#000000',
+  AMBER_CANDIDATE: '#f59e0b',
+  AMBER_ESCALATED: '#d97706',
 });
 
 export const MAP_CONFIG = Object.freeze({
@@ -412,6 +415,25 @@ export const FLOOD_REPORT_I18N = Object.freeze({
   ERROR_GENERIC: {
     vi: 'Không thể gửi báo cáo',
     en: 'Unable to submit report',
+  },
+});
+
+export const USER_FLOOD_REPORT_I18N = Object.freeze({
+  BADGE_CANDIDATE: {
+    vi: '[Báo cáo từ người dân: Có ngập]',
+    en: '[Crowdsourced: Flooding reported]',
+  },
+  BADGE_ESCALATED: {
+    vi: '[Báo cáo từ người dân: Có ngập (Nhiều nguồn xác nhận)]',
+    en: '[Crowdsourced: Flooding reported (Multiple confirmations)]',
+  },
+  REMAINING_MINUTES: {
+    vi: (m: number) => `(còn ${m} phút)`,
+    en: (m: number) => `(${m}m remaining)`,
+  },
+  LEGEND_LABEL: {
+    vi: 'Báo cáo từ người dân (Có ngập)',
+    en: 'Crowdsourced reports (Flooded)',
   },
 });
 

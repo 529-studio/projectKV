@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
-import { API_ENDPOINTS, FLOOD_REPORT_I18N, FLOOD_VERIFY_I18N, FUNCTIONAL_COLORS, getApiUrl, VERDICT_I18N } from '../config/constants';
+import { API_ENDPOINTS, FLOOD_REPORT_I18N, FLOOD_VERIFY_I18N, FUNCTIONAL_COLORS, getApiUrl, USER_FLOOD_REPORT_I18N, VERDICT_I18N } from '../config/constants';
 import {
   FLOOD_MODAL_I18N,
   isDryRoadSeverity,
   isWetRoadSeverity,
+  type UserFloodReport,
+  isUserReportActive,
+  getUserReportRemainingMinutes,
 } from '../utils/floodUtils';
 import {
   calculateCooldownRemaining,
@@ -23,6 +26,7 @@ let lastFloodVerifyTimestamp = 0;
 interface CameraModalProps {
   camera: Camera | null;
   verdict: TrafficVerdict | undefined;
+  userFloodReport?: UserFloodReport;
   onClose: () => void;
   isPinned: boolean;
   onTogglePin: () => void;
@@ -41,6 +45,7 @@ interface CameraModalProps {
 export default function CameraModal({
   camera,
   verdict,
+  userFloodReport,
   onClose,
   isPinned,
   onTogglePin,
@@ -426,6 +431,22 @@ export default function CameraModal({
                 </span>
               )}
 
+              {/* CROWDSOURCED FLOOD REPORT BADGE (S8-T7) */}
+              {userFloodReport && isUserReportActive(userFloodReport) && (
+                <span
+                  className="px-2 py-0.5 rounded border border-amber-500/80 bg-amber-950/40 text-amber-300 text-xs font-bold inline-flex items-center gap-1.5"
+                  title={userFloodReport.escalated ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED[lang] : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE[lang]}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full bg-amber-400 ${userFloodReport.escalated ? 'animate-ping' : ''}`} />
+                  <span>
+                    {userFloodReport.escalated
+                      ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED[lang]
+                      : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE[lang]}
+                    {' '}{USER_FLOOD_REPORT_I18N.REMAINING_MINUTES[lang](getUserReportRemainingMinutes(userFloodReport))}
+                  </span>
+                </span>
+              )}
+
               {isActuallyAvailable && hasRealVerdict && (
                 <>
                   <span className="px-2 py-0.5 rounded border" style={{ borderColor: severityColor, color: severityColor, backgroundColor: `${severityColor}20` }}>
@@ -636,6 +657,19 @@ export default function CameraModal({
                 {floodReportFeedback && (
                   <span className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-900 text-zinc-300 text-xs font-mono select-none">
                     [{floodReportFeedback.text}]
+                  </span>
+                )}
+
+                {/* ACTIVE CROWDSOURCED FLOOD REPORT STATUS (S8-T7) */}
+                {userFloodReport && isUserReportActive(userFloodReport) && (
+                  <span className="px-2 py-0.5 rounded border border-amber-500/80 bg-amber-950/60 text-amber-300 text-xs font-mono font-semibold select-none inline-flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full bg-amber-400 ${userFloodReport.escalated ? 'animate-ping' : ''}`} />
+                    <span>
+                      {userFloodReport.escalated
+                        ? (lang === 'vi' ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED.vi : USER_FLOOD_REPORT_I18N.BADGE_ESCALATED.en)
+                        : (lang === 'vi' ? USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE.vi : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE.en)}
+                      {' '}{USER_FLOOD_REPORT_I18N.REMAINING_MINUTES[lang](getUserReportRemainingMinutes(userFloodReport))}
+                    </span>
                   </span>
                 )}
 
