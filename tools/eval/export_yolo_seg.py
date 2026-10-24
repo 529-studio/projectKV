@@ -20,6 +20,10 @@ Class Mapping (ADR-009 §4.2):
 
 Usage:
   python3 tools/eval/export_yolo_seg.py --labels-dir tools/eval/labels_gold_standard --output-dir data/yolo_seg --verify
+
+By default labels without explicit polygon `annotations` are SKIPPED (never
+synthesized): fabricated geometry is opt-in via --allow-synthetic and is meant
+for pipeline smoke tests only (ADR-011 D2).
 """
 
 from __future__ import annotations
@@ -184,11 +188,19 @@ def synthesize_polygons_from_metadata(labels_meta: Dict[str, Any]) -> List[Tuple
 
 
 def parse_label_file(
-    label_path: Path, repo_root: Path, images_dir: Optional[Path] = None
-) -> Tuple[Optional[Path], List[Tuple[int, List[float]]]]:
+    label_path: Path,
+    repo_root: Path,
+    images_dir: Optional[Path] = None,
+    allow_synthetic: bool = False,
+) -> Tuple[Optional[Path], List[Tuple[int, List[float]]], bool]:
     """
     Parses a single ground-truth JSON label file.
-    Returns (resolved_image_path, list_of_(class_id, normalized_polygon_floats)).
+    Returns (resolved_image_path, list_of_(class_id, normalized_polygon_floats),
+    used_synthetic) where used_synthetic is True when the segments were
+    synthesized from classification metadata instead of explicit annotations.
+    By default synthetic geometry is DISABLED (ADR-011 D2): labels without
+    explicit polygon annotations return an empty segment list so the exporter
+    skips them instead of training on fabricated shapes.
     """
     with open(label_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -267,13 +279,15 @@ def parse_label_file(
                 )
                 segments.append((cls_id, [round(p, 6) for p in flat_poly]))
 
-    # If no explicit polygon annotations were found, synthesize from metadata
-    if not segments:
+    # Synthetic geometry is opt-in only (ADR-011 D2): metadata-derived shapes
+    # are fabricated ground truth and must never silently enter a dataset.
+    if not segments and allow_synthetic:
         labels_meta = data.get("labels", {})
         synthesized = synthesize_polygons_from_metadata(labels_meta)
         segments.extend(synthesized)
+        return resolved_img, segments, True
 
-    return resolved_img, segments
+    return resolved_img, segments, False
 
 
 def export_dataset(
@@ -284,9 +298,13 @@ def export_dataset(
     seed: int = 42,
     copy_images: bool = True,
     verify: bool = False,
+    allow_synthetic: bool = False,
 ) -> Dict[str, Any]:
     """
     Exports gold-standard label JSONs into YOLO segmentation format.
+    By default, labels without explicit polygon annotations are SKIPPED and
+    counted in `skipped_no_annotations` (ADR-011 D2). Pass allow_synthetic=True
+    (CLI: --allow-synthetic) to opt into metadata-derived geometry.
     """
     repo_root = Path(__file__).resolve().parent.parent.parent
     labels_dir = labels_dir.resolve()
@@ -312,12 +330,15 @@ def export_dataset(
     val_count = int(round(len(shuffled) * val_split))
     val_files = set(shuffled[:val_count])
 
-    stats = {
+    stats: Dict[str, Any] = {
         "total_labels": len(label_files),
         "train_samples": 0,
         "val_samples": 0,
         "images_copied": 0,
         "class_counts": {name: 0 for name in TARGET_CLASSES.values()},
+        "skipped_no_annotations": 0,
+        "synthesized_labels": 0,
+        "allow_synthetic": allow_synthetic,
         "errors": [],
     }
 
@@ -326,13 +347,23 @@ def export_dataset(
         base_name = lf.stem
 
         try:
-            resolved_img, segments = parse_label_file(lf, repo_root=repo_root, images_dir=images_dir)
+            resolved_img, segments, used_synthetic = parse_label_file(
+                lf, repo_root=repo_root, images_dir=images_dir, allow_synthetic=allow_synthetic
+            )
         except Exception as exc:
             stats["errors"].append(f"{lf.name}: parse error - {exc}")
             continue
 
         if not segments:
+            stats["skipped_no_annotations"] += 1
+            logging.debug(
+                "Skipping %s: no explicit polygon annotations%s",
+                lf.name,
+                "" if allow_synthetic else " (pass --allow-synthetic to derive geometry from metadata)",
+            )
             continue
+        if used_synthetic:
+            stats["synthesized_labels"] += 1
 
         # Write YOLO segmentation label txt
         label_out = output_dir / "labels" / split / f"{base_name}.txt"
@@ -382,6 +413,19 @@ def export_dataset(
     logging.info("  Images copied:          %d", stats["images_copied"])
     logging.info("  Class distributions:    %s", stats["class_counts"])
     logging.info("  Manifest written:       %s", dataset_yaml_path)
+    if stats["skipped_no_annotations"] > 0:
+        logging.warning(
+            "Skipped %d label(s) without explicit polygon annotations; only annotated "
+            "geometry may train the segmentation model (ADR-011 D2). Use --allow-synthetic "
+            "explicitly if metadata-derived geometry is intentionally required.",
+            stats["skipped_no_annotations"],
+        )
+    if stats["synthesized_labels"] > 0:
+        logging.warning(
+            "FABRICATED GEOMETRY: %d label(s) used metadata-derived synthetic polygons "
+            "(--allow-synthetic). These shapes are NOT human ground truth.",
+            stats["synthesized_labels"],
+        )
 
     if verify:
         verification_passed, v_errors = verify_dataset(output_dir)
@@ -499,6 +543,16 @@ def parse_args():
         action="store_true",
         help="Verify exported segmentation manifests and polygon boundaries",
     )
+    parser.add_argument(
+        "--allow-synthetic",
+        action="store_true",
+        help=(
+            "OPT-IN ONLY (ADR-011 D2): derive polygons from classification metadata when a label "
+            "has no explicit annotations. The resulting geometry is fabricated (fixed roadway "
+            "trapezoid + severity-based puddles) and is NOT human ground truth; intended solely "
+            "for pipeline smoke tests, never for training datasets."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -513,6 +567,7 @@ def main():
             seed=args.seed,
             copy_images=not args.no_copy_images,
             verify=args.verify,
+            allow_synthetic=args.allow_synthetic,
         )
         if args.verify and not stats.get("verification_passed", True):
             sys.exit(1)
