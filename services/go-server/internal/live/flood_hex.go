@@ -21,6 +21,20 @@ type FloodHexCell struct {
 	Polygon         [][]float64 `json:"polygon"`           // [[lat,lng], ...] boundary for rendering
 }
 
+// UserReportSummary represents an active crowdsourced flood report for a camera.
+type UserReportSummary struct {
+	CameraID    string    `json:"camera_id"`
+	ReportCount int       `json:"report_count"`
+	Escalated   bool      `json:"escalated"`
+	LatestAt    time.Time `json:"latest_at"`
+	ExpiresAt   time.Time `json:"expires_at"`
+}
+
+type userReportEntry struct {
+	clientIPHash string
+	timestamp    time.Time
+}
+
 // FloodBroadcaster broadcasts flood hex updates to connected SSE clients.
 type FloodBroadcaster interface {
 	BroadcastFloodHex(cell FloodHexCell)
@@ -53,10 +67,14 @@ type FloodHexAggregator struct {
 	cellCameras map[string][]string // h3_id -> list of camera IDs
 	camToCell   map[string]string   // camera ID -> h3_id
 	polygons    map[string][][]float64
-	verdicts    map[string]hotset.Verdict // camera ID -> latest verdict
-	activeCells map[string]bool           // h3_id -> currently active cell
-	staleTTL    time.Duration             // maximum observation freshness TTL
-	allowMock   bool                      // allow mock verdicts when running in dev mode
+	verdicts            map[string]hotset.Verdict // camera ID -> latest verdict
+	activeCells         map[string]bool           // h3_id -> currently active cell
+	staleTTL            time.Duration             // maximum observation freshness TTL
+	allowMock           bool                      // allow mock verdicts when running in dev mode
+	userReports         map[string][]userReportEntry // camera ID -> active user reports
+	userReportTTL       time.Duration             // sliding TTL for active user reports (default 15m)
+	escalationWindow    time.Duration             // window to check distinct IPs for escalation (default 10m)
+	escalationThreshold int                       // distinct IPs required to escalate (default 2)
 }
 
 // SetAllowMock enables or disables aggregation of mock verdicts for local development testing.
@@ -72,6 +90,21 @@ func (f *FloodHexAggregator) SetStaleTTL(ttl time.Duration) {
 	defer f.mu.Unlock()
 	if ttl > 0 {
 		f.staleTTL = ttl
+	}
+}
+
+// SetUserReportConfig sets the sliding TTL and escalation window for crowdsourced reports.
+func (f *FloodHexAggregator) SetUserReportConfig(ttl, escWindow time.Duration, escThreshold int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if ttl > 0 {
+		f.userReportTTL = ttl
+	}
+	if escWindow > 0 {
+		f.escalationWindow = escWindow
+	}
+	if escThreshold > 0 {
+		f.escalationThreshold = escThreshold
 	}
 }
 
@@ -106,9 +139,13 @@ func NewFloodHexAggregator(
 		cellCameras: make(map[string][]string),
 		camToCell:   make(map[string]string, len(cameras)),
 		polygons:    polygons,
-		verdicts:    make(map[string]hotset.Verdict),
-		activeCells: make(map[string]bool),
-		staleTTL:    180 * time.Second,
+		verdicts:            make(map[string]hotset.Verdict),
+		activeCells:         make(map[string]bool),
+		staleTTL:            180 * time.Second,
+		userReports:         make(map[string][]userReportEntry),
+		userReportTTL:       15 * time.Minute,
+		escalationWindow:    10 * time.Minute,
+		escalationThreshold: 2,
 	}
 
 	for _, c := range cameras {
@@ -203,6 +240,23 @@ func (f *FloodHexAggregator) ReapStaleCells() []string {
 			cleared = append(cleared, h3ID)
 		}
 	}
+
+	// Also prune expired user reports past userReportTTL
+	now := time.Now()
+	reportCutoff := now.Add(-f.userReportTTL)
+	for camID, reports := range f.userReports {
+		var valid []userReportEntry
+		for _, r := range reports {
+			if r.timestamp.After(reportCutoff) {
+				valid = append(valid, r)
+			}
+		}
+		if len(valid) == 0 {
+			delete(f.userReports, camID)
+		} else {
+			f.userReports[camID] = valid
+		}
+	}
 	f.mu.Unlock()
 
 	if f.broadcaster != nil {
@@ -221,6 +275,123 @@ func (f *FloodHexAggregator) ReapStaleCells() []string {
 		}
 	}
 	return cleared
+}
+
+// OnUserReport registers a crowdsourced flood report for a camera, recalculates active reports
+// within the 15-minute sliding TTL, and evaluates whether >= 2 distinct IP hashes reported
+// flooding within the 10-minute window for escalation.
+func (f *FloodHexAggregator) OnUserReport(cameraID string, clientIPHash string, ts time.Time) (int, bool) {
+	if ts.IsZero() {
+		ts = time.Now()
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	ttl := f.userReportTTL
+	if ttl <= 0 {
+		ttl = 15 * time.Minute
+	}
+	escWindow := f.escalationWindow
+	if escWindow <= 0 {
+		escWindow = 10 * time.Minute
+	}
+	escThreshold := f.escalationThreshold
+	if escThreshold <= 0 {
+		escThreshold = 2
+	}
+
+	cutoff := ts.Add(-ttl)
+	var valid []userReportEntry
+	for _, r := range f.userReports[cameraID] {
+		if r.timestamp.After(cutoff) {
+			valid = append(valid, r)
+		}
+	}
+	valid = append(valid, userReportEntry{
+		clientIPHash: clientIPHash,
+		timestamp:    ts,
+	})
+	f.userReports[cameraID] = valid
+
+	// Escalation check: count distinct clientIPHash within escalationWindow (10m)
+	escalationCutoff := ts.Add(-escWindow)
+	distinctIPs := make(map[string]struct{})
+	anonCount := 0
+	for _, r := range valid {
+		if r.timestamp.After(escalationCutoff) {
+			if r.clientIPHash != "" {
+				distinctIPs[r.clientIPHash] = struct{}{}
+			} else {
+				anonCount++
+			}
+		}
+	}
+	distinctCount := len(distinctIPs) + anonCount
+	escalated := distinctCount >= escThreshold
+	reportCount := len(valid)
+
+	return reportCount, escalated
+}
+
+// GetActiveUserReports returns summaries of all cameras with active crowdsourced reports.
+func (f *FloodHexAggregator) GetActiveUserReports() []UserReportSummary {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	now := time.Now()
+	ttl := f.userReportTTL
+	if ttl <= 0 {
+		ttl = 15 * time.Minute
+	}
+	escWindow := f.escalationWindow
+	if escWindow <= 0 {
+		escWindow = 10 * time.Minute
+	}
+	escThreshold := f.escalationThreshold
+	if escThreshold <= 0 {
+		escThreshold = 2
+	}
+
+	cutoff := now.Add(-ttl)
+	escalationCutoff := now.Add(-escWindow)
+
+	var summaries []UserReportSummary
+	for camID, reports := range f.userReports {
+		var valid []userReportEntry
+		var latest time.Time
+		distinctIPs := make(map[string]struct{})
+		anonCount := 0
+
+		for _, r := range reports {
+			if r.timestamp.After(cutoff) {
+				valid = append(valid, r)
+				if r.timestamp.After(latest) {
+					latest = r.timestamp
+				}
+				if r.timestamp.After(escalationCutoff) {
+					if r.clientIPHash != "" {
+						distinctIPs[r.clientIPHash] = struct{}{}
+					} else {
+						anonCount++
+					}
+				}
+			}
+		}
+
+		if len(valid) > 0 {
+			distinctCount := len(distinctIPs) + anonCount
+			summaries = append(summaries, UserReportSummary{
+				CameraID:    camID,
+				ReportCount: len(valid),
+				Escalated:   distinctCount >= escThreshold,
+				LatestAt:    latest,
+				ExpiresAt:   latest.Add(ttl),
+			})
+		}
+	}
+
+	return summaries
 }
 
 func (f *FloodHexAggregator) aggregateCellLocked(h3ID string) (*FloodHexCell, bool) {
