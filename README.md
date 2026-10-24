@@ -91,7 +91,9 @@ hcm-traffic-cameras/
 │       └── api.py                     # Multi-threaded OpenVINO detection endpoint (:8000)
 │
 ├── tools/
-│   ├── eval/                          # [EVALUATION] Ground-truth benchmarks & label curation
+│   ├── eval/                          # [EVALUATION & MLOPS] Benchmarks & automated labeling
+│   │   ├── batch_auto_label.py        # Stream raw snapshots from R2 & auto-label via OpenVINO
+│   │   ├── batch_approve_labels.py    # High-throughput atomic R2 promotion to human-verified labels
 │   │   ├── auto_harvest.py            # Standalone automated frame harvester & Draft-07 labeler CLI
 │   │   ├── label_curator.py           # Taxonomy curation and legacy label cleansing
 │   │   └── benchmark.py               # PCU & flood accuracy evaluation harness
@@ -106,6 +108,7 @@ hcm-traffic-cameras/
 ├── docs/
 │   ├── SYSTEM_DESIGN.md               # Original caching & CV roadmap design
 │   ├── ADR-001-flood-alert-architecture.md   # Flood-alert feasibility, Go migration & Sprint 1 scope
+│   ├── mlops_automated_annotation_and_bulk_approval.md # MLOps automated labeling & atomic approval architecture
 │   └── sprint1_execution_guide.md     # Sprint 1 task sequencing and agy CLI commands
 │
 ├── cameras_all.json                   # Base traffic camera catalog dataset
@@ -314,7 +317,8 @@ make dev-all
 | Dịch vụ | Cổng | Địa chỉ truy cập | Mục đích kiểm tra |
 |---|:---:|---|---|
 | **Giao diện Bản đồ** | `3001` | http://localhost:3001 | Bản đồ camera, dock theo dõi hành lang |
-| **Gán nhãn Labeler** | `3001` | http://localhost:3001/labeler | Công cụ dán nhãn tập trung với bộ lọc duyệt nhãn tự động, bộ nhớ đệm phân vùng và phím tắt duyệt nhanh Shift+Enter |
+| **Gán nhãn Labeler** | `3001` | http://localhost:3001/labeler | Công cụ dán nhãn tập trung với bộ lọc duyệt nhãn tự động, bộ nhớ đệm phân vùng, nút duyệt toàn bộ trang và phím tắt duyệt nhanh Shift+Enter |
+| **Duyệt Nhãn Tự Động** | CLI | `tools/eval/batch_approve_labels.py` | Robot phê duyệt hàng loạt nhãn AI thành nhãn Human (`thdat-bot`) với cơ chế nâng cấp nguyên tử trên Cloudflare R2 |
 | **Go Backend API** | `3000` | http://localhost:3000 | Máy chủ API Gin |
 | **API Đăng ký Cảnh báo** | `3000` | http://localhost:3000/api/subscriptions | `POST`, `GET`, `DELETE` đăng ký cảnh báo ngập |
 | **Tài liệu Swagger** | `3000` | http://localhost:3000/swagger/index.html | Tài liệu API tương tác |
