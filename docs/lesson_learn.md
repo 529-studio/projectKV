@@ -1048,5 +1048,37 @@
   4. **Pagination Controls & Total Snapshot Telemetry**:
      - Added `page` state and pagination controls (`Trang trước`, `Trang sau`, `Trang X/Y`) for the `[Tất cả]` tab, accurately surfacing `snapData.total` (e.g. `19,607`).
 
+---
+
+## Lesson 54: Silent Configuration Failures via Shell Quotation & The NaN Float Trap in Environment Parsers
+
+- **Incident & Tracking:** Issue #288 / PR targeting `dev` (`fix/s8-t6-config-sanitization-observability`, [KV-18]).
+- **Symptom:**
+  1. Setting environment variables with surrounding quotes or whitespace (e.g. `HOTSET_INTERVAL_SECONDS="30"`, `PCU_CAPACITY_FLOOR=" 15.0 "`, or `HARVESTER_ENABLED='true'`) in deployment scripts, systemd service files, or Docker Compose silently caused configuration parsing to fail.
+  2. The server silently fell back to compiled defaults without emitting any warnings or errors in the startup logs, leaving DevOps engineers under the false impression that custom performance parameters were active.
+  3. When invalid non-numeric inputs were passed (e.g. `HOTSET_INTERVAL_SECONDS="abc"`), errors were discarded silently via bare `if v, err := strconv.Atoi(val); err == nil { ... }`.
+- **Root Cause:**
+  1. **Strict Formatting of `strconv`**:
+     - Standard Go functions `strconv.Atoi`, `strconv.ParseFloat`, and `strconv.ParseBool` do not tolerate surrounding quotes (`"`, `'`) or whitespace/tab padding. A single space or quote triggers `strconv.ErrSyntax`.
+  2. **The NaN Float Trap**:
+     - `strconv.ParseFloat("nan", 64)` and `strconv.ParseFloat("inf", 64)` return `math.NaN(), nil` and `+Inf, nil` without producing an error.
+     - In Go IEEE 754 arithmetic, all comparisons against `NaN` (such as `NaN < min`) evaluate to `false`. Without explicit `math.IsNaN(v)` and `math.IsInf(v, 0)` checks, invalid floats bypass minimum threshold validation and poison downstream arithmetic (such as PCU saturation formulas).
+  3. **Silent Error Swallowing**:
+     - Across 25+ configuration parameters in `services/go-server/internal/config/config.go`, failure to parse an environment variable silently did nothing, masking typos and operational misconfigurations.
+- **Mandatory Takeaways & Engineering Resolutions:**
+  1. **Holistic Quote & Whitespace Stripping**:
+     - Implemented `CleanEnv(key)` and unified helper parsers (`parseEnvInt`, `parseEnvInt64`, `parseEnvFloat`, `parseEnvBool`, `parseEnvDuration`, `parseEnvString`) that systematically strip surrounding quotes (`"`, `'`) and whitespace before parsing.
+  2. **Explicit NaN/Inf Defensive Guardrails**:
+     - Added `math.IsNaN(v) || math.IsInf(v, 0)` guards to `parseEnvFloat` to ensure corrupted strings trigger structured fallback warnings.
+  3. **Structured Observability via `log/slog`**:
+     - Replaced silently discarded errors with structured warning logs:
+       ```go
+       slog.Warn("config: invalid numeric format, using fallback default",
+           "key", key, "raw_value", val, "default", fallback, "error", err)
+       ```
+  4. **Comprehensive Configuration Matrix Test Suite**:
+     - Implemented `TestLoadConfig_SanitizationAndQuotedVariables` and `TestLoadConfig_InvalidInputsTriggerFallbackDefaults` in `internal/config/config_test.go` verifying quotes, spaces, tabs, out-of-bound values, and non-numeric inputs across both `LoadConfig()` and `LoadFromEnv()`.
+
+
 
 

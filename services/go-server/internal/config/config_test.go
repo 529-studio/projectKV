@@ -585,3 +585,307 @@ func TestLoadConfig_HarvesterWhitespaceAndQuotes(t *testing.T) {
 		t.Errorf("expected HarvesterConcurrency=15, got %d", cfg.HarvesterConcurrency)
 	}
 }
+
+func TestLoadConfig_SanitizationAndQuotedVariables(t *testing.T) {
+	envVars := map[string]string{
+		"PORT":                             " \"3005\" ",
+		"SNAPSHOT_CACHE_TTL_SECONDS":       " 25 \t",
+		"HOTSET_INTERVAL_SECONDS":          " \"45\" ",
+		"HOTSET_MAX_PARALLEL":              " '12' ",
+		"HOTSET_FIXED_MAX_CAMERAS":         " \"50\" ",
+		"ARCHIVE_SAMPLE_INTERVAL_SECONDS":  " '180' ",
+		"ARCHIVE_RETENTION_DAYS":           " \"30\" ",
+		"ARCHIVE_MAX_DISK_MB":              " 30000 ",
+		"ARCHIVE_RETENTION_CHECK_INTERVAL": " \"2h\" ",
+		"RATE_LIMIT_RPS":                   " '25' ",
+		"RATE_LIMIT_BURST":                 " 50 ",
+		"ANALYZER_DAILY_BUDGET":            " \"8000\" ",
+		"VERDICT_STALE_TTL_SECONDS":        " '240' ",
+		"FROZEN_FRAME_THRESHOLD":           " 5 ",
+		"HEX_RESOLUTION":                   " 8 ",
+		"HEX_MIN_CAMERAS":                  " 4 ",
+		"PCU_WEIGHT_MOTORCYCLE":            " '0.35' ",
+		"PCU_WEIGHT_CAR":                   " \"1.2\" ",
+		"PCU_WEIGHT_BUS":                   " '3.0' ",
+		"PCU_WEIGHT_TRUCK":                 " 2.2 ",
+		"PCU_WEIGHT_CONTAINER":             " \"2.5\" ",
+		"PCU_CAPACITY_FLOOR":               " 18.5 ",
+		"PCU_THRESHOLD_MODERATE":           " '0.35' ",
+		"PCU_THRESHOLD_HEAVY":              " \"0.65\" ",
+		"PCU_THRESHOLD_CONGESTED":          " '0.85' ",
+		"TELEGRAM_DEBOUNCE_MINUTES":        " 45 ",
+		"STORAGE_DRIVER":                   " \"r2\" ",
+		"STORAGE_LOCAL_ROOT":               " '/custom/path' ",
+		"R2_ACCOUNT_ID":                    " \"acc999\" ",
+		"R2_BUCKET_NAME":                   " 'custom-bucket' ",
+		"R2_REGION":                        " \"apac\" ",
+		"R2_ACCESS_KEY_ID":                 " 'key999' ",
+		"R2_SECRET_ACCESS_KEY":             " \"sec999\" ",
+		"R2_PUBLIC_URL":                    " 'https://cdn.example.org' ",
+		"DEV_ACCESS_TOKEN":                 " 'token-xyz-123' ",
+		"HARVESTER_ENABLED":                " \"true\" ",
+		"HARVESTER_SCHEDULE_HOURS":         " '6,12,18' ",
+		"HARVESTER_RAIN_COOLDOWN_MINUTES":  " 40 ",
+		"HARVESTER_CONCURRENCY":            " 20 ",
+	}
+
+	for k, v := range envVars {
+		_ = os.Setenv(k, v)
+	}
+	defer func() {
+		for k := range envVars {
+			_ = os.Unsetenv(k)
+		}
+	}()
+
+	cfg := config.LoadConfig()
+
+	if cfg.Port != "3005" {
+		t.Errorf("expected Port='3005', got %q", cfg.Port)
+	}
+	if cfg.HotsetIntervalSeconds != 45 {
+		t.Errorf("expected HotsetIntervalSeconds=45, got %d", cfg.HotsetIntervalSeconds)
+	}
+	if cfg.HotsetMaxParallel != 12 {
+		t.Errorf("expected HotsetMaxParallel=12, got %d", cfg.HotsetMaxParallel)
+	}
+	if cfg.HotsetFixedMaxCameras != 50 {
+		t.Errorf("expected HotsetFixedMaxCameras=50, got %d", cfg.HotsetFixedMaxCameras)
+	}
+	if cfg.ArchiveSampleIntervalSeconds != 180 {
+		t.Errorf("expected ArchiveSampleIntervalSeconds=180, got %d", cfg.ArchiveSampleIntervalSeconds)
+	}
+	if cfg.ArchiveRetentionDays != 30 {
+		t.Errorf("expected ArchiveRetentionDays=30, got %d", cfg.ArchiveRetentionDays)
+	}
+	if cfg.ArchiveMaxDiskMB != 30000 {
+		t.Errorf("expected ArchiveMaxDiskMB=30000, got %d", cfg.ArchiveMaxDiskMB)
+	}
+	if cfg.ArchiveRetentionCheckInterval.Hours() != 2.0 {
+		t.Errorf("expected ArchiveRetentionCheckInterval=2h, got %v", cfg.ArchiveRetentionCheckInterval)
+	}
+	if cfg.RateLimitRPS != 25 {
+		t.Errorf("expected RateLimitRPS=25, got %d", cfg.RateLimitRPS)
+	}
+	if cfg.RateLimitBurst != 50 {
+		t.Errorf("expected RateLimitBurst=50, got %d", cfg.RateLimitBurst)
+	}
+	if cfg.AnalyzerDailyBudget != 8000 {
+		t.Errorf("expected AnalyzerDailyBudget=8000, got %d", cfg.AnalyzerDailyBudget)
+	}
+	if cfg.VerdictStaleTTLSeconds != 240 {
+		t.Errorf("expected VerdictStaleTTLSeconds=240, got %d", cfg.VerdictStaleTTLSeconds)
+	}
+	if cfg.FrozenFrameThreshold != 5 {
+		t.Errorf("expected FrozenFrameThreshold=5, got %d", cfg.FrozenFrameThreshold)
+	}
+	if cfg.HexResolution != 8 {
+		t.Errorf("expected HexResolution=8, got %d", cfg.HexResolution)
+	}
+	if cfg.HexMinCameras != 4 {
+		t.Errorf("expected HexMinCameras=4, got %d", cfg.HexMinCameras)
+	}
+	if cfg.PCUWeightMotorcycle != 0.35 {
+		t.Errorf("expected PCUWeightMotorcycle=0.35, got %f", cfg.PCUWeightMotorcycle)
+	}
+	if cfg.PCUWeightCar != 1.2 {
+		t.Errorf("expected PCUWeightCar=1.2, got %f", cfg.PCUWeightCar)
+	}
+	if cfg.PCUWeightBus != 3.0 {
+		t.Errorf("expected PCUWeightBus=3.0, got %f", cfg.PCUWeightBus)
+	}
+	if cfg.PCUWeightTruck != 2.2 {
+		t.Errorf("expected PCUWeightTruck=2.2, got %f", cfg.PCUWeightTruck)
+	}
+	if cfg.PCUWeightContainer != 2.5 {
+		t.Errorf("expected PCUWeightContainer=2.5, got %f", cfg.PCUWeightContainer)
+	}
+	if cfg.PCUCapacityFloor != 18.5 {
+		t.Errorf("expected PCUCapacityFloor=18.5, got %f", cfg.PCUCapacityFloor)
+	}
+	if cfg.PCUThresholdModerate != 0.35 {
+		t.Errorf("expected PCUThresholdModerate=0.35, got %f", cfg.PCUThresholdModerate)
+	}
+	if cfg.PCUThresholdHeavy != 0.65 {
+		t.Errorf("expected PCUThresholdHeavy=0.65, got %f", cfg.PCUThresholdHeavy)
+	}
+	if cfg.PCUThresholdCongested != 0.85 {
+		t.Errorf("expected PCUThresholdCongested=0.85, got %f", cfg.PCUThresholdCongested)
+	}
+	if cfg.TelegramDebounceMinutes != 45 {
+		t.Errorf("expected TelegramDebounceMinutes=45, got %d", cfg.TelegramDebounceMinutes)
+	}
+	if cfg.StorageDriver != "r2" {
+		t.Errorf("expected StorageDriver='r2', got %q", cfg.StorageDriver)
+	}
+	if cfg.StorageLocalRoot != "/custom/path" {
+		t.Errorf("expected StorageLocalRoot='/custom/path', got %q", cfg.StorageLocalRoot)
+	}
+	if cfg.R2AccountID != "acc999" {
+		t.Errorf("expected R2AccountID='acc999', got %q", cfg.R2AccountID)
+	}
+	if cfg.R2BucketName != "custom-bucket" {
+		t.Errorf("expected R2BucketName='custom-bucket', got %q", cfg.R2BucketName)
+	}
+	if cfg.R2Region != "apac" {
+		t.Errorf("expected R2Region='apac', got %q", cfg.R2Region)
+	}
+	if cfg.R2AccessKeyID != "key999" {
+		t.Errorf("expected R2AccessKeyID='key999', got %q", cfg.R2AccessKeyID)
+	}
+	if cfg.R2SecretAccessKey != "sec999" {
+		t.Errorf("expected R2SecretAccessKey='sec999', got %q", cfg.R2SecretAccessKey)
+	}
+	if cfg.R2PublicURL != "https://cdn.example.org" {
+		t.Errorf("expected R2PublicURL='https://cdn.example.org', got %q", cfg.R2PublicURL)
+	}
+	if cfg.DevAccessToken != "token-xyz-123" {
+		t.Errorf("expected DevAccessToken='token-xyz-123', got %q", cfg.DevAccessToken)
+	}
+	if cfg.HarvesterEnabled != true {
+		t.Errorf("expected HarvesterEnabled=true, got %v", cfg.HarvesterEnabled)
+	}
+	if cfg.HarvesterScheduleHours != "6,12,18" {
+		t.Errorf("expected HarvesterScheduleHours='6,12,18', got %q", cfg.HarvesterScheduleHours)
+	}
+	if cfg.HarvesterRainCooldownMinutes != 40 {
+		t.Errorf("expected HarvesterRainCooldownMinutes=40, got %d", cfg.HarvesterRainCooldownMinutes)
+	}
+	if cfg.HarvesterConcurrency != 20 {
+		t.Errorf("expected HarvesterConcurrency=20, got %d", cfg.HarvesterConcurrency)
+	}
+}
+
+func TestLoadConfig_InvalidInputsTriggerFallbackDefaults(t *testing.T) {
+	envVars := map[string]string{
+		"HOTSET_INTERVAL_SECONDS":          "not_a_number",
+		"HOTSET_MAX_PARALLEL":              "-10",
+		"HOTSET_FIXED_MAX_CAMERAS":         "-1",
+		"ARCHIVE_SAMPLE_INTERVAL_SECONDS":  "invalid",
+		"ARCHIVE_MAX_DISK_MB":              "bad_mb",
+		"ARCHIVE_RETENTION_CHECK_INTERVAL": "invalid_duration",
+		"RATE_LIMIT_RPS":                   "abc",
+		"PCU_WEIGHT_MOTORCYCLE":            "nan",
+		"PCU_CAPACITY_FLOOR":               "-5.0",
+		"PCU_THRESHOLD_MODERATE":           "invalid_float",
+		"HARVESTER_ENABLED":                "neither_true_nor_false",
+		"HEX_MIN_CAMERAS":                  "-2",
+	}
+
+	for k, v := range envVars {
+		_ = os.Setenv(k, v)
+	}
+	defer func() {
+		for k := range envVars {
+			_ = os.Unsetenv(k)
+		}
+	}()
+
+	cfg := config.LoadConfig()
+
+	// Should safely fall back to default values
+	if cfg.HotsetIntervalSeconds != 30 {
+		t.Errorf("expected fallback HotsetIntervalSeconds=30, got %d", cfg.HotsetIntervalSeconds)
+	}
+	if cfg.HotsetMaxParallel != 10 {
+		t.Errorf("expected fallback HotsetMaxParallel=10, got %d", cfg.HotsetMaxParallel)
+	}
+	if cfg.HotsetFixedMaxCameras != 0 { // default for analyzer=none is 0
+		t.Errorf("expected fallback HotsetFixedMaxCameras=0, got %d", cfg.HotsetFixedMaxCameras)
+	}
+	if cfg.ArchiveSampleIntervalSeconds != 300 {
+		t.Errorf("expected fallback ArchiveSampleIntervalSeconds=300, got %d", cfg.ArchiveSampleIntervalSeconds)
+	}
+	if cfg.ArchiveMaxDiskMB != 20000 {
+		t.Errorf("expected fallback ArchiveMaxDiskMB=20000, got %d", cfg.ArchiveMaxDiskMB)
+	}
+	if cfg.ArchiveRetentionCheckInterval.Hours() != 1.0 {
+		t.Errorf("expected fallback ArchiveRetentionCheckInterval=1h, got %v", cfg.ArchiveRetentionCheckInterval)
+	}
+	if cfg.RateLimitRPS != 10 {
+		t.Errorf("expected fallback RateLimitRPS=10, got %d", cfg.RateLimitRPS)
+	}
+	if cfg.PCUWeightMotorcycle != 0.3 {
+		t.Errorf("expected fallback PCUWeightMotorcycle=0.3, got %f", cfg.PCUWeightMotorcycle)
+	}
+	if cfg.PCUCapacityFloor != 15.0 {
+		t.Errorf("expected fallback PCUCapacityFloor=15.0, got %f", cfg.PCUCapacityFloor)
+	}
+	if cfg.PCUThresholdModerate != 0.30 {
+		t.Errorf("expected fallback PCUThresholdModerate=0.30, got %f", cfg.PCUThresholdModerate)
+	}
+	if cfg.HarvesterEnabled != false {
+		t.Errorf("expected fallback HarvesterEnabled=false, got %v", cfg.HarvesterEnabled)
+	}
+	if cfg.HexMinCameras != 3 {
+		t.Errorf("expected fallback HexMinCameras=3, got %d", cfg.HexMinCameras)
+	}
+}
+
+func TestLoadFromEnv_SanitizationAndQuotedVariables(t *testing.T) {
+	envVars := map[string]string{
+		"PORT":                       " '3008' ",
+		"SNAPSHOT_UPSTREAM_BASE_URL": " 'https://snapshot.example.com' ",
+		"SNAPSHOT_CACHE_TTL_SECONDS": " \"15\" ",
+		"HOTSET_INTERVAL_SECONDS":    " '25' ",
+		"HOTSET_MAX_PARALLEL":        " \"8\" ",
+		"HOTSET_ACTIVE_TTL_SECONDS":  " 150 ",
+		"DEDUPE_COOLDOWN_MINUTES":    " \"20\" ",
+		"HARVESTER_ENABLED":          " 'true' ",
+		"HARVESTER_CONCURRENCY":      " 12 ",
+	}
+
+	for k, v := range envVars {
+		_ = os.Setenv(k, v)
+	}
+	defer func() {
+		for k := range envVars {
+			_ = os.Unsetenv(k)
+		}
+	}()
+
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		t.Fatalf("unexpected error from LoadFromEnv: %v", err)
+	}
+
+	if cfg.Port != 3008 {
+		t.Errorf("expected Port=3008, got %d", cfg.Port)
+	}
+	if cfg.SnapshotUpstreamBaseURL != "https://snapshot.example.com" {
+		t.Errorf("expected SnapshotUpstreamBaseURL='https://snapshot.example.com', got %q", cfg.SnapshotUpstreamBaseURL)
+	}
+	if cfg.SnapshotCacheTTLSeconds != 15 {
+		t.Errorf("expected SnapshotCacheTTLSeconds=15, got %d", cfg.SnapshotCacheTTLSeconds)
+	}
+	if cfg.HotsetIntervalSeconds != 25 {
+		t.Errorf("expected HotsetIntervalSeconds=25, got %d", cfg.HotsetIntervalSeconds)
+	}
+	if cfg.HotsetMaxParallel != 8 {
+		t.Errorf("expected HotsetMaxParallel=8, got %d", cfg.HotsetMaxParallel)
+	}
+	if cfg.HotsetActiveTTLSeconds != 150 {
+		t.Errorf("expected HotsetActiveTTLSeconds=150, got %d", cfg.HotsetActiveTTLSeconds)
+	}
+	if cfg.DedupeCooldownMinutes != 20 {
+		t.Errorf("expected DedupeCooldownMinutes=20, got %d", cfg.DedupeCooldownMinutes)
+	}
+	if cfg.HarvesterEnabled != true {
+		t.Errorf("expected HarvesterEnabled=true, got %v", cfg.HarvesterEnabled)
+	}
+	if cfg.HarvesterConcurrency != 12 {
+		t.Errorf("expected HarvesterConcurrency=12, got %d", cfg.HarvesterConcurrency)
+	}
+}
+
+func TestCleanEnv_UtilityFunction(t *testing.T) {
+	_ = os.Setenv("TEST_CLEAN_ENV_KEY", "  \"hello world\"  \t ")
+	defer func() {
+		_ = os.Unsetenv("TEST_CLEAN_ENV_KEY")
+	}()
+
+	cleaned := config.CleanEnv("TEST_CLEAN_ENV_KEY")
+	if cleaned != "hello world" {
+		t.Errorf("expected 'hello world', got %q", cleaned)
+	}
+}
