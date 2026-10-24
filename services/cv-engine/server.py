@@ -5,6 +5,8 @@ Evaluated and validated in Spike #104 (docs/spike-cv-runtime.md) for non-AVX har
 Runs Intel OpenVINO CPU plugin with SSE4.2 vector instructions.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -12,6 +14,7 @@ import sys
 import time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from io import BytesIO
+from typing import Any, Dict, List, Optional, Tuple
 
 logging.basicConfig(
     level=logging.INFO,
