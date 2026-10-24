@@ -613,3 +613,40 @@ export function formatFloodHexTooltip(cell: FloodHexCell, lang: 'vi' | 'en' = 'v
     `</div>` +
   `</div>`;
 }
+
+export interface UserFloodReport {
+  camera_id: string;
+  client_ip_hash?: string;
+  timestamp: string;
+  report_count: number;
+  escalated: boolean;
+  ttl_seconds?: number;
+  expires_at?: number; // epoch ms
+}
+
+/**
+ * Checks whether a crowdsourced flood report is still active within its sliding TTL.
+ */
+export function isUserReportActive(report: UserFloodReport | null | undefined, nowMs: number = Date.now()): boolean {
+  if (!report) return false;
+  if (report.expires_at) {
+    return nowMs < report.expires_at;
+  }
+  const ts = new Date(report.timestamp).getTime();
+  if (isNaN(ts)) return false;
+  const ttlMs = (report.ttl_seconds || 900) * 1000;
+  return nowMs - ts < ttlMs;
+}
+
+/**
+ * Calculates remaining active minutes for a user flood report.
+ */
+export function getUserReportRemainingMinutes(report: UserFloodReport | null | undefined, nowMs: number = Date.now()): number {
+  if (!report) return 0;
+  const expireTime = report.expires_at
+    ? report.expires_at
+    : new Date(report.timestamp).getTime() + (report.ttl_seconds || 900) * 1000;
+  const remainingMs = expireTime - nowMs;
+  if (remainingMs <= 0) return 0;
+  return Math.max(1, Math.ceil(remainingMs / 60000));
+}
