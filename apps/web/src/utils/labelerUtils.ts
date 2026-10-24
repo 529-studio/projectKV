@@ -27,6 +27,7 @@ export interface LabelState {
   weather?: Weather;
   time_of_day?: TimeOfDay;
   notes?: string;
+  annotations?: PolygonAnnotation[];
 }
 
 export interface LabelPayload extends LabelState {
@@ -49,6 +50,133 @@ export interface SnapshotItem {
 }
 
 export type LabelFilterStatus = 'all' | 'pending_auto' | 'approved_human';
+
+// ---------------------------------------------------------------------------
+// Segmentation polygon contract (ADR-011 D1 / Issue #297)
+// Mirrors services/go-server internal/archiver LabelPayload validation and
+// tools/eval/export_yolo_seg.py parsing: normalized [0, 1] coordinates,
+// canonical 6-class taxonomy, 3-64 vertices, max 32 annotations per label.
+// ---------------------------------------------------------------------------
+
+export type PolygonClass =
+  | 'roadway'
+  | 'water_puddle'
+  | 'motorcycle'
+  | 'car'
+  | 'bus'
+  | 'truck';
+
+export const POLYGON_CLASSES: readonly PolygonClass[] = [
+  'roadway',
+  'water_puddle',
+  'motorcycle',
+  'car',
+  'bus',
+  'truck',
+] as const;
+
+export const POLYGON_CLASS_ALIASES: Record<string, PolygonClass> = {
+  road: 'roadway',
+  asphalt: 'roadway',
+  carriageway: 'roadway',
+  water: 'water_puddle',
+  puddle: 'water_puddle',
+  flood: 'water_puddle',
+  flooded: 'water_puddle',
+  motorbike: 'motorcycle',
+  bike: 'motorcycle',
+  mc: 'motorcycle',
+  automobile: 'car',
+  passenger_car: 'car',
+  van: 'car',
+  suv: 'car',
+  coach: 'bus',
+  container: 'truck',
+  lorry: 'truck',
+};
+
+export const MIN_POLYGON_POINTS = 3;
+export const MAX_POLYGON_POINTS = 64;
+export const MAX_ANNOTATIONS_PER_LABEL = 32;
+export const POLYGON_PROVENANCE_SAM = 'sam_prelabel';
+
+export type PolygonPoint = [number, number];
+
+export interface PolygonAnnotation {
+  class: PolygonClass;
+  polygon: PolygonPoint[];
+  source?: string;
+}
+
+/** Resolves an arbitrary class string to the canonical taxonomy, or null. */
+export function normalizePolygonClass(raw: string): PolygonClass | null {
+  const norm = raw.trim().toLowerCase();
+  if ((POLYGON_CLASSES as readonly string[]).includes(norm)) {
+    return norm as PolygonClass;
+  }
+  return POLYGON_CLASS_ALIASES[norm] ?? null;
+}
+
+/**
+ * Converts pixel-space points to normalized [0, 1] coordinates against the
+ * image natural size, clamping and rounding to 6 decimals. The backend rejects
+ * pixel coordinates, so normalization MUST happen client-side before saving.
+ */
+export function normalizePixelPoints(
+  points: Array<{ x: number; y: number }>,
+  naturalWidth: number,
+  naturalHeight: number
+): PolygonPoint[] {
+  const w = naturalWidth > 0 ? naturalWidth : 1;
+  const h = naturalHeight > 0 ? naturalHeight : 1;
+  return points.map(({ x, y }) => [
+    round6(clamp01(x / w)),
+    round6(clamp01(y / h)),
+  ]);
+}
+
+/**
+ * Client-side mirror of the backend LabelPayload annotation validation.
+ * Returns an error message string, or null when the annotations are valid.
+ */
+export function validatePolygonAnnotations(anns: PolygonAnnotation[] | undefined | null): string | null {
+  if (!anns || anns.length === 0) return null;
+  if (anns.length > MAX_ANNOTATIONS_PER_LABEL) {
+    return `too many polygon annotations: ${anns.length} (max ${MAX_ANNOTATIONS_PER_LABEL})`;
+  }
+  for (let i = 0; i < anns.length; i++) {
+    const ann = anns[i];
+    if (!POLYGON_CLASSES.includes(ann.class)) {
+      return `annotation[${i}]: unknown class "${ann.class}"`;
+    }
+    if (ann.polygon.length < MIN_POLYGON_POINTS || ann.polygon.length > MAX_POLYGON_POINTS) {
+      return `annotation[${i}] (${ann.class}): polygon must have ${MIN_POLYGON_POINTS}-${MAX_POLYGON_POINTS} vertices`;
+    }
+    for (let j = 0; j < ann.polygon.length; j++) {
+      const [x, y] = ann.polygon[j];
+      if (x < 0 || x > 1 || y < 0 || y > 1) {
+        return `annotation[${i}] (${ann.class}): vertex ${j} outside normalized range [0, 1]`;
+      }
+    }
+    if (ann.source !== undefined && ann.source !== null && ann.source.length > 32) {
+      return `annotation[${i}]: source exceeds 32 characters`;
+    }
+  }
+  return null;
+}
+
+/** True when any polygon on the label was machine-proposed (SAM pre-label). */
+export function hasAutoPolygons(anns: PolygonAnnotation[] | undefined | null): boolean {
+  return !!anns && anns.some((a) => a.source === POLYGON_PROVENANCE_SAM);
+}
+
+function clamp01(v: number): number {
+  return Math.max(0, Math.min(1, v));
+}
+
+function round6(v: number): number {
+  return Math.round(v * 1e6) / 1e6;
+}
 
 export interface HotkeyResult {
   state: LabelState;
@@ -328,6 +456,14 @@ export const LABELER_I18N = {
     annotatorPlaceholder: 'Nhập tên của bạn...',
     progress: 'Tiến độ',
     noSnapshots: 'Không tìm thấy ảnh chụp nào cho ngày đã chọn',
+    segModeToggle: 'Chế độ phân vùng',
+    segModeHint: 'Nhấp để thêm đỉnh, nhấp đỉnh đầu hoặc Enter để đóng polygon, Esc để hủy',
+    segClassLabel: 'Lớp phân vùng',
+    segPolygonsLabel: 'Polygon đã vẽ',
+    segEmpty: 'Chưa có polygon nào',
+    segAutoBadge: '[Tự động: SAM]',
+    segDeleteBtn: 'Xóa',
+    segValidationError: 'Polygon không hợp lệ',
     loading: 'Đang tải danh sách ảnh...',
     floodLabel: 'Mức độ ngập (Phím 1-3)',
     floodNone: '1: Khô ráo',
@@ -403,6 +539,14 @@ export const LABELER_I18N = {
     annotatorPlaceholder: 'Enter your name...',
     progress: 'Progress',
     noSnapshots: 'No snapshots found for selected date',
+    segModeToggle: 'Segmentation mode',
+    segModeHint: 'Click to add vertices, click the first vertex or press Enter to close, Esc to cancel',
+    segClassLabel: 'Segmentation class',
+    segPolygonsLabel: 'Drawn polygons',
+    segEmpty: 'No polygons yet',
+    segAutoBadge: '[Auto: SAM]',
+    segDeleteBtn: 'Delete',
+    segValidationError: 'Invalid polygon',
     loading: 'Loading snapshot catalog...',
     floodLabel: 'Flood Level (Keys 1-3)',
     floodNone: '1: None',

@@ -8,14 +8,24 @@ import (
 
 // GroundTruthManifest represents a JSON label manifest adhering to tools/eval/label_schema.json (Draft-07).
 type GroundTruthManifest struct {
-	FrameID     string        `json:"frame_id"`
-	CameraID    string        `json:"camera_id,omitempty"`
-	CameraName  string        `json:"camera_name,omitempty"`
-	ImagePath   string        `json:"image_path"`
-	Annotator   string        `json:"annotator"`
-	AnnotatedAt string        `json:"annotated_at"`
-	Notes       string        `json:"notes,omitempty"`
-	Labels      LabelsPayload `json:"labels"`
+	FrameID     string            `json:"frame_id"`
+	CameraID    string            `json:"camera_id,omitempty"`
+	CameraName  string            `json:"camera_name,omitempty"`
+	ImagePath   string            `json:"image_path"`
+	Annotator   string            `json:"annotator"`
+	AnnotatedAt string            `json:"annotated_at"`
+	Notes       string            `json:"notes,omitempty"`
+	Labels      LabelsPayload     `json:"labels"`
+	Annotations []ManifestPolygon `json:"annotations,omitempty"`
+}
+
+// ManifestPolygon is an optional segmentation polygon on a harvested label,
+// expressed in normalized image coordinates [0, 1] (ADR-011 D1 contract,
+// consumed by tools/eval/export_yolo_seg.py).
+type ManifestPolygon struct {
+	Class   string      `json:"class"`            // canonical: roadway, water_puddle, motorcycle, car, bus, truck
+	Polygon [][]float64 `json:"polygon"`          // [[x, y], ...] normalized to [0, 1]
+	Source  string      `json:"source,omitempty"` // provenance, e.g. "sam_prelabel"
 }
 
 // LabelsPayload represents the structured annotations payload inside GroundTruthManifest.
@@ -106,6 +116,15 @@ var (
 		"night_glare":  {},
 		"occluded":     {},
 		"signal_noise": {},
+	}
+
+	validPolygonClasses = map[string]struct{}{
+		"roadway":      {},
+		"water_puddle": {},
+		"motorcycle":   {},
+		"car":          {},
+		"bus":          {},
+		"truck":        {},
 	}
 )
 
@@ -202,6 +221,30 @@ func ValidateDraft07(m *GroundTruthManifest) error {
 	for _, tag := range m.Labels.QualityTags {
 		if _, ok := validQualityTags[tag]; !ok {
 			return fmt.Errorf("invalid 'labels.quality_tags' item %q", tag)
+		}
+	}
+
+	// Optional segmentation polygons (ADR-011 D1): validated only when present.
+	if len(m.Annotations) > 32 {
+		return fmt.Errorf("too many polygon annotations: %d (max 32)", len(m.Annotations))
+	}
+	for i, ann := range m.Annotations {
+		if _, ok := validPolygonClasses[ann.Class]; !ok {
+			return fmt.Errorf("invalid 'annotations[%d].class' value %q (must be canonical: roadway, water_puddle, motorcycle, car, bus, truck)", i, ann.Class)
+		}
+		if len(ann.Polygon) < 3 || len(ann.Polygon) > 64 {
+			return fmt.Errorf("invalid 'annotations[%d].polygon': must have 3 to 64 vertices, got %d", i, len(ann.Polygon))
+		}
+		for j, pt := range ann.Polygon {
+			if len(pt) != 2 {
+				return fmt.Errorf("invalid 'annotations[%d].polygon' vertex %d: must be an [x, y] pair", i, j)
+			}
+			if pt[0] < 0.0 || pt[0] > 1.0 || pt[1] < 0.0 || pt[1] > 1.0 {
+				return fmt.Errorf("invalid 'annotations[%d].polygon' vertex %d: coordinates must be normalized within [0, 1]", i, j)
+			}
+		}
+		if len(ann.Source) > 32 {
+			return fmt.Errorf("invalid 'annotations[%d].source': exceeds 32 characters", i)
 		}
 	}
 
