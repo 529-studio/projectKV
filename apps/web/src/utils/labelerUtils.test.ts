@@ -267,6 +267,10 @@ describe('Labeler Utilities & Hotkeys (Issue #214 / S7-T8 Directional Taxonomy)'
       assert.ok(strings.badgeUnlabeled);
       assert.ok(strings.fastApproveAction);
       assert.ok(strings.fastApproveTooltip);
+      assert.ok(strings.batchApprovePage);
+      assert.ok(strings.batchApprovePageTooltip);
+      assert.ok(strings.batchApprovePageSuccess);
+      assert.ok(strings.batchApprovePageInProgress);
 
       for (const [key, val] of Object.entries(strings)) {
         if (typeof val === 'string') {

@@ -56,6 +56,8 @@ export default function LabelerPage() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [isBatchApproving, setIsBatchApproving] = useState<boolean>(false);
+  const [batchToast, setBatchToast] = useState<string | null>(null);
 
   const { cameras } = useCameras();
   const cameraMap = useMemo(() => {
@@ -107,12 +109,14 @@ export default function LabelerPage() {
     };
   }, []);
 
-  // Load annotator nickname from localStorage
+  // Load annotator nickname from localStorage, default to 'thdat-bot'
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedAnnotator = localStorage.getItem('labeler_annotator');
       if (storedAnnotator) {
         setAnnotator(storedAnnotator);
+      } else {
+        setAnnotator('thdat-bot');
       }
     }
   }, []);
@@ -291,7 +295,7 @@ export default function LabelerPage() {
   const handleFastApprove = useCallback(async () => {
     if (!currentSnapshot || !selectedDate) return;
 
-    const reviewer = annotator.trim() || 'reviewer';
+    const reviewer = annotator.trim() || 'thdat-bot';
     const existing = labels[currentSnapshot.key];
     const payload: LabelPayload = {
       date: selectedDate,
@@ -371,6 +375,72 @@ export default function LabelerPage() {
     devToken,
     t.devInvalidToken,
   ]);
+
+  // Batch approve all candidate frames on the current view (up to 200 items)
+  const handleBatchApproveCurrentPage = useCallback(async () => {
+    if (filteredSnapshots.length === 0 || !selectedDate) return;
+    const reviewer = annotator.trim() || 'thdat-bot';
+
+    setIsBatchApproving(true);
+    setBatchToast(null);
+
+    const candidates = filteredSnapshots.slice(0, 200);
+    const nowTs = Math.floor(Date.now() / 1000);
+    const payloads: LabelPayload[] = candidates.map((snap) => {
+      const existing = labels[snap.key];
+      return {
+        date: selectedDate,
+        camera_id: snap.camera_id,
+        snapshot_key: snap.key,
+        annotator: reviewer,
+        flood_level: existing?.flood_level || 'none',
+        traffic_level: existing?.traffic_level || 'clear',
+        traffic_dir_a: existing?.traffic_dir_a || existing?.traffic_level || 'clear',
+        traffic_dir_b: existing?.traffic_dir_b || 'not_applicable',
+        queue_reason: existing?.queue_reason || 'free_flow',
+        flood_submersion_anchor:
+          existing?.flood_submersion_anchor ||
+          (existing?.flood_level === 'deep'
+            ? 'exhaust_hub_over_15cm'
+            : existing?.flood_level === 'puddle'
+            ? 'tire_base_under_10cm'
+            : 'dry'),
+        quality_tags: existing?.quality_tags || [],
+        weather: existing?.weather || 'clear',
+        time_of_day: existing?.time_of_day || 'day',
+        notes: existing?.notes ? `${existing.notes} [Approved by ${reviewer}]` : `[Approved by ${reviewer}]`,
+        timestamp: nowTs,
+      };
+    });
+
+    const concurrency = 10;
+    for (let i = 0; i < payloads.length; i += concurrency) {
+      const chunk = payloads.slice(i, i + concurrency);
+      await Promise.all(
+        chunk.map(async (p) => {
+          try {
+            await fetch(getApiUrl('/api/archiver/labels'), {
+              method: 'POST',
+              headers: buildAuthHeaders(devToken, { 'Content-Type': 'application/json' }),
+              credentials: 'include',
+              body: JSON.stringify(p),
+            });
+          } catch (e) {
+            console.error('Failed to post approval for', p.snapshot_key, e);
+          }
+        })
+      );
+    }
+
+    setLabels((prev) => {
+      const combined = [...Object.values(prev), ...payloads];
+      return resolveCanonicalLabels(combined);
+    });
+
+    setIsBatchApproving(false);
+    setBatchToast(t.batchApprovePageSuccess);
+    setTimeout(() => setBatchToast(null), 3000);
+  }, [filteredSnapshots, selectedDate, annotator, labels, devToken, t.batchApprovePageSuccess]);
 
   // Save current label and optionally advance
   const saveCurrent = useCallback(
@@ -693,6 +763,17 @@ export default function LabelerPage() {
             {isLoading ? '...' : t.refreshData}
           </button>
 
+          {/* Batch Approve Current Page Button */}
+          <button
+            type="button"
+            onClick={handleBatchApproveCurrentPage}
+            disabled={isBatchApproving || filteredSnapshots.length === 0}
+            title={t.batchApprovePageTooltip}
+            className="text-xs font-medium px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-zinc-200 transition"
+          >
+            {isBatchApproving ? t.batchApprovePageInProgress : `${t.batchApprovePage} (${filteredSnapshots.length})`}
+          </button>
+
           {/* Export JSON Button */}
           <button
             type="button"
@@ -832,6 +913,11 @@ export default function LabelerPage() {
           {saveStatus === 'error' && (
             <span className="text-red-400 bg-red-950/50 border border-red-900 px-2 py-0.5 rounded text-[11px]">
               {t.saveError}
+            </span>
+          )}
+          {batchToast && (
+            <span className="text-emerald-300 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded text-[11px]">
+              {batchToast}
             </span>
           )}
         </div>
