@@ -51,8 +51,18 @@ def load_model():
     if not OPENVINO_AVAILABLE or not core:
         return
 
-    model_xml = os.path.join(MODEL_DIR, "yolov8n.xml")
-    if not os.path.isfile(model_xml):
+    # Look for segmentation model first, then detection model
+    candidate_xmls = [
+        os.path.join(MODEL_DIR, "yolov8n_seg.xml"),
+        os.path.join(MODEL_DIR, "yolov8n.xml"),
+    ]
+    model_xml = None
+    for candidate in candidate_xmls:
+        if os.path.isfile(candidate):
+            model_xml = candidate
+            break
+
+    if not model_xml:
         # Look for any .xml file in MODEL_DIR
         if os.path.isdir(MODEL_DIR):
             xml_files = [f for f in os.listdir(MODEL_DIR) if f.endswith(".xml")]
@@ -127,6 +137,157 @@ def nms_cpu(boxes: np.ndarray, scores: np.ndarray, iou_thresh: float = 0.45):
         inds = np.where(iou <= iou_thresh)[0]
         order = order[inds + 1]
     return keep
+
+
+def decode_mask_prototypes(
+    mask_coeffs: np.ndarray,
+    proto: np.ndarray,
+    binarize_thresh: float = 0.5,
+) -> np.ndarray:
+    """
+    Decodes mask prototypes into binary 2D spatial masks using NumPy BLAS.
+    mask_coeffs: shape (K, 32) where K is number of candidates.
+    proto: shape (32, H_proto, W_proto) or (1, 32, H_proto, W_proto).
+    Returns binary mask array of shape (K, H_proto, W_proto).
+    """
+    if mask_coeffs.size == 0 or proto.size == 0:
+        return np.zeros((0, 104, 104), dtype=bool)
+
+    if proto.ndim == 4:
+        proto = proto[0]
+
+    num_protos, h_proto, w_proto = proto.shape
+    proto_flat = proto.reshape(num_protos, h_proto * w_proto)
+
+    logits = np.matmul(mask_coeffs, proto_flat)
+    sigmoids = 1.0 / (1.0 + np.exp(-np.clip(logits, -12.0, 12.0)))
+    masks = sigmoids.reshape(-1, h_proto, w_proto)
+    return masks > binarize_thresh
+
+
+def calculate_water_ratio(
+    water_mask: np.ndarray,
+    road_mask: Optional[np.ndarray] = None,
+) -> float:
+    """
+    Layer 1: Roadway Surface Water Coverage Ratio (ADR-009 §5.1).
+    R_water = sum(M_water & M_road) / sum(M_road)
+    Fallback: sum(M_water) / total_pixels if road_mask is empty/missing.
+    """
+    if water_mask is None or water_mask.size == 0:
+        return 0.0
+
+    if road_mask is not None and road_mask.size == water_mask.size:
+        road_sum = float(np.sum(road_mask))
+        if road_sum > 0:
+            intersection = np.logical_and(water_mask, road_mask)
+            return float(np.sum(intersection)) / road_sum
+
+    total_pixels = float(water_mask.size)
+    if total_pixels <= 0:
+        return 0.0
+    return float(np.sum(water_mask)) / total_pixels
+
+
+def calculate_motorcycle_submersion(
+    motorcycle_boxes: np.ndarray,
+    water_mask: np.ndarray,
+    target_img_size: Tuple[int, int] = (416, 416),
+) -> Tuple[float, float, int]:
+    """
+    Layer 2: Motorcycle Wheel Submersion Ratio & Physical Depth Estimation (ADR-009 §5.2).
+    motorcycle_boxes: np.ndarray of shape (N, 4) in [cx, cy, w, h] format.
+    water_mask: binary 2D array of shape (H_proto, W_proto), e.g. (104, 104).
+    Returns:
+      (max_delta_sub, max_depth_cm, submerged_motorcycle_count)
+    """
+    if motorcycle_boxes is None or len(motorcycle_boxes) == 0 or water_mask is None or water_mask.size == 0:
+        return 0.0, 0.0, 0
+
+    h_grid, w_grid = water_mask.shape
+    h_img, w_img = target_img_size
+
+    scale_x = w_grid / float(w_img)
+    scale_y = h_grid / float(h_img)
+
+    max_delta = 0.0
+    submerged_count = 0
+
+    boxes_xyxy = []
+    for b in motorcycle_boxes:
+        if len(b) != 4:
+            continue
+        cx, cy, w, h = b[0], b[1], b[2], b[3]
+        if w > 0 and h > 0:
+            xmin = max(0.0, cx - w / 2.0)
+            ymin = max(0.0, cy - h / 2.0)
+            xmax = min(float(w_img), cx + w / 2.0)
+            ymax = min(float(h_img), cy + h / 2.0)
+            boxes_xyxy.append((xmin, ymin, xmax, ymax))
+
+    for xmin, ymin, xmax, ymax in boxes_xyxy:
+        box_h = ymax - ymin
+        if box_h <= 0:
+            continue
+
+        gx1 = int(round(xmin * scale_x))
+        gx2 = int(round(xmax * scale_x))
+        gy1 = int(round(ymin * scale_y))
+        gy2 = int(round(ymax * scale_y))
+
+        gx1 = max(0, min(w_grid - 1, gx1))
+        gx2 = max(gx1 + 1, min(w_grid, gx2))
+        gy1 = max(0, min(h_grid - 1, gy1))
+        gy2 = max(gy1 + 1, min(h_grid, gy2))
+
+        sub_region = water_mask[gy1:gy2, gx1:gx2]
+
+        if np.any(sub_region):
+            water_rows, _ = np.where(sub_region)
+            min_water_row = np.min(water_rows) + gy1
+            y_waterline = min_water_row / scale_y
+            delta = (ymax - y_waterline) / box_h
+            delta = max(0.0, min(1.0, float(delta)))
+            if delta > 0.05:
+                submerged_count += 1
+            if delta > max_delta:
+                max_delta = delta
+
+    max_depth_cm = round(max_delta * 110.0, 1)
+    return round(max_delta, 4), max_depth_cm, submerged_count
+
+
+def triangulate_flood_verdict(
+    water_ratio: float,
+    max_delta_sub: float,
+    depth_estimated_cm: float,
+    motorcycles_observed: int = 0,
+    rain_event: bool = False,
+) -> Tuple[str, float]:
+    """
+    Dual-Layer Physical Triangulation Decision Engine (ADR-009 §5).
+    Layer 1: Road water ratio >= 0.15 activates Layer 2.
+    Layer 2: delta_sub >= 0.18 (depth >= 20cm) triggers FLOODED_DEEP.
+    Returns (verdict_str, confidence_float).
+    """
+    if water_ratio >= 0.15 and (max_delta_sub >= 0.18 or depth_estimated_cm >= 20.0):
+        conf = min(0.95, 0.85 + (water_ratio * 0.2))
+        return "FLOODED_DEEP", round(conf, 2)
+
+    if water_ratio >= 0.15:
+        conf = min(0.92, 0.80 + (water_ratio * 0.2))
+        return "FLOODED_SHALLOW", round(conf, 2)
+
+    if motorcycles_observed == 0 and water_ratio >= 0.35:
+        return "FLOODED_SHALLOW", 0.82
+
+    if water_ratio >= 0.05:
+        return "WET", 0.80
+
+    if rain_event:
+        return "WET", 0.75
+
+    return "CLEAR", 0.95
 
 
 class CVServer(ThreadingHTTPServer):
@@ -226,9 +387,27 @@ class CVRequestHandler(BaseHTTPRequestHandler):
 
                     infer_request = compiled_model.create_infer_request()
                     results = infer_request.infer({0: input_tensor})
-                    output_data = results[0]
 
-                    # Parse output detections (YOLO format)
+                    output_data = None
+                    proto_data = None
+                    if isinstance(results, dict):
+                        output_data = results.get(0) or results.get("output0")
+                        proto_data = results.get(1) or results.get("output1")
+                        if output_data is None and len(results) > 0:
+                            vals = list(results.values())
+                            output_data = vals[0]
+                            if len(vals) > 1:
+                                proto_data = vals[1]
+                    elif hasattr(results, "__getitem__"):
+                        try:
+                            output_data = results[0]
+                            if len(results) > 1:
+                                proto_data = results[1]
+                        except Exception:
+                            pass
+                    if output_data is None and results is not None:
+                        output_data = results
+
                     latency = (time.perf_counter() - start_t) * 1000
 
                     vehicle_counts = {
@@ -241,13 +420,93 @@ class CVRequestHandler(BaseHTTPRequestHandler):
 
                     CONF_THRESH = 0.25
                     IOU_THRESH = 0.45
+                    vehicles = 0
+                    kept_motorcycles = []
+                    water_ratio = 0.0
+                    max_delta_sub = 0.0
+                    depth_estimated_cm = 0.0
+                    submerged_mc = 0
+                    puddle_count = 0
+                    model_tag = f"yolov8n_openvino_{target_w}"
 
                     if output_data is not None and hasattr(output_data, "shape"):
-                        data = output_data[0] if output_data.ndim == 3 else output_data
-                        if data.ndim == 2 and data.shape[0] >= 12:
-                            # Standard COCO 80-class model (YOLOv8n default):
-                            # Vehicle classes: 2: car (row 6), 3: motorcycle (row 7), 5: bus (row 9), 7: truck (row 11).
-                            # Note: Heavy freight / container trucks are detected under class 'truck' (ADR-005 T6 / decision-container-class-gap.md).
+                        if output_data.ndim == 3:
+                            if output_data.shape[1] > output_data.shape[2]:
+                                data = output_data[0].T
+                            else:
+                                data = output_data[0]
+                        else:
+                            data = output_data
+
+                        num_channels = data.shape[0] if data.ndim == 2 else 0
+
+                        if data.ndim == 2 and num_channels == 42:
+                            # Fine-tuned 6-class YOLOv8n-seg model (ADR-009):
+                            # Classes: 0: roadway, 1: water_puddle, 2: motorcycle, 3: car, 4: bus, 5: truck
+                            # Rows: 0..3 box, 4..9 classes, 10..41 (32 mask coeffs)
+                            model_tag = f"yolov8n_seg_openvino_{target_w}"
+                            seg_classes = {
+                                "motorcycle": 6,
+                                "car": 7,
+                                "bus": 8,
+                                "truck": 9,
+                            }
+                            for cls_name, row_idx in seg_classes.items():
+                                scores = data[row_idx, :]
+                                valid_mask = scores > CONF_THRESH
+                                if np.any(valid_mask):
+                                    valid_indices = np.where(valid_mask)[0]
+                                    candidate_boxes = np.column_stack([
+                                        data[0, valid_indices],
+                                        data[1, valid_indices],
+                                        data[2, valid_indices],
+                                        data[3, valid_indices],
+                                    ])
+                                    candidate_scores = scores[valid_indices]
+                                    keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
+                                    vehicle_counts[cls_name] = len(keep)
+                                    if cls_name == "motorcycle" and len(keep) > 0:
+                                        kept_motorcycles = candidate_boxes[keep]
+                                else:
+                                    vehicle_counts[cls_name] = 0
+
+                            vehicle_counts["container"] = 0
+                            vehicles = sum(vehicle_counts.values())
+
+                            # Segmentation mask decoding & triangulation
+                            road_mask = None
+                            water_mask = None
+                            if proto_data is not None:
+                                # Roadway mask (class 0, row 4)
+                                road_scores = data[4, :]
+                                valid_road = road_scores > CONF_THRESH
+                                if np.any(valid_road):
+                                    road_indices = np.where(valid_road)[0]
+                                    road_coeffs = data[10:42, road_indices].T
+                                    road_masks = decode_mask_prototypes(road_coeffs, proto_data, binarize_thresh=0.5)
+                                    road_mask = np.any(road_masks, axis=0)
+
+                                # Water puddle mask (class 1, row 5)
+                                water_scores = data[5, :]
+                                valid_water = water_scores > CONF_THRESH
+                                if np.any(valid_water):
+                                    water_indices = np.where(valid_water)[0]
+                                    puddle_count = len(water_indices)
+                                    water_coeffs = data[10:42, water_indices].T
+                                    water_masks = decode_mask_prototypes(water_coeffs, proto_data, binarize_thresh=0.5)
+                                    water_mask = np.any(water_masks, axis=0)
+                                else:
+                                    water_mask = np.zeros((104, 104), dtype=bool)
+
+                                water_ratio = calculate_water_ratio(water_mask, road_mask)
+                                if len(kept_motorcycles) > 0 and water_mask is not None:
+                                    max_delta_sub, depth_estimated_cm, submerged_mc = calculate_motorcycle_submersion(
+                                        np.array(kept_motorcycles), water_mask, target_img_size=(target_w, target_h)
+                                    )
+
+                        elif data.ndim == 2 and num_channels >= 12:
+                            # Standard COCO 80-class model:
+                            # Vehicle classes: 2: car (row 6), 3: motorcycle (row 7), 5: bus (row 9), 7: truck (row 11)
                             coco_vehicle_rows = {
                                 "car": 6,
                                 "motorcycle": 7,
@@ -268,12 +527,15 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                                     candidate_scores = scores[valid_indices]
                                     keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
                                     vehicle_counts[cls_name] = len(keep)
+                                    if cls_name == "motorcycle" and len(keep) > 0:
+                                        kept_motorcycles = candidate_boxes[keep]
                                 else:
                                     vehicle_counts[cls_name] = 0
 
-                            vehicle_counts["container"] = 0  # Folded into 'truck' in COCO ground truth and PCU formula
+                            vehicle_counts["container"] = 0
                             vehicles = sum(vehicle_counts.values())
-                        elif data.ndim == 2 and data.shape[0] == 9:
+
+                        elif data.ndim == 2 and num_channels == 9:
                             # Legacy DatapolisX 5-class model: 0: motorcycle, 1: car, 2: bus, 3: truck, 4: container
                             legacy_vehicle_rows = {
                                 "motorcycle": 4,
@@ -306,21 +568,41 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                     else:
                         vehicles = 0
 
-                    severity = "CLEAR"
+                    traffic_severity = "CLEAR"
                     if vehicles > 35:
-                        severity = "CONGESTED"
+                        traffic_severity = "CONGESTED"
                     elif vehicles > 20:
-                        severity = "HEAVY"
+                        traffic_severity = "HEAVY"
                     elif vehicles > 8:
-                        severity = "MODERATE"
+                        traffic_severity = "MODERATE"
+
+                    flood_verdict, flood_conf = triangulate_flood_verdict(
+                        water_ratio=water_ratio,
+                        max_delta_sub=max_delta_sub,
+                        depth_estimated_cm=depth_estimated_cm,
+                        motorcycles_observed=vehicle_counts["motorcycle"],
+                    )
 
                     self._send_json(200, {
+                        "service": "projectkv-cv-engine",
                         "vehicles_detected": vehicles,
                         "vehicle_counts": vehicle_counts,
-                        "traffic_severity": severity,
-                        "confidence": 0.88,
+                        "traffic_severity": traffic_severity,
+                        "flood_severity": flood_verdict,
+                        "water_ratio": round(water_ratio, 4),
+                        "depth_estimated_cm": round(depth_estimated_cm, 1),
+                        "confidence": round(float(flood_conf if flood_verdict != "CLEAR" else 0.88), 2),
                         "latency_ms": round(latency, 2),
-                        "model": f"yolov8n_openvino_{target_w}"
+                        "model": model_tag,
+                        "flood_assessment": {
+                            "status": flood_verdict,
+                            "water_surface_ratio": round(water_ratio, 4),
+                            "wheel_submersion_detected": max_delta_sub >= 0.18,
+                            "max_submersion_depth_cm": round(depth_estimated_cm, 1),
+                            "motorcycles_observed": vehicle_counts["motorcycle"],
+                            "motorcycles_submerged": submerged_mc,
+                            "puddle_polygon_count": puddle_count,
+                        },
                     })
                     return
                 except Exception as exc:

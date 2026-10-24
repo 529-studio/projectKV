@@ -280,6 +280,12 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Fast-approval hotkey ergonomics: `Shift + Enter` (and primary button) promotes auto-harvested candidate parameters directly to gold standard, stamps annotator attribution with reviewer nickname, persists to `/api/archiver/labels`, and smoothly advances the queue.
   - 100% test pass rate: 155 web unit tests (`npm test --prefix apps/web`), zero ESLint errors, Next.js static production export (6/6 pages).
 
+- **Sprint 8: Wave 2 — Road Surface Water Segmentation Dataset Toolchain & Off-Box Training Pipeline (S8-T8, Issue #290, Kanban [KV-20], ADR-009)**:
+  - Standalone dataset export CLI (`tools/eval/export_yolo_seg.py`): Converts authentic camera frames and ground-truth metadata (`tools/eval/labels_gold_standard/`) into standard Ultralytics YOLO segmentation directory structure (`data/yolo_seg/`) with 6 target classes (`roadway`, `water_puddle`, `motorcycle`, `car`, `bus`, `truck`). Normalized coordinates in $[0.0, 1.0]$ and strict `--verify` manifest checks.
+  - Off-box training pipeline (`tools/train/train_yolov8_seg.py`): Designed for off-box execution (Google Colab / external GPU workstation) to respect dev-box 20 GB disk ceiling (auto-guard at 16 GB) and 2 GB RAM limits. Automatic host compute headroom checks with dry-run fallback. Exports best checkpoints to OpenVINO FP16 IR (`yolov8n_seg.xml` and `yolov8n_seg.bin`, size $< 10$ MB).
+  - CV engine inference upgrade (`services/cv-engine/server.py`): Prioritizes loading `yolov8n_seg.xml`, parses mask prototypes (`output1`, shape `[1, 32, 104, 104]`), and executes Dual-Layer Physical Triangulation (Layer 1: surface water ratio $R_{\text{water}} \ge 0.15$; Layer 2: motorcycle wheel submersion $\delta_{\text{sub}} \ge 0.18 \to \text{FLOODED\_DEEP}$).
+  - 100% test pass rate: `make test-model` (14/14 tests in 0.66s), `make test-train` (4/4 tests in 0.06s), `make test-eval` (66/66 tests in 0.33s), and `make test-go` (`-race` all packages pass).
+
 ---
 
 
@@ -298,9 +304,12 @@ make dev-model
 
 # 3. Run automated test suites:
 make test-go       # Full Go backend test suite with -race
+make test-model    # CV Engine segmentation & triangulation test suite (14 tests)
+make test-eval     # Ground-truth evaluation & export test suite (66 tests)
+make test-train    # Off-box training pipeline test suite (4 tests)
 make test-pcu      # PCU Saturation Index boundary test suite
 make test-enrich   # Geo-enrichment catalog filter unit tests
-cd apps/web && npm test  # Web client unit test suite (155 tests)
+cd apps/web && npm test  # Web client unit test suite (159 tests)
 ```
 
 ---
