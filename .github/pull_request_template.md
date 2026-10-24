@@ -1,12 +1,13 @@
-Close #<issue-number> closes [KV-<card-id>]
+Close #<issue-number>
 
 <!--
-MANDATORY ISSUE & KANBAN LINKING (AGENTS.md Rule 9):
-1. GitHub Issue: Use "Close #<issue-number>" format only (e.g., Close #248).
-   Do NOT use informal phrasing like "Addresses Issue #248" or "Implement #248".
-2. Kanban Board (529 Studio Hub / Plane): Include "closes [KV-<card-id>]" (e.g., closes [KV-2]).
-   The n8n Gateway automation exclusively parses "closes [KV-X]" to automatically link the PR
-   and transition the card on the Kanban board (https://hub.529studio.site).
+MANDATORY ISSUE LINKING (AGENTS.md Rule 9, amended by ADR-011 D6):
+1. GitHub Issue: Use "Close #<issue-number>" format only (e.g., Close #297).
+   Do NOT use informal phrasing like "Addresses Issue #297" or "Implement #297".
+2. Sprint/task progress is tracked on the org GitHub Projects v2 board "ProjectKV"
+   (https://github.com/orgs/529-studio/projects/2). The legacy 529 Studio Hub (Plane)
+   Kanban format "closes [KV-<card-id>]" is RETIRED (Hub decommissioned 10/2026)
+   and must NOT be used in new PRs.
 -->
 
 ## Summary & Rationale
