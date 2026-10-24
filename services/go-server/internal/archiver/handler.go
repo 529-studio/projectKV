@@ -114,6 +114,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, middlewares ...gin.Handler
 		archiverGroup.HEAD("/snapshots/raw", h.GetSnapshotRaw)
 		archiverGroup.GET("/labels", h.GetLabels)
 		archiverGroup.POST("/labels", h.SaveLabel)
+		archiverGroup.POST("/cache/invalidate", h.InvalidateCache)
 		archiverGroup.GET("/auth/me", h.GetAuthMe)
 	}
 }
@@ -126,6 +127,25 @@ func (h *Handler) GetAuthMe(c *gin.Context) {
 		"authenticated": true,
 		"auth_method":   method,
 		"user_email":    email,
+	})
+}
+
+// InvalidateCache godoc
+// @Summary Invalidate archiver in-memory caches
+// @Description Purges snapshotCache and labelCache to force fresh fetch from storage
+// @Tags archiver
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /api/archiver/cache/invalidate [post]
+func (h *Handler) InvalidateCache(c *gin.Context) {
+	h.cacheMu.Lock()
+	h.snapshotCache = make(map[string]snapshotCacheEntry)
+	h.labelCache = make(map[string]labelCacheEntry)
+	h.cacheMu.Unlock()
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "ok",
+		"message": "archiver caches invalidated",
 	})
 }
 

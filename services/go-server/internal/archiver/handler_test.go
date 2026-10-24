@@ -340,3 +340,33 @@ func TestHandler_GetLabels_WithHarvesterGroundTruthManifest(t *testing.T) {
 		t.Errorf("expected Weather rain, got %s", l.Weather)
 	}
 }
+
+func TestHandler_InvalidateCache(t *testing.T) {
+	router, store := setupTestRouter(t)
+	ctx := context.Background()
+
+	// Seed dummy label to populate cache
+	_ = store.Put(ctx, "labels/2026-10-23/cam1_reviewer_1729600000.json", bytes.NewReader([]byte(`{"snapshot_key":"snap1","date":"2026-10-23","camera_id":"cam1","annotator":"reviewer"}`)))
+
+	// First call primes cache
+	w1 := httptest.NewRecorder()
+	req1, _ := http.NewRequest("GET", "/api/archiver/labels?date=2026-10-23", nil)
+	router.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w1.Code)
+	}
+
+	// Call invalidation endpoint
+	w2 := httptest.NewRecorder()
+	req2, _ := http.NewRequest("POST", "/api/archiver/cache/invalidate", nil)
+	router.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 on cache invalidate, got %d", w2.Code)
+	}
+
+	var resp map[string]interface{}
+	_ = json.Unmarshal(w2.Body.Bytes(), &resp)
+	if resp["status"] != "ok" {
+		t.Errorf("expected status ok, got %v", resp["status"])
+	}
+}

@@ -8,6 +8,29 @@
     },
     "basePath": "/",
     "paths": {
+        "/api/archiver/cache/invalidate": {
+            "post": {
+                "description": "Purges snapshotCache and labelCache to force fresh fetch from storage",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "archiver"
+                ],
+                "summary": "Invalidate archiver in-memory caches",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/archiver/dates": {
             "get": {
                 "description": "Retrieve a list of dates that contain archived snapshot proof frames",

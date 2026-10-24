@@ -455,6 +455,21 @@ info:
   title: Camera View API
   version: "1.0"
 paths:
+  /api/archiver/cache/invalidate:
+    post:
+      description: Purges snapshotCache and labelCache to force fresh fetch from storage
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Invalidate archiver in-memory caches
+      tags:
+      - archiver
   /api/archiver/dates:
     get:
       description: Retrieve a list of dates that contain archived snapshot proof frames
