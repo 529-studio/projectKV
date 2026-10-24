@@ -14,6 +14,13 @@ var (
 	googleAPIKeyRegex = regexp.MustCompile(`AIza[0-9A-Za-z-_]{35}`)
 	// awsAccessKeyRegex matches AWS / Cloudflare R2 standard 20-character Access Key IDs.
 	awsAccessKeyRegex = regexp.MustCompile(`\b(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b`)
+	// telegramBotTokenRegex matches Telegram Bot API tokens (Issue #246 / S8-T9):
+	// 8-10 digit bot ID, colon, then a base64url secret of 33-36 characters
+	// (real-world variance includes a publicly documented 34-char example).
+	// No leading \b guard: tokens typically appear glued to "/bot" prefixes in
+	// URLs, which are all word characters. The long strict tail rules out clock
+	// times and ratio strings like "12:34:56" or "10:1".
+	telegramBotTokenRegex = regexp.MustCompile(`\d{8,10}:[A-Za-z0-9_-]{33,36}\b`)
 	// queryKeyRegex matches URL query parameter credentials (e.g., ?api_key=SECRET or ?key=AIza...).
 	queryKeyRegex = regexp.MustCompile(`(?i)([?&](?:key|api_key|token|secret|access_token)=)[^&\s"\'\\}]+`)
 )
@@ -26,6 +33,7 @@ func SanitizeBytes(b []byte) []byte {
 	}
 	out := googleAPIKeyRegex.ReplaceAll(b, []byte("[REDACTED_KEY]"))
 	out = awsAccessKeyRegex.ReplaceAll(out, []byte("[REDACTED_KEY]"))
+	out = telegramBotTokenRegex.ReplaceAll(out, []byte("[REDACTED_BOT_TOKEN]"))
 	out = queryKeyRegex.ReplaceAllFunc(out, func(match []byte) []byte {
 		str := string(match)
 		idx := strings.Index(str, "=")

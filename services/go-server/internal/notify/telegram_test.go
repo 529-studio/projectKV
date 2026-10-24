@@ -149,3 +149,41 @@ func TestTelegramChannel_UnconfiguredTokenNoop(t *testing.T) {
 		t.Fatalf("expected nil when token is unconfigured, got %v", err)
 	}
 }
+
+// TestFormatTelegramMessage_StagingChokepointFixture pins the exact rendered
+// alert for the staging verification camera (Issue #246 / S8-T9). The ops
+// pre-flight script scripts/verify_staging_telegram.sh mirrors this output;
+// if this test changes, the script message must be updated in lockstep.
+func TestFormatTelegramMessage_StagingChokepointFixture(t *testing.T) {
+	alert := FloodAlert{
+		CameraID:       "586e2995f9fab7001111b0b5",
+		CameraName:     "Ung Văn Khiêm - Nguyễn Gia Trí (D2)",
+		Ward:           "Thạnh Mỹ Tây",
+		District:       "Bình Thạnh",
+		FloodSeverity:  "FLOODED_DEEP",
+		TypicalDepthCm: 35,
+		ObservedAt:     time.Date(2026, 10, 24, 14, 15, 0, 0, time.UTC),
+	}
+
+	msg := FormatTelegramMessage(alert)
+
+	// Rule 1: zero emojis across the full pictograph/symbol spectrum.
+	for _, r := range msg {
+		if r > 0x1F000 && (unicode.Is(unicode.So, r) || unicode.Is(unicode.Sk, r)) {
+			t.Fatalf("Rule 1 violation: found emoji in message: %c (U+%04X)", r, r)
+		}
+	}
+
+	// Exact canonical rendering: 14:15 UTC + 7 = 21:15 ICT same day.
+	want := "<b>[CẢNH BÁO NGẬP NƯỚC / FLOOD ALERT]</b>\n\n" +
+		"<b>Điểm ngập / Chokepoint:</b> Ung Văn Khiêm - Nguyễn Gia Trí (D2)\n" +
+		"<b>Khu vực / Area:</b> Thạnh Mỹ Tây, Bình Thạnh\n" +
+		"<b>Mức độ / Severity:</b> [NGẬP SÂU / DEEP FLOOD]\n" +
+		"<b>Độ sâu ước lượng / Depth:</b> ~35 cm\n" +
+		"<b>Thời gian / Time:</b> 21:15 24/10/2026 (ICT)\n" +
+		"<b>Chi tiết / Live View:</b> <a href=\"https://warded.529studio.site/?cam=586e2995f9fab7001111b0b5\">https://warded.529studio.site/?cam=586e2995f9fab7001111b0b5</a>"
+
+	if msg != want {
+		t.Fatalf("staging fixture message drifted from canonical format.\nwant:\n%s\n\ngot:\n%s", want, msg)
+	}
+}
