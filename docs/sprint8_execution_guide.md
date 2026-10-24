@@ -156,9 +156,9 @@ PR Description: Must strictly start with 'Close #289 closes [KV-19]' per AGENTS.
 
 ---
 
-## Wave 2 — Thị Giác Phân Vùng Mặt Nước On-Premise (S8-T8)
+## Wave 2 — Thị Giác Phân Vùng Mặt Nước On-Premise (S8-T8) [COMPLETED]
 
-Xây dựng toolchain và quy trình huấn luyện off-box để đưa mô hình phân vùng ngập nước vào `dev-box`.
+Toolchain xuất dataset phân vùng mặt nước YOLO segmentation, pipeline huấn luyện off-box và logic Dual-Layer Physical Triangulation trong `services/cv-engine/server.py` đã hoàn thành và kiểm thử 100% (Issue #290, PR branch `feat/s8-t8-road-water-segmentation-pipeline`).
 
 ### Terminal 1 — S8-T8 (Toolchain xuất dataset phân vùng mặt nước & Pipeline huấn luyện Off-Box)
 
