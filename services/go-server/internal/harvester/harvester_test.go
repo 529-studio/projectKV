@@ -188,6 +188,58 @@ func TestValidateDraft07(t *testing.T) {
 		}
 	})
 
+	t.Run("Valid Manifest with polygon annotations passes", func(t *testing.T) {
+		m := validManifest()
+		m.Annotations = []harvester.ManifestPolygon{
+			{
+				Class:   "roadway",
+				Polygon: [][]float64{{0.10, 0.95}, {0.90, 0.95}, {0.65, 0.40}, {0.35, 0.40}},
+				Source:  "sam_prelabel",
+			},
+			{
+				Class:   "water_puddle",
+				Polygon: [][]float64{{0.15, 0.95}, {0.85, 0.95}, {0.62, 0.48}, {0.38, 0.48}},
+			},
+		}
+		if err := harvester.ValidateDraft07(m); err != nil {
+			t.Fatalf("expected manifest with valid polygons to pass, got: %v", err)
+		}
+	})
+
+	t.Run("Invalid polygon annotations rejected", func(t *testing.T) {
+		m := validManifest()
+		m.Annotations = []harvester.ManifestPolygon{
+			{Class: "aeroplane", Polygon: [][]float64{{0.1, 0.1}, {0.2, 0.2}, {0.3, 0.3}}},
+		}
+		if err := harvester.ValidateDraft07(m); err == nil {
+			t.Errorf("expected error on non-canonical polygon class")
+		}
+
+		m = validManifest()
+		m.Annotations = []harvester.ManifestPolygon{
+			{Class: "car", Polygon: [][]float64{{0.1, 0.1}, {0.2, 0.2}}},
+		}
+		if err := harvester.ValidateDraft07(m); err == nil {
+			t.Errorf("expected error on polygon with fewer than 3 vertices")
+		}
+
+		m = validManifest()
+		m.Annotations = []harvester.ManifestPolygon{
+			{Class: "bus", Polygon: [][]float64{{150.0, 950.0}, {850.0, 950.0}, {500.0, 480.0}}},
+		}
+		if err := harvester.ValidateDraft07(m); err == nil {
+			t.Errorf("expected error on pixel (non-normalized) polygon coordinates")
+		}
+
+		m = validManifest()
+		m.Annotations = []harvester.ManifestPolygon{
+			{Class: "truck", Polygon: [][]float64{{0.1, 0.1, 0.1}, {0.2, 0.2}, {0.3, 0.3}}},
+		}
+		if err := harvester.ValidateDraft07(m); err == nil {
+			t.Errorf("expected error on ragged vertex")
+		}
+	})
+
 	t.Run("Missing root fields", func(t *testing.T) {
 		m := validManifest()
 		m.FrameID = ""

@@ -8,9 +8,18 @@ import {
   buildAuthHeaders,
   isAutoHarvested,
   filterSnapshots,
+  normalizePolygonClass,
+  normalizePixelPoints,
+  validatePolygonAnnotations,
+  hasAutoPolygons,
+  POLYGON_PROVENANCE_SAM,
+  MAX_ANNOTATIONS_PER_LABEL,
   type LabelFilterStatus,
   type LabelPayload,
   type LabelState,
+  type PolygonAnnotation,
+  type PolygonClass,
+  type PolygonPoint,
 } from './labelerUtils.ts';
 
 describe('Labeler Utilities & Hotkeys (Issue #214 / S7-T8 Directional Taxonomy)', () => {
@@ -273,5 +282,101 @@ describe('Labeler Utilities & Hotkeys (Issue #214 / S7-T8 Directional Taxonomy)'
         }
       }
     }
+  });
+});
+
+describe('Segmentation Polygon Contract (Issue #297 / ADR-011 D1)', () => {
+  test('normalizePolygonClass resolves canonical names and aliases', () => {
+    assert.equal(normalizePolygonClass('Roadway'), 'roadway');
+    assert.equal(normalizePolygonClass(' flood '), 'water_puddle');
+    assert.equal(normalizePolygonClass('motorbike'), 'motorcycle');
+    assert.equal(normalizePolygonClass('container'), 'truck');
+    assert.equal(normalizePolygonClass('aeroplane'), null);
+    assert.equal(normalizePolygonClass(''), null);
+  });
+
+  test('normalizePixelPoints converts, clamps, and rounds to 6 decimals', () => {
+    const pts = normalizePixelPoints(
+      [
+        { x: 192, y: 108 },
+        { x: 960, y: 540 },
+        { x: 2000, y: -5 },
+      ],
+      1920,
+      1080
+    );
+    assert.deepEqual(pts[0], [0.1, 0.1]);
+    assert.deepEqual(pts[1], [0.5, 0.5]);
+    // Out-of-range pixel coordinates clamp into [0, 1] instead of leaking.
+    assert.deepEqual(pts[2], [1, 0]);
+  });
+
+  test('validatePolygonAnnotations accepts a valid annotation set', () => {
+    const ok: PolygonAnnotation[] = [
+      { class: 'roadway', polygon: [[0.1, 0.9], [0.9, 0.9], [0.5, 0.4]], source: 'human' },
+      { class: 'water_puddle', polygon: [[0.2, 0.8], [0.8, 0.8], [0.5, 0.5]] },
+    ];
+    assert.equal(validatePolygonAnnotations(ok), null);
+    assert.equal(validatePolygonAnnotations([]), null);
+    assert.equal(validatePolygonAnnotations(undefined), null);
+  });
+
+  test('validatePolygonAnnotations rejects contract violations with messages', () => {
+    const tooFew: PolygonAnnotation[] = [
+      { class: 'car', polygon: [[0.1, 0.1], [0.2, 0.2]] },
+    ];
+    assert.match(validatePolygonAnnotations(tooFew) ?? '', /3-64 vertices/);
+
+    const pixelCoords: PolygonAnnotation[] = [
+      { class: 'bus', polygon: [[150, 950], [850, 950], [500, 480]] },
+    ];
+    assert.match(validatePolygonAnnotations(pixelCoords) ?? '', /normalized range/);
+
+    const badClass: PolygonAnnotation[] = [
+      { class: 'aeroplane' as unknown as PolygonClass, polygon: [[0.1, 0.1], [0.2, 0.2], [0.3, 0.3]] },
+    ];
+    assert.match(validatePolygonAnnotations(badClass) ?? '', /unknown class/);
+
+    const tooMany = Array.from({ length: MAX_ANNOTATIONS_PER_LABEL + 1 }, () => ({
+      class: 'car' as const,
+      polygon: [[0.1, 0.1], [0.2, 0.2], [0.3, 0.3]] as PolygonPoint[],
+    }));
+    assert.match(validatePolygonAnnotations(tooMany) ?? '', /too many polygon annotations/);
+
+    const longSource: PolygonAnnotation[] = [
+      {
+        class: 'car',
+        polygon: [[0.1, 0.1], [0.2, 0.2], [0.3, 0.3]],
+        source: 'x'.repeat(33),
+      },
+    ];
+    assert.match(validatePolygonAnnotations(longSource) ?? '', /source exceeds/);
+  });
+
+  test('hasAutoPolygons detects SAM provenance only', () => {
+    const anns: PolygonAnnotation[] = [
+      { class: 'roadway', polygon: [[0.1, 0.1], [0.2, 0.2], [0.3, 0.3]], source: 'human' },
+      { class: 'water_puddle', polygon: [[0.4, 0.4], [0.5, 0.5], [0.6, 0.6]], source: POLYGON_PROVENANCE_SAM },
+    ];
+    assert.equal(hasAutoPolygons(anns), true);
+    assert.equal(hasAutoPolygons([anns[0]]), false);
+    assert.equal(hasAutoPolygons(undefined), false);
+  });
+
+  test('annotations flow through LabelState into LabelPayload type contract', () => {
+    const draft: LabelState = {
+      flood_level: 'puddle',
+      annotations: [{ class: 'water_puddle', polygon: [[0, 0], [0.5, 0], [0.25, 0.5]] }],
+    };
+    const payload: LabelPayload = {
+      ...draft,
+      date: '2026-10-24',
+      camera_id: 'cam1',
+      snapshot_key: 'proofs/2026-10-24/cam1/1_sample.jpg',
+      annotator: 'dev_user',
+      timestamp: 1792736298,
+    };
+    assert.equal(payload.annotations?.length, 1);
+    assert.equal(payload.annotations?.[0].class, 'water_puddle');
   });
 });
