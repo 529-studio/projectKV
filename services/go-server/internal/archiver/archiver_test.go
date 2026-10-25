@@ -167,6 +167,20 @@ func TestPolicyEngine_EvalSet(t *testing.T) {
 	}
 }
 
+// validArchiveJPEG builds a payload satisfying the archiver quality gate
+// (SOI magic bytes + minimum size), keeping deterministic filler content.
+func validArchiveJPEG(total int) []byte {
+	if total < archiver.MinArchiveJPEGSizeBytes {
+		total = archiver.MinArchiveJPEGSizeBytes
+	}
+	data := make([]byte, total)
+	copy(data, []byte{0xFF, 0xD8, 0xFF, 0xE0})
+	for i := 4; i < total; i++ {
+		data[i] = byte(i % 251)
+	}
+	return data
+}
+
 func TestArchiver_OnVerdict(t *testing.T) {
 	tmpDir := t.TempDir()
 	store, err := storage.NewLocalStorage(tmpDir)
@@ -188,7 +202,7 @@ func TestArchiver_OnVerdict(t *testing.T) {
 		Timestamp: t0,
 	}
 
-	data := []byte("fake jpeg payload")
+	data := validArchiveJPEG(archiver.MinArchiveJPEGSizeBytes + 512)
 	err = arch.OnVerdict(v, bytes.NewReader(data))
 	if err != nil {
 		t.Fatalf("OnVerdict failed: %v", err)
@@ -225,7 +239,7 @@ func TestArchiver_OnVerdict_DirectRawFrame(t *testing.T) {
 	arch := archiver.New(store, tmpDir, cfg, nil)
 
 	t0 := time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)
-	rawPayload := []byte("direct-analyzed-jpeg-bytes")
+	rawPayload := validArchiveJPEG(0)
 
 	v := hotset.Verdict{
 		CameraID:  "cam_direct",
@@ -397,5 +411,78 @@ func TestRetention_CleansEmptyDirectories(t *testing.T) {
 	// Directory should be cleaned up after deleting the only file in it
 	if _, err := os.Stat(parentDir); !os.IsNotExist(err) {
 		t.Errorf("empty parent directory should have been removed: %s", parentDir)
+	}
+}
+
+// TestArchiver_OnVerdict_RejectsPlaceholderFrames verifies the quality gate
+// (Issue #305): undersized stubs (the empirically observed frozen 2638-byte
+// upstream placeholder), non-SOI payloads, and empty frames are skipped with
+// no storage write and no error — mirroring the harvester gate semantics.
+func TestArchiver_OnVerdict_RejectsPlaceholderFrames(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := storage.NewLocalStorage(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create local storage: %v", err)
+	}
+
+	cfg := archiver.Config{
+		SampleInterval: 300 * time.Second,
+		RetentionDays:  14,
+		MaxDiskMB:      100,
+	}
+	arch := archiver.New(store, tmpDir, cfg, nil)
+
+	t0 := time.Date(2026, 10, 25, 7, 30, 0, 0, time.UTC)
+	cases := []struct {
+		name  string
+		frame []byte
+		raw   bool
+	}{
+		{"undersized upstream placeholder stub", append([]byte{0xFF, 0xD8}, make([]byte, 2636)...), false},
+		{"non-SOI payload of sufficient size", make([]byte, archiver.MinArchiveJPEGSizeBytes+100), false},
+		{"empty frame", nil, false},
+		{"undersized stub via RawFrame path", append([]byte{0xFF, 0xD8}, make([]byte, 100)...), true},
+	}
+
+	for _, tc := range cases {
+		v := hotset.Verdict{
+			CameraID:  "cam_placeholder",
+			Severity:  hotset.SeverityCongested,
+			Timestamp: t0,
+		}
+		if tc.raw {
+			v.RawFrame = tc.frame
+			err = arch.OnVerdict(v, nil)
+		} else {
+			err = arch.OnVerdict(v, bytes.NewReader(tc.frame))
+		}
+		if err != nil {
+			t.Errorf("%s: expected nil error on skipped frame, got %v", tc.name, err)
+		}
+
+		expectedPath := archiver.StoragePath(t0, "cam_placeholder", t0.Unix(), archiver.ReasonStateChange)
+		exists, existsErr := store.Exists(context.Background(), expectedPath)
+		if existsErr != nil {
+			t.Fatalf("%s: Exists failed: %v", tc.name, existsErr)
+		}
+		if exists {
+			t.Errorf("%s: expected NO archived file at %s, but it exists", tc.name, expectedPath)
+		}
+	}
+
+	// Sanity: a valid frame still archives (fresh camera so policy hysteresis
+	// does not suppress the state_change reason).
+	valid := hotset.Verdict{
+		CameraID:  "cam_valid",
+		Severity:  hotset.SeverityCongested,
+		Timestamp: t0.Add(time.Minute),
+	}
+	if err := arch.OnVerdict(valid, bytes.NewReader(validArchiveJPEG(0))); err != nil {
+		t.Fatalf("valid frame should archive, got %v", err)
+	}
+	validPath := archiver.StoragePath(t0.Add(time.Minute), "cam_valid", t0.Add(time.Minute).Unix(), archiver.ReasonStateChange)
+	exists, err := store.Exists(context.Background(), validPath)
+	if err != nil || !exists {
+		t.Errorf("expected valid frame archived at %s (exists=%v err=%v)", validPath, exists, err)
 	}
 }

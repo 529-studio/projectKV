@@ -84,6 +84,23 @@ func (a *Archiver) Retention() *RetentionJob {
 	return a.retention
 }
 
+// MinArchiveJPEGSizeBytes mirrors the harvester quality gate
+// (internal/harvester MinJPEGSizeBytes, ADR-009 / Issue #262): upstream
+// placeholder frames are undersized stubs (empirically a frozen 2638-byte
+// image per camera) and must never enter the archive. Keep in sync with the
+// harvester constant; archiver cannot import harvester per the leaf modulith
+// import graph.
+const MinArchiveJPEGSizeBytes = 20480
+
+// IsValidArchiveJPEG checks SOI magic bytes (0xFF, 0xD8) and the minimum size
+// constraint, mirroring harvester.IsValidJPEG semantics.
+func IsValidArchiveJPEG(data []byte) bool {
+	if len(data) < MinArchiveJPEGSizeBytes {
+		return false
+	}
+	return data[0] == 0xFF && data[1] == 0xD8
+}
+
 // OnVerdict evaluates the incoming verdict against policy and archives the frame if eligible.
 func (a *Archiver) OnVerdict(v hotset.Verdict, frameReader io.Reader) error {
 	now := time.Now().UTC()
@@ -105,6 +122,28 @@ func (a *Archiver) OnVerdict(v hotset.Verdict, frameReader io.Reader) error {
 		return nil
 	}
 
+	// Quality gate (Issue #305): buffer and validate the frame before storage.
+	// Placeholder or corrupt upstream frames are skipped with a warning rather
+	// than polluting the archive and the labeler catalog.
+	frameBytes, err := io.ReadAll(frameReader)
+	if err != nil {
+		a.log.Warn("archiver skipped: failed to read frame",
+			"camera", v.CameraID,
+			"reason", reason,
+			"error", err,
+		)
+		return nil
+	}
+	if !IsValidArchiveJPEG(frameBytes) {
+		a.log.Warn("archiver skipped: placeholder or invalid JPEG frame",
+			"camera", v.CameraID,
+			"reason", reason,
+			"size_bytes", len(frameBytes),
+			"min_bytes", MinArchiveJPEGSizeBytes,
+		)
+		return nil
+	}
+
 	ts := v.Timestamp
 	if ts.IsZero() {
 		ts = now
@@ -114,7 +153,7 @@ func (a *Archiver) OnVerdict(v hotset.Verdict, frameReader io.Reader) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := a.store.Put(ctx, path, frameReader); err != nil {
+	if err := a.store.Put(ctx, path, bytes.NewReader(frameBytes)); err != nil {
 		a.log.Error("failed to archive frame",
 			"camera", v.CameraID,
 			"path", path,
