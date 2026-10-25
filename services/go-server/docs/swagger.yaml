@@ -13,6 +13,11 @@ definitions:
     type: object
   archiver.LabelPayload:
     properties:
+      annotations:
+        description: segmentation polygons (normalized [0,1])
+        items:
+          $ref: '#/definitions/archiver.PolygonAnnotation'
+        type: array
       annotator:
         type: string
       camera_id:
@@ -58,6 +63,23 @@ definitions:
     - camera_id
     - date
     - snapshot_key
+    type: object
+  archiver.PolygonAnnotation:
+    properties:
+      class:
+        description: 'canonical: roadway, water_puddle, motorcycle, car, bus, truck'
+        type: string
+      polygon:
+        description: '[[x, y], ...] normalized to [0, 1]'
+        items:
+          items:
+            format: float64
+            type: number
+          type: array
+        type: array
+      source:
+        description: 'provenance: "human" | "sam_prelabel" | model id'
+        type: string
     type: object
   archiver.SnapshotItem:
     properties:
@@ -520,8 +542,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Record ground truth label for flood, traffic, weather, and time
-        of day
+      description: 'Record ground truth label for flood, traffic, weather, time of
+        day, and optional segmentation polygons (annotations with normalized [0,1]
+        coordinates, canonical classes: roadway, water_puddle, motorcycle, car, bus,
+        truck)'
       parameters:
       - description: Label annotation payload
         in: body

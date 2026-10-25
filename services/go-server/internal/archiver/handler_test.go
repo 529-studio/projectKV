@@ -340,3 +340,107 @@ func TestHandler_GetLabels_WithHarvesterGroundTruthManifest(t *testing.T) {
 		t.Errorf("expected Weather rain, got %s", l.Weather)
 	}
 }
+
+// TestHandler_SaveLabel_PolygonAnnotations verifies the segmentation polygon
+// contract: alias classes are canonicalized before persisting, valid polygons
+// round-trip through GetLabels, and malformed geometry fails fast with 400.
+func TestHandler_SaveLabel_PolygonAnnotations(t *testing.T) {
+	router, _ := setupTestRouter(t)
+
+	validLabel := LabelPayload{
+		Date:        "2026-10-11",
+		CameraID:    "cam1",
+		SnapshotKey: "2026-10-11/cam1/1791560000_sample.jpg",
+		Annotator:   "dev_user",
+		FloodLevel:  "puddle",
+		Weather:     "rain",
+		TimeOfDay:   "day",
+		Annotations: []PolygonAnnotation{
+			{
+				// Alias class "flood" must be canonicalized to water_puddle.
+				Class:   "flood",
+				Polygon: [][]float64{{0.15, 0.95}, {0.85, 0.95}, {0.62, 0.48}, {0.38, 0.48}},
+				Source:  "human",
+			},
+			{
+				Class:   "Roadway",
+				Polygon: [][]float64{{0.10, 0.95}, {0.90, 0.95}, {0.65, 0.40}, {0.35, 0.40}},
+			},
+		},
+		Timestamp: 1791560000,
+	}
+
+	body, _ := json.Marshal(validLabel)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/archiver/labels", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 on SaveLabel with polygons, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Round-trip: canonical classes must be persisted and served back.
+	wGet := httptest.NewRecorder()
+	reqGet, _ := http.NewRequest("GET", "/api/archiver/labels?date=2026-10-11", nil)
+	router.ServeHTTP(wGet, reqGet)
+	if wGet.Code != http.StatusOK {
+		t.Fatalf("expected 200 on GetLabels, got %d: %s", wGet.Code, wGet.Body.String())
+	}
+	var labelsResp LabelListResponse
+	if err := json.Unmarshal(wGet.Body.Bytes(), &labelsResp); err != nil {
+		t.Fatalf("failed to unmarshal labels response: %v", err)
+	}
+	if labelsResp.Total != 1 || len(labelsResp.Labels[0].Annotations) != 2 {
+		t.Fatalf("expected 1 label with 2 annotations, got total=%d annotations=%d", labelsResp.Total, len(labelsResp.Labels[0].Annotations))
+	}
+	if labelsResp.Labels[0].Annotations[0].Class != "water_puddle" {
+		t.Errorf("expected alias 'flood' canonicalized to water_puddle, got %q", labelsResp.Labels[0].Annotations[0].Class)
+	}
+	if labelsResp.Labels[0].Annotations[1].Class != "roadway" {
+		t.Errorf("expected 'Roadway' canonicalized to lowercase roadway, got %q", labelsResp.Labels[0].Annotations[1].Class)
+	}
+
+	// Malformed payloads must fail fast with 400 and an actionable message.
+	cases := []struct {
+		name string
+		ann  PolygonAnnotation
+		want string
+	}{
+		{
+			name: "pixel coordinates rejected",
+			ann:  PolygonAnnotation{Class: "roadway", Polygon: [][]float64{{150.0, 950.0}, {850.0, 950.0}, {620.0, 480.0}}},
+			want: "normalized range",
+		},
+		{
+			name: "too few vertices",
+			ann:  PolygonAnnotation{Class: "car", Polygon: [][]float64{{0.1, 0.1}, {0.2, 0.2}}},
+			want: "between 3 and 64 vertices",
+		},
+		{
+			name: "unknown class",
+			ann:  PolygonAnnotation{Class: "aeroplane", Polygon: [][]float64{{0.1, 0.1}, {0.2, 0.2}, {0.3, 0.3}}},
+			want: "unknown class",
+		},
+		{
+			name: "ragged vertex",
+			ann:  PolygonAnnotation{Class: "bus", Polygon: [][]float64{{0.1, 0.1, 0.1}, {0.2, 0.2}, {0.3, 0.3}}},
+			want: "[x, y] pair",
+		},
+	}
+	for _, tc := range cases {
+		bad := validLabel
+		bad.Annotations = []PolygonAnnotation{tc.ann}
+		badBody, _ := json.Marshal(bad)
+		wBad := httptest.NewRecorder()
+		reqBad, _ := http.NewRequest("POST", "/api/archiver/labels", bytes.NewReader(badBody))
+		reqBad.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(wBad, reqBad)
+		if wBad.Code != http.StatusBadRequest {
+			t.Errorf("%s: expected 400, got %d: %s", tc.name, wBad.Code, wBad.Body.String())
+		}
+		if !strings.Contains(wBad.Body.String(), tc.want) {
+			t.Errorf("%s: expected error mentioning %q, got: %s", tc.name, tc.want, wBad.Body.String())
+		}
+	}
+}

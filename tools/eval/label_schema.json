@@ -131,5 +131,38 @@
       "additionalProperties": true
     }
   },
+  "annotations": {
+    "type": "array",
+    "maxItems": 32,
+    "description": "Optional segmentation polygons in normalized image coordinates [0, 1] (ADR-011 D1 contract).",
+    "items": {
+      "type": "object",
+      "required": ["class", "polygon"],
+      "properties": {
+        "class": {
+          "type": "string",
+          "enum": ["roadway", "water_puddle", "motorcycle", "car", "bus", "truck"],
+          "description": "Canonical segmentation class."
+        },
+        "polygon": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 64,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "description": "Vertices as [[x, y], ...] normalized to [0, 1] against image natural size."
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Provenance of the polygon, e.g. 'human' or 'sam_prelabel'."
+        }
+      }
+    }
+  },
   "additionalProperties": true
 }

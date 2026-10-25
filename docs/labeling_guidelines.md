@@ -129,3 +129,31 @@ Unit tests for the validator can be run via:
 ```bash
 python3 -m unittest tools/eval/validate_labels_test.py
 ```
+
+---
+
+## Segmentation Polygon Annotations (Issue #297 / ADR-011 D1)
+
+The web labeler (`/labeler`, Segmentation mode) now supports polygon ground truth
+for the 6-class segmentation taxonomy. The contract is enforced identically on
+client and server:
+
+| Rule | Value |
+|---|---|
+| Classes (canonical) | `roadway`, `water_puddle`, `motorcycle`, `car`, `bus`, `truck` |
+| Aliases | accepted and canonicalized server-side (`flood`/`puddle`/`water` → `water_puddle`, `road`/`asphalt` → `roadway`, `motorbike`/`bike`/`mc` → `motorcycle`, `van`/`suv`/`automobile` → `car`, `coach` → `bus`, `container`/`lorry` → `truck`) |
+| Coordinates | normalized `[0.0, 1.0]` against image natural size (pixel coordinates are rejected) |
+| Vertices per polygon | 3 – 64 |
+| Polygons per label | ≤ 32 |
+| Provenance `source` | `human` (canvas), `sam_prelabel` (machine proposal, must be human-corrected before promotion) |
+
+Labeling workflow: enable `Chế độ phân vùng / Segmentation mode`, pick a class,
+click vertices on the snapshot, close by clicking the first vertex (enlarged) or
+pressing Enter (Esc cancels the draft). Existing polygons reload as editable
+annotations; drag vertices to correct them. `water_puddle` polygons must follow
+ADR-009 §4.3: specular wet asphalt without standing water is `wet_asphalt_no_standing`
+and must NOT be masked as water.
+
+Dataset export: `python3 tools/eval/export_yolo_seg.py --labels-dir <dir> --verify`
+consumes `annotations` directly. Labels without polygons are skipped by default;
+`--allow-synthetic` (fabricated geometry, smoke tests only) is opt-in per Lesson 58.

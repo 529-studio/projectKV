@@ -23,6 +23,82 @@ import (
 
 var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
+// Polygon annotation contract limits, mirrored by the web labeler and the
+// YOLO segmentation exporter (tools/eval/export_yolo_seg.py).
+const (
+	minPolygonPoints       = 3
+	maxPolygonPoints       = 64
+	maxAnnotationsPerLabel = 32
+	maxAnnotationSrcLen    = 32
+)
+
+// polygonCanonicalClasses is the fixed 6-class segmentation taxonomy
+// (ADR-009 §4.2) shared by the exporter and the labeler UI.
+var polygonCanonicalClasses = map[string]bool{
+	"roadway":      true,
+	"water_puddle": true,
+	"motorcycle":   true,
+	"car":          true,
+	"bus":          true,
+	"truck":        true,
+}
+
+// polygonClassAliases accepts alternate label conventions and maps them onto
+// the canonical taxonomy. Kept in sync with CLASS_ALIASES in export_yolo_seg.py.
+var polygonClassAliases = map[string]string{
+	"road": "roadway", "asphalt": "roadway", "carriageway": "roadway",
+	"water": "water_puddle", "puddle": "water_puddle", "flood": "water_puddle", "flooded": "water_puddle",
+	"motorbike": "motorcycle", "bike": "motorcycle", "mc": "motorcycle",
+	"automobile": "car", "passenger_car": "car", "van": "car", "suv": "car",
+	"coach":     "bus",
+	"container": "truck", "lorry": "truck",
+}
+
+// normalizePolygonClass resolves a raw class string to a canonical class id.
+func normalizePolygonClass(raw string) string {
+	norm := strings.ToLower(strings.TrimSpace(raw))
+	if polygonCanonicalClasses[norm] {
+		return norm
+	}
+	if canonical, ok := polygonClassAliases[norm]; ok {
+		return canonical
+	}
+	return ""
+}
+
+// validateAnnotations enforces the polygon geometry contract: canonical class,
+// 3-64 vertices, and pixel-free normalized coordinates in [0, 1].
+func validateAnnotations(anns []PolygonAnnotation) error {
+	if len(anns) > maxAnnotationsPerLabel {
+		return fmt.Errorf("too many polygon annotations: %d (max %d)", len(anns), maxAnnotationsPerLabel)
+	}
+	for i, ann := range anns {
+		if normalizePolygonClass(ann.Class) == "" {
+			return fmt.Errorf("annotation[%d]: unknown class %q (must be one of roadway, water_puddle, motorcycle, car, bus, truck)", i, ann.Class)
+		}
+		if len(ann.Polygon) < minPolygonPoints || len(ann.Polygon) > maxPolygonPoints {
+			return fmt.Errorf("annotation[%d] (%s): polygon must have between %d and %d vertices, got %d",
+				i, ann.Class, minPolygonPoints, maxPolygonPoints, len(ann.Polygon))
+		}
+		for j, pt := range ann.Polygon {
+			if len(pt) != 2 {
+				return fmt.Errorf("annotation[%d] (%s): vertex %d must be an [x, y] pair, got %d elements", i, ann.Class, j, len(pt))
+			}
+			for k, v := range pt {
+				if v < 0.0 || v > 1.0 {
+					// Pixel coordinates (> 1.0) are ambiguous across resolutions;
+					// the client must normalize against image natural size.
+					return fmt.Errorf("annotation[%d] (%s): vertex %d coordinate %d is %v, outside normalized range [0, 1] (normalize pixel coordinates client-side before saving)", i, ann.Class, j, k, v)
+				}
+			}
+		}
+		if len(ann.Source) > maxAnnotationSrcLen {
+			return fmt.Errorf("annotation[%d]: source exceeds %d characters", i, maxAnnotationSrcLen)
+		}
+	}
+	return nil
+}
+
 // CameraLookup defines the minimal camera metadata lookup needed by the archiver handler.
 type CameraLookup interface {
 	GetCameraTitle(id string) string
@@ -49,23 +125,33 @@ type SnapshotListResponse struct {
 	Snapshots []SnapshotItem `json:"snapshots"`
 }
 
+// PolygonAnnotation represents a single segmentation polygon drawn over a
+// snapshot, expressed in normalized image coordinates [0.0, 1.0] following the
+// YOLO segmentation export contract consumed by tools/eval/export_yolo_seg.py.
+type PolygonAnnotation struct {
+	Class   string      `json:"class"`            // canonical: roadway, water_puddle, motorcycle, car, bus, truck
+	Polygon [][]float64 `json:"polygon"`          // [[x, y], ...] normalized to [0, 1]
+	Source  string      `json:"source,omitempty"` // provenance: "human" | "sam_prelabel" | model id
+}
+
 // LabelPayload represents human-annotated ground truth for a snapshot.
 type LabelPayload struct {
-	Date                  string   `json:"date" binding:"required"`
-	CameraID              string   `json:"camera_id" binding:"required"`
-	SnapshotKey           string   `json:"snapshot_key" binding:"required"`
-	Annotator             string   `json:"annotator"`
-	FloodLevel            string   `json:"flood_level"`                       // none, puddle/shallow, deep
-	TrafficLevel          string   `json:"traffic_level"`                     // clear, moderate, heavy, gridlock/congested
-	TrafficDirA           string   `json:"traffic_dir_a,omitempty"`           // CLEAR, MODERATE, HEAVY, CONGESTED
-	TrafficDirB           string   `json:"traffic_dir_b,omitempty"`           // CLEAR, MODERATE, HEAVY, CONGESTED, NOT_APPLICABLE
-	QueueReason           string   `json:"queue_reason,omitempty"`            // free_flow, traffic_light, bottleneck, flood_barrier, accident
-	FloodSubmersionAnchor string   `json:"flood_submersion_anchor,omitempty"` // dry, wet_asphalt_no_standing, tire_base_under_10cm, exhaust_hub_over_15cm
-	Weather               string   `json:"weather"`                           // clear/dry, rain, heavy_rain/fog
-	TimeOfDay             string   `json:"time_of_day"`                       // day, dusk, night
-	QualityTags           []string `json:"quality_tags,omitempty"`            // rain_on_lens, night_glare, occluded, signal_noise
-	Notes                 string   `json:"notes,omitempty"`
-	Timestamp             int64    `json:"timestamp"`
+	Date                  string              `json:"date" binding:"required"`
+	CameraID              string              `json:"camera_id" binding:"required"`
+	SnapshotKey           string              `json:"snapshot_key" binding:"required"`
+	Annotator             string              `json:"annotator"`
+	FloodLevel            string              `json:"flood_level"`                       // none, puddle/shallow, deep
+	TrafficLevel          string              `json:"traffic_level"`                     // clear, moderate, heavy, gridlock/congested
+	TrafficDirA           string              `json:"traffic_dir_a,omitempty"`           // CLEAR, MODERATE, HEAVY, CONGESTED
+	TrafficDirB           string              `json:"traffic_dir_b,omitempty"`           // CLEAR, MODERATE, HEAVY, CONGESTED, NOT_APPLICABLE
+	QueueReason           string              `json:"queue_reason,omitempty"`            // free_flow, traffic_light, bottleneck, flood_barrier, accident
+	FloodSubmersionAnchor string              `json:"flood_submersion_anchor,omitempty"` // dry, wet_asphalt_no_standing, tire_base_under_10cm, exhaust_hub_over_15cm
+	Weather               string              `json:"weather"`                           // clear/dry, rain, heavy_rain/fog
+	TimeOfDay             string              `json:"time_of_day"`                       // day, dusk, night
+	QualityTags           []string            `json:"quality_tags,omitempty"`            // rain_on_lens, night_glare, occluded, signal_noise
+	Annotations           []PolygonAnnotation `json:"annotations,omitempty"`             // segmentation polygons (normalized [0,1])
+	Notes                 string              `json:"notes,omitempty"`
+	Timestamp             int64               `json:"timestamp"`
 }
 
 // LabelListResponse represents a collection of ground truth labels for a date.
@@ -368,7 +454,7 @@ func (h *Handler) GetSnapshotRaw(c *gin.Context) {
 
 // SaveLabel godoc
 // @Summary Save human annotation label for a snapshot
-// @Description Record ground truth label for flood, traffic, weather, and time of day
+// @Description Record ground truth label for flood, traffic, weather, time of day, and optional segmentation polygons (annotations with normalized [0,1] coordinates, canonical classes: roadway, water_puddle, motorcycle, car, bus, truck)
 // @Tags archiver
 // @Accept json
 // @Produce json
@@ -388,6 +474,20 @@ func (h *Handler) SaveLabel(c *gin.Context) {
 	if !datePattern.MatchString(payload.Date) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "date must be in YYYY-MM-DD format"})
 		return
+	}
+
+	// Normalize polygon classes to the canonical taxonomy and enforce the
+	// geometry contract before persisting.
+	for i := range payload.Annotations {
+		payload.Annotations[i].Class = normalizePolygonClass(payload.Annotations[i].Class)
+		payload.Annotations[i].Source = strings.TrimSpace(payload.Annotations[i].Source)
+	}
+	if err := validateAnnotations(payload.Annotations); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(payload.Annotations) == 0 {
+		payload.Annotations = nil
 	}
 
 	annotator := strings.TrimSpace(payload.Annotator)
