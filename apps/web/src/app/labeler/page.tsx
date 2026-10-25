@@ -13,6 +13,9 @@ import {
   setStoredDevToken,
   clearStoredDevToken,
   buildAuthHeaders,
+  validatePolygonAnnotations,
+  hasAutoPolygons,
+  POLYGON_CLASSES,
   type LabelFilterStatus,
   type FloodLevel,
   type TrafficLevel,
@@ -25,7 +28,9 @@ import {
   type LabelState,
   type LabelPayload,
   type SnapshotItem,
+  type PolygonClass,
 } from '@/utils/labelerUtils';
+import PolygonCanvas, { POLYGON_CLASS_COLORS } from '@/components/PolygonCanvas';
 import { getApiUrl } from '@/config/constants';
 import { useCameras } from '@/hooks/useCameras';
 
@@ -55,6 +60,9 @@ export default function LabelerPage() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [segMode, setSegMode] = useState<boolean>(false);
+  const [activeSegClass, setActiveSegClass] = useState<PolygonClass>('roadway');
+  const [segError, setSegError] = useState<string | null>(null);
 
   const { cameras } = useCameras();
   const cameraMap = useMemo(() => {
@@ -282,11 +290,13 @@ export default function LabelerPage() {
         weather: existing.weather,
         time_of_day: existing.time_of_day,
         notes: existing.notes || '',
+        annotations: existing.annotations,
       });
     } else {
       setCurrentDraft({});
     }
     setSaveStatus(null);
+    setSegError(null);
   }, [currentSnapshot, labels]);
 
   // Fast-approve candidate label and advance
@@ -321,8 +331,17 @@ export default function LabelerPage() {
       weather: currentDraft.weather || existing?.weather || 'clear',
       time_of_day: currentDraft.time_of_day || existing?.time_of_day || 'day',
       notes: currentDraft.notes || existing?.notes || '',
+      annotations: currentDraft.annotations || existing?.annotations,
       timestamp: Math.floor(Date.now() / 1000),
     };
+
+    const annErr = validatePolygonAnnotations(payload.annotations);
+    if (annErr) {
+      setSegError(annErr);
+      setSaveStatus('error');
+      return;
+    }
+    setSegError(null);
 
     setIsSaving(true);
     try {
@@ -394,8 +413,17 @@ export default function LabelerPage() {
         weather: currentDraft.weather || 'clear',
         time_of_day: currentDraft.time_of_day || 'day',
         notes: currentDraft.notes || '',
+        annotations: currentDraft.annotations || labels[currentSnapshot.key]?.annotations,
         timestamp: Math.floor(Date.now() / 1000),
       };
+
+      const annErr = validatePolygonAnnotations(payload.annotations);
+      if (annErr) {
+        setSegError(annErr);
+        setSaveStatus('error');
+        return;
+      }
+      setSegError(null);
 
       setIsSaving(true);
       try {
@@ -446,6 +474,7 @@ export default function LabelerPage() {
       filteredSnapshots.length,
       filterStatus,
       devToken,
+      labels,
       t.devInvalidToken,
     ]
   );
@@ -855,13 +884,21 @@ export default function LabelerPage() {
             <div className="flex flex-col h-full gap-3 min-h-0">
               {/* Snapshot Metadata Bar */}
               <div className="shrink-0 flex flex-wrap items-center justify-between text-xs text-zinc-400 border-b border-zinc-800/80 pb-2">
-                <div className="flex items-center gap-2 font-mono">
+                  <div className="flex items-center gap-2 font-mono">
                   <span className="text-zinc-100 font-semibold">
                     {currentSnapshot.camera_name || currentSnapshot.camera_id}
                   </span>
                   <span className="text-zinc-600">|</span>
                   <span className="text-zinc-400">{currentSnapshot.camera_id}</span>
                   <span className="text-zinc-600">|</span>
+                  {hasAutoPolygons(currentDraft.annotations) && (
+                    <>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-amber-700/60 bg-amber-950/40 text-amber-300">
+                        {t.segAutoBadge}
+                      </span>
+                      <span className="text-zinc-600">|</span>
+                    </>
+                  )}
                   {/* Provenance Badge */}
                   {(() => {
                     const currentLabel = labels[currentSnapshot.key];
@@ -895,21 +932,46 @@ export default function LabelerPage() {
                 </div>
               </div>
 
-              {/* High-res Image View */}
+              {/* High-res Image View (with optional polygon overlay editor) */}
               <div className="w-full h-[260px] sm:h-[340px] lg:h-auto lg:flex-1 lg:min-h-0 relative flex items-center justify-center bg-black border border-zinc-800 rounded overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={(() => {
-                    const baseUrl = currentSnapshot.key
-                      ? `/api/archiver/snapshots/raw?key=${encodeURIComponent(currentSnapshot.key)}`
-                      : currentSnapshot.raw_url;
-                    return devToken
-                      ? `${getApiUrl(baseUrl)}&token=${encodeURIComponent(devToken)}`
-                      : getApiUrl(baseUrl);
-                  })()}
-                  alt={`Snapshot from camera ${currentSnapshot.camera_id}`}
-                  className="max-h-full max-w-full object-contain"
-                />
+                {segMode || (currentDraft.annotations && currentDraft.annotations.length > 0) ? (
+                  <PolygonCanvas
+                    imageUrl={(() => {
+                      const baseUrl = currentSnapshot.key
+                        ? `/api/archiver/snapshots/raw?key=${encodeURIComponent(currentSnapshot.key)}`
+                        : currentSnapshot.raw_url;
+                      return devToken
+                        ? `${getApiUrl(baseUrl)}&token=${encodeURIComponent(devToken)}`
+                        : getApiUrl(baseUrl);
+                    })()}
+                    imageAlt={`Snapshot from camera ${currentSnapshot.camera_id}`}
+                    annotations={currentDraft.annotations || []}
+                    onChange={(next) => setCurrentDraft((d) => ({ ...d, annotations: next }))}
+                    activeClass={activeSegClass}
+                    enabled={segMode}
+                    labels={{
+                      hint: t.segModeHint,
+                      polygonsLabel: t.segPolygonsLabel,
+                      empty: t.segEmpty,
+                      deleteBtn: t.segDeleteBtn,
+                      autoBadge: t.segAutoBadge,
+                    }}
+                  />
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={(() => {
+                      const baseUrl = currentSnapshot.key
+                        ? `/api/archiver/snapshots/raw?key=${encodeURIComponent(currentSnapshot.key)}`
+                        : currentSnapshot.raw_url;
+                      return devToken
+                        ? `${getApiUrl(baseUrl)}&token=${encodeURIComponent(devToken)}`
+                        : getApiUrl(baseUrl);
+                    })()}
+                    alt={`Snapshot from camera ${currentSnapshot.camera_id}`}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                )}
               </div>
 
               {/* Navigation Bar */}
@@ -940,6 +1002,57 @@ export default function LabelerPage() {
 
         {/* Right: Annotation Controls & Hotkey Panels */}
         <div className="w-full shrink-0 border-t lg:border-t-0 lg:border-l border-zinc-800 bg-zinc-900/40 p-4 flex flex-col gap-5 lg:w-96 lg:min-h-0 lg:overflow-y-auto">
+          {/* Segmentation Mode: Polygon Annotation (Issue #297 / ADR-011 D1) */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                {t.segModeToggle}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSegMode((v) => !v)}
+                className={`px-2.5 py-1 rounded border text-[11px] font-mono transition ${
+                  segMode
+                    ? 'bg-zinc-100 text-zinc-900 border-zinc-100'
+                    : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
+                }`}
+              >
+                {segMode ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            {segMode && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] text-zinc-500 font-mono">{t.segClassLabel}</span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {POLYGON_CLASSES.map((cls) => (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => setActiveSegClass(cls)}
+                      className={`flex items-center gap-1.5 px-1.5 py-1 rounded border text-[10px] font-mono transition ${
+                        activeSegClass === cls
+                          ? 'border-zinc-300 bg-zinc-800 text-zinc-100'
+                          : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
+                      }`}
+                    >
+                      <span
+                        aria-hidden
+                        className="inline-block w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: POLYGON_CLASS_COLORS[cls] }}
+                      />
+                      {cls}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {segError && (
+              <span className="text-[11px] font-mono text-red-400">
+                {t.segValidationError}: {segError}
+              </span>
+            )}
+          </div>
+
           {/* Dimension 1: Flood Level & Physical Anchor */}
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">

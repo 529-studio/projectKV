@@ -90,7 +90,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Record ground truth label for flood, traffic, weather, and time of day",
+                "description": "Record ground truth label for flood, traffic, weather, time of day, and optional segmentation polygons (annotations with normalized [0,1] coordinates, canonical classes: roadway, water_puddle, motorcycle, car, bus, truck)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1244,6 +1244,13 @@ const docTemplate = `{
                 "snapshot_key"
             ],
             "properties": {
+                "annotations": {
+                    "description": "segmentation polygons (normalized [0,1])",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/archiver.PolygonAnnotation"
+                    }
+                },
                 "annotator": {
                     "type": "string"
                 },
@@ -1299,6 +1306,30 @@ const docTemplate = `{
                 },
                 "weather": {
                     "description": "clear/dry, rain, heavy_rain/fog",
+                    "type": "string"
+                }
+            }
+        },
+        "archiver.PolygonAnnotation": {
+            "type": "object",
+            "properties": {
+                "class": {
+                    "description": "canonical: roadway, water_puddle, motorcycle, car, bus, truck",
+                    "type": "string"
+                },
+                "polygon": {
+                    "description": "[[x, y], ...] normalized to [0, 1]",
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "number",
+                            "format": "float64"
+                        }
+                    }
+                },
+                "source": {
+                    "description": "provenance: \"human\" | \"sam_prelabel\" | model id",
                     "type": "string"
                 }
             }
