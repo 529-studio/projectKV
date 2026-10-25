@@ -988,6 +988,7 @@ func main() {
 			ScheduleHours:       cfg.HarvesterScheduleHours,
 			RainCooldownMinutes: cfg.HarvesterRainCooldownMinutes,
 			Concurrency:         cfg.HarvesterConcurrency,
+			CatchupWindow:       time.Duration(cfg.HarvesterCatchupMinutes) * time.Minute,
 		}
 
 		var weatherProv harvester.WeatherProvider
@@ -1094,10 +1095,12 @@ func main() {
 			subHandler.RegisterRoutes(api)
 		}
 		// Shared archiver snapshots and collaborative team labeler endpoints (Issue #214)
+		// Harvester flywheel observability (Issue #299 / S9-T3)
+		devAuth := middleware.RequireDevAuth(cfg.DevAccessToken, cfg.AppEnv)
 		if archiverHandler != nil {
-			devAuth := middleware.RequireDevAuth(cfg.DevAccessToken, cfg.AppEnv)
 			archiverHandler.RegisterRoutes(api, devAuth)
 		}
+		harvester.NewHandler(harvesterCoord, cfg.HarvesterEnabled).RegisterRoutes(api, devAuth)
 		// Crowdsourced flood feedback & R2 archiver (Issue #249 / S7-T4 / S8-T2)
 		if feedbackHandler != nil {
 			feedbackHandler.RegisterRoutes(api)

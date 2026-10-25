@@ -12,6 +12,7 @@ type Scope string
 const (
 	ScopeScheduled Scope = "scheduled_peak"
 	ScopeRain      Scope = "rain_watcher"
+	ScopeManual    Scope = "manual"
 )
 
 // Camera represents the minimal camera details needed by harvester.
@@ -89,6 +90,7 @@ type Config struct {
 	Concurrency         int           // e.g. 15
 	WatcherInterval     time.Duration // default: 5m (can be set lower in tests)
 	TimeLocation        *time.Location
+	CatchupWindow       time.Duration // fire slots missed by a late boot or restart (default: 2h; 0 disables)
 }
 
 // Dependencies contains the injected implementations for the harvester.

@@ -1171,6 +1171,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/harvester/status": {
+            "get": {
+                "description": "Observability snapshot of the autonomous data flywheel: schedule slots, next slot, per-slot last runs, rain watcher state, lifetime totals, and recent errors. Protected by dev authentication.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "harvester"
+                ],
+                "summary": "Harvester subsystem status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/harvester.Status"
+                        }
+                    },
+                    "503": {
+                        "description": "harvester subsystem unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "Liveness and readiness probe",
@@ -1645,6 +1674,111 @@ const docTemplate = `{
                 },
                 "remaining_rpm": {
                     "type": "integer"
+                }
+            }
+        },
+        "harvester.RainWatcherStatus": {
+            "type": "object",
+            "properties": {
+                "cooldown_minutes": {
+                    "type": "integer"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "last_trigger_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "harvester.RunRecord": {
+            "type": "object",
+            "properties": {
+                "duration_ms": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "failed": {
+                    "type": "integer"
+                },
+                "harvested": {
+                    "type": "integer"
+                },
+                "scope": {
+                    "description": "scheduled_peak | rain_watcher | manual",
+                    "type": "string"
+                },
+                "slot": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "total_cameras": {
+                    "type": "integer"
+                }
+            }
+        },
+        "harvester.RunTotals": {
+            "type": "object",
+            "properties": {
+                "cameras_failed": {
+                    "type": "integer"
+                },
+                "cameras_harvested": {
+                    "type": "integer"
+                },
+                "rain_runs": {
+                    "type": "integer"
+                },
+                "scheduled_runs": {
+                    "type": "integer"
+                }
+            }
+        },
+        "harvester.Status": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "last_rain": {
+                    "$ref": "#/definitions/harvester.RunRecord"
+                },
+                "next_slot": {
+                    "type": "string"
+                },
+                "next_slot_at": {
+                    "type": "string"
+                },
+                "rain_watcher": {
+                    "$ref": "#/definitions/harvester.RainWatcherStatus"
+                },
+                "recent_errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "schedule_slots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "slot_runs": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/harvester.RunRecord"
+                    }
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "totals": {
+                    "$ref": "#/definitions/harvester.RunTotals"
                 }
             }
         },
