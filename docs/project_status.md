@@ -300,6 +300,10 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Web labeler segmentation mode (`apps/web`): new `PolygonCanvas.tsx` SVG overlay editor (zero new dependencies) — click-to-add vertices, first-vertex/Enter close, drag-to-edit, per-annotation delete, 6-class monochromatic selector, `[Tự động: SAM]` provenance badge, client-side contract validation mirroring the backend, and layout measurement robust to embedded views without `ResizeObserver` (baseline `getBoundingClientRect` + image load + window resize, observer as enhancement).
   - End-to-end empirical verification (Rule 10): real go-server + web dev servers; curl round-trip (alias canonicalization persisted, pixel payload rejected 400); browser E2E drew a real polygon on a live snapshot, saved it (global Enter flow), reloaded and re-rendered it as an editable annotation; `export_yolo_seg.py` produced YOLO txt with the exact drawn polygon and zero synthesized masks (2 train / 1 val / 1 skipped demo). Screenshot evidence captured.
   - 100% test pass rate: `make test-go` (`-race`, all packages), `npm test` 165/165, Next.js build clean (6/6 pages), `tools/eval` 68/68, `gofmt`/`go vet` clean on changed files.
+- **Sprint 9 hotfix: Sample Archiver JPEG Quality Gate (Issue #305, ADR-009 gate parity)**:
+  - Empirical origin: first overnight autonomous harvest rehearsal (2026-10-25) showed the scheduled harvester correctly rejecting a frozen 2,638-byte upstream placeholder (camera Cong Hoa - Ut Tich 1, 56/57 clean labels) while the sample archiver stored 107 identical junk frames to R2 overnight.
+  - `internal/archiver.OnVerdict` now buffers and validates every frame (SOI magic + >= 20,480 bytes, mirroring `harvester.IsValidJPEG` per the leaf modulith boundary) before storage; invalid/placeholder frames are skipped with a structured warning (`camera`, `reason`, `size_bytes`) and never pollute the labeler catalog.
+  - Updated contract tests: valid frames archive unchanged; 2,638-byte stub, non-SOI payload, empty frame, and RawFrame-path stub all skipped with zero storage writes (fresh-camera hysteresis case covered).
 
 ---
 
