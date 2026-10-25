@@ -58,23 +58,23 @@ func FloodSeverityRank(s string) int {
 // FloodHexAggregator groups cameras by precomputed H3 cell ID and aggregates flood verdicts
 // using worst-of logic with a safety-critical floor of >= 1 camera per ADR-004 §D4/D11.
 type FloodHexAggregator struct {
-	mu          sync.RWMutex
-	resolution  int
-	minCameras  int
-	broadcaster FloodBroadcaster
-	log         *slog.Logger
-	cameras     map[string]camera.Camera
-	cellCameras map[string][]string // h3_id -> list of camera IDs
-	camToCell   map[string]string   // camera ID -> h3_id
-	polygons    map[string][][]float64
-	verdicts            map[string]hotset.Verdict // camera ID -> latest verdict
-	activeCells         map[string]bool           // h3_id -> currently active cell
-	staleTTL            time.Duration             // maximum observation freshness TTL
-	allowMock           bool                      // allow mock verdicts when running in dev mode
+	mu                  sync.RWMutex
+	resolution          int
+	minCameras          int
+	broadcaster         FloodBroadcaster
+	log                 *slog.Logger
+	cameras             map[string]camera.Camera
+	cellCameras         map[string][]string // h3_id -> list of camera IDs
+	camToCell           map[string]string   // camera ID -> h3_id
+	polygons            map[string][][]float64
+	verdicts            map[string]hotset.Verdict    // camera ID -> latest verdict
+	activeCells         map[string]bool              // h3_id -> currently active cell
+	staleTTL            time.Duration                // maximum observation freshness TTL
+	allowMock           bool                         // allow mock verdicts when running in dev mode
 	userReports         map[string][]userReportEntry // camera ID -> active user reports
-	userReportTTL       time.Duration             // sliding TTL for active user reports (default 15m)
-	escalationWindow    time.Duration             // window to check distinct IPs for escalation (default 10m)
-	escalationThreshold int                       // distinct IPs required to escalate (default 2)
+	userReportTTL       time.Duration                // sliding TTL for active user reports (default 15m)
+	escalationWindow    time.Duration                // window to check distinct IPs for escalation (default 10m)
+	escalationThreshold int                          // distinct IPs required to escalate (default 2)
 }
 
 // SetAllowMock enables or disables aggregation of mock verdicts for local development testing.
@@ -131,14 +131,14 @@ func NewFloodHexAggregator(
 	}
 
 	agg := &FloodHexAggregator{
-		resolution:  resolution,
-		minCameras:  minCameras,
-		broadcaster: broadcaster,
-		log:         log,
-		cameras:     make(map[string]camera.Camera, len(cameras)),
-		cellCameras: make(map[string][]string),
-		camToCell:   make(map[string]string, len(cameras)),
-		polygons:    polygons,
+		resolution:          resolution,
+		minCameras:          minCameras,
+		broadcaster:         broadcaster,
+		log:                 log,
+		cameras:             make(map[string]camera.Camera, len(cameras)),
+		cellCameras:         make(map[string][]string),
+		camToCell:           make(map[string]string, len(cameras)),
+		polygons:            polygons,
 		verdicts:            make(map[string]hotset.Verdict),
 		activeCells:         make(map[string]bool),
 		staleTTL:            180 * time.Second,
