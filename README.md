@@ -240,6 +240,7 @@ make dev-all
 | `HARVESTER_SCHEDULE_HOURS` | `7,12,17` | Daily peak harvest schedule in ICT (UTC+7, e.g. `07:30,12:00,17:30`) |
 | `HARVESTER_RAIN_COOLDOWN_MINUTES` | `60` | Sliding window cooldown for rain watcher triggers (in minutes) |
 | `HARVESTER_CONCURRENCY` | `15` | Worker pool concurrency for frame ingestion & R2 streaming |
+| `HARVESTER_CATCHUP_MINUTES` | `120` | Boot-time catch-up window: slots missed by a late start or restart fire once at startup (0 disables) |
 
 #### CV Model Service (`services/cv-engine`)
 
@@ -396,6 +397,7 @@ make dev-all
 | `HARVESTER_SCHEDULE_HOURS` | `7,12,17` | Lịch thu thập khung giờ cao điểm theo giờ Việt Nam ICT (UTC+7, ví dụ `07:30,12:00,17:30`) |
 | `HARVESTER_RAIN_COOLDOWN_MINUTES` | `60` | Cửa sổ trượt giãn cách giữa các lần kích hoạt thu thập theo mưa (phút) |
 | `HARVESTER_CONCURRENCY` | `15` | Số lượng luồng worker thu thập ảnh và đẩy lên R2 đồng thời |
+| `HARVESTER_CATCHUP_MINUTES` | `120` | Cửa sổ bù khởi động: slot bị lỡ trong khung này sẽ chạy một lần khi server khởi động muộn hoặc khởi động lại (0 để tắt) |
 
 #### Dịch vụ Suy Luận Mô Hình (`services/cv-engine`)
 

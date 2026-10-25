@@ -305,6 +305,13 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - `internal/archiver.OnVerdict` now buffers and validates every frame (SOI magic + >= 20,480 bytes, mirroring `harvester.IsValidJPEG` per the leaf modulith boundary) before storage; invalid/placeholder frames are skipped with a structured warning (`camera`, `reason`, `size_bytes`) and never pollute the labeler catalog.
   - Updated contract tests: valid frames archive unchanged; 2,638-byte stub, non-SOI payload, empty frame, and RawFrame-path stub all skipped with zero storage writes (fresh-camera hysteresis case covered).
 
+- **Sprint 9: Wave 1 — Staging Autonomous Data Flywheel & Harvester Observability (S9-T3, Issue #299)**:
+  - `GET /api/harvester/status` (dev-auth protected, `internal/harvester/handler.go`): schedule slots, next slot, per-slot last runs (scope, duration, harvested/failed), rain watcher state, lifetime totals since start, and recent run-level errors — flywheel health from a browser with zero SSH/terminal.
+  - Boot-time catch-up (`HARVESTER_CATCHUP_MINUTES`, default 120, 0 disables): slots missed by a late boot or stack restart within the window fire once at startup, eliminating the silent daily loss observed when a server starts after 07:30.
+  - Scheduler onTrigger now receives the slot label; run bookkeeping lives in `stats.go` (thread-safe, bounded error ring).
+  - Empirical verification (2026-10-25 16:41 ICT): a server booted one minute past its only slot fired catch-up immediately, completed a real harvest (42/57 cameras, 29.3 s, offline placeholders counted as failed by the quality gates), and served the full status payload; unauthenticated requests are rejected with 401.
+  - Runbook `docs/runbooks/staging_harvester_flywheel.md`: Stack 14 enablement, no-terminal verification, one-day acceptance observation, rollback, and evidence checklist.
+
 ---
 
 

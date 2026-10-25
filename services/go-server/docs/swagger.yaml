@@ -289,6 +289,75 @@ definitions:
       remaining_rpm:
         type: integer
     type: object
+  harvester.RainWatcherStatus:
+    properties:
+      cooldown_minutes:
+        type: integer
+      enabled:
+        type: boolean
+      last_trigger_at:
+        type: string
+    type: object
+  harvester.RunRecord:
+    properties:
+      duration_ms:
+        type: integer
+      error:
+        type: string
+      failed:
+        type: integer
+      harvested:
+        type: integer
+      scope:
+        description: scheduled_peak | rain_watcher | manual
+        type: string
+      slot:
+        type: string
+      started_at:
+        type: string
+      total_cameras:
+        type: integer
+    type: object
+  harvester.RunTotals:
+    properties:
+      cameras_failed:
+        type: integer
+      cameras_harvested:
+        type: integer
+      rain_runs:
+        type: integer
+      scheduled_runs:
+        type: integer
+    type: object
+  harvester.Status:
+    properties:
+      enabled:
+        type: boolean
+      last_rain:
+        $ref: '#/definitions/harvester.RunRecord'
+      next_slot:
+        type: string
+      next_slot_at:
+        type: string
+      rain_watcher:
+        $ref: '#/definitions/harvester.RainWatcherStatus'
+      recent_errors:
+        items:
+          type: string
+        type: array
+      schedule_slots:
+        items:
+          type: string
+        type: array
+      slot_runs:
+        additionalProperties:
+          $ref: '#/definitions/harvester.RunRecord'
+        type: object
+      started_at:
+        type: string
+      totals:
+        $ref: '#/definitions/harvester.RunTotals'
+    type: object
   hotset.FloodStatusResponse:
     properties:
       analysis_enabled:
@@ -1286,6 +1355,27 @@ paths:
       summary: Verify flood status for a camera
       tags:
       - flood
+  /harvester/status:
+    get:
+      description: 'Observability snapshot of the autonomous data flywheel: schedule
+        slots, next slot, per-slot last runs, rain watcher state, lifetime totals,
+        and recent errors. Protected by dev authentication.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/harvester.Status'
+        "503":
+          description: harvester subsystem unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Harvester subsystem status
+      tags:
+      - harvester
   /health:
     get:
       description: Liveness and readiness probe

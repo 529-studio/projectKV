@@ -48,6 +48,7 @@ type Config struct {
 	HarvesterScheduleHours        string
 	HarvesterRainCooldownMinutes  int
 	HarvesterConcurrency          int
+	HarvesterCatchupMinutes       int
 }
 
 // CleanEnv returns the environment variable value with surrounding whitespace and quotes (`"`, `'`) stripped.
@@ -281,6 +282,7 @@ func LoadFromEnv() (*Config, error) {
 		HarvesterScheduleHours:        parseEnvString("HARVESTER_SCHEDULE_HOURS", "7,12,17"),
 		HarvesterRainCooldownMinutes:  parseEnvInt("HARVESTER_RAIN_COOLDOWN_MINUTES", 60, 1),
 		HarvesterConcurrency:          parseEnvInt("HARVESTER_CONCURRENCY", 15, 1),
+		HarvesterCatchupMinutes:       parseEnvInt("HARVESTER_CATCHUP_MINUTES", 120, 0),
 	}
 
 	cfg.SnapshotUpstreamBaseURL = parseEnvString("SNAPSHOT_UPSTREAM_BASE_URL", "")
@@ -364,6 +366,7 @@ type ServerConfig struct {
 	HarvesterScheduleHours        string        // default: "7,12,17" (HARVESTER_SCHEDULE_HOURS)
 	HarvesterRainCooldownMinutes  int           // default: 60 (HARVESTER_RAIN_COOLDOWN_MINUTES)
 	HarvesterConcurrency          int           // default: 15 (HARVESTER_CONCURRENCY)
+	HarvesterCatchupMinutes       int           // default: 120 (HARVESTER_CATCHUP_MINUTES; 0 disables boot-time catch-up)
 }
 
 // ResolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -506,6 +509,7 @@ func LoadConfig() *ServerConfig {
 	harvesterScheduleHours := parseEnvString("HARVESTER_SCHEDULE_HOURS", "7,12,17")
 	harvesterRainCooldownMinutes := parseEnvInt("HARVESTER_RAIN_COOLDOWN_MINUTES", 60, 1)
 	harvesterConcurrency := parseEnvInt("HARVESTER_CONCURRENCY", 15, 1)
+	harvesterCatchupMinutes := parseEnvInt("HARVESTER_CATCHUP_MINUTES", 120, 0)
 
 	return &ServerConfig{
 		Port:                          port,
@@ -561,5 +565,6 @@ func LoadConfig() *ServerConfig {
 		HarvesterScheduleHours:        harvesterScheduleHours,
 		HarvesterRainCooldownMinutes:  harvesterRainCooldownMinutes,
 		HarvesterConcurrency:          harvesterConcurrency,
+		HarvesterCatchupMinutes:       harvesterCatchupMinutes,
 	}
 }
