@@ -304,6 +304,9 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - Empirical origin: first overnight autonomous harvest rehearsal (2026-10-25) showed the scheduled harvester correctly rejecting a frozen 2,638-byte upstream placeholder (camera Cong Hoa - Ut Tich 1, 56/57 clean labels) while the sample archiver stored 107 identical junk frames to R2 overnight.
   - `internal/archiver.OnVerdict` now buffers and validates every frame (SOI magic + >= 20,480 bytes, mirroring `harvester.IsValidJPEG` per the leaf modulith boundary) before storage; invalid/placeholder frames are skipped with a structured warning (`camera`, `reason`, `size_bytes`) and never pollute the labeler catalog.
   - Updated contract tests: valid frames archive unchanged; 2,638-byte stub, non-SOI payload, empty frame, and RawFrame-path stub all skipped with zero storage writes (fresh-camera hysteresis case covered).
+- **Sprint 9 backlog extension: Directional Roadway Polygons (S9-T7, Issue #309, ADR-011 D8)**:
+  - Gap identified during the 2026-10-25 polygon-canvas E2E review: the Sprint 7 directional taxonomy (`traffic_dir_a`/`traffic_dir_b`) exists only in classification labels, while cv-engine counts vehicles frame-wide — so one-direction congestion on divided carriageways is indistinguishable to the model and the S9-T6 forecast signal is diluted when the two directions disagree.
+  - Planned scope (Wave 3): optional `direction` attribute on `roadway` polygons (canonical `a`/`b`, server-side alias canonicalization, class-conditional validation, backward compatible), a labeler direction selector with vi/en i18n, and a `roadway_regions.json` export sidecar (YOLO txt unchanged) unlocking per-direction vehicle counting and directional PCU series. Roundabout multi-approach semantics (>2 regions) explicitly deferred.
 
 ---
 
