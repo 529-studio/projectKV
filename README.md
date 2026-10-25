@@ -107,6 +107,9 @@ hcm-traffic-cameras/
 │   └── crawler/                       # [DATA CRAWLER]
 │       └── get_all_cameras.js         # Fetch camera dataset from official DOT portal
 │
+├── scripts/
+│   └── verify_staging_telegram.sh     # Ops pre-flight: live staging Telegram flood alert verification (Issue #246)
+│
 ├── docs/
 │   ├── SYSTEM_DESIGN.md               # Original caching & CV roadmap design
 │   ├── ADR-001-flood-alert-architecture.md   # Flood-alert feasibility, Go migration & Sprint 1 scope
@@ -248,6 +251,22 @@ make dev-all
 | **Resource Caps** | 2 vCPU / 2 GB RAM | Resource limits configured via Docker Compose stack |
 | **API Endpoints** | `POST /predict`, `GET /healthz` | Prediction endpoint accepting JPEG bytes and returning vehicle counts |
 
+#### Operational Verification: Staging Telegram Flood Alerts
+
+Before enabling public subscriptions, verify live alert delivery on the staging
+stack (Portainer Stack 14) with the pre-flight script and follow the runbook at
+[`docs/runbooks/telegram_staging_verification.md`](docs/runbooks/telegram_staging_verification.md):
+
+```bash
+# Credentials are read from environment variables or the gitignored .env (never hardcoded)
+TELEGRAM_BOT_TOKEN=<your-telegram-bot-token> TELEGRAM_CHAT_ID=<your-telegram-chat-id> \
+  ./scripts/verify_staging_telegram.sh
+```
+
+The script validates the bot token (`getMe`), the bilingual zero-emoji message
+contract, and live `sendMessage` delivery (HTTP 200). The 30-minute sliding
+debouncer and token redaction are enforced deterministically by
+`go test -race ./cmd/server -run TestNotifyIntegration`.
 
 ## 4. Next Evolution Steps
 
@@ -387,6 +406,23 @@ make dev-all
 | **Kích thước ảnh** | 416x416 (kèm tiền xử lý letterbox & NMS) | Cân bằng giữa bảo toàn tỷ lệ khung hình, chống trùng lặp hộp nhận diện và độ trễ thấp |
 | **Giới hạn tài nguyên** | 2 vCPU / 2 GB RAM | Mức trần tài nguyên cấu hình qua Docker Compose stack |
 | **Endpoint API** | `POST /predict`, `GET /healthz` | Nhận ảnh JPEG nhị phân, phản hồi danh sách xe đếm được và nhịp tim sức khỏe |
+
+### Kiểm chứng vận hành: cảnh báo ngập Telegram trên Staging
+
+Trước khi mở đăng ký cảnh báo công khai, cần kiểm chứng phát cảnh báo live trên
+staging (Portainer Stack 14) bằng script pre-flight và tuân theo runbook
+[`docs/runbooks/telegram_staging_verification.md`](docs/runbooks/telegram_staging_verification.md):
+
+```bash
+# Thông tin xác thực chỉ đọc từ biến môi trường hoặc file .env (không bao giờ hardcode)
+TELEGRAM_BOT_TOKEN=<your-telegram-bot-token> TELEGRAM_CHAT_ID=<your-telegram-chat-id> \
+  ./scripts/verify_staging_telegram.sh
+```
+
+Script kiểm tra tính hợp lệ của bot token (`getMe`), chuẩn thông điệp song ngữ
+không emoji, và việc phát trực tiếp qua `sendMessage` (HTTP 200). Cơ chế chống
+spam trượt 30 phút và che giấu token được xác thực tất định bằng
+`go test -race ./cmd/server -run TestNotifyIntegration`.
 
 ## Tài liệu kiến trúc chuyên sâu
 - [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md) — thiết kế caching & roadmap CV gốc.
