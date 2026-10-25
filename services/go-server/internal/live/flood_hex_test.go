@@ -306,4 +306,3 @@ func TestFloodHexAggregator_OnUserReport_EscalationAndTTL(t *testing.T) {
 		t.Errorf("expected escalated=false")
 	}
 }
-

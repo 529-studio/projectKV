@@ -195,3 +195,116 @@ func TestNotifyIntegration_EndToEnd(t *testing.T) {
 	}
 	mu.Unlock()
 }
+
+// TestNotifyIntegration_DebounceFiveMinuteWindow reproduces the Issue #246 /
+// S8-T9 staging acceptance scenario deterministically: a second flood alert for
+// the same chokepoint within 5 minutes MUST be suppressed by the 30-minute
+// sliding debouncer, while an alert after the window expires dispatches again.
+func TestNotifyIntegration_DebounceFiveMinuteWindow(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db, err := store.NewDB(":memory:")
+	if err != nil {
+		t.Fatalf("failed to initialize in-memory DB: %v", err)
+	}
+	defer db.Close()
+
+	subStore := subscription.NewSQLiteStore(db)
+	subHandler := subscription.NewHandler(subStore)
+
+	var mu sync.Mutex
+	receivedCount := 0
+
+	mockTelegram := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		receivedCount++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok": true, "result": {"message_id": 202}}`))
+	}))
+	defer mockTelegram.Close()
+
+	router := gin.New()
+	api := router.Group("/api")
+	subHandler.RegisterRoutes(api)
+
+	reqBody, _ := json.Marshal(subscription.SubscribeRequest{
+		ChannelName: "telegram",
+		ChatID:      "chat-staging-verify",
+		TargetType:  "chokepoint",
+		TargetID:    "586e2995f9fab7001111b0b5",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/subscriptions", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected HTTP 201 for staging subscription, got %d: %s", w.Code, w.Body.String())
+	}
+
+	debouncer := notify.NewDebouncer(30 * time.Minute)
+	manager := notify.NewManager(debouncer)
+
+	subFinder := notify.SubscriberFinderFunc(func(ctx context.Context, channelName string, alert notify.FloodAlert) ([]string, error) {
+		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.District, alert.Ward)
+	})
+
+	manager.Register(notify.NewTelegramChannel(
+		"test-mock-token-staging",
+		subFinder,
+		notify.WithBaseURL(mockTelegram.URL),
+	))
+
+	baseAlert := notify.FloodAlert{
+		CameraID:       "586e2995f9fab7001111b0b5",
+		CameraName:     "Ung Văn Khiêm - Nguyễn Gia Trí (D2)",
+		Ward:           "Thạnh Mỹ Tây",
+		District:       "Khu vực Nội thành TP.HCM", // production cam.Zone (traffic zone, not administrative district)
+		FloodSeverity:  "FLOODED_DEEP",
+		TypicalDepthCm: 35,
+	}
+
+	ctx := context.Background()
+	t0 := time.Date(2026, 10, 24, 9, 0, 0, 0, time.UTC)
+
+	// Dispatch 1: initial verified flood at T0 — must deliver.
+	first := baseAlert
+	first.ObservedAt = t0
+	if err := manager.Dispatch(ctx, first); err != nil {
+		t.Fatalf("unexpected dispatch error at T0: %v", err)
+	}
+	mu.Lock()
+	if receivedCount != 1 {
+		t.Fatalf("expected 1 delivered message after first dispatch, got %d", receivedCount)
+	}
+	mu.Unlock()
+
+	// Dispatch 2: repeat at T0+5min (Issue #246 acceptance step) — must be suppressed.
+	second := baseAlert
+	second.ObservedAt = t0.Add(5 * time.Minute)
+	if err := manager.Dispatch(ctx, second); err != nil {
+		t.Fatalf("unexpected dispatch error at T0+5m: %v", err)
+	}
+	mu.Lock()
+	if receivedCount != 1 {
+		t.Fatalf("30-minute debouncer failed: expected suppression at T0+5m, got %d delivered messages", receivedCount)
+	}
+	mu.Unlock()
+
+	if got := debouncer.LastDispatched(baseAlert.CameraID); !got.Equal(t0) {
+		t.Errorf("suppressed dispatch must not advance the sliding window anchor: want %v, got %v", t0, got)
+	}
+
+	// Dispatch 3: repeat at T0+31min — window expired, must deliver again.
+	third := baseAlert
+	third.ObservedAt = t0.Add(31 * time.Minute)
+	if err := manager.Dispatch(ctx, third); err != nil {
+		t.Fatalf("unexpected dispatch error at T0+31m: %v", err)
+	}
+	mu.Lock()
+	if receivedCount != 2 {
+		t.Fatalf("expected window expiry to re-deliver at T0+31m, got %d delivered messages", receivedCount)
+	}
+	mu.Unlock()
+}
