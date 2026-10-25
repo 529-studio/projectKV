@@ -66,6 +66,10 @@ With Plane Hub decommissioned, `closes [KV-x]` has no backend automation. Sprint
 
 Congestion forecasting (10–30 min ahead) from the accumulated PCU/verdict time-series — precedent: DatapolisX's scikit-learn predictor over YOLO counts. Prototype must outperform a persistence baseline on backtest MAE before any UI exposure. Deliberately scheduled after the segmentation loop so it never competes with the critical path.
 
+### D8. Directional Roadway Polygon Semantics (S9-T7, added 2026-10-25)
+
+The Sprint 7 directional taxonomy (`traffic_dir_a` = near lane, `traffic_dir_b` = far lane) lives only in classification labels, while cv-engine counts vehicles across the entire frame. Consequently a "one carriageway jammed, the other free-flowing" state (the divided-carriageway paradox that motivated the taxonomy) is indistinguishable to the model, and the D7 forecast signal is diluted whenever the two directions disagree. Decision: extend the D1 contract with an optional `direction` attribute on `roadway` polygons only — canonical values `a`/`b`, aliases (`dir_a`, `traffic_dir_a`, `near` / `dir_b`, `traffic_dir_b`, `far`) canonicalized server-side, empty = unspecified (fully backward compatible). The exporter's YOLO txt output is unchanged; directional roadway polygons are additionally emitted to a `roadway_regions.json` sidecar so per-direction vehicle counting and directional PCU series become derivable without touching the training format. Roundabout multi-approach semantics (more than two regions per camera) are explicitly deferred.
+
 ## 3. Sprint 9 Backlog
 
 | Wave | ID | Issue | Title | Labels | Est. (Rule 3) | Depends |
@@ -75,9 +79,10 @@ Congestion forecasting (10–30 min ahead) from the accumulated PCU/verdict time
 | 1 | S9-T3 | (created) | `[ops + go-server] Staging Autonomous Data Flywheel: Scheduled Harvester, Auto-Label & Status Observability` | `tooling, backend, cross-cutting` | 6–8h | — |
 | 2 | S9-T4 | (created) | `[tooling + cv-engine] First Off-Box YOLOv8-Seg Training, mAP Benchmark Gate & Staging Weights Deployment` | `tooling, cross-cutting` | 10–12h | S9-T1, T2, T3 |
 | 3 | S9-T5 | (created) | `[go-server + ops] Telegram Verification Script Single-Source Parity Rework (notify-preview)` | `backend, tooling` | 4h | — |
+| 3 | S9-T7 | (created 2026-10-25) | `[go-server + web + tooling] Directional Roadway Polygons (direction attribute) for Per-Direction Congestion Ground Truth` | `backend, frontend, cross-cutting` | 6–8h | S9-T1; feeds S9-T6 |
 | 3 | S9-T6 | (created) | `[go-server] Short-Horizon Congestion Forecast Prototype (PCU Time-Series, 10–30 min)` — stretch | `backend, enhancement` | 12h | — |
 
-Total: ~56–70 h active effort (7–9 working days).
+Total: ~62–78 h active effort (8–10 working days).
 
 ## 4. Risk Register
 
@@ -89,6 +94,7 @@ Total: ~56–70 h active effort (7–9 working days).
 | 416 px latency breaks 30 s/57-camera budget | Medium | High | D4 mandates latency re-measurement; 320 px fallback; hot-set interval is configurable |
 | R2 label-key collision between human and SAM labels | Low | Medium | Annotator namespaced keys (`sam_prelabel`) + existing `resolveCanonicalLabels` precedence |
 | Staging harvester floods R2 with low-value frames | Low | Medium | Fixed 3-slot schedule + rain cooldown already implemented; retention policy 7 days |
+| Directional roadway polygons mislabeled (A/B swapped or overlapping) | Medium | Medium | Selector labels embed lane hints (near/far); regions pass through the same human labeler review flow as all ground truth; sidecar consumption is opt-in so wrong regions never silently alter model inputs |
 
 ## 5. Consequences
 

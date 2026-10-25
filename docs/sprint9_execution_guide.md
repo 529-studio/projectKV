@@ -1,14 +1,19 @@
 # Sprint 9 — Hướng dẫn thực thi agy CLI theo từng Wave
 
-> **Trạng thái**: Toàn bộ 6 ticket đã có issue chính thức trên GitHub
+> **Trạng thái**: Toàn bộ 7 ticket đã có issue chính thức trên GitHub
 > ([#297](https://github.com/529-studio/projectKV/issues/297),
 > [#298](https://github.com/529-studio/projectKV/issues/298),
 > [#299](https://github.com/529-studio/projectKV/issues/299),
 > [#300](https://github.com/529-studio/projectKV/issues/300),
 > [#301](https://github.com/529-studio/projectKV/issues/301),
-> [#302](https://github.com/529-studio/projectKV/issues/302)),
-> bám sát [ADR-011](ADR-011-sprint8-audit-and-sprint9-plan.md) và kết quả audit
+> [#302](https://github.com/529-studio/projectKV/issues/302),
+> [#309](https://github.com/529-studio/projectKV/issues/309)),
+> bám sát [ADR-011](ADR-011-sprint8-audit-and-sprint9-plan.md) (D1-D8) và kết quả audit
 > [Sprint 8 Report](sprint8_report.md). Tài liệu sẵn sàng đưa vào vận hành.
+> Issue #309 (S9-T7) bổ sung ngày 2026-10-25: quá trình review E2E PolygonCanvas phát hiện
+> taxonomy hướng `dir_a`/`dir_b` mới chỉ tồn tại ở nhãn phân loại trong khi model đếm xe toàn khung hình —
+> tắc nghẽn một chiều ("kẹt 1 bên") không tách được; polygon `roadway` mang thuộc tính `direction`
+> sẽ mở khóa đếm xe theo chiều làm đầu vào cho S9-T6.
 > Theo dõi tiến độ trên GitHub Projects v2 board **ProjectKV** (ADR-011 D6; Plane Hub đã decommission).
 
 Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers thực thi toàn bộ Sprint 9 Backlog theo quy chuẩn [ADR-011](ADR-011-sprint8-audit-and-sprint9-plan.md) (Ground-Truth Segmentation Flywheel & Live Model Retraining), [GO_BACKEND_ARCHITECTURE.md](GO_BACKEND_ARCHITECTURE.md) và [AGENTS.md](../AGENTS.md).
@@ -21,9 +26,9 @@ Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers 
 
 | Epic | Tên Epic | Issues con | Mục tiêu chính |
 |---|---|---|---|
-| **epic:eval-tooling** | `[Epic] Ground-Truth Segmentation Flywheel` | S9-T1, S9-T2, S9-T4 | Polygon annotation contract + canvas editor, SAM-assisted pre-labeling trên dev-box, huấn luyện segmentation lần đầu với mAP gate và deploy weights |
+| **epic:eval-tooling** | `[Epic] Ground-Truth Segmentation Flywheel` | S9-T1, S9-T2, S9-T4, S9-T7 | Polygon annotation contract + canvas editor, SAM-assisted pre-labeling trên dev-box, huấn luyện segmentation lần đầu với mAP gate và deploy weights; polygon roadway theo chiều (`direction`) làm nền đo tắc nghẽn một chiều |
 | **epic:infra-resilience** | `[Epic] Autonomous Staging & Alert Hygiene` | S9-T3, S9-T5 | Harvester chạy tự chủ theo giờ cố định trên staging + observability không cần terminal; vá parity bug script Telegram |
-| **(mở rộng)** | `[Epic] Forecast Foundation` (stretch) | S9-T6 | Prototype dự báo tắc đường 10-30 phút từ chuỗi PCU, vượt baseline persistence |
+| **(mở rộng)** | `[Epic] Forecast Foundation` (stretch) | S9-T6 (tiêu thụ đầu ra S9-T7) | Prototype dự báo tắc đường 10-30 phút từ chuỗi PCU (tách được theo chiều khi S9-T7 xong), vượt baseline persistence |
 
 ---
 
@@ -36,7 +41,8 @@ Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers 
 | **1** | **S9-T3** | [#299](https://github.com/529-studio/projectKV/issues/299) | `[ops + go-server] S9-T3: Staging Autonomous Data Flywheel — Scheduled Harvester, Auto-Label & Status Observability` | epic:infra-resilience | `tooling, backend, cross-cutting` | 6-8h (1.5d) | Bắt đầu ngay (chạy song song Wave 0) |
 | **2** | **S9-T4** | [#300](https://github.com/529-studio/projectKV/issues/300) | `[tooling + cv-engine] S9-T4: First Off-Box YOLOv8-Seg Training, mAP Benchmark Gate & Staging Weights Deployment` | epic:eval-tooling | `tooling, cross-cutting` | 10-12h (2d) | S9-T1, S9-T2, S9-T3 |
 | **3** | **S9-T5** | [#301](https://github.com/529-studio/projectKV/issues/301) | `[go-server + ops] S9-T5: Telegram Verification Script Single-Source Parity Rework (notify-preview)` | epic:infra-resilience | `backend, tooling` | 4h (0.5d) | Bắt đầu ngay |
-| **3** | **S9-T6** | [#302](https://github.com/529-studio/projectKV/issues/302) | `[go-server] S9-T6: Short-Horizon Congestion Forecast Prototype (PCU Time-Series, 10-30 min) — stretch` | (mở rộng) | `backend, enhancement` | 12h (2d) | Chỉ khởi động khi Wave 0-2 không chặn |
+| **3** | **S9-T7** | [#309](https://github.com/529-studio/projectKV/issues/309) | `[go-server + web + tooling] S9-T7: Directional Roadway Polygons (direction attribute) for Per-Direction Congestion Ground Truth` | epic:eval-tooling | `backend, frontend, cross-cutting` | 6-8h (1d) | S9-T1 (đã merge); nên hoàn thành trước S9-T6 |
+| **3** | **S9-T6** | [#302](https://github.com/529-studio/projectKV/issues/302) | `[go-server] S9-T6: Short-Horizon Congestion Forecast Prototype (PCU Time-Series, 10-30 min) — stretch` | (mở rộng) | `backend, enhancement` | 12h (2d) | Chỉ khởi động khi Wave 0-2 không chặn; chuỗi PCU tách chiều nếu S9-T7 đã xong |
 
 ---
 
@@ -179,7 +185,7 @@ PR Description: Must strictly start with 'Close #300'. Do NOT merge."
 
 ---
 
-## Wave 3 — Dọn nợ & Stretch (S9-T5, S9-T6)
+## Wave 3 — Dọn nợ, Ground Truth Theo Chiều & Stretch (S9-T5, S9-T7, S9-T6)
 
 ### Terminal 1 — S9-T5 (Vá parity script Telegram bằng notify-preview)
 
@@ -207,7 +213,40 @@ PR Title: fix(notify): single-source staging verification message via notify-pre
 PR Description: Must strictly start with 'Close #301'. Do NOT merge."
 ```
 
-### Terminal 2 — S9-T6 (Prototype forecast — stretch, chỉ chạy khi Wave 0-2 xong)
+### Terminal 2 — S9-T7 (Polygon roadway theo chiều — direction attribute)
+
+```bash
+cd ~/repos/projectKV
+
+agy "Implement issue #309: [go-server + web + tooling] S9-T7: Directional Roadway Polygons (direction attribute) for Per-Direction Congestion Ground Truth.
+
+Read the full issue at https://github.com/529-studio/projectKV/issues/309 for complete Technical Details and Definition of Done.
+
+Key requirements:
+1. Backend (internal/archiver): PolygonAnnotation gains optional Direction string; canonical values a/b with
+   alias canonicalization (dir_a/traffic_dir_a/near -> a; dir_b/traffic_dir_b/far -> b); direction valid only
+   when class == roadway; absent/empty passes (backward compatible); handler tests under -race; make swagger.
+2. Schema: internal/harvester Draft-07 + tools/eval/label_schema.json optional direction (enum a/b, roadway only).
+3. Web: when active class is roadway, show optional direction selector (none / Direction A - near lane /
+   Direction B - far lane; i18n vi/en); direction suffix badge on polygon chips; labelerUtils validation
+   mirrors the backend rule; unit tests.
+4. Exporter (tools/eval/export_yolo_seg.py): YOLO txt unchanged (roadway stays one class id); additionally emit
+   roadway_regions.json sidecar per split (normalized coords + direction + label id); python tests; zero
+   behavior change when direction absent.
+5. Run verification:
+   - make test-go
+   - cd apps/web && npm test && npm run build
+   - python3 -m unittest discover -s tools/eval -p '*_test.py'
+   - make swagger
+   - Browser E2E: draw two roadway polygons (A + B) on a local snapshot -> save -> reload shows both with
+     direction badges -> export sidecar contains both regions (screenshots as evidence).
+
+Branch: feat/s9-t7-directional-roadway-polygons
+PR Title: feat(labeler): directional roadway polygon semantics for per-direction congestion ground truth
+PR Description: Must strictly start with 'Close #309'. Do NOT merge."
+```
+
+### Terminal 3 — S9-T6 (Prototype forecast — stretch, chỉ chạy khi Wave 0-2 xong)
 
 ```bash
 cd ~/repos/projectKV
