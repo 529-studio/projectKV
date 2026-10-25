@@ -398,4 +398,3 @@ func TestHub_BroadcastUserFloodReport(t *testing.T) {
 		t.Errorf("expected report_count:3 in data, got %q", data)
 	}
 }
-

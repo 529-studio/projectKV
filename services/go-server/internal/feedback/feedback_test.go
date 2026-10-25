@@ -362,4 +362,3 @@ func TestHandler_OnReportAccepted_Callback(t *testing.T) {
 		t.Errorf("expected callbackCount to remain 1 after rate limited request, got %d", callbackCount)
 	}
 }
-

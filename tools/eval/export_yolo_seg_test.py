@@ -163,8 +163,9 @@ class TestExportYoloSeg(unittest.TestCase):
         with open(label_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
-        _, segments = parse_label_file(label_file, repo_root=self.tmp_path)
+        _, segments, used_synthetic = parse_label_file(label_file, repo_root=self.tmp_path)
         self.assertEqual(len(segments), 3)
+        self.assertFalse(used_synthetic)
         self.assertEqual(segments[0][0], 0)  # roadway
         self.assertEqual(len(segments[0][1]), 8)
         self.assertEqual(segments[1][0], 1)  # water_puddle
@@ -172,12 +173,73 @@ class TestExportYoloSeg(unittest.TestCase):
         self.assertEqual(segments[2][0], 2)  # motorcycle
         self.assertEqual(len(segments[2][1]), 8)
 
-    def test_export_dataset_deterministic_and_valid(self):
-        labels_dir = self.tmp_path / "labels"
-        labels_dir.mkdir()
-        output_dir = self.tmp_path / "output_yolo"
+    def test_parse_label_file_synthetic_is_opt_in(self):
+        label_file = self.tmp_path / "meta_only_label.json"
+        data = {
+            "frame_id": "frame_meta",
+            "labels": {
+                "traffic": "MODERATE",
+                "flood": "SHALLOW",
+                "waterline_depth": "TIRE_QUARTER_SUBMERGED",
+            },
+        }
+        with open(label_file, "w", encoding="utf-8") as f:
+            json.dump(data, f)
 
-        # Create 10 dummy label files
+        # Default: NO synthetic geometry (ADR-011 D2) — empty segments.
+        _, segments, used_synthetic = parse_label_file(label_file, repo_root=self.tmp_path)
+        self.assertEqual(segments, [])
+        self.assertFalse(used_synthetic)
+
+        # Opt-in: metadata-derived geometry is returned and flagged.
+        _, segments_opt, used_synthetic_opt = parse_label_file(
+            label_file, repo_root=self.tmp_path, allow_synthetic=True
+        )
+        self.assertTrue(len(segments_opt) >= 2)  # roadway + shallow puddle
+        self.assertTrue(used_synthetic_opt)
+
+    def test_export_dataset_skips_labels_without_annotations_by_default(self):
+        labels_dir = self.tmp_path / "labels_default"
+        labels_dir.mkdir()
+        output_dir = self.tmp_path / "output_default"
+
+        # Classification-only labels (the entire production catalog today).
+        for i in range(10):
+            lf = labels_dir / f"cam_{i:03d}.json"
+            data = {
+                "frame_id": f"cam_{i:03d}",
+                "labels": {
+                    "traffic": "MODERATE",
+                    "flood": "SHALLOW" if i % 2 == 0 else "NONE",
+                    "waterline_depth": "TIRE_QUARTER_SUBMERGED" if i % 2 == 0 else "DRY",
+                },
+            }
+            with open(lf, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+
+        stats = export_dataset(
+            labels_dir=labels_dir,
+            output_dir=output_dir,
+            val_split=0.2,
+            seed=42,
+            copy_images=False,
+            verify=False,
+        )
+
+        self.assertEqual(stats["total_labels"], 10)
+        self.assertEqual(stats["skipped_no_annotations"], 10)
+        self.assertEqual(stats["synthesized_labels"], 0)
+        self.assertEqual(stats["train_samples"], 0)
+        self.assertEqual(stats["val_samples"], 0)
+        # No YOLO label files may be emitted from fabricated geometry.
+        self.assertEqual(list((output_dir / "labels" / "train").glob("*.txt")), [])
+        self.assertEqual(list((output_dir / "labels" / "val").glob("*.txt")), [])
+
+    def test_export_dataset_allow_synthetic_opt_in(self):
+        labels_dir = self.tmp_path / "labels_synth"
+        labels_dir.mkdir()
+        output_dir = self.tmp_path / "output_synth"
+
         for i in range(10):
             lf = labels_dir / f"cam_{i:03d}.json"
             is_flood = (i % 2 == 0)
@@ -200,11 +262,14 @@ class TestExportYoloSeg(unittest.TestCase):
             seed=42,
             copy_images=False,
             verify=True,
+            allow_synthetic=True,
         )
 
         self.assertEqual(stats["total_labels"], 10)
         self.assertEqual(stats["train_samples"], 8)
         self.assertEqual(stats["val_samples"], 2)
+        self.assertEqual(stats["skipped_no_annotations"], 0)
+        self.assertEqual(stats["synthesized_labels"], 10)
         self.assertTrue(stats.get("verification_passed", False))
 
         # Check dataset.yaml
