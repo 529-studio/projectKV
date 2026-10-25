@@ -87,6 +87,7 @@ type Coordinator struct {
 	pipeline  *Pipeline
 	scheduler *Scheduler
 	watcher   *Watcher
+	stats     *runStats
 
 	mu      sync.Mutex
 	running bool
@@ -122,12 +123,13 @@ func New(cfg Config, deps Dependencies) (*Coordinator, error) {
 		hotsetCameras: deps.HotsetCameras,
 		rainCameras:   deps.RainCameras,
 		pipeline:      pipeline,
+		stats:         newRunStats(),
 	}
 
-	c.scheduler = NewScheduler(cfg.ScheduleHours, loc, func(ctx context.Context) error {
-		_, err := c.RunScheduledHarvest(ctx)
+	c.scheduler = NewScheduler(cfg.ScheduleHours, loc, func(ctx context.Context, slot string) error {
+		_, err := c.runScheduledHarvestSlot(ctx, slot)
 		return err
-	})
+	}, cfg.CatchupWindow)
 
 	if deps.Weather != nil {
 		c.watcher = NewWatcher(deps.Weather, cfg.RainCooldownMinutes, cfg.WatcherInterval, func(ctx context.Context, w *WeatherInfo) error {
@@ -201,7 +203,16 @@ func (c *Coordinator) Stop() {
 
 // RunScheduledHarvest triggers harvesting across the Hot Set cameras immediately.
 func (c *Coordinator) RunScheduledHarvest(ctx context.Context) (int, error) {
-	slog.Info("harvester: executing scheduled peak harvest", "cameras", len(c.hotsetCameras))
+	return c.runScheduledHarvestSlot(ctx, "")
+}
+
+func (c *Coordinator) runScheduledHarvestSlot(ctx context.Context, slot string) (int, error) {
+	scope := string(ScopeScheduled)
+	if slot == "" {
+		scope = string(ScopeManual)
+	}
+	started := time.Now().UTC()
+	slog.Info("harvester: executing scheduled peak harvest", "slot", slot, "cameras", len(c.hotsetCameras))
 
 	var weather *WeatherInfo
 	if c.weather != nil {
@@ -211,7 +222,18 @@ func (c *Coordinator) RunScheduledHarvest(ctx context.Context) (int, error) {
 	}
 
 	count, err := c.pipeline.HarvestCameras(ctx, c.hotsetCameras, ScopeScheduled, weather)
-	slog.Info("harvester: scheduled harvest complete", "harvested", count, "total", len(c.hotsetCameras))
+	slog.Info("harvester: scheduled harvest complete", "slot", slot, "harvested", count, "total", len(c.hotsetCameras))
+
+	c.stats.record(RunRecord{
+		Scope:      scope,
+		Slot:       slot,
+		StartedAt:  started,
+		DurationMs: time.Since(started).Milliseconds(),
+		Total:      len(c.hotsetCameras),
+		Harvested:  count,
+		Failed:     len(c.hotsetCameras) - count,
+		Error:      errString(err),
+	})
 	return count, err
 }
 
@@ -227,10 +249,62 @@ func (c *Coordinator) RunRainHarvest(ctx context.Context) (int, error) {
 }
 
 func (c *Coordinator) runRainHarvestWithWeather(ctx context.Context, weather *WeatherInfo) (int, error) {
+	started := time.Now().UTC()
 	slog.Info("harvester: executing meteorological rain harvest", "cameras", len(c.rainCameras))
 	count, err := c.pipeline.HarvestCameras(ctx, c.rainCameras, ScopeRain, weather)
 	slog.Info("harvester: rain harvest complete", "harvested", count, "total", len(c.rainCameras))
+
+	c.stats.record(RunRecord{
+		Scope:      string(ScopeRain),
+		StartedAt:  started,
+		DurationMs: time.Since(started).Milliseconds(),
+		Total:      len(c.rainCameras),
+		Harvested:  count,
+		Failed:     len(c.rainCameras) - count,
+		Error:      errString(err),
+	})
 	return count, err
+}
+
+// Status assembles the observability snapshot served by GET /api/harvester/status.
+func (c *Coordinator) Status() Status {
+	slotRuns, lastRain, totals, recentErrs, startedAt := c.stats.snapshot()
+
+	slots := c.scheduler.Slots()
+	labels := make([]string, 0, len(slots))
+	for _, s := range slots {
+		labels = append(labels, s.String())
+	}
+	nextLabel, nextAt := c.scheduler.NextSlot(time.Now())
+
+	rain := RainWatcherStatus{Enabled: c.watcher != nil}
+	if c.watcher != nil {
+		rain.CooldownMinutes = c.cfg.RainCooldownMinutes
+		if lt := c.watcher.LastTriggeredAt(); !lt.IsZero() {
+			lt = lt.UTC()
+			rain.LastTriggerAt = &lt
+		}
+	}
+
+	return Status{
+		Enabled:       c.cfg.Enabled,
+		ScheduleSlots: labels,
+		NextSlot:      nextLabel,
+		NextSlotAt:    nextAt.UTC(),
+		SlotRuns:      slotRuns,
+		LastRain:      lastRain,
+		Totals:        totals,
+		RainWatcher:   rain,
+		StartedAt:     startedAt,
+		RecentErrors:  recentErrs,
+	}
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 // Pipeline returns the underlying ingestion pipeline.

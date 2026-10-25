@@ -422,7 +422,7 @@ func TestParseScheduleSlots(t *testing.T) {
 
 func TestScheduler_Deduplication(t *testing.T) {
 	loc := time.FixedZone("ICT", 7*3600)
-	sched := harvester.NewScheduler("07:30,12:00", loc, nil)
+	sched := harvester.NewScheduler("07:30,12:00", loc, nil, 0)
 
 	t1 := time.Date(2026, 10, 16, 7, 30, 10, 0, loc)
 	slot, ok := sched.ShouldTrigger(t1)
@@ -690,5 +690,131 @@ func TestHarvester_ContextCancellationCleanShutdown(t *testing.T) {
 
 	if successCount >= 20 {
 		t.Errorf("expected fewer than 20 successful harvests, got %d", successCount)
+	}
+}
+
+// TestScheduler_CatchupSlots verifies Issue #299 boot-time catch-up: slots
+// missed within the window fire once, older slots are skipped, and already
+// fired slots are not repeated.
+func TestScheduler_CatchupSlots(t *testing.T) {
+	loc := time.FixedZone("ICT", 7*3600)
+	now := time.Date(2026, 10, 25, 8, 0, 0, 0, loc)
+
+	t.Run("slot missed within window fires once", func(t *testing.T) {
+		s := harvester.NewScheduler("07:30,12:00", loc, nil, 2*time.Hour)
+		missed := s.CatchupSlots(now)
+		if len(missed) != 1 || missed[0] != "07:30" {
+			t.Fatalf("expected catch-up of 07:30, got %v", missed)
+		}
+		// Second call must not fire again.
+		if again := s.CatchupSlots(now); len(again) != 0 {
+			t.Fatalf("expected no repeat catch-up, got %v", again)
+		}
+	})
+
+	t.Run("slot older than window is not fired", func(t *testing.T) {
+		s := harvester.NewScheduler("05:30,12:00", loc, nil, 2*time.Hour)
+		if missed := s.CatchupSlots(now); len(missed) != 0 {
+			t.Fatalf("expected no catch-up for 05:30 (2.5h old), got %v", missed)
+		}
+	})
+
+	t.Run("future slot is not fired", func(t *testing.T) {
+		s := harvester.NewScheduler("12:00", loc, nil, 2*time.Hour)
+		if missed := s.CatchupSlots(now); len(missed) != 0 {
+			t.Fatalf("expected no catch-up for future 12:00, got %v", missed)
+		}
+	})
+
+	t.Run("catchup disabled", func(t *testing.T) {
+		s := harvester.NewScheduler("07:30", loc, nil, 0)
+		if missed := s.CatchupSlots(now); len(missed) != 0 {
+			t.Fatalf("expected no catch-up when disabled, got %v", missed)
+		}
+	})
+}
+
+// TestScheduler_NextSlot verifies next-slot computation across today/tomorrow.
+func TestScheduler_NextSlot(t *testing.T) {
+	loc := time.FixedZone("ICT", 7*3600)
+
+	s := harvester.NewScheduler("07:30,12:00,17:30", loc, nil, 0)
+
+	// Before all slots today -> today's first.
+	label, at := s.NextSlot(time.Date(2026, 10, 25, 6, 0, 0, 0, loc))
+	if label != "07:30" || at.In(loc).Day() != 25 {
+		t.Fatalf("expected 07:30 today, got %s %v", label, at)
+	}
+
+	// Between slots -> today's next.
+	label, at = s.NextSlot(time.Date(2026, 10, 25, 13, 0, 0, 0, loc))
+	if label != "17:30" || at.In(loc).Day() != 25 {
+		t.Fatalf("expected 17:30 today, got %s %v", label, at)
+	}
+
+	// After last slot -> tomorrow's first.
+	label, at = s.NextSlot(time.Date(2026, 10, 25, 23, 0, 0, 0, loc))
+	if label != "07:30" || at.In(loc).Day() != 26 {
+		t.Fatalf("expected 07:30 tomorrow, got %s %v", label, at)
+	}
+}
+
+// TestCoordinator_StatusSnapshot verifies the observability payload assembled
+// for GET /api/harvester/status: slots, next slot, per-slot run records, rain
+// watcher state, and lifetime totals.
+func TestCoordinator_StatusSnapshot(t *testing.T) {
+	loc := time.FixedZone("ICT", 7*3600)
+	fetcher := &mockSnapshotFetcher{}
+	predictor := &mockVisionPredictor{}
+	storage := newMockStorageUploader()
+
+	cfg := harvester.Config{
+		Enabled:             true,
+		ScheduleHours:       "07:30,12:00",
+		RainCooldownMinutes: 60,
+		Concurrency:         5,
+		TimeLocation:        loc,
+	}
+
+	coord, err := harvester.New(cfg, harvester.Dependencies{
+		Weather:       &mockWeatherProvider{},
+		Fetcher:       fetcher,
+		Predictor:     predictor,
+		Storage:       storage,
+		HotsetCameras: []harvester.Camera{{ID: "c1"}, {ID: "c2"}},
+		RainCameras:   []harvester.Camera{{ID: "c1"}},
+	})
+	if err != nil {
+		t.Fatalf("failed to construct coordinator: %v", err)
+	}
+
+	status := coord.Status()
+	if !status.Enabled {
+		t.Error("expected enabled=true")
+	}
+	if len(status.ScheduleSlots) != 2 || status.ScheduleSlots[0] != "07:30" {
+		t.Errorf("unexpected schedule slots: %v", status.ScheduleSlots)
+	}
+	if status.NextSlot == "" || status.NextSlotAt.IsZero() {
+		t.Error("expected next slot to be computed")
+	}
+	if status.Totals.ScheduledRuns != 0 {
+		t.Errorf("expected zero scheduled runs initially, got %d", status.Totals.ScheduledRuns)
+	}
+
+	// Simulate a scheduled run for slot 07:30.
+	if _, err := coord.RunScheduledHarvest(context.Background()); err != nil {
+		t.Fatalf("scheduled harvest failed: %v", err)
+	}
+
+	status = coord.Status()
+	if status.Totals.ScheduledRuns != 1 {
+		t.Errorf("expected 1 scheduled run recorded, got %d", status.Totals.ScheduledRuns)
+	}
+	if status.Totals.CamerasHarvested != 2 {
+		t.Errorf("expected 2 harvested cameras recorded, got %d", status.Totals.CamerasHarvested)
+	}
+	if !status.RainWatcher.Enabled || status.RainWatcher.CooldownMinutes != 60 {
+		t.Errorf("unexpected rain watcher status: %+v", status.RainWatcher)
 	}
 }
