@@ -287,6 +287,11 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
   - CV engine inference upgrade (`services/cv-engine/server.py`): Prioritizes loading `yolov8n_seg.xml`, parses mask prototypes (`output1`, shape `[1, 32, 104, 104]`), and executes Dual-Layer Physical Triangulation (Layer 1: surface water ratio $R_{\text{water}} \ge 0.15$; Layer 2: motorcycle wheel submersion $\delta_{\text{sub}} \ge 0.18 \to \text{FLOODED\_DEEP}$).
   - 100% test pass rate: `make test-model` (14/14 tests in 0.66s), `make test-train` (4/4 tests in 0.06s), `make test-eval` (66/66 tests in 0.33s), and `make test-go` (`-race` all packages pass).
 
+- **Sprint 9 hotfix: Sample Archiver JPEG Quality Gate (Issue #305, ADR-009 gate parity)**:
+  - Empirical origin: first overnight autonomous harvest rehearsal (2026-10-25) showed the scheduled harvester correctly rejecting a frozen 2,638-byte upstream placeholder (camera Cong Hoa - Ut Tich 1, 56/57 clean labels) while the sample archiver stored 107 identical junk frames to R2 overnight.
+  - `internal/archiver.OnVerdict` now buffers and validates every frame (SOI magic + >= 20,480 bytes, mirroring `harvester.IsValidJPEG` per the leaf modulith boundary) before storage; invalid/placeholder frames are skipped with a structured warning (`camera`, `reason`, `size_bytes`) and never pollute the labeler catalog.
+  - Updated contract tests: valid frames archive unchanged; 2,638-byte stub, non-SOI payload, empty frame, and RawFrame-path stub all skipped with zero storage writes (fresh-camera hysteresis case covered).
+
 ---
 
 
