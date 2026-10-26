@@ -26,7 +26,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - CLOUD_VISION_API_KEY=${CLOUD_VISION_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
-      - CV_ENGINE_URL=${CV_ENGINE_URL:-http://100.118.7.57:8000}
+      - CV_ENGINE_URL=${CV_ENGINE_URL:?CV_ENGINE_URL must be provided by the deployment pipeline}
       - DEV_ACCESS_TOKEN=${DEV_ACCESS_TOKEN:-}
       - STORAGE_DRIVER=${STORAGE_DRIVER:-r2}
       - STORAGE_LOCAL_ROOT=${STORAGE_LOCAL_ROOT:-/app/data/proofs}

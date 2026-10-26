@@ -1,5 +1,5 @@
-# Dedicated Docker Compose configuration for CV Engine on dev-box worker
-# Deployed via Portainer on Endpoint ID 4 (dev-box)
+# Dedicated Docker Compose configuration for the CV Engine on the inference worker host
+# Deployed via the container management API configured in CI (see docker-publish.yml)
 
 services:
   warded-cv-engine:
