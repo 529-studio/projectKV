@@ -2,8 +2,8 @@
 #
 # verify_staging_telegram.sh — Live staging Telegram flood alert verification (Issue #246 / S8-T9).
 #
-# Pre-flight verification for the staging Telegram flood alert channel on Portainer
-# Stack 14 (homesrv). Performs, in order:
+# Pre-flight verification for the staging Telegram flood alert channel on the
+# staging application stack. Performs, in order:
 #   1. Fail-fast credential validation (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID from
 #      environment or repo-root .env — never hardcoded, per AGENTS.md Rule 8).
 #   2. Bot API getMe round-trip: proves the token authenticates (HTTP 200, ok=true).
