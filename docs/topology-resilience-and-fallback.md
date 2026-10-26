@@ -36,14 +36,14 @@ To guarantee public safety integrity and system reliability, this document estab
                                           ▼
              ┌─────────────────────────────────────────────────────────┐
              │                  Home WiFi Router (2.4/5GHz)             │
-             │    ⚠️ SPOF 1: Residential power & wireless link           │
+             │    [WARN] SPOF 1: Residential power & wireless link           │
              └────────────────────────────┬────────────────────────────┘
                                           │ 802.11ac WiFi (wlp2s0)
                                           │ [Wired enp1s0 is DOWN]
                                           ▼
   ═══════════════════════════════════════════════════════════════════════════
    PHYSICAL HOST: local edge host (ZOTAC ZBOX-CI320NANO, Debian 13)
-   ⚠️ SPOF 2: Single node, no VPS, fanless 7.5W TDP chassis, 5400RPM HDD
+   [WARN] SPOF 2: Single node, no VPS, fanless 7.5W TDP chassis, 5400RPM HDD
   ═══════════════════════════════════════════════════════════════════════════
      │
      ├── Traefik Edge Router (Port 80/443, Cloudflare SSL Resolver)
@@ -63,7 +63,7 @@ To guarantee public safety integrity and system reliability, this document estab
      │     └─► warded-model (OpenVINO / Python, 1.0 CPU / 512M) ─────┘
      │           [Internal only: traefik.enable=false, port 8000]
      │
-     └── Shared Disk: 250GB 5400RPM SATA HDD (⚠️ SPOF 3: Disk I/O contention)
+     └── Shared Disk: 250GB 5400RPM SATA HDD ([WARN] SPOF 3: Disk I/O contention)
 ```
 
 ### 2.2 Confirmed SPOF Breakdown

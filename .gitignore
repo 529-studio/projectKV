@@ -73,3 +73,6 @@ __pycache__/
 yolov8n_openvino_model/
 models/
 
+
+# Local agent session artefacts
+.zcode/

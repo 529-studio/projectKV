@@ -22,7 +22,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue" alt="License"></a>
 </p>
 
-[🇬🇧 English](#-english) &nbsp;•&nbsp; [🇻🇳 Tiếng Việt](#-tiếng-việt)
+[English](#english) &nbsp;•&nbsp; [Tiếng Việt](#tiếng-việt)
 
 <br />
 <br />
@@ -47,7 +47,7 @@
 
 ---
 
-# 🇬🇧 English
+# English
 
 > **Ho Chi Minh City traffic camera viewer and explorer optimized for low latency, clean monochromatic high-contrast UI, chained hierarchical filtering, multi-camera pin dock, and extensible modular architecture — extending toward real-time computer vision and flood alerting.**
 
@@ -227,7 +227,7 @@ make dev-all
 | `PORT` | `3000` | HTTP service port |
 | `STORAGE_DRIVER` | `local` | Storage driver (`local` for disk or `r2` / `s3` for Cloudflare R2) |
 | `STORAGE_LOCAL_ROOT` | `./data/proofs` | Root directory for local snapshot archiving |
-| `R2_ACCOUNT_ID` | `REDACTED_R2_ACCOUNT_ID` | Cloudflare Account Identifier |
+| `R2_ACCOUNT_ID` | `<your-account-id>` | Cloudflare Account Identifier |
 | `R2_ENDPOINT` | `https://<account_id>.r2.cloudflarestorage.com` | Base S3 API endpoint for Cloudflare R2 |
 | `R2_BUCKET_NAME` | `warded-proofs` | Object storage bucket name |
 | `R2_REGION` | `auto` | R2 signing region |
@@ -281,7 +281,7 @@ Detailed architectural decisions are documented in:
 
 ---
 
-# 🇻🇳 Tiếng Việt
+# Tiếng Việt
 
 > **Ứng dụng tra cứu và theo dõi camera giao thông Thành phố Hồ Chí Minh với độ trễ thấp tối ưu, giao diện tối giản trực quan, hỗ trợ bộ lọc phân cấp liên hoàn, dock ghim theo dõi nhiều camera đồng thời, tích hợp đa ngôn ngữ i18n cùng các tính năng phân tích mở rộng — hướng tới xử lý thị giác máy tính thời gian thực và cảnh báo ngập lụt.**
 

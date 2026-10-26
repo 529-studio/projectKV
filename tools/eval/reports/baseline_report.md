@@ -8,9 +8,9 @@
 
 | Gate Metric | Target | Actual Value | Verdict |
 |---|---|---|---|
-| **Flood False-Negative Rate (FNR)** | ≤ 5.0% | **0.0%** (0/2 missed) | ✅ **PASS** |
-| Traffic Macro F1 | ≥ 0.70 | **1.000** | ✅ |
-| Flood Macro F1 | ≥ 0.80 | **1.000** | ✅ |
+| **Flood False-Negative Rate (FNR)** | ≤ 5.0% | **0.0%** (0/2 missed) | ✓ **PASS** |
+| Traffic Macro F1 | ≥ 0.70 | **1.000** | ✓ |
+| Flood Macro F1 | ≥ 0.80 | **1.000** | ✓ |
 
 > **Safety Gate Rule (ADR-004 §D6)**: A flood false-negative (failing to detect standing water or deep floods) directs drivers into hazardous corridors. Until the flood FNR is rigorously ≤ 5.0% across ≥60 rain/flood frames, route verdicts cannot show an unrestricted 'clear' state.
 
@@ -66,7 +66,7 @@
 
 ## 5. Flood False-Negative Diagnostic (Missed Floods)
 
-🎉 **Zero false-negative flood events detected!** All flooded conditions were recognized as hazardous.
+ **Zero false-negative flood events detected!** All flooded conditions were recognized as hazardous.
 
 ## 6. Sliced Analysis (Weather & Lighting)
 

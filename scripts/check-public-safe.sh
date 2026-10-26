@@ -43,6 +43,11 @@ scan "hardcoded credential material" \
   'ak_live_[A-Za-z0-9_]+|(ghp|gho|ghs|ghu)_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AIza[0-9A-Za-z_-]{35}' \
   .
 
+echo "[INFO] Scanning every tracked file for credential-shaped assignments..."
+scan "credential-shaped assignment (a real value instead of a placeholder)" \
+  '(SECRET|ACCESS_KEY|PRIVATE_KEY|TOKEN|PASSWORD|API_KEY|ACCOUNT_ID)[A-Z_]*=[A-Za-z0-9/+_-]{24,}' \
+  .
+
 if [ "${STATUS}" -ne 0 ]; then
   echo "[ERR] Public-safety guard failed. Remove the flagged values or load them from secrets/variables."
   exit 1

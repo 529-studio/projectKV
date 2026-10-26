@@ -79,13 +79,13 @@ Time to process N cameras serially = N × (1000ms / 2.27) / 1000
 
 | N cameras | Time needed | Fits 30s? | Fits 45s? | Fits 60s? |
 |---:|---:|:---:|:---:|:---:|
-| 49 (Option 1a) | 21.6 s | ✅ | ✅ | ✅ |
-| 57 (Option 1b — 4 corridors) | 25.1 s | ✅ | ✅ | ✅ |
-| 68 (max-safe at 30s) | 30.0 s | ✅ | ✅ | ✅ |
-| 75 (Option 1c — 5 corridors) | 33.0 s | ❌ | ✅ | ✅ |
-| 102 (max-safe at 45s) | 45.0 s | ❌ | ✅ | ✅ |
-| 136 (max-safe at 60s) | 60.0 s | ❌ | ❌ | ✅ |
-| 245–256 (all 16 corridors) | 108–113 s | ❌ | ❌ | ❌ |
+| 49 (Option 1a) | 21.6 s | ✓ | ✓ | ✓ |
+| 57 (Option 1b — 4 corridors) | 25.1 s | ✓ | ✓ | ✓ |
+| 68 (max-safe at 30s) | 30.0 s | ✓ | ✓ | ✓ |
+| 75 (Option 1c — 5 corridors) | 33.0 s | ✗ | ✓ | ✓ |
+| 102 (max-safe at 45s) | 45.0 s | ✗ | ✓ | ✓ |
+| 136 (max-safe at 60s) | 60.0 s | ✗ | ✗ | ✓ |
+| 245–256 (all 16 corridors) | 108–113 s | ✗ | ✗ | ✗ |
 
 **Safe maximum N per cycle interval:**
 
@@ -136,7 +136,7 @@ cancellation — overlap is bounded, not catastrophic.
 |---|---:|---:|---:|---:|
 | 3a (45s) | **102** | 45 s | 45.0 s | **0 s (0%)** |
 | 3b (60s) | **136** | 60 s | 60.0 s | **0 s (0%)** |
-| 3c (all 256, 60s) | **256** | would need 113s | — | **❌ not viable** |
+| 3c (all 256, 60s) | **256** | would need 113s | — | **✗ not viable** |
 
 > There is no safe variant of Option 3 that covers all 256 intersection cameras
 > within a 60s cycle at 1.0 CPU / 2.27 FPS. The arithmetic is definitive.

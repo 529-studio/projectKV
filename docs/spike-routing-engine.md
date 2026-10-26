@@ -61,8 +61,8 @@ All measurements were run locally on a MacBook Pro (Apple M3, 8 cores, 24 GB RAM
 
 | Engine | Result | Peak observed |
 |---|---|---|
-| Valhalla | ✅ Starts and serves routes | 151.6 MiB |
-| OSRM | ❌ Killed by OOM during startup | N/A (process killed before serving) |
+| Valhalla | ✓ Starts and serves routes | 151.6 MiB |
+| OSRM | ✗ Killed by OOM during startup | N/A (process killed before serving) |
 
 **Unlimited container during benchmark load**
 
@@ -105,10 +105,10 @@ For the clipped HCMC extract, Valhalla fits inside the 256 MB staging limit with
 
 | Engine | Capability | Observed |
 |---|---|---|
-| Valhalla | `exclude_polygons` with arbitrary lat/lon polygon arrays | ✅ Works — route detours around blocked polygon |
+| Valhalla | `exclude_polygons` with arbitrary lat/lon polygon arrays | ✓ Works — route detours around blocked polygon |
 | Valhalla | `exclude_locations` (radius around points) | Available in API (not explicitly tested) |
-| OSRM | `exclude=toll\|motorway\|ferry` (one class at a time, depending on profile `excludable` config) | ✅ Single-class exclude works; combinations rejected |
-| OSRM | Arbitrary polygon / flooded segment | ❌ Not supported |
+| OSRM | `exclude=toll\|motorway\|ferry` (one class at a time, depending on profile `excludable` config) | ✓ Single-class exclude works; combinations rejected |
+| OSRM | Arbitrary polygon / flooded segment | ✗ Not supported |
 
 ## Analysis
 

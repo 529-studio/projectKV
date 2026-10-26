@@ -73,7 +73,7 @@ jobs:
           # 5. Direct push violation detected!
           echo ""
           echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-          echo "🛑 DIRECT PUSH DETECTED: Direct push to '$BRANCH_NAME' is forbidden!"
+          echo "[ERR] DIRECT PUSH DETECTED: Direct push to '$BRANCH_NAME' is forbidden!"
           echo "Policy: All changes to '$BRANCH_NAME' must be merged via Pull Requests."
           echo "Actor: @$ACTOR"
           echo "Commit: $COMMIT_SHA"
@@ -84,7 +84,7 @@ jobs:
 
           gh issue create \
             --repo "${{ github.repository }}" \
-            --title "⚠️ Direct Push Policy Violation on ${BRANCH_NAME} by @${ACTOR}" \
+            --title "[WARN] Direct Push Policy Violation on ${BRANCH_NAME} by @${ACTOR}" \
             --body "$ISSUE_BODY" || true
 
           exit 1

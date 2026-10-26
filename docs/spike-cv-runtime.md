@@ -29,7 +29,7 @@ This spike fulfills the requirements of **Issue #104** and the CV research plan.
 | **Hardware Compatibility (Non-AVX)** | **PASS** (Zero crash) | **PASS** (Zero crash) | Validated on Celeron N2930 |
 | **Model Load Time (Cold)** | 1,575.6 ms | 1,101.1 ms | **-30.1% faster** |
 | **Model Load Time (Warm restart)** | 996.8 ms | 980.2 ms | Sub-second ready |
-| **P50 Latency** | **718.41 ms** | **425.84 ms** | **-40.7% faster** 🚀 |
+| **P50 Latency** | **718.41 ms** | **425.84 ms** | **-40.7% faster** |
 | **P90 Latency** | 763.26 ms | 468.75 ms | **-38.6% faster** |
 | **P95 Latency** | 767.07 ms | 469.85 ms | **-38.7% faster** |
 | **P99 Latency** | 836.96 ms | 492.10 ms | **-41.2% faster** |

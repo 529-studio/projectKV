@@ -1,11 +1,21 @@
 title = "projectKV Gitleaks Configuration"
 
+# Standalone configuration: no external base file is required, so the same
+# ruleset works in CI (secret-scan.yml) and locally via `gitleaks git`.
 [extend]
-path = "/tmp/gitleaks.base.toml"
+useDefault = true
 
-[allowlist]
-description = "projectKV repository-specific exemptions for traffic camera mocks, test fixtures, and storage vectors"
+[[allowlists]]
+description = "Traffic camera mocks, test fixtures and storage tooling use synthetic credentials"
 paths = [
   '''(^|/)tests/fixtures/.*''',
   '''(^|/)tools/storage/.*'''
+]
+
+[[allowlists]]
+description = "Public dataset identifiers and documentation placeholders are not credentials"
+regexTarget = "match"
+regexes = [
+  '''road_key''',
+  '''your-[a-z0-9-]+'''
 ]
