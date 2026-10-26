@@ -4,12 +4,22 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
+)
+
+// Default retry policy for POST /predict. A redeploy of the inference worker
+// closes the listening socket for a second or two; without retries a single
+// missed frame per camera is enough to mark the whole hot set UNKNOWN.
+const (
+	defaultPredictAttempts = 4
+	defaultPredictBackoff  = 300 * time.Millisecond
 )
 
 // cvPredictResponse is the JSON payload returned by POST /predict when the
@@ -36,6 +46,20 @@ func WithPCUCalculator(calc *PCUCalculator) CVEngineOption {
 	}
 }
 
+// WithPredictRetry overrides the retry policy used when POST /predict fails at
+// the transport layer (connection refused, reset, timeout). Non-positive values
+// keep the current setting, so callers can tune only one dimension.
+func WithPredictRetry(attempts int, backoff time.Duration) CVEngineOption {
+	return func(a *CVEngineAnalyzer) {
+		if attempts > 0 {
+			a.attempts = attempts
+		}
+		if backoff > 0 {
+			a.backoff = backoff
+		}
+	}
+}
+
 // CVEngineAnalyzer calls the self-hosted OpenVINO cv-engine microservice at
 // url (CV_ENGINE_URL). It implements hotset.Analyzer.
 //
@@ -49,6 +73,8 @@ type CVEngineAnalyzer struct {
 	url        string
 	client     *http.Client
 	calculator *PCUCalculator
+	attempts   int
+	backoff    time.Duration
 }
 
 // Ensure CVEngineAnalyzer satisfies hotset.Analyzer at compile time.
@@ -65,6 +91,8 @@ func NewCVEngineAnalyzer(url string, client *http.Client, opts ...CVEngineOption
 		url:        url,
 		client:     client,
 		calculator: NewPCUCalculator(DefaultPCUConfig()),
+		attempts:   defaultPredictAttempts,
+		backoff:    defaultPredictBackoff,
 	}
 	for _, opt := range opts {
 		opt(a)
@@ -115,17 +143,12 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: snapshot body is empty")
 	}
 
-	// Step 2: POST raw JPEG bytes to /predict.
+	// Step 2: POST raw JPEG bytes to /predict, retrying transient transport
+	// failures such as the inference worker restarting mid-deploy.
 	predictURL := a.url + "/predict"
-	predReq, err := http.NewRequestWithContext(ctx, http.MethodPost, predictURL, bytes.NewReader(jpegBytes))
+	predResp, err := a.postPredict(ctx, predictURL, jpegBytes)
 	if err != nil {
-		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: build predict request: %w", err)
-	}
-	predReq.Header.Set("Content-Type", "application/octet-stream")
-
-	predResp, err := a.client.Do(predReq)
-	if err != nil {
-		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: POST /predict: %w", err)
+		return unknownVerdict(cam.ID), err
 	}
 	defer predResp.Body.Close()
 
@@ -178,4 +201,55 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 		SaturationIndex: saturationIndex,
 		PCUTotal:        pcuTotal,
 	}, nil
+}
+
+// postPredict sends the JPEG bytes to the predict endpoint, retrying only
+// transport-level failures with linear backoff. HTTP responses (including 503
+// standby) are returned to the caller unretried because they are deterministic.
+func (a *CVEngineAnalyzer) postPredict(ctx context.Context, url string, jpeg []byte) (*http.Response, error) {
+	attempts := a.attempts
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jpeg))
+		if err != nil {
+			return nil, fmt.Errorf("cv-engine: build predict request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/octet-stream")
+
+		resp, err := a.client.Do(req)
+		if err == nil {
+			return resp, nil
+		}
+		lastErr = err
+
+		if attempt == attempts || !isRetryableTransportError(ctx, err) {
+			break
+		}
+
+		wait := time.Duration(attempt) * a.backoff
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("cv-engine: POST /predict: %w", ctx.Err())
+		case <-time.After(wait):
+		}
+	}
+
+	return nil, fmt.Errorf("cv-engine: POST /predict failed after %d attempt(s): %w", attempts, lastErr)
+}
+
+// isRetryableTransportError reports whether err is a transient network failure
+// worth another attempt. Context cancellation and deadlines are never retried.
+func isRetryableTransportError(ctx context.Context, err error) bool {
+	if err == nil || ctx.Err() != nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr)
 }
