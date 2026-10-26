@@ -1,0 +1,30 @@
+name: Public Safety Guard
+
+# Blocks any change that would introduce internal infrastructure references or
+# credential material into the repository. Runs on every pull request without
+# path filters so that workflow edits cannot bypass it.
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-safety-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Scan for non-public material
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run public-safety guard
+        run: bash scripts/check-public-safe.sh
