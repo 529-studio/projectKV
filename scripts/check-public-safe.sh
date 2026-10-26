@@ -7,8 +7,11 @@
 # runtime surface already removed.
 set -euo pipefail
 
-SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
-REPO_ROOT="$(git -C "$(dirname "${SCRIPT_PATH}")" rev-parse --show-toplevel)"
+# Resolve every path physically (pwd -P) so a symlinked checkout such as
+# /tmp -> /private/tmp on macOS cannot desynchronise SELF from the git prefix.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(cd "$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel)" && pwd -P)"
+SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
 cd "${REPO_ROOT}"
 
 SELF="${SCRIPT_PATH#"${REPO_ROOT}/"}"
