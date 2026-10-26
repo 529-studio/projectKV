@@ -31,9 +31,9 @@ From spike #104 (single-stream measurement on `warded-model` container):
 | **ms per frame** | **~440 ms** |
 | CPU cgroup limit | 1.0 CPU (deliberately protective, not final — ADR-004 §14 Finding 1) |
 | RAM cgroup limit | 512 MB |
-| Host | `local-homesrv` (ZOTAC ZBOX-CI320NANO, Celeron N2930, Debian 13, Docker) |
+| Host | `local edge host` (ZOTAC ZBOX-CI320NANO, Celeron N2930, Debian 13, Docker) |
 
-> **§15 constraint**: Do **not** raise the CPU limit this sprint. `local-homesrv`
+> **§15 constraint**: Do **not** raise the CPU limit this sprint. `local edge host`
 > is a confirmed SPOF for the entire public `warded-stg` service (ADR-004 §14
 > Finding 2 — WiFi-only uplink, all 3 containers on the same box). Preserving
 > headroom takes priority over broader coverage.

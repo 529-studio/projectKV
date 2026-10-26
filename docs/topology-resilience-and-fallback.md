@@ -1,18 +1,18 @@
-# Infrastructure Topology, Resilience & Graceful Fallback (`local-homesrv` ↔ `warded-stg`)
+# Infrastructure Topology, Resilience & Graceful Fallback (`local edge host` ↔ `warded-stg`)
 
 **Task ID:** [#143](https://github.com/529-studio/projectKV/issues/143) (S8)  
 **Branch:** `feat/s8-resilience-fallback`  
 **Execution Date:** 2026-10-03  
 **Author:** Giang Đàm (`gdq2k2`)  
 **Status:** Completed & Validated  
-**Related Documents:** [ADR-004](ADR-004-route-check-and-snapshot-archive.md) (§9 D14, §10 S8, §14 Finding 2, §15), [infra-disk-io-baseline.md](infra-disk-io-baseline.md)
+**Related Documents:** [ADR-004](ADR-004-route-check-and-snapshot-archive.md) (§9 D14, §10 S8, §14 Finding 2, §15), infra-disk-io-baseline.md
 
 ---
 
 ## 1. Executive Summary
 
 This architecture document formally addresses **ADR-004 §10 Item S8** and **§14 Finding 2**:
-> **Finding 2 (§14)**: All three staging containers (`warded-backend`, `warded-frontend`, `warded-model`) run on the same physical box, `local-homesrv`, with **no separate VPS and no wired ethernet** (WiFi-only uplink, `enp1s0` is down). A home power or WiFi outage takes down the entire public `warded-stg` service, not just a compute auxiliary. This elevates S8 from "worth doing" to a **real operational risk**.
+> **Finding 2 (§14)**: All three staging containers (`warded-backend`, `warded-frontend`, `warded-model`) run on the same physical box, `local edge host`, with **no separate VPS and no wired ethernet** (WiFi-only uplink, `enp1s0` is down). A home power or WiFi outage takes down the entire public `warded-stg` service, not just a compute auxiliary. This elevates S8 from "worth doing" to a **real operational risk**.
 
 To guarantee public safety integrity and system reliability, this document establishes:
 1. **Full Topology Mapping**: Complete documentation of the current deployment architecture, container network, and single points of failure (SPOF).
@@ -42,7 +42,7 @@ To guarantee public safety integrity and system reliability, this document estab
                                           │ [Wired enp1s0 is DOWN]
                                           ▼
   ═══════════════════════════════════════════════════════════════════════════
-   PHYSICAL HOST: local-homesrv (ZOTAC ZBOX-CI320NANO, Debian 13)
+   PHYSICAL HOST: local edge host (ZOTAC ZBOX-CI320NANO, Debian 13)
    ⚠️ SPOF 2: Single node, no VPS, fanless 7.5W TDP chassis, 5400RPM HDD
   ═══════════════════════════════════════════════════════════════════════════
      │
@@ -165,7 +165,7 @@ To provide operational observability without breaking Traefik load balancing, th
      ```json
      {
        "status": "degraded",
-       "hostname": "local-homesrv",
+       "hostname": "local edge host",
        "cameras_loaded": 1234,
        "online_cameras": 1050,
        "components": {
@@ -200,6 +200,6 @@ Provides continuous or one-shot inspection of kernel thermal zones (`/sys/class/
 
 ## 6. Long-Term Redundancy Roadmap (Post-Sprint 3)
 
-1. **Wired Ethernet Uplink**: Re-enable or repair `enp1s0` on `local-homesrv` to replace WiFi with gigabit Ethernet.
-2. **Dual-Homed Staging Gateway**: Deploy a lightweight VPS reverse proxy (e.g. Hetzner / DigitalOcean, $4/mo) holding static frontend assets, proxying to `local-homesrv` via Tailscale. When `local-homesrv` drops off Tailscale, the public gateway serves a maintenance banner rather than dropping DNS connections.
+1. **Wired Ethernet Uplink**: Re-enable or repair `enp1s0` on `local edge host` to replace WiFi with gigabit Ethernet.
+2. **Dual-Homed Staging Gateway**: Deploy a lightweight VPS reverse proxy (e.g. Hetzner / DigitalOcean, $4/mo) holding static frontend assets, proxying to `local edge host` via a private mesh VPN. When `local edge host` drops off private mesh VPN, the public gateway serves a maintenance banner rather than dropping DNS connections.
 3. **Hardware Storage Upgrade**: Replace 5400RPM HDD with SATA SSD per S7 report recommendations.

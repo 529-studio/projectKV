@@ -32,7 +32,7 @@
 #   go test -race ./cmd/server -run TestNotifyIntegration
 # and observed on staging via the log line
 #   "notify: flood alert suppressed by 30-minute debounce window"
-# See docs/runbooks/telegram_staging_verification.md for the full procedure.
+# The script is self-contained; see its header for the verification contract.
 
 set -euo pipefail
 
@@ -242,7 +242,7 @@ fi
 printf '\n%s\n' "------------------------------------------------------------"
 printf 'Verification summary: %d passed, %d failed.\n' "$PASS_COUNT" "$FAIL_COUNT"
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
-    printf 'Result: FAILED. Consult docs/runbooks/telegram_staging_verification.md.\n'
+    printf 'Result: FAILED. Consult the verification contract in the header of this script.\n'
     exit 1
 fi
 printf 'Result: PASSED. Confirm the message in the staging Telegram group renders correctly (HTML, zero emojis).\n'

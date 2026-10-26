@@ -3,7 +3,7 @@
   "hardware_limits": {
     "cpus": "2.00 vCPU",
     "memory": "2048 MB",
-    "host": "AMD Ryzen 7 6800HS Creator Edition (8 vCPU on dev-box VM)"
+    "host": "AMD Ryzen 7 6800HS Creator Edition (8 vCPU on inference worker VM)"
   },
   "resource_monitoring": {
     "initial": {

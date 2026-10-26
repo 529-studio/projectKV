@@ -4,7 +4,7 @@
 
 This document defines the formal engineering standard for labeling ground-truth traffic and flood camera frames in ProjectKV. It accompanies Sprint 7 Issue #253 (S7-T8) and formalizes the transition from naive whole-frame heuristic classifications to multi-lane dual-carriageway directional evaluation and physical waterline depth anchors.
 
-All ground truth labels emitted by human annotators or automated ingestion tools must adhere strictly to the JSON Schema Draft-07 specification in [`tools/eval/label_schema.json`](file:///Users/thanhdatvu/repos/projectKV/tools/eval/label_schema.json) and be validated using [`tools/eval/validate_labels.py`](file:///Users/thanhdatvu/repos/projectKV/tools/eval/validate_labels.py).
+All ground truth labels emitted by human annotators or automated ingestion tools must adhere strictly to the JSON Schema Draft-07 specification in [`tools/eval/label_schema.json`](../tools/eval/label_schema.json) and be validated using [`tools/eval/validate_labels.py`](../tools/eval/validate_labels.py).
 
 ---
 

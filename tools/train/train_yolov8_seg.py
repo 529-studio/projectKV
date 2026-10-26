@@ -4,7 +4,7 @@ train_yolov8_seg.py — Off-Box YOLOv8 Segmentation Training & OpenVINO FP16 Exp
 
 Part of Sprint 8 Issue #290 (S8-T8, Kanban [KV-20], ADR-009).
 Designed to execute on off-box infrastructure (Google Colab / external GPU workstation)
-to respect dev-box 20 GB disk ceiling (auto-guard at 16 GB) and 2 GB RAM cgroup limits.
+to respect inference worker 20 GB disk ceiling (auto-guard at 16 GB) and 2 GB RAM cgroup limits.
 
 Fine-tunes YOLOv8n-seg on road surface water puddles vs asphalt (6 classes):
   0: roadway
@@ -26,7 +26,7 @@ Usage:
       --batch 16 \
       --export-openvino models/yolov8n_seg_openvino_416
 
-  # Verification / Dry-run in CI / dev-box:
+  # Verification / Dry-run in CI / inference worker:
   python3 tools/train/train_yolov8_seg.py --dry-run
 """
 
@@ -74,13 +74,13 @@ def check_host_compute_headroom() -> Dict[str, Any]:
         total, used, free = shutil.disk_usage(Path.cwd())
         info["total_disk_gb"] = round(total / (1024**3), 2)
         info["free_disk_gb"] = round(free / (1024**3), 2)
-        # If disk is under 4GB or total under 25GB, host resembles constrained dev-box
+        # If disk is under 4GB or total under 25GB, host resembles constrained inference worker
         if info["free_disk_gb"] < 4.0 or info["total_disk_gb"] < 25.0:
             info["is_constrained"] = True
             info["warning"] = (
                 f"Constrained host detected (free disk: {info['free_disk_gb']} GB). "
                 f"Full PyTorch training must run off-box (Google Colab / external GPU) "
-                f"per ADR-009 to protect dev-box 20GB disk ceiling."
+                f"per ADR-009 to protect inference worker 20GB disk ceiling."
             )
     except Exception as exc:
         info["warning"] = f"Could not inspect disk usage: {exc}"
@@ -375,7 +375,7 @@ def parse_args():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Execute simulated training and export pipeline for verification in CI/dev-box",
+        help="Execute simulated training and export pipeline for verification in CI/inference worker",
     )
     return parser.parse_args()
 

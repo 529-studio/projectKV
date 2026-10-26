@@ -35,10 +35,14 @@ except ImportError:
     print("[ERROR] boto3 is required. Install via: pip install boto3")
     sys.exit(1)
 
-ENDPOINT = os.getenv("R2_ENDPOINT", "https://bb67574163a065e4aad475fb3aa6bb92.r2.cloudflarestorage.com")
-BUCKET = os.getenv("R2_BUCKET_NAME", "warded-proofs")
+ENDPOINT = os.getenv("R2_ENDPOINT", "")
+BUCKET = os.getenv("R2_BUCKET_NAME", "")
 ACCESS_KEY = os.getenv("R2_ACCESS_KEY_ID", "")
 SECRET_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "")
+
+if not ENDPOINT or not BUCKET:
+    print("[ERROR] R2_ENDPOINT and R2_BUCKET_NAME must be configured in .env")
+    sys.exit(1)
 
 if not ACCESS_KEY or not SECRET_KEY:
     print("[ERROR] R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be configured in .env")

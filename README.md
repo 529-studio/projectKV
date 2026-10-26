@@ -86,7 +86,7 @@ hcm-traffic-cameras/
 │   │       ├── store/                 # SQLite (pure Go, no cgo) — subscriptions, dedupe, verdicts
 │   │       └── tilecache/             # Offline/local map tile proxy and caching
 │   │
-│   └── cv-engine/                     # [ML PLANE — Python] Model inference on dev-box worker
+│   └── cv-engine/                     # [ML PLANE — Python] Model inference on inference worker
 │       ├── models/                    # YOLO / ONNX / OpenVINO IR FP16 weights
 │       └── api.py                     # Multi-threaded OpenVINO detection endpoint (:8000)
 │
@@ -112,8 +112,9 @@ hcm-traffic-cameras/
 │
 ├── docs/
 │   ├── SYSTEM_DESIGN.md               # Original caching & CV roadmap design
+│   ├── GO_BACKEND_ARCHITECTURE.md     # Go backend service layout and runtime model
 │   ├── ADR-001-flood-alert-architecture.md   # Flood-alert feasibility, Go migration & Sprint 1 scope
-│   └── sprint1_execution_guide.md     # Sprint 1 task sequencing and agy CLI commands
+│   └── labeling_guidelines.md         # Label schema and annotation rules
 │
 ├── cameras_all.json                   # Base traffic camera catalog dataset
 ├── cameras_enriched.json              # Enriched camera catalog with phuong_id / phuong_name
@@ -201,9 +202,9 @@ make dev-all
 
 | Service | Technology | Port | Host & Node Role | Primary Responsibilities |
 |---|---|:---:|---|---|
-| **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `homesrv` (Portainer Endpoint 3) | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal corridor dock, bilingual UI (`vi` / `en`). |
-| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `homesrv` (Portainer Endpoint 3) | Snapshot proxy cache (15s TTL), camera catalog, hotset scheduler (30s cycle), crowdsourced flood report archiver (`internal/feedback`), PCU Saturation Index, SSE stream, Cloudflare R2 storage integration. |
-| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n-seg FP16 | `8000` | `dev-box` (Portainer Endpoint 4) | High-throughput vehicle detection & road water segmentation (`POST /predict`), Dual-Layer Physical Triangulation (Layer 1 surface water ratio, Layer 2 motorcycle wheel submersion), `GET /healthz` healthchecks (< 38.5ms latency). |
+| **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `edge host` | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal corridor dock, bilingual UI (`vi` / `en`). |
+| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` | Snapshot proxy cache (15s TTL), camera catalog, hotset scheduler (30s cycle), crowdsourced flood report archiver (`internal/feedback`), PCU Saturation Index, SSE stream, Cloudflare R2 storage integration. |
+| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n-seg FP16 | `8000` | `inference worker` | High-throughput vehicle detection & road water segmentation (`POST /predict`), Dual-Layer Physical Triangulation (Layer 1 surface water ratio, Layer 2 motorcycle wheel submersion), `GET /healthz` healthchecks (< 38.5ms latency). |
 | **Storage & Edge CDN** | Cloudflare R2, AWS Signature V4 | `443` | Cloudflare Edge (`file.529studio.site`) | S3-compatible snapshot proof repository (`warded-proofs`), Vietnam ICT (`UTC+7`) key hierarchy (`YYYY-MM-DD/<camera_id>/<unix_ts>_<reason>.jpg`). |
 
 ### Tech Stack & Core Libraries
@@ -246,7 +247,7 @@ make dev-all
 
 | Parameter | Configuration | Description |
 |---|---|---|
-| **Host Worker** | `dev-box` (Portainer Endpoint 4) | Dedicated multi-core host with Tailscale mesh networking |
+| **Host Worker** | `inference worker` | Dedicated multi-core host with private mesh VPN |
 | **Model Runtime** | Intel OpenVINO 2024.4 IR | Optimized FP16 vehicle detection engine (~6.3 MB) |
 | **Input Resolution** | 416x416 (with letterbox preprocessing & NMS) | Low-latency inference geometry with aspect ratio preservation and box deduplication |
 | **Resource Caps** | 2 vCPU / 2 GB RAM | Resource limits configured via Docker Compose stack |
@@ -255,8 +256,7 @@ make dev-all
 #### Operational Verification: Staging Telegram Flood Alerts
 
 Before enabling public subscriptions, verify live alert delivery on the staging
-stack (Portainer Stack 14) with the pre-flight script and follow the runbook at
-[`docs/runbooks/telegram_staging_verification.md`](docs/runbooks/telegram_staging_verification.md):
+stack with the pre-flight script:
 
 ```bash
 # Credentials are read from environment variables or the gitignored .env (never hardcoded)
@@ -356,11 +356,11 @@ make dev-all
 
 | Dịch vụ | Công nghệ | Cổng | Node & Máy chủ | Vai trò chính |
 |---|---|:---:|---|---|
-| **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `homesrv` (Portainer Endpoint 3) | Trực quan hóa bản đồ, điểm tròn camera, H3 hex overlay, dock ghim camera, giao diện song ngữ (`vi` / `en`). |
-| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `homesrv` (Portainer Endpoint 3) | Proxy cache snapshot (15s TTL), điều phối Hot Set (chu kỳ 30s), lưu trữ phản ánh ngập từ cộng đồng (`internal/feedback`), tính chỉ số bão hòa PCU, luồng SSE, tích hợp lưu trữ Cloudflare R2. |
-| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n-seg FP16 | `8000` | `dev-box` (Portainer Endpoint 4) | Nhận diện phương tiện thông lượng cao và phân đoạn ngập nước mặt đường (`POST /predict`), phân tầng vật lý 2 lớp (Layer 1 tỷ lệ nước mặt đường, Layer 2 độ ngập bánh xe máy), kiểm tra sức khỏe `GET /healthz` (< 38.5ms latency). |
-| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `homesrv` (Portainer Endpoint 3) | Proxy cache snapshot (15s TTL), điều phối Hot Set (chu kỳ 30s), lưu trữ và cầu nối phản ánh ngập cộng đồng thời gian thực (`internal/feedback` sang SSE & Hex Aggregator), tính chỉ số bão hòa PCU, luồng SSE, tích hợp lưu trữ Cloudflare R2. |
-| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n FP16 | `8000` | `dev-box` (Portainer Endpoint 4) | Nhận diện phương tiện thông lượng cao (`POST /predict`), phân loại đếm xe, kiểm tra sức khỏe `GET /healthz` (24 FPS, ~18.2ms latency). |
+| **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `edge host` | Trực quan hóa bản đồ, điểm tròn camera, H3 hex overlay, dock ghim camera, giao diện song ngữ (`vi` / `en`). |
+| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` | Proxy cache snapshot (15s TTL), điều phối Hot Set (chu kỳ 30s), lưu trữ phản ánh ngập từ cộng đồng (`internal/feedback`), tính chỉ số bão hòa PCU, luồng SSE, tích hợp lưu trữ Cloudflare R2. |
+| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n-seg FP16 | `8000` | `inference worker` | Nhận diện phương tiện thông lượng cao và phân đoạn ngập nước mặt đường (`POST /predict`), phân tầng vật lý 2 lớp (Layer 1 tỷ lệ nước mặt đường, Layer 2 độ ngập bánh xe máy), kiểm tra sức khỏe `GET /healthz` (< 38.5ms latency). |
+| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` | Proxy cache snapshot (15s TTL), điều phối Hot Set (chu kỳ 30s), lưu trữ và cầu nối phản ánh ngập cộng đồng thời gian thực (`internal/feedback` sang SSE & Hex Aggregator), tính chỉ số bão hòa PCU, luồng SSE, tích hợp lưu trữ Cloudflare R2. |
+| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n FP16 | `8000` | `inference worker` | Nhận diện phương tiện thông lượng cao (`POST /predict`), phân loại đếm xe, kiểm tra sức khỏe `GET /healthz` (24 FPS, ~18.2ms latency). |
 | **Lưu trữ & Edge CDN** | Cloudflare R2, AWS Signature V4 | `443` | Cloudflare Edge (`file.529studio.site`) | Lưu trữ ảnh chụp bằng chứng giao thông (`warded-proofs`), phân cấp ngày theo giờ Việt Nam ICT (`UTC+7`, `YYYY-MM-DD/<camera_id>/<unix_ts>_<reason>.jpg`). |
 
 ## Công nghệ cốt lõi (Tech Stack)
@@ -403,7 +403,7 @@ make dev-all
 
 | Thông số | Giá trị triển khai | Diễn giải |
 |---|---|---|
-| **Máy chủ Host** | `dev-box` (Portainer Endpoint 4) | Máy chủ phần cứng độc lập, kết nối mạng nội bộ an toàn qua Tailscale mesh |
+| **Máy chủ Host** | `inference worker` | Máy chủ phần cứng độc lập, kết nối mạng nội bộ an toàn qua private mesh VPN mesh |
 | **Engine thực thi** | Intel OpenVINO 2024.4 IR | Runtime tối ưu hóa FP16 suy luận trên CPU cho kiến trúc YOLOv8n (~6.3 MB) |
 | **Kích thước ảnh** | 416x416 (kèm tiền xử lý letterbox & NMS) | Cân bằng giữa bảo toàn tỷ lệ khung hình, chống trùng lặp hộp nhận diện và độ trễ thấp |
 | **Giới hạn tài nguyên** | 2 vCPU / 2 GB RAM | Mức trần tài nguyên cấu hình qua Docker Compose stack |
@@ -412,8 +412,7 @@ make dev-all
 ### Kiểm chứng vận hành: cảnh báo ngập Telegram trên Staging
 
 Trước khi mở đăng ký cảnh báo công khai, cần kiểm chứng phát cảnh báo live trên
-staging (Portainer Stack 14) bằng script pre-flight và tuân theo runbook
-[`docs/runbooks/telegram_staging_verification.md`](docs/runbooks/telegram_staging_verification.md):
+staging bằng script pre-flight:
 
 ```bash
 # Thông tin xác thực chỉ đọc từ biến môi trường hoặc file .env (không bao giờ hardcode)
@@ -432,5 +431,5 @@ spam trượt 30 phút và che giấu token được xác thực tất định b
 - [`docs/ADR-009-zero-vlm-flood-segmentation.md`](docs/ADR-009-zero-vlm-flood-segmentation.md) — đặc tả kỹ thuật phân đoạn ảnh ngập nước on-premise, benchmark OpenVINO và phân tầng vật lý 2 lớp (Zero-VLM).
 
 ## Vì sao chuyển sang Go?
-Không phải vì lưu lượng hiện tại đã vượt ngưỡng (chưa vượt), mà vì các thành phần mới cần xây (Hot Set Scheduler, Notification Adapter, state store, R2 object storage) hợp với goroutine/channel hơn, và rủi ro viết mới bằng Go thấp hơn nhiều so với việc viết lại `server.js` đang chạy ổn. Phần suy luận mô hình CV (YOLO/ONNX/OpenVINO, xử lý ảnh nặng) được đưa lên node phần cứng `dev-box` riêng biệt để bảo toàn CPU cho máy chủ web và backend.
+Không phải vì lưu lượng hiện tại đã vượt ngưỡng (chưa vượt), mà vì các thành phần mới cần xây (Hot Set Scheduler, Notification Adapter, state store, R2 object storage) hợp với goroutine/channel hơn, và rủi ro viết mới bằng Go thấp hơn nhiều so với việc viết lại `server.js` đang chạy ổn. Phần suy luận mô hình CV (YOLO/ONNX/OpenVINO, xử lý ảnh nặng) được đưa lên node phần cứng `inference worker` riêng biệt để bảo toàn CPU cho máy chủ web và backend.
 

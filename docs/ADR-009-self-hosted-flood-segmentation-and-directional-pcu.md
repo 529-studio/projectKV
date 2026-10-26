@@ -15,7 +15,7 @@ Post-Sprint 6 architectural audits, empirical D6 real-world evaluations, and dev
 1. **The Runtime VLM Dilemma**:
    - Initial experimental prototypes explored cloud Vision Language Models (VLM) for zero-shot flood verification in modal views.
    - **Constraint**: Cloud VLM APIs incur unpredictable per-request latency (1.5s - 4.0s), rate-limit throttling (10 RPM / 300 RPD), per-call financial costs, and external network dependencies. For a city-wide system monitoring 800+ cameras with 30s polling intervals, cloud VLM calls are structurally infeasible at production scale.
-   - **Decision**: The runtime telemetry system will **never** call external VLM or Gemini APIs. All inference must execute strictly locally or on dedicated self-hosted nodes (`dev-box` worker) using CPU-optimized open-source runtimes (Intel OpenVINO).
+   - **Decision**: The runtime telemetry system will **never** call external VLM or Gemini APIs. All inference must execute strictly locally or on dedicated self-hosted nodes (`inference worker` worker) using CPU-optimized open-source runtimes (Intel OpenVINO).
 
 2. **The Directional Congestion Paradox (The Two-Way Road Flaw)**:
    - On major dual-carriageway boulevards (e.g., Võ Văn Kiệt, Mai Chí Thọ, Điện Biên Phủ), morning rush-hour traffic moving inbound toward District 1 is frequently in complete breakdown (`CONGESTED`), while outbound lanes toward Thủ Đức or Bình Chánh are completely clear (`CLEAR`).
@@ -58,7 +58,7 @@ For flood detection, the system transitions from synthetic corridor heuristics t
    - If $0.05 \le R_{\text{water}} < 0.25$: `SHALLOW` (localized pooling, tire base submerged $<10\text{ cm}$).
    - If $R_{\text{water}} \ge 0.25$ with vehicle wheel intersection: `DEEP` ($>15-20\text{ cm}$).
 3. **Execution Runtime**:
-   - Runs on the existing `dev-box` node (2 vCPU / 2 GB RAM capped) at $>20\text{ FPS}$ with $<30\text{ ms}$ latency per frame, fully decoupling from cloud APIs.
+   - Runs on the existing `inference worker` node (2 vCPU / 2 GB RAM capped) at $>20\text{ FPS}$ with $<30\text{ ms}$ latency per frame, fully decoupling from cloud APIs.
 
 > [!NOTE]
 > For the comprehensive model selection benchmarks (YOLOv8n-seg vs BiSeNet v2 vs SegFormer-B0), compute budget profiling (< 80ms on AMD Ryzen 7 6800HS), training dataset acquisition protocols, and dual-layer physical triangulation mathematics, see [`docs/ADR-009-zero-vlm-flood-segmentation.md`](ADR-009-zero-vlm-flood-segmentation.md) (Issue #254, S7-T9).
@@ -104,7 +104,7 @@ flowchart TD
         ScopeSelector --> FrameFetcher["Concurrent Snapshot Fetcher<br/>(DOT Portal Upstream)"]
         FrameFetcher --> JPEGCheck{"Valid JPEG SOI<br/>& Size >= 20KB?"}
         JPEGCheck -- No --> Drop["Discard corrupted / placeholder frame"]
-        JPEGCheck -- Yes --> OpenVINO["Self-Hosted OpenVINO Predictor<br/>(POST /predict on dev-box)"]
+        JPEGCheck -- Yes --> OpenVINO["Self-Hosted OpenVINO Predictor<br/>(POST /predict on inference worker)"]
         
         OpenVINO --> PCU["Directional PCU Saturation Engine<br/>(Inbound vs Outbound Corridor Capacity)"]
         OpenVINO --> Waterline["Physical Waterline Depth Mapper<br/>(dry / wet_asphalt / tire_base_under_10cm)"]
