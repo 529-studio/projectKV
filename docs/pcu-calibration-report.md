@@ -1,7 +1,7 @@
 # PCU Weights & Saturation Thresholds Calibration Report
 
 - **Issue**: [#196](https://github.com/529-studio/projectKV/issues/196) (Sprint 4 T5)
-- **Related ADR**: [ADR-005](file:///Users/thanhdatvu/repos/projectKV/docs/ADR-005-sprint3-audit-and-sprint4-plan.md) (§2 Finding C, Finding D, §6 row T5)
+- **Related ADR**: ADR-005 (§2 Finding C, Finding D, §6 row T5)
 - **Status**: Completed
 - **Date**: 2026-10-09
 - **Author**: Antigravity AI & `@thdat-vu`
@@ -21,7 +21,7 @@ Prior to this calibration, the Passenger Car Unit (PCU) calculation formula in `
 - `Heavy Threshold`: 0.70
 - `Congested Threshold`: 0.90
 
-During the Sprint 4 T4 benchmark ([Issue #195](https://github.com/529-studio/projectKV/issues/195) / [eval_report_d6_real.md](file:///Users/thanhdatvu/repos/projectKV/docs/reports/eval_report_d6_real.md)), evaluation across 764 real labeled frames revealed severe classification distortion:
+During the Sprint 4 T4 benchmark ([Issue #195](https://github.com/529-studio/projectKV/issues/195) / [eval_report_d6_real.md](../docs/reports/eval_report_d6_real.md)), evaluation across 764 real labeled frames revealed severe classification distortion:
 1. **Uncalibrated Capacity Floor Distortion**: A fixed camera viewport at 320x320 resolution captures an instantaneous 20–30 meter road segment, physically accommodating at most 12–16 PCU before bumper-to-bumper queue lock. A cold-start capacity floor of `25.0` required unrealistically high vehicle volumes (>17.5 PCU for `HEAVY`, >22.5 PCU for `CONGESTED`), causing 94.4% of actual `HEAVY` frames and 94.5% of `CONGESTED` frames to be misclassified as `CLEAR`.
 2. **Vietnamese Traffic Engineering Discrepancy**: The Western default weight of 0.20 for motorcycles assumed disciplined single-file lane alignment. In Ho Chi Minh City's mixed urban traffic, motorcycles operate 3–4 abreast per lane, filtering through gaps, swerving, and generating significant lateral clearance friction. Under Vietnamese standards (**TCVN 4054:2005** and **TCVN 13592:2022**), motorcycle equivalents range from 0.25 to 0.33, and urban buses require 2.50 to reflect boarding dwell delays and multi-lane blockage.
 
@@ -37,7 +37,7 @@ This calibration updates the default constants in `services/go-server/internal/c
 | **`PCU_WEIGHT_CAR`** | `1.00` | **`1.00`** | Reference Passenger Car Unit (baseline standard) |
 | **`PCU_WEIGHT_BUS`** | `2.00` | **`2.50`** | TCVN urban bus coefficient accounting for transit dwell stops, acceleration lag, and physical blind spots |
 | **`PCU_WEIGHT_TRUCK`** | `2.00` | **`2.00`** | Standard medium/heavy commercial vehicle (unchanged) |
-| **`PCU_WEIGHT_CONTAINER`** | `2.00` | **`2.00`** | Folded into Truck per ADR-005 T6 ([decision-container-class-gap.md](file:///Users/thanhdatvu/repos/projectKV/docs/decision-container-class-gap.md)) |
+| **`PCU_WEIGHT_CONTAINER`** | `2.00` | **`2.00`** | Folded into Truck per ADR-005 T6 ([decision-container-class-gap.md](../docs/decision-container-class-gap.md)) |
 | **`PCU_CAPACITY_FLOOR`** | `25.0` | **`15.0`** | Instantaneous physical queue capacity of a 20–30m CCTV viewport (3 lanes x 4–5 queue vehicles) |
 | **`PCU_THRESHOLD_MODERATE`** | `0.35` | **`0.30`** | LOS C/D boundary: noticeable platoon queuing clearing within one green signal cycle (~4.5 PCU) |
 | **`PCU_THRESHOLD_HEAVY`** | `0.70` | **`0.60`** | LOS E boundary: unstable flow, stop-and-go waves, approach saturation (~9.0 PCU) |
@@ -107,7 +107,7 @@ PCU_THRESHOLD_HEAVY=0.60
 PCU_THRESHOLD_CONGESTED=0.80
 ```
 
-Unit test [`TestLoadConfig_PCU_Custom`](file:///Users/thanhdatvu/repos/projectKV/services/go-server/internal/config/config_test.go#L365-L415) rigorously validates that all custom environment variables override the defaults.
+Unit test [`TestLoadConfig_PCU_Custom`](../services/go-server/internal/config/config_test.go#L365-L415) rigorously validates that all custom environment variables override the defaults.
 
 ---
 

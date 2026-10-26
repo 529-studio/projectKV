@@ -2,7 +2,7 @@
 
 - **Generated At**: `2026-10-01T16:22:03.810127+00:00`
 - **Analyzer**: `mock` (`mock-dev-engine`)
-- **Evaluation Dataset**: `5` labeled frames from `/Users/thanhdatvu/repos/projectKV/tools/eval/labels`
+- **Evaluation Dataset**: `5` labeled frames from `../../../tools/eval/labels`
 
 ## 1. Executive Summary & Accuracy Gate
 

@@ -140,7 +140,7 @@ Hosted should remain a fallback, not the primary design.
 
 **Adopt Valhalla self-hosted** for the route-check engine.
 
-Run the engine as a separate container/service on the home server (`local-homesrv`), not inside the 256 MB `warded-stg` container. Tiles can be pre-built on a faster machine (e.g., the M3 Mac used in this spike) and copied to the server, because Valhalla tiles are architecture-independent serialized data.
+Run the engine as a separate container/service on the home server (`local edge host`), not inside the 256 MB `warded-stg` container. Tiles can be pre-built on a faster machine (e.g., the M3 Mac used in this spike) and copied to the server, because Valhalla tiles are architecture-independent serialized data.
 
 ## Reproducible Commands
 
@@ -193,7 +193,7 @@ curl -s "http://localhost:5001/route/v1/driving/106.698,10.772;106.699,10.780"
 
 1. Define the `route.Engine` Go interface in `services/go-server/internal/route/` (swappable adapter for Valhalla, OSRM, hosted).
 2. Integrate Valhalla HTTP calls into the route-check handler (2b): A→B polyline → camera matching (D3) → worst-of verdict coloring.
-3. Build a CI step or script that pre-builds Valhalla tiles from `cameras_enriched.json` bbox and ships them to `local-homesrv`.
+3. Build a CI step or script that pre-builds Valhalla tiles from `cameras_enriched.json` bbox and ships them to `local edge host`.
 4. Re-verify `exclude_polygons` after every Valhalla image upgrade.
 5. Monitor Valhalla memory under concurrent route requests; if it grows close to 256 MB, move the engine to a dedicated container with ≥512 MB.
 

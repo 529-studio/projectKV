@@ -1,5 +1,5 @@
 ; FIO Storm-Burst Benchmark Job File
-; Simulates concurrent disk I/O contention on local-homesrv (5400RPM HDD)
+; Simulates concurrent disk I/O contention on local edge host (5400RPM HDD)
 ; Multi-tenant workload: Archiver + SQLite WAL + Valhalla Tiles + CV Worker
 
 [global]

@@ -31,7 +31,7 @@ The root causes of this failure are structural and cannot be mitigated by retrie
 ### 1.2. Architectural Decision
 
 ProjectKV formally adopts a **Zero-VLM On-Premise Computer Vision Architecture**:
-- All runtime flood perception, vehicle counting, and environmental assessments execute strictly on local infrastructure (`dev-box` worker node).
+- All runtime flood perception, vehicle counting, and environmental assessments execute strictly on local infrastructure (`inference worker` worker node).
 - Zero requests are dispatched to external cloud vision APIs during live operations.
 - The computer vision subsystem transitions from qualitative image-level heuristics to a **Dual-Layer Physical Triangulation Pipeline**:
   - **Layer 1 (Surface Water Segmentation)**: Deep semantic segmentation of standing water accumulation across the drivable roadway surface.
@@ -41,7 +41,7 @@ ProjectKV formally adopts a **Zero-VLM On-Premise Computer Vision Architecture**
 
 ## 2. Model Selection & Benchmark Evaluation Matrix
 
-To identify the optimal on-premise segmentation architecture, three state-of-the-art edge vision models were benchmarked under identical deployment constraints on the `dev-box` host:
+To identify the optimal on-premise segmentation architecture, three state-of-the-art edge vision models were benchmarked under identical deployment constraints on the `inference worker` host:
 1. **YOLOv8n-seg** (Ultralytics multitask anchor-free CNN).
 2. **BiSeNet v2** (Bilateral Segmentation Network with two-branch spatial/context CNN).
 3. **SegFormer-B0** (Lightweight Hierarchical Vision Transformer with MiT-B0 encoder).
@@ -111,11 +111,11 @@ Benchmarks were evaluated on an isolated container allocation matching the produ
 
 ---
 
-## 3. Compute Budget & Headroom Analysis (`dev-box`)
+## 3. Compute Budget & Headroom Analysis (`inference worker`)
 
 ### 3.1. Hardware Profile & Container Allocation
 
-The target deployment host is the dedicated `dev-box` worker instance running Docker/Podman:
+The target deployment host is the dedicated `inference worker` worker instance running Docker/Podman:
 - **CPU**: AMD Ryzen 7 6800HS with Radeon 680M Graphics (8 Cores, 16 Threads).
 - **Instruction Sets**: x86-64-v3, AVX2, FMA3, BMI1, BMI2, VNNI (Vector Neural Network Instructions).
 - **Container Limit**: `--cpus="2.0" --memory="2048m"`.
@@ -389,7 +389,7 @@ If a legacy vehicle-only model (`yolov8n.xml`) is mounted in `MODEL_DIR`, `flood
 |---|---|---|:---:|
 | **M1: Dataset Annotation** | Curate and polygon-annotate 500 rain frames from R2 `warded-proofs/` using Web Labeler | `apps/web/labeler` + `tools/eval` | 12 hours |
 | **M2: Transfer Learning** | Fine-tune YOLOv8n-seg on Cityscapes water subset + local CCTV dataset | `tools/train` | 16 hours |
-| **M3: OpenVINO Quantization** | Export FP16 IR, calibrate INT8 with NNCF, benchmark latency on `dev-box` | `services/cv-engine` | 8 hours |
+| **M3: OpenVINO Quantization** | Export FP16 IR, calibrate INT8 with NNCF, benchmark latency on `inference worker` | `services/cv-engine` | 8 hours |
 | **M4: Microservice Integration** | Update `server.py` to parse segmentation prototypes and evaluate Layer 1/2 heuristics | `services/cv-engine` | 8 hours |
 | **M5: End-to-End Verification** | Validate against 207 gold-standard frames and execute live rain test on staging | `services/go-server` + Ops | 8 hours |
 
@@ -397,7 +397,7 @@ If a legacy vehicle-only model (`yolov8n.xml`) is mounted in `MODEL_DIR`, `flood
 
 ## 8. Living Documentation & References
 
-- **Lesson 37**: *Data Labeling Paradigms, Why Frame-Diff Fails in Outdoor Surveillance, and Zero-VLM Flood Detection* (`docs/lesson_learn.md`).
+- **Lesson 37**: *Data Labeling Paradigms, Why Frame-Diff Fails in Outdoor Surveillance, and Zero-VLM Flood Detection*.
 - **ADR-009 Revision**: *Self-Hosted Flood Segmentation, Directional Multi-Lane PCU & Continuous Data Flywheel* (`docs/ADR-009-self-hosted-flood-segmentation-and-directional-pcu.md`).
 - **OpenVINO Runtime Baseline**: *Standalone Computer Vision Inference Microservice* (`services/cv-engine/server.py`).
 - **Autonomous Rain Harvester**: *Dual-Trigger Poller & Cloudflare R2 Archiver* (`services/go-server/internal/harvester/`).

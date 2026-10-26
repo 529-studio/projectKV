@@ -269,11 +269,11 @@ Based on the empirical evidence gathered in this audit, five concrete, sound tec
 ### Proposal 3: Input Resolution Upgrade to 416x416
 - **Location**: `services/cv-engine/` (Model export and runtime configuration).
 - **Action**: Export YOLOv8n OpenVINO IR model at input shape `[1, 3, 416, 416]` (or dynamic input shape `[1, 3, -1, -1]`).
-- **Hardware Viability on `dev-box` (Endpoint 4)**:
-  - Benchmark on `dev-box` (AMD Ryzen 7 6800HS, 8 vCPU):
+- **Hardware Viability on `inference worker` (Endpoint 4)**:
+  - Benchmark on `inference worker` (AMD Ryzen 7 6800HS, 8 vCPU):
     - At $320 \times 320$: $18.2\text{ms}$ latency, $24.01\text{ FPS}$.
     - At $416 \times 416$: estimated $28 - 35\text{ms}$ latency, $\approx 15 - 18\text{ FPS}$.
-  - Polling 57 hotset cameras every 30 seconds requires only $1.90\text{ FPS}$, which leaves $> 80\%$ idle compute headroom on `dev-box`.
+  - Polling 57 hotset cameras every 30 seconds requires only $1.90\text{ FPS}$, which leaves $> 80\%$ idle compute headroom on `inference worker`.
 - **Impact**: Resolves small-object blindness in midground and background queues, increasing distant queue detection on congested corridors.
 
 ### Proposal 4: Cross-Class Non-Maximum Suppression for Heavy Commercial Vehicles
