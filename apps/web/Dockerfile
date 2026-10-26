@@ -1,6 +1,8 @@
 # Stage 1: Build Frontend (Next.js Static Export)
 FROM node:20-alpine AS builder
 
+RUN apk update && apk upgrade --no-cache
+
 WORKDIR /app/web
 
 # Cache NPM dependencies
@@ -13,6 +15,8 @@ RUN npm run build
 
 # Stage 2: Production Nginx Server
 FROM nginx:1.27-alpine
+
+RUN apk update && apk upgrade --no-cache
 
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/web/out /usr/share/nginx/html
