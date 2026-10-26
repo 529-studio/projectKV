@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -227,5 +228,101 @@ func TestCVEngineAnalyzer_Analyze_SetsUserAgentHeader(t *testing.T) {
 	const expectedUA = "Mozilla/5.0 (compatible; CameraViewProxy/1.0)"
 	if capturedUA != expectedUA {
 		t.Errorf("expected User-Agent %q on snapshot fetch, got %q", expectedUA, capturedUA)
+	}
+}
+
+// newFlakyPredictServer serves a normal snapshot and, on /predict, closes the
+// connection for the first failCount requests to simulate the inference worker
+// being replaced mid-deploy. Requests after that succeed.
+func newFlakyPredictServer(t *testing.T, failCount int32) (*httptest.Server, *int32) {
+	t.Helper()
+	var attempts int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/snapshot/") {
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("\xff\xd8\xff\xe0minimal-jpeg"))
+			return
+		}
+		if atomic.AddInt32(&attempts, 1) <= failCount {
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				t.Errorf("response writer does not support hijacking")
+				return
+			}
+			conn, _, err := hj.Hijack()
+			if err != nil {
+				t.Errorf("hijack failed: %v", err)
+				return
+			}
+			_ = conn.Close()
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"traffic_severity":"LOW","confidence":0.72,"vehicles_detected":3,"latency_ms":5,"model":"test"}`)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &attempts
+}
+
+// TestCVEngineAnalyzer_RetriesTransientPredictFailure verifies that a socket
+// closed by the inference worker is retried instead of failing the frame.
+func TestCVEngineAnalyzer_RetriesTransientPredictFailure(t *testing.T) {
+	srv, attempts := newFlakyPredictServer(t, 2)
+	analyzer := NewCVEngineAnalyzer(srv.URL, srv.Client(), WithPredictRetry(3, time.Millisecond))
+
+	cam := hotset.Camera{ID: "cam-retry", SnapshotURL: srv.URL + "/snapshot/cam-retry.jpg"}
+	v, err := analyzer.Analyze(context.Background(), cam)
+	if err != nil {
+		t.Fatalf("expected success after retries, got: %v", err)
+	}
+	if got := atomic.LoadInt32(attempts); got != 3 {
+		t.Fatalf("expected 3 predict attempts, got %d", got)
+	}
+	if v.CameraID != cam.ID {
+		t.Errorf("expected camera %q, got %q", cam.ID, v.CameraID)
+	}
+}
+
+// TestCVEngineAnalyzer_StopsAfterMaxAttempts verifies the retry budget is honoured
+// and the caller still receives a typed UNKNOWN verdict.
+func TestCVEngineAnalyzer_StopsAfterMaxAttempts(t *testing.T) {
+	srv, attempts := newFlakyPredictServer(t, 99)
+	analyzer := NewCVEngineAnalyzer(srv.URL, srv.Client(), WithPredictRetry(2, time.Millisecond))
+
+	cam := hotset.Camera{ID: "cam-down", SnapshotURL: srv.URL + "/snapshot/cam-down.jpg"}
+	v, err := analyzer.Analyze(context.Background(), cam)
+	if err == nil {
+		t.Fatal("expected an error when every attempt fails")
+	}
+	if got := atomic.LoadInt32(attempts); got != 2 {
+		t.Fatalf("expected 2 predict attempts, got %d", got)
+	}
+	if v.Severity != hotset.SeverityUnknown || v.CameraID != cam.ID {
+		t.Errorf("expected UNKNOWN verdict for %q, got %+v", cam.ID, v)
+	}
+}
+
+// TestCVEngineAnalyzer_DoesNotRetryOnStandby verifies HTTP responses are never
+// retried: a 503 means no model is loaded, which retrying cannot fix.
+func TestCVEngineAnalyzer_DoesNotRetryOnStandby(t *testing.T) {
+	var attempts int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/snapshot/") {
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("\xff\xd8\xff\xe0minimal-jpeg"))
+			return
+		}
+		atomic.AddInt32(&attempts, 1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(srv.Close)
+
+	analyzer := NewCVEngineAnalyzer(srv.URL, srv.Client(), WithPredictRetry(4, time.Millisecond))
+	cam := hotset.Camera{ID: "cam-standby", SnapshotURL: srv.URL + "/snapshot/cam-standby.jpg"}
+	if _, err := analyzer.Analyze(context.Background(), cam); err == nil {
+		t.Fatal("expected standby error")
+	}
+	if got := atomic.LoadInt32(&attempts); got != 1 {
+		t.Fatalf("expected exactly 1 predict attempt on HTTP 503, got %d", got)
 	}
 }

@@ -255,6 +255,7 @@ jobs:
           STACK_CV_ID: ${{ secrets.PORTAINER_STACK_CV }}
           EP_EDGE_ID: ${{ secrets.PORTAINER_ENDPOINT_HOMESRV }}
           EP_WORKER_ID: ${{ secrets.PORTAINER_ENDPOINT_DEVBOX }}
+          CV_CONTAINER_NAME: ${{ secrets.PORTAINER_CV_CONTAINER_NAME }}
           CV_ENGINE_URL: ${{ secrets.CV_ENGINE_URL }}
         run: |
           if [ -z "${PORTAINER_KEY}" ] || [ -z "${PORTAINER_URL}" ]; then
@@ -262,41 +263,12 @@ jobs:
             exit 0
           fi
 
-          # Step A: Redeploy the application stack on the edge host
-          if [ "${{ needs.detect-changes.outputs.backend }}" = "true" ] || [ "${{ needs.detect-changes.outputs.frontend }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Triggering staging application stack redeploy..."
-            STACK_RES=$(curl -sS -f -X GET "${PORTAINER_URL}/api/stacks/${STACK_APP_ID}" \
-              -H "X-API-Key: ${PORTAINER_KEY}" \
-              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
-              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
-              -H "User-Agent: Mozilla/5.0")
+          # Order matters. The inference worker is restarted before the backend:
+          # the backend starts its analysis loop immediately, so restarting the
+          # worker first and waiting for it to report healthy removes the window
+          # where the whole hot set is briefly marked UNKNOWN.
 
-            STACK_FILE=$(cat docker-compose.stg.yml)
-            if [ -z "${CV_ENGINE_URL}" ]; then
-              echo "CV_ENGINE_URL is not configured — refusing to redeploy the application stack."
-              exit 1
-            fi
-            ENV_JSON=$(echo "$STACK_RES" | jq --arg url "${CV_ENGINE_URL}" '
-              (.Env // []) | map(select(.name != "CV_ENGINE_URL")) + [{"name": "CV_ENGINE_URL", "value": $url}]
-            ')
-
-            PAYLOAD=$(jq -n \
-              --arg file "$STACK_FILE" \
-              --argjson env "$ENV_JSON" \
-              '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
-
-            curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/${STACK_APP_ID}?endpointId=${EP_EDGE_ID}" \
-              -H "X-API-Key: ${PORTAINER_KEY}" \
-              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
-              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
-              -H "Content-Type: application/json" \
-              -H "User-Agent: Mozilla/5.0" \
-              -d "$PAYLOAD"
-
-            echo "Application stack redeployed successfully."
-          fi
-
-          # Step B: Redeploy the model inference stack on the worker host
+          # Step A: Redeploy the model inference stack on the worker host
           if [ "${{ needs.detect-changes.outputs.model }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "Checking worker host availability..."
             DEVBOX_STATUS=$(curl -sS -m 8 "${PORTAINER_URL}/api/endpoints/${EP_WORKER_ID}" \
@@ -330,10 +302,71 @@ jobs:
                 -d "$PAYLOAD"
 
               echo "Model inference stack redeployed successfully."
+
+              # Gate: wait for the inference container to report healthy so the
+              # backend never starts while the predict endpoint is still down.
+              if [ -n "${CV_CONTAINER_NAME}" ]; then
+                echo "Waiting for ${CV_CONTAINER_NAME} to report healthy (max 120s)..."
+                for i in $(seq 1 24); do
+                  HEALTH=$(curl -sS -m 10 "${PORTAINER_URL}/api/endpoints/${EP_WORKER_ID}/docker/containers/${CV_CONTAINER_NAME}/json" \
+                    -H "X-API-Key: ${PORTAINER_KEY}" \
+                    -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+                    -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+                    -H "User-Agent: Mozilla/5.0" 2>/dev/null \
+                    | jq -r '.State.Health.Status // .State.Status // "unknown"' 2>/dev/null || echo "unknown")
+                  echo "  attempt ${i}: ${HEALTH}"
+                  if [ "${HEALTH}" = "healthy" ] || [ "${HEALTH}" = "running" ]; then
+                    break
+                  fi
+                  sleep 5
+                done
+                if [ "${HEALTH}" = "healthy" ] || [ "${HEALTH}" = "running" ]; then
+                  echo "Inference container is ${HEALTH}."
+                else
+                  echo "[WARN] Inference container did not become healthy within 120s (last state: ${HEALTH})."
+                  echo "Continuing with the application redeploy; the backend falls back to the cloud analyzer for degraded cameras."
+                fi
+              else
+                echo "[INFO] PORTAINER_CV_CONTAINER_NAME is not configured — skipping the worker health gate."
+              fi
             else
               echo "[WARN] Worker host is currently unreachable/offline (Status: ${DEVBOX_STATUS})."
               echo "Skipping model stack redeployment. The edge host continues serving with the fallback path."
             fi
+          fi
+
+          # Step B: Redeploy the application stack on the edge host
+          if [ "${{ needs.detect-changes.outputs.backend }}" = "true" ] || [ "${{ needs.detect-changes.outputs.frontend }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Triggering staging application stack redeploy..."
+            STACK_RES=$(curl -sS -f -X GET "${PORTAINER_URL}/api/stacks/${STACK_APP_ID}" \
+              -H "X-API-Key: ${PORTAINER_KEY}" \
+              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+              -H "User-Agent: Mozilla/5.0")
+
+            STACK_FILE=$(cat docker-compose.stg.yml)
+            if [ -z "${CV_ENGINE_URL}" ]; then
+              echo "CV_ENGINE_URL is not configured — refusing to redeploy the application stack."
+              exit 1
+            fi
+            ENV_JSON=$(echo "$STACK_RES" | jq --arg url "${CV_ENGINE_URL}" '
+              (.Env // []) | map(select(.name != "CV_ENGINE_URL")) + [{"name": "CV_ENGINE_URL", "value": $url}]
+            ')
+
+            PAYLOAD=$(jq -n \
+              --arg file "$STACK_FILE" \
+              --argjson env "$ENV_JSON" \
+              '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
+
+            curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/${STACK_APP_ID}?endpointId=${EP_EDGE_ID}" \
+              -H "X-API-Key: ${PORTAINER_KEY}" \
+              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+              -H "Content-Type: application/json" \
+              -H "User-Agent: Mozilla/5.0" \
+              -d "$PAYLOAD"
+
+            echo "Application stack redeployed successfully."
           fi
 
       - name: Verify Post-Deploy Health
