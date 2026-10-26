@@ -19,7 +19,7 @@
   <a href="https://www.rainviewer.com/api.html"><img src="https://img.shields.io/badge/RainViewer-Radar_API-0284C7?logo=radar&logoColor=white" alt="RainViewer"></a>
   <a href="https://www.cloudflare.com/developer-platform/r2/"><img src="https://img.shields.io/badge/Cloudflare_R2-Object_Storage-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare R2"></a>
   <a href="https://python.org/"><img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Proprietary-yellow" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue" alt="License"></a>
 </p>
 
 [🇬🇧 English](#-english) &nbsp;•&nbsp; [🇻🇳 Tiếng Việt](#-tiếng-việt)
@@ -119,7 +119,7 @@ hcm-traffic-cameras/
 ├── cameras_all.json                   # Base traffic camera catalog dataset
 ├── cameras_enriched.json              # Enriched camera catalog with phuong_id / phuong_name
 ├── Makefile                           # Unified orchestration commands
-├── LICENSE                            # Strict proprietary, reference-only license
+├── LICENSE                            # GNU Affero General Public License v3.0
 └── README.md                          # Project documentation
 ```
 
@@ -216,7 +216,7 @@ make dev-all
 | **Cloud Storage & CDN** | [![Cloudflare R2](https://img.shields.io/badge/Cloudflare_R2-Object_Storage-F38020?logo=cloudflare&logoColor=white)](https://www.cloudflare.com/developer-platform/r2/) [![AWS SDK v2](https://img.shields.io/badge/AWS_SDK_v2-Go-FF9900?logo=amazonwebservices&logoColor=white)](https://github.com/aws/aws-sdk-go-v2) | Cloudflare R2 S3-compatible object storage (`warded-proofs`), public edge delivery (`file.529studio.site`), centralized proof snapshots repository |
 | **Computer Vision** | [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/) [![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/) [![OpenVINO](https://img.shields.io/badge/Intel_OpenVINO-Runtime-0071C5?logo=intel&logoColor=white)](https://openvino.ai/) | Python 3.11+, OpenVINO IR YOLOv8n FP16 inference, pluggable traffic congestion and flood alert analyzers |
 | **Weather & Radar APIs** | [![Open-Meteo](https://img.shields.io/badge/Open--Meteo-Weather_API-FF8C00?logo=weatherdotcom&logoColor=white)](https://open-meteo.com/) [![RainViewer](https://img.shields.io/badge/RainViewer-Radar_API-0284C7?logo=radar&logoColor=white)](https://www.rainviewer.com/api.html) | Real-time weather, temperature, humidity, rainfall metrics (Open-Meteo) and live composite weather radar precipitation tiles (RainViewer) |
-| **DevOps & Tooling** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-Proprietary-yellow)](LICENSE) [![Geo-Enrich](https://img.shields.io/badge/Geo--Enrich-Point--in--Polygon-708090?logo=python&logoColor=white)](tools/geo-enrich) | GitHub Actions CI/CD workflows, golangci-lint, ESLint, unified Makefile, batch Phường point-in-polygon enrichment |
+| **DevOps & Tooling** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](LICENSE) [![Geo-Enrich](https://img.shields.io/badge/Geo--Enrich-Point--in--Polygon-708090?logo=python&logoColor=white)](tools/geo-enrich) | GitHub Actions CI/CD workflows, golangci-lint, ESLint, unified Makefile, batch Phường point-in-polygon enrichment |
 
 ### Configuration Reference
 
@@ -272,9 +272,9 @@ debouncer and token redaction are enforced deterministically by
 ## 4. Next Evolution Steps
 
 Detailed architectural decisions are documented in:
-📄 **[`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md)** — original caching & CV roadmap
-📄 **[`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md)** — flood-alert feasibility, notification channels, and the Go backend migration decision (ADR-002)
-📄 **[`docs/ADR-009-zero-vlm-flood-segmentation.md`](docs/ADR-009-zero-vlm-flood-segmentation.md)** — self-hosted flood segmentation, OpenVINO model selection benchmarks, and dual-layer physical triangulation (Zero-VLM)
+**[`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md)** — original caching & CV roadmap
+**[`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md)** — flood-alert feasibility, notification channels, and the Go backend migration decision (ADR-002)
+**[`docs/ADR-009-zero-vlm-flood-segmentation.md`](docs/ADR-009-zero-vlm-flood-segmentation.md)** — self-hosted flood segmentation, OpenVINO model selection benchmarks, and dual-layer physical triangulation (Zero-VLM)
 
 *   **Computer Vision Integration**: Traffic congestion + flood detection via a **Pluggable Adapter** pattern (Mock ➔ Cloud Vision API ➔ Self-hosted YOLO/ONNX), orchestrated from Go, model inference in Python.
 *   **Real-Time Flood Alerting**: Zone-based subscriptions with a pluggable **Notification Adapter** — Telegram (Phase 1), Zalo OA (Phase 2), Web Push, SMS — because a rider on a motorbike cannot open a browser tab to check a map.
@@ -372,7 +372,7 @@ make dev-all
 | **Lưu trữ đám mây & CDN** | [![Cloudflare R2](https://img.shields.io/badge/Cloudflare_R2-Object_Storage-F38020?logo=cloudflare&logoColor=white)](https://www.cloudflare.com/developer-platform/r2/) [![AWS SDK v2](https://img.shields.io/badge/AWS_SDK_v2-Go-FF9900?logo=amazonwebservices&logoColor=white)](https://github.com/aws/aws-sdk-go-v2) | Lưu trữ ảnh bằng chứng trên Cloudflare R2 (`warded-proofs`), phân phối qua Edge CDN (`file.529studio.site`), phục vụ dán nhãn tập trung cho toàn đội ngũ |
 | **Thị giác máy tính** | [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/) [![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/) [![OpenVINO](https://img.shields.io/badge/Intel_OpenVINO-Runtime-0071C5?logo=intel&logoColor=white)](https://openvino.ai/) | Python 3.11+, suy luận mô hình OpenVINO IR YOLOv8n-seg FP16, phân tích kẹt xe, phân đoạn mặt nước và phân tầng vật lý 2 lớp đo độ ngập bánh xe máy (ADR-009) |
 | **Dịch vụ Thời tiết & Radar** | [![Open-Meteo](https://img.shields.io/badge/Open--Meteo-Weather_API-FF8C00?logo=weatherdotcom&logoColor=white)](https://open-meteo.com/) [![RainViewer](https://img.shields.io/badge/RainViewer-Radar_API-0284C7?logo=radar&logoColor=white)](https://www.rainviewer.com/api.html) | Dữ liệu khí tượng, nhiệt độ, lượng mưa thời gian thực (Open-Meteo) và tile ảnh radar phản hồi mưa trực tiếp (RainViewer) |
-| **DevOps & Công cụ** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-Proprietary-yellow)](LICENSE) [![Geo-Enrich](https://img.shields.io/badge/Geo--Enrich-Point--in--Polygon-708090?logo=python&logoColor=white)](tools/geo-enrich) | CI/CD GitHub Actions, golangci-lint, ESLint, Makefile điều phối tập trung, công cụ gán Phường point-in-polygon |
+| **DevOps & Công cụ** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](LICENSE) [![Geo-Enrich](https://img.shields.io/badge/Geo--Enrich-Point--in--Polygon-708090?logo=python&logoColor=white)](tools/geo-enrich) | CI/CD GitHub Actions, golangci-lint, ESLint, Makefile điều phối tập trung, công cụ gán Phường point-in-polygon |
 
 ### Bảng Thông Số Cấu Hình Dịch Vụ
 
@@ -433,3 +433,29 @@ spam trượt 30 phút và che giấu token được xác thực tất định b
 ## Vì sao chuyển sang Go?
 Không phải vì lưu lượng hiện tại đã vượt ngưỡng (chưa vượt), mà vì các thành phần mới cần xây (Hot Set Scheduler, Notification Adapter, state store, R2 object storage) hợp với goroutine/channel hơn, và rủi ro viết mới bằng Go thấp hơn nhiều so với việc viết lại `server.js` đang chạy ổn. Phần suy luận mô hình CV (YOLO/ONNX/OpenVINO, xử lý ảnh nặng) được đưa lên node phần cứng `inference worker` riêng biệt để bảo toàn CPU cho máy chủ web và backend.
 
+
+## License
+
+This project is licensed under the **GNU Affero General Public License v3.0**
+(AGPL-3.0). See [`LICENSE`](LICENSE) for the full text.
+
+AGPL-3.0 is a copyleft license with a network clause: if you run a modified
+version of this software as a network service, you must make the corresponding
+source code available to the users of that service. Self-hosting an unmodified
+copy requires no additional obligation.
+
+- Contributions are accepted under the same license, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Security reports follow [`SECURITY.md`](SECURITY.md).
+
+## Giấy phép
+
+Dự án này được phát hành theo **GNU Affero General Public License v3.0**
+(AGPL-3.0). Xem [`LICENSE`](LICENSE) để đọc toàn văn.
+
+AGPL-3.0 là giấy phép copyleft có điều khoản mạng: nếu bạn chạy một phiên bản
+đã chỉnh sửa của phần mềm này dưới dạng dịch vụ mạng, bạn phải công bố mã nguồn
+tương ứng cho người dùng của dịch vụ đó. Tự triển khai bản không chỉnh sửa thì
+không phát sinh nghĩa vụ bổ sung.
+
+- Đóng góp được chấp nhận theo cùng giấy phép, xem [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Báo cáo lỗ hổng bảo mật theo [`SECURITY.md`](SECURITY.md).
