@@ -30,7 +30,6 @@ permissions:
   contents: read
   packages: write
   pull-requests: read
-  actions: read
 
 env:
   REGISTRY: ghcr.io
@@ -47,7 +46,6 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       model: ${{ steps.filter.outputs.model }}
-      target_runner: ${{ steps.probe-runner.outputs.target_runner }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -73,33 +71,6 @@ jobs:
               - 'docker-compose.cv.yml'
               - '.github/workflows/docker-publish.yml'
 
-      - name: Probe Self-Hosted Runner Status
-        id: probe-runner
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.ACTIONS_RUNNER_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            try {
-              const res = await github.rest.actions.listSelfHostedRunnersForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-              });
-              const runner = res.data.runners.find(r => 
-                r.status === 'online' && 
-                r.labels.some(l => l.name === 'inference worker')
-              );
-              if (runner) {
-                core.info(`[OK] Self-hosted runner '${runner.name}' is ONLINE. Routing to inference worker.`);
-                core.setOutput('target_runner', JSON.stringify(['self-hosted', 'inference worker']));
-              } else {
-                core.warning(`[WARN] inference worker runner is OFFLINE. Fallback to ubuntu-latest.`);
-                core.setOutput('target_runner', JSON.stringify(['ubuntu-latest']));
-              }
-            } catch (err) {
-              core.warning(`[WARN] Failed to query runner status: ${err.message}. Defaulting to ubuntu-latest.`);
-              core.setOutput('target_runner', JSON.stringify(['ubuntu-latest']));
-            }
-
   # ────────────────────────────────────────────────────────────────────────────
   # JOB 1A: Build & Push Go Backend Service
   # ────────────────────────────────────────────────────────────────────────────
@@ -107,7 +78,7 @@ jobs:
     name: Build & Push Backend Image
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ fromJSON(needs.detect-changes.outputs.target_runner) }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
@@ -159,7 +130,7 @@ jobs:
     name: Build & Push Frontend Image
     needs: detect-changes
     if: needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ fromJSON(needs.detect-changes.outputs.target_runner) }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
@@ -210,7 +181,7 @@ jobs:
     name: Build & Push Model Image
     needs: detect-changes
     if: needs.detect-changes.outputs.model == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ fromJSON(needs.detect-changes.outputs.target_runner) }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
@@ -258,8 +229,9 @@ jobs:
   # JOB 2: Deploy via Portainer
   # ────────────────────────────────────────────────────────────────────────────
   deploy:
-    name: Deploy via Portainer
+    name: Deploy to Staging
     runs-on: ubuntu-latest
+    environment: staging
     needs: [detect-changes, build-backend, build-frontend, build-model]
     if: |
       always() &&
@@ -274,34 +246,46 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Trigger Portainer Redeploy
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          PORTAINER_KEY: ${{ secrets.PORTAINER_API_KEY }}
+          CF_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          STACK_APP_ID: ${{ secrets.PORTAINER_STACK_APP }}
+          STACK_CV_ID: ${{ secrets.PORTAINER_STACK_CV }}
+          EP_EDGE_ID: ${{ secrets.PORTAINER_ENDPOINT_HOMESRV }}
+          EP_WORKER_ID: ${{ secrets.PORTAINER_ENDPOINT_DEVBOX }}
+          CV_ENGINE_URL: ${{ secrets.CV_ENGINE_URL }}
         run: |
-          if [ -z "${{ secrets.PORTAINER_API_KEY }}" ]; then
-            echo "PORTAINER_API_KEY is not set — skipping deploy trigger."
+          if [ -z "${PORTAINER_KEY}" ] || [ -z "${PORTAINER_URL}" ]; then
+            echo "PORTAINER_URL / PORTAINER_API_KEY not configured — skipping deploy trigger."
             exit 0
           fi
-          PORTAINER_URL="https://REDACTED_ADMIN_HOST"
-          PORTAINER_KEY="${{ secrets.PORTAINER_API_KEY }}"
-          CF_CLIENT_ID="${{ secrets.CF_ACCESS_CLIENT_ID }}"
-          CF_CLIENT_SECRET="${{ secrets.CF_ACCESS_CLIENT_SECRET }}"
 
-          # Step A: Redeploy App Stack 14 on edge host (Endpoint 3)
+          # Step A: Redeploy the application stack on the edge host
           if [ "${{ needs.detect-changes.outputs.backend }}" = "true" ] || [ "${{ needs.detect-changes.outputs.frontend }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Triggering Portainer Stack 14 (App on edge host, endpoint 3)..."
-            STACK_RES=$(curl -sS -f -X GET "${PORTAINER_URL}/api/stacks/14" \
+            echo "Triggering Portainer application stack redeploy..."
+            STACK_RES=$(curl -sS -f -X GET "${PORTAINER_URL}/api/stacks/${STACK_APP_ID}" \
               -H "X-API-Key: ${PORTAINER_KEY}" \
               -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
               -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
               -H "User-Agent: Mozilla/5.0")
 
             STACK_FILE=$(cat docker-compose.stg.yml)
-            ENV_JSON=$(echo "$STACK_RES" | jq 'if .Env then (.Env | map(if .name == "CV_ENGINE_URL" then .value = "http://REDACTED_PRIVATE_MESH_IP:8000" else . end)) else [] end')
+            if [ -z "${CV_ENGINE_URL}" ]; then
+              echo "CV_ENGINE_URL is not configured — refusing to redeploy the application stack."
+              exit 1
+            fi
+            ENV_JSON=$(echo "$STACK_RES" | jq --arg url "${CV_ENGINE_URL}" '
+              (.Env // []) | map(select(.name != "CV_ENGINE_URL")) + [{"name": "CV_ENGINE_URL", "value": $url}]
+            ')
 
             PAYLOAD=$(jq -n \
               --arg file "$STACK_FILE" \
               --argjson env "$ENV_JSON" \
               '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
 
-            curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/14?endpointId=3" \
+            curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/${STACK_APP_ID}?endpointId=${EP_EDGE_ID}" \
               -H "X-API-Key: ${PORTAINER_KEY}" \
               -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
               -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
@@ -309,21 +293,21 @@ jobs:
               -H "User-Agent: Mozilla/5.0" \
               -d "$PAYLOAD"
 
-            echo "Stack 14 (App on edge host) redeployed successfully."
+            echo "Application stack redeployed successfully."
           fi
 
-          # Step B: Redeploy CV Model Stack 17 on inference worker (Endpoint 4)
+          # Step B: Redeploy the model inference stack on the worker host
           if [ "${{ needs.detect-changes.outputs.model }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Checking inference worker (endpoint 4) availability..."
-            DEVBOX_STATUS=$(curl -sS -m 8 "${PORTAINER_URL}/api/endpoints/4" \
+            echo "Checking worker host availability..."
+            DEVBOX_STATUS=$(curl -sS -m 8 "${PORTAINER_URL}/api/endpoints/${EP_WORKER_ID}" \
               -H "X-API-Key: ${PORTAINER_KEY}" \
               -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
               -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
               -H "User-Agent: Mozilla/5.0" | jq -r '.Status // 2' 2>/dev/null || echo "2")
 
             if [ "$DEVBOX_STATUS" = "1" ]; then
-              echo "inference worker is online. Triggering Portainer Stack 17 (CV Engine on inference worker, endpoint 4)..."
-              STACK_RES=$(curl -sS -f -X GET "${PORTAINER_URL}/api/stacks/17" \
+              echo "Worker host is online. Triggering model inference stack redeploy..."
+              STACK_RES=$(curl -sS -f -X GET "${PORTAINER_URL}/api/stacks/${STACK_CV_ID}" \
                 -H "X-API-Key: ${PORTAINER_KEY}" \
                 -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
                 -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
@@ -337,7 +321,7 @@ jobs:
                 --argjson env "$ENV_JSON" \
                 '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
 
-              curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/17?endpointId=4" \
+              curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/${STACK_CV_ID}?endpointId=${EP_WORKER_ID}" \
                 -H "X-API-Key: ${PORTAINER_KEY}" \
                 -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
                 -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
@@ -345,44 +329,56 @@ jobs:
                 -H "User-Agent: Mozilla/5.0" \
                 -d "$PAYLOAD"
 
-              echo "Stack 17 (CV Engine on inference worker) redeployed successfully."
+              echo "Model inference stack redeployed successfully."
             else
-              echo "[WARN] inference worker (endpoint 4) is currently unreachable/offline (Status: ${DEVBOX_STATUS})."
-              echo "Skipping Stack 17 redeployment. edge host continues running normally with Gemini fallback."
+              echo "[WARN] Worker host is currently unreachable/offline (Status: ${DEVBOX_STATUS})."
+              echo "Skipping model stack redeployment. The edge host continues serving with the fallback path."
             fi
           fi
 
       - name: Verify Post-Deploy Health
+        env:
+          STG_HEALTH_URL: ${{ secrets.STG_HEALTH_URL }}
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          PORTAINER_KEY: ${{ secrets.PORTAINER_API_KEY }}
+          CF_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          EP_WORKER_ID: ${{ secrets.PORTAINER_ENDPOINT_DEVBOX }}
+          CV_CONTAINER_NAME: ${{ secrets.PORTAINER_CV_CONTAINER_NAME }}
         run: |
           echo "Verifying health after redeployment..."
           sleep 10
-          curl -sS -f -m 15 https://warded-stg.529studio.site/health || {
-            echo "Staging backend health check failed!"
-            exit 1
-          }
-          echo "Staging backend health check passed."
+          if [ -z "${STG_HEALTH_URL}" ]; then
+            echo "[WARN] STG_HEALTH_URL is not configured — skipping the staging health probe."
+          else
+            curl -sS -f -m 15 "${STG_HEALTH_URL}" || {
+              echo "Staging backend health check failed!"
+              exit 1
+            }
+            echo "Staging backend health check passed."
+          fi
 
-          if [ -n "${{ secrets.PORTAINER_API_KEY }}" ] && ([ "${{ needs.detect-changes.outputs.model }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]); then
-            DEVBOX_STATUS=$(curl -sS -m 8 "https://REDACTED_ADMIN_HOST/api/endpoints/4" \
-              -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
-              -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
-              -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
+          if [ -n "${PORTAINER_KEY}" ] && ([ "${{ needs.detect-changes.outputs.model }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]); then
+            DEVBOX_STATUS=$(curl -sS -m 8 "${PORTAINER_URL}/api/endpoints/${EP_WORKER_ID}" \
+              -H "X-API-Key: ${PORTAINER_KEY}" \
+              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
               -H "User-Agent: Mozilla/5.0" | jq -r '.Status // 2' 2>/dev/null || echo "2")
 
             if [ "$DEVBOX_STATUS" = "1" ]; then
-              CONTAINER_HEALTH=$(curl -sS -m 15 "https://REDACTED_ADMIN_HOST/api/endpoints/4/docker/containers/json" \
-                -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
-                -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
-                -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
-                -H "User-Agent: Mozilla/5.0" | jq -r '.[] | select(.Names[] == "/warded-cv-engine") | .State')
-              echo "inference worker CV container state: ${CONTAINER_HEALTH}"
+              CONTAINER_HEALTH=$(curl -sS -m 15 "${PORTAINER_URL}/api/endpoints/${EP_WORKER_ID}/docker/containers/json" \
+                -H "X-API-Key: ${PORTAINER_KEY}" \
+                -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+                -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+                -H "User-Agent: Mozilla/5.0" | jq -r --arg name "/${CV_CONTAINER_NAME}" '.[] | select(.Names[] == $name) | .State')
+              echo "Model inference container state: ${CONTAINER_HEALTH}"
               if [ "${CONTAINER_HEALTH}" != "running" ]; then
-                echo "[WARN] CV engine container is not in running state on inference worker (${CONTAINER_HEALTH})."
+                echo "[WARN] Model inference container is not in running state on the worker host (${CONTAINER_HEALTH})."
               else
-                echo "inference worker CV engine verification passed."
+                echo "Model inference container verification passed."
               fi
             else
-              echo "[INFO] inference worker is offline. Skipping inference worker container verification."
+              echo "[INFO] Worker host is offline. Skipping container verification."
             fi
           fi
 
@@ -398,8 +394,8 @@ jobs:
     steps:
       - name: Send Alert to Gateway
         env:
-          ALERT_URL: ${{ secrets.ALERT_GATEWAY_URL || 'https://REDACTED_WEBHOOK_HOST/webhook/alert-gateway' }}
-          ALERT_KEY: ${{ secrets.ALERT_GATEWAY_KEY || 'REDACTED_ALERT_GATEWAY_KEY' }}
+          ALERT_URL: ${{ secrets.ALERT_GATEWAY_URL }}
+          ALERT_KEY: ${{ secrets.ALERT_GATEWAY_KEY }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_MSG: ${{ github.event.head_commit.message || github.sha }}
           BE_RES: ${{ needs.build-backend.result }}
@@ -407,6 +403,10 @@ jobs:
           MODEL_RES: ${{ needs.build-model.result }}
           DP_RES: ${{ needs.deploy.result }}
         run: |
+          if [ -z "${ALERT_URL}" ] || [ -z "${ALERT_KEY}" ]; then
+            echo "[INFO] ALERT_GATEWAY_URL / ALERT_GATEWAY_KEY not configured — skipping notification."
+            exit 0
+          fi
           if [ "$BE_RES" = "failure" ] || [ "$FE_RES" = "failure" ] || [ "$MODEL_RES" = "failure" ] || [ "$DP_RES" = "failure" ]; then
             SEVERITY="CRITICAL"
             TITLE="CI/CD Failed: ${{ github.repository }}"
@@ -414,7 +414,7 @@ jobs:
           elif [ "$DP_RES" = "success" ]; then
             SEVERITY="SUCCESS"
             TITLE="Deploy Success: ${{ github.repository }}"
-            MESSAGE="Đã build và triển khai thành công Camera View lên Warded STG (Portainer Stacks 14 & 17) - Commit: $COMMIT_MSG"
+            MESSAGE="Đã build và triển khai thành công Camera View lên staging - Commit: $COMMIT_MSG"
           else
             exit 0
           fi
