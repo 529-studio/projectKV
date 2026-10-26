@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Thermal & CPU Throttling Monitor for local-edge host (ZOTAC ZBOX-CI320NANO).
+Thermal & CPU Throttling Monitor for local edge host (ZOTAC ZBOX-CI320NANO).
 
 Inspects Linux kernel thermal zones and CPU frequencies to detect overheating
 and thermal throttling on fanless 7.5W TDP chassis (Celeron N2930).
@@ -127,7 +127,7 @@ class ThermalMonitor:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Thermal & Throttling Monitor for local-edge host")
+    parser = argparse.ArgumentParser(description="Thermal & Throttling Monitor for local edge host")
     parser.add_argument("--sys-root", default="/", help="Root directory for /sys filesystem inspection")
     parser.add_argument("--out", default="", help="Optional JSON output path")
     parser.add_argument("--interval", type=float, default=0.0, help="Monitoring interval in seconds (0 for once)")

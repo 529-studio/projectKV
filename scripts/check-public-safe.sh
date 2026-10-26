@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 # Guard: fail when the working tree contains material that must never be public.
 #
-# Stage 1 (this file) scans the runtime surface (workflows, compose files, shell
-# scripts, Makefile, environment templates) for internal infrastructure
-# references, and scans every tracked file for credential material.
-#
-# Stage 2 (documentation sanitation) extends RUNTIME_PATHS to every tracked path
-# before the repository visibility is switched to public.
+# Scans every tracked file for internal infrastructure references (host names,
+# private mesh addresses, admin endpoints) and for credential material. Both
+# scans run on the full tree so documentation cannot reintroduce what the
+# runtime surface already removed.
 set -euo pipefail
 
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -35,23 +33,12 @@ scan() { # scan <label> <regex> <pathspec...>
   fi
 }
 
-RUNTIME_PATHS=(
-  .github/workflows
-  docker-compose.stg.yml
-  docker-compose.cv.yml
-  docker-compose.local.yml
-  Makefile
-  scripts
-  .env.example
-  .env.stg.example
-)
-
-echo "[INFO] Scanning runtime surface for internal infrastructure references..."
+echo "[INFO] Scanning every tracked file for internal infrastructure references..."
 scan "internal host name, private mesh address or admin endpoint" \
-  'edge host|edge host|inference worker|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+|portainer\.529studio\.site|n8n\.529studio\.site' \
-  "${RUNTIME_PATHS[@]}"
+  'edge host|edge host|inference worker|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+|portainer\.529studio\.site|n8n\.529studio\.site|hub\.529studio\.site' \
+  .
 
-echo "[INFO] Scanning all tracked files for credential material..."
+echo "[INFO] Scanning every tracked file for credential material..."
 scan "hardcoded credential material" \
   'ak_live_[A-Za-z0-9_]+|(ghp|gho|ghs|ghu)_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AIza[0-9A-Za-z_-]{35}' \
   .

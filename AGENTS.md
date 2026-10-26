@@ -12,7 +12,7 @@ This document defines the core principles, design standards, and mandatory techn
 
 5. **Git Flow & Zero Direct Push**: Direct push to `main` and `dev` is strictly prohibited. Create feature/fix/doc branches (`feat/*`, `fix/*`, `docs/*`), push, and open PR targeting `dev`. AI agents must NEVER auto-merge PRs.
 
-6. **Living Documentation & Holistic Knowledge Maintenance**: Updating `docs/project_status.md` and `docs/lesson_learn.md` alone is NOT sufficient. Whenever any task or PR is implemented or merged, developers and AI agents MUST holistically audit and synchronize all related documentation across the repository:
+6. **Living Documentation & Holistic Knowledge Maintenance**: Whenever any task or PR is implemented or merged, developers and AI agents MUST holistically audit and synchronize all related documentation across the repository:
    - Update any relevant topic, architecture, operational, sprint, or guideline files under `docs/` directly affected by the changes (e.g. execution guides, ADR references, data schemas, API catalogs).
    - Update root `README.md` (both English and Vietnamese sections) whenever public features, developer workflows, instructions, setup commands, or system architectures are affected or expanded.
    - Codebase, git history, and PR list remain the sole source of truth; never fabricate claims.

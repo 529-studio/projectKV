@@ -11,7 +11,7 @@
 
 ## 1. Executive Summary & Architectural Decision
 
-This spike fulfills the requirements of **Issue #104** and the CV research plan. We conducted an empirical, sandbox-isolated evaluation on our actual production staging host (`local-edge host`), which is powered by an **Intel Celeron N2930 @ 1.83GHz** (Silvermont architecture, 4 cores, 8GB RAM). 
+This spike fulfills the requirements of **Issue #104** and the CV research plan. We conducted an empirical, sandbox-isolated evaluation on our actual production staging host (`local edge host`), which is powered by an **Intel Celeron N2930 @ 1.83GHz** (Silvermont architecture, 4 cores, 8GB RAM). 
 
 ### Key Constraints Addressed
 1. **No-AVX Compatibility**: Standard PyTorch / Ultralytics wheels crash on this CPU with `Illegal instruction (core dumped)`. OpenVINO was confirmed to execute cleanly via native SSE4.2 vector instructions.
@@ -72,12 +72,12 @@ Based on the empirical throughput of **2.27 FPS per core** at $320 \times 320$:
    $$\text{Required Throughput} = \frac{30\text{ cameras}}{30\text{ seconds}} = 1.0\text{ FPS}$$
    * With 1 core providing 2.27 FPS, the CPU will only be active **44% of the time** on 1 single core.
    * Total host CPU utilization across 4 cores: $\frac{44\%}{4} = \mathbf{11\%}$ average load!
-   * `local-edge host` can comfortably handle the full 30–50 camera Hot Set on-premise without overheating or throttling.
+   * `local edge host` can comfortably handle the full 30–50 camera Hot Set on-premise without overheating or throttling.
 
 2. **All 720 City Cameras**:
    * To evaluate all 720 cameras every 30s requires **24 FPS**, which exceeds Celeron N2930's 4-core capacity (~9 FPS total across all 4 cores).
    * **Recommendation**:
-     * Run Hot Set (30–50 cameras) on `local-edge host` at **$0 cost**.
+     * Run Hot Set (30–50 cameras) on `local edge host` at **$0 cost**.
      * When scaling to all 720 cameras citywide, deploy the exact same `cv-engine` container to **Oracle Cloud Always Free (ARM Ampere A1: 4 OCPUs / 24GB RAM)** or an ultra-cheap Hetzner ARM instance (€3.29/mo), which effortlessly delivers >80 FPS.
 
 ---
@@ -103,7 +103,7 @@ CMD ["python3", "server.py"]
 ```
 
 ### Clean Teardown
-All test containers, volumes, networks, and temporary artifacts under `/home/REDACTED_USER/spike_cv_sandbox` on `local-edge host` were cleanly terminated and purged immediately after the benchmark run.
+All test containers, volumes, networks, and temporary artifacts under `/tmp/spike_cv_sandbox` on `local edge host` were cleanly terminated and purged immediately after the benchmark run.
 
 ---
 
