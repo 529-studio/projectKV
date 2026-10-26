@@ -397,7 +397,7 @@ If a legacy vehicle-only model (`yolov8n.xml`) is mounted in `MODEL_DIR`, `flood
 
 ## 8. Living Documentation & References
 
-- **Lesson 37**: *Data Labeling Paradigms, Why Frame-Diff Fails in Outdoor Surveillance, and Zero-VLM Flood Detection* (`docs/lesson_learn.md`).
+- **Lesson 37**: *Data Labeling Paradigms, Why Frame-Diff Fails in Outdoor Surveillance, and Zero-VLM Flood Detection*.
 - **ADR-009 Revision**: *Self-Hosted Flood Segmentation, Directional Multi-Lane PCU & Continuous Data Flywheel* (`docs/ADR-009-self-hosted-flood-segmentation-and-directional-pcu.md`).
 - **OpenVINO Runtime Baseline**: *Standalone Computer Vision Inference Microservice* (`services/cv-engine/server.py`).
 - **Autonomous Rain Harvester**: *Dual-Trigger Poller & Cloudflare R2 Archiver* (`services/go-server/internal/harvester/`).

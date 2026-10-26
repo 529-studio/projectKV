@@ -2,7 +2,7 @@
 
 - **Generated At**: `2026-10-08T14:02:27.341582+00:00`
 - **Analyzer**: `cv-engine` (`yolov8n_openvino_320`)
-- **Evaluation Dataset**: `764` labeled frames from `REDACTED_LOCAL_HOME/repos/projectKV/tools/eval/labels`
+- **Evaluation Dataset**: `764` labeled frames from `../../tools/eval/labels`
 
 ## 1. Executive Summary & Accuracy Gate
 

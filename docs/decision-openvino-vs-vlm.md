@@ -6,12 +6,12 @@
 - **Author**: Warded Architecture Team (`@thdat-vu`)
 - **References**:
   - [ADR-004](ADR-004-route-check-and-snapshot-archive.md) §D6 (Accuracy Gate Specification)
-  - [ADR-005](ADR-005-sprint3-audit-and-sprint4-plan.md) §2 Finding B/D6, §6 Row T9
+  - ADR-005 §2 Finding B/D6, §6 Row T9
   - [eval_report_d6_real.md](reports/eval_report_d6_real.md) (Real D6 Accuracy Gate Evaluation across 764 frames)
   - [smoke_eval_d6_real.md](reports/smoke_eval_d6_real.md) (Known-State Smoke-Test Camera Verification)
   - [pcu-calibration-report.md](pcu-calibration-report.md) (PCU Weights and Saturation Thresholds Calibration)
-  - [cv_model_stress_test_devbox.md](reports/cv_model_stress_test_devbox.md) (Full-Scale Citywide Stress Test on `inference worker`)
-  - [cv_engine_bench_devbox.md](reports/cv_engine_bench_devbox.md) (OpenVINO Benchmark on AMD Ryzen 7 6800HS)
+  - cv_model_stress_test_devbox.md (Full-Scale Citywide Stress Test on `inference worker`)
+  - cv_engine_bench_devbox.md (OpenVINO Benchmark on AMD Ryzen 7 6800HS)
   - [bench_solution1_report.md](reports/bench_solution1_report.md) (High-Concurrency Load Benchmark on Solution 1)
 
 ---
@@ -20,7 +20,7 @@
 
 In Sprint 3 (S3 / Issue #137), ProjectKV migrated its continuous camera analysis pipeline from external Vision-Language Model (VLM) APIs (Gemini Flash-Lite) to a self-hosted Intel OpenVINO inference service (`services/cv-engine`, stock COCO-pretrained YOLOv8n FP16). The migration was motivated by strict API quota limits (15 RPM free-tier limit) and the goal of zero-cost edge inference.
 
-However, [ADR-005](ADR-005-sprint3-audit-and-sprint4-plan.md) §2 Finding B identified that OpenVINO vehicle detection accuracy had never been evaluated against real ground-truth camera data in Ho Chi Minh City. In Sprint 4 T4 ([Issue #195](https://github.com/529-studio/projectKV/issues/195)), the formal D6 accuracy gate was executed against 764 authentic HCMC frames, yielding two critical findings:
+However, ADR-005 §2 Finding B identified that OpenVINO vehicle detection accuracy had never been evaluated against real ground-truth camera data in Ho Chi Minh City. In Sprint 4 T4 ([Issue #195](https://github.com/529-studio/projectKV/issues/195)), the formal D6 accuracy gate was executed against 764 authentic HCMC frames, yielding two critical findings:
 
 1. **Traffic Macro F1 Was 0.209 (Below the 0.70 Target)**:
    - *Capacity Floor Distortion*: The initial uncalibrated `CapacityFloor = 25.0` PCU caused 94.4% of actual `HEAVY` frames and 94.5% of `CONGESTED` frames to be misclassified as `CLEAR`. This was empirically diagnosed and resolved in Sprint 4 T5 ([Issue #196](https://github.com/529-studio/projectKV/issues/196) / [pcu-calibration-report.md](pcu-calibration-report.md)) by realigning the floor to `15.0` PCU and calibrating vehicle weights to Vietnamese standards (**TCVN 4054:2005** / **TCVN 13592:2022**).
@@ -34,7 +34,7 @@ Per ADR-005 §6 row T9, the project must make an objective, evidence-driven deci
 
 ## 2. Evaluation Criteria & Empirical Data
 
-To reach a sound engineering decision, four dimensions were evaluated using empirical data from Sprint 4 T4, T5, and the recent host stress benchmarks on `inference worker` and `local-edge host`:
+To reach a sound engineering decision, four dimensions were evaluated using empirical data from Sprint 4 T4, T5, and the recent host stress benchmarks on `inference worker` and `local edge host`:
 
 ### 2.1 Criterion 1: Economics, Throughput & Polling Feasibility
 
@@ -53,7 +53,7 @@ To reach a sound engineering decision, four dimensions were evaluated using empi
 
 ### 2.2 Criterion 2: Hardware Resource Consumption & Isolation
 
-From the stress test on `inference worker` ([cv_model_stress_test_devbox.md](reports/cv_model_stress_test_devbox.md)):
+From the stress test on `inference worker` (cv_model_stress_test_devbox.md):
 - **CPU Clamping**: Under 4 concurrent worker threads continuously processing 708 images, container CPU was strictly clamped at **199.31%** by the Linux CFS scheduler (`cpus: "2.00"`), never exceeding the quota.
 - **Memory Footprint**: Peak RAM was **97.90 MiB** (under 4.8% of the 2,048 MB cap). After processing 3,383 requests, memory settled back to **84.93 MiB** with **zero memory leak**.
 - **Reliability**: **0.00% failure rate** across 3,383 requests (0 crashes, 0 timeouts, 0 connection drops).

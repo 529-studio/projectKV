@@ -6,7 +6,7 @@
 **Author**: Warded Architecture Team  
 **References**:
 - [ADR-004](ADR-004-route-check-and-snapshot-archive.md) §9 D15 (PCU Saturation Index Specification)
-- [ADR-005](ADR-005-sprint3-audit-and-sprint4-plan.md) §2 Finding D and §6 Row T6
+- ADR-005 §2 Finding D and §6 Row T6
 - [Spike #104](spike-cv-runtime.md) (Computer Vision Runtime Evaluation on Non-AVX Hardware)
 - [GO_BACKEND_ARCHITECTURE.md](GO_BACKEND_ARCHITECTURE.md) §2 (Modulith Import Boundaries)
 
@@ -56,7 +56,7 @@ Per ADR-005 Finding D and Issue #186, an explicit architectural decision must be
 - **Description**: Maintain a secondary custom model (e.g., DatapolisX 5-class model) for cameras near port corridors while running COCO YOLOv8n for other cameras.
 - **Why Rejected**:
   1. **Hardware performance**: Spike #104 established that DatapolisX caused high inference latencies (>1.5s–2.5s per frame on non-AVX Celeron hardware), violating the 30-second Hot Set cycle budget.
-  2. **Memory limits**: Staging containers on `local-edge host` are constrained to 512MB RAM (`docker-compose.stg.yml`). Loading two concurrent OpenVINO models risks out-of-memory crashes.
+  2. **Memory limits**: Staging containers on `local edge host` are constrained to 512MB RAM (`docker-compose.stg.yml`). Loading two concurrent OpenVINO models risks out-of-memory crashes.
   3. **No validated model weights**: The repository currently only maintains `yolov8n.xml`/`.bin` for COCO. Fine-tuning and validating a new custom model contradicts Sprint 4's explicit mandate ("verification and closing debt; no speculative runtime expansions").
 
 ---

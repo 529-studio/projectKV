@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Storm-Burst Disk I/O Benchmark & Simulation Tool for local-edge host.
+Storm-Burst Disk I/O Benchmark & Simulation Tool for local edge host.
 
 Simulates concurrent multi-tenant storage workloads on Debian/Docker hosts:
   1. Archiver: Sequential burst writing of camera JPEG frames (50KB - 100KB).
@@ -260,7 +260,7 @@ def execute_workload(mode: str, duration_sec: float, base_dir: str) -> Dict[str,
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Simulate local-edge host Disk I/O Baseline & Storm-Burst")
+    parser = argparse.ArgumentParser(description="Simulate local edge host Disk I/O Baseline & Storm-Burst")
     parser.add_argument("--mode", choices=["baseline", "storm-burst", "both"], default="both", help="Workload scenario to run")
     parser.add_argument("--duration", type=float, default=10.0, help="Duration in seconds per scenario")
     parser.add_argument("--dir", type=str, default="", help="Directory for test files (defaults to tempdir)")
