@@ -4,7 +4,7 @@ FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk update && apk upgrade --no-cache && apk add --no-cache ca-certificates tzdata
 
 # Cache Go modules dependencies
 COPY services/go-server/go.mod services/go-server/go.sum ./services/go-server/
@@ -21,6 +21,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /build/server ./cmd/se
 
 # Stage 2: Minimal production runtime
 FROM alpine:3.20
+
+RUN apk update && apk upgrade --no-cache
 
 WORKDIR /app
 

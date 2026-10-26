@@ -20,6 +20,7 @@ ehthumbs.db
 Thumbs.db
 .idea/
 .vscode/
+.zcode/
 *.sublime-workspace
 
 # Logs & Debug
