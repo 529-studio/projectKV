@@ -10,7 +10,6 @@ on:
       - 'docs/**'
       - '.agents/**'
       - '.githooks/**'
-      - '.github/workflows/auto-request-reviewers.yml'
       - '.github/workflows/branch-guard.yml'
       - '.github/workflows/ci.yml'
       - '.env.example'
