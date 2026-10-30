@@ -20,7 +20,6 @@ ehthumbs.db
 Thumbs.db
 .idea/
 .vscode/
-.zcode/
 *.sublime-workspace
 
 # Logs & Debug
@@ -54,6 +53,7 @@ bin/
 services/go-server/bin/
 services/go-server/data/
 services/go-server/server
+services/go-server/notify-preview
 *.db
 *.db-journal
 *.db-wal
