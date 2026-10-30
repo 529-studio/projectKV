@@ -1,0 +1,16 @@
+## Lesson 32: Affordance Collision & Client-Side Rate-Limit Cooldown in Real-Time Surveillance UIs
+
+- **Incident & Tracking:** Issue #223, Pull Request for S6-T3 (`feat/s6-t3-modal-affordance-cooldown`).
+- **Symptom:**
+  In `apps/web/src/components/CameraModal.tsx`, commuters could not discern that the flood verification element was an interactive button rather than a passive status chip. The trigger was styled identically to passive badges (`[HOẠT ĐỘNG]`, `[BÌNH THƯỜNG]`, `[XÁC MINH VLM: Khô ráo]`) using identical font, dark background, border, and bracketed syntax (`[Xác minh ngập nước]`). Furthermore, the button only disabled while an HTTP request was in flight (`isVerifyingFlood === true`); as soon as the server responded (~1s), the button re-enabled immediately, enabling rapid click spamming that exhausted the backend's 10 RPM sliding window quota (HTTP 429).
+- **Root Cause:**
+  1. **Affordance Collision**: Conflating interactive action controls with passive metadata indicators by placing them inside the same flex layout container and reusing identical badge typography, padding, and bracket enclosures (`[...]`).
+  2. **Short-Lived Request-Bound Disabling**: Treating in-flight network activity as the sole disabled condition instead of enforcing a true client-side rate limit cooldown interval matching or buffering the backend quota.
+- **Mandatory Takeaway & Engineering Resolution:**
+  1. **Strict Syntactic & Visual Affordance Separation**: Square brackets `[...]` are strictly reserved for passive status chips and metadata verdicts. Action triggers must never use brackets. Converted `[Xác minh ngập nước]` into an inverted, tactile monochromatic action button (`bg-zinc-100 text-zinc-950 hover:bg-white active:scale-[0.98]`) equipped with a crisp monochromatic SVG reticle scan glyph (`⌖`).
+  2. **Dedicated Hierarchy Rows**: Visually separated the action control row from the passive verdict chip row, guaranteeing that status indicators remain passive while primary user actions stand out unambiguously.
+  3. **Module-Persistent 15-Second Cooldown**: Implemented a 15-second client-side countdown timer (`Chờ xác minh (15s)` $\rightarrow$ `(1s)`) initialized and updated via module-scoped timestamp tracking (`lastFloodVerifyTimestamp`). Guarantees that users cannot circumvent the cooldown by closing and reopening the modal or switching cameras, completely eliminating duplicate network dispatch and protecting backend quotas.
+  4. **Defense-in-Depth Secret Shielding & Error Concealment (Option A)**:
+     - Eliminated API key leakage in Go HTTP client by migrating Gemini REST API authentication from URL query string (`?key=%s`) to `x-goog-api-key` HTTP header, preventing `url.Error` timeout messages from containing credentials.
+     - Sanitized backend HTTP 503 response in `flood.Handler.VerifyCamera` to emit generic `{"error": "verification service temporarily unavailable"}` rather than internal Go stack traces.
+     - Concealed technical exceptions from end users in `CameraModal.tsx`: replaced multi-line red error blocks with a subtle monochromatic zinc chip `[Tạm thời gián đoạn]` that automatically dismisses after 4 seconds, while logging debug traces strictly to `console.warn` for developers.
