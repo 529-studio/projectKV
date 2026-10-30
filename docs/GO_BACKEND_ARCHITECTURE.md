@@ -46,6 +46,7 @@ Follow this pattern for every new cross-module dependency. **No module should im
 ### Rule 2 — Allowed import graph
 ```
 cmd/server     → may import anything (composition root only — wiring, no business logic)
+cmd/notify-preview → camera, config, flood, notify (standalone alert generator for ops & verification)
 httpserver     → camera, proxycache, hotset, cvclient, ws (for route registration only)
 camera         → (leaf — no internal imports)
 proxycache     → camera
@@ -97,11 +98,13 @@ services/go-server/
 │   │   ├── cloudvision.go             # CloudVisionAnalyzer: calls Gemini/OpenAI multimodal API, implements hotset.Analyzer
 │   │   └── cvengine.go                # CVEngineAnalyzer: calls Python cv-engine HTTP API (Phase 2 self-hosted model), implements hotset.Analyzer
 │   ├── notify/
-│   │   ├── channel.go                 # [ALREADY PROVIDED — paste as-is]
-│   │   ├── telegram.go                # [ALREADY PROVIDED — paste as-is]
-│   │   ├── telegram_webhook.go        # inbound: POST /telegram/webhook, parses /subscribe <zone> command, calls subscription.Service
-│   │   ├── zalo.go                    # Phase 2 stub: Channel implementation returning "not implemented" error, ready to fill in once OA is approved
-│   │   └── webpush.go                 # stub Channel implementation for later
+│   │   ├── alert.go                   # FloodAlert and Channel abstractions
+│   │   ├── alert_builder.go           # BuildFloodAlert pure helper; derives alerts from primitives without internal/ dependencies
+│   │   ├── alert_builder_test.go      # unit tests for BuildFloodAlert fallback logic
+│   │   ├── debounce.go                # 30-minute anti-spam sliding debouncer
+│   │   ├── manager.go                 # notification manager dispatching alerts across registered channels
+│   │   ├── telegram.go                # TelegramChannel adapter + FormatTelegramMessage HTML formatter
+│   │   └── telegram_webhook.go        # inbound webhook handler for telegram bot commands
 │   ├── subscription/
 │   │   ├── service.go                 # Subscribe(ctx, channel, recipientID, zone) — validates zone against camera.Catalog, upserts via store
 │   │   └── handler.go                 # POST /api/subscriptions (for web-push based subscribe flow), DELETE /api/subscriptions/:id
