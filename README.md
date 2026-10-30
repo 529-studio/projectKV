@@ -72,6 +72,7 @@ hcm-traffic-cameras/
 │   ├── go-server/                     # [BACKEND — Go] Single static binary (Gin + SQLite + R2 Storage)
 │   │   ├── cmd/
 │   │   │   ├── server/main.go         # Composition root, routing, graceful shutdown
+│   │   │   ├── notify-preview/main.go # CLI for single-source Telegram flood alert message preview
 │   │   │   ├── sync-proofs/main.go    # High-concurrency Cloudflare R2 proofs sync CLI
 │   │   │   └── verify-r2/main.go      # Cloudflare R2 connectivity verification tool
 │   │   └── internal/
