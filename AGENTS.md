@@ -14,6 +14,7 @@ This document defines the core principles, design standards, and mandatory techn
 
 6. **Living Documentation & Holistic Knowledge Maintenance**: Whenever any task or PR is implemented or merged, developers and AI agents MUST holistically audit and synchronize all related documentation across the repository:
    - Update any relevant topic, architecture, operational, sprint, or guideline files under `docs/` directly affected by the changes (e.g. execution guides, ADR references, data schemas, API catalogs).
+   - Record a new engineering lesson as a new `docs/lessons/L<NN>-<slug>.md` plus one row in `docs/lessons/INDEX.md`. Never append to a single register file — that is how the 143 KB monolith was created.
    - Update root `README.md` (both English and Vietnamese sections) whenever public features, developer workflows, instructions, setup commands, or system architectures are affected or expanded.
    - Codebase, git history, and PR list remain the sole source of truth; never fabricate claims.
 
