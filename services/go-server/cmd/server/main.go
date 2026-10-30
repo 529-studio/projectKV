@@ -511,20 +511,17 @@ func main() {
 		if obs.IsZero() {
 			obs = v.Timestamp
 		}
-		if obs.IsZero() {
-			obs = time.Now()
-		}
 
-		alert := notify.FloodAlert{
-			CameraID:       v.CameraID,
-			CameraName:     camName,
-			District:       district,
-			Ward:           ward,
-			FloodSeverity:  v.FloodSeverity,
-			TypicalDepthCm: typicalDepth,
-			ObservedAt:     obs,
-			SnapshotURL:    snapshotURL,
-		}
+		alert := notify.BuildFloodAlert(
+			v.CameraID,
+			camName,
+			district,
+			ward,
+			snapshotURL,
+			typicalDepth,
+			v.FloodSeverity,
+			obs,
+		)
 
 		go func() {
 			dispatchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
