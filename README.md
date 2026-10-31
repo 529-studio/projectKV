@@ -22,7 +22,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue" alt="License"></a>
 </p>
 
-[English](README.md#english) &nbsp;•&nbsp; [Tiếng Việt](README.vi.md#tiếng-việt)
+[English](README.md#english) &nbsp;•&nbsp; [Tiếng Việt](README.vi.md)
 
 <br />
 <br />

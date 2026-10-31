@@ -2,7 +2,7 @@
 
 **Ứng dụng xem camera giao thông TP. Hồ Chí Minh & tính năng phân tích mở rộng**
 
-[English](README.md#english) &nbsp;•&nbsp; [Tiếng Việt](README.vi.md#tiếng-việt)
+[English](README.md#english) &nbsp;•&nbsp; [Tiếng Việt](README.vi.md)
 
 Đây là **hướng dẫn nhanh** bằng tiếng Việt, đủ để chạy ứng dụng trên máy cục bộ.
 Bản đầy đủ — kiến trúc, cấu hình, API, roadmap, giấy phép — nằm ở

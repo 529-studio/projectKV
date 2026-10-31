@@ -40,7 +40,14 @@ PORT_RE = re.compile(r"localhost:(\d{2,5})")
 TABLE_ROW_RE = re.compile(r"^\|\s*([^|]+?)\s*\|\s*`(\d{2,5})`\s*\|\s*(http\S+)\s*\|", re.MULTILINE)
 LINK_RE = re.compile(r"\]\(([^)\s]+)\)")
 SCHEME_RE = re.compile(r"^[a-z][a-z0-9+.-]*:", re.IGNORECASE)
-SWITCHER = "[English](README.md#english) &nbsp;•&nbsp; [Tiếng Việt](README.vi.md#tiếng-việt)"
+SWITCHER = "[English](README.md#english) &nbsp;•&nbsp; [Tiếng Việt](README.vi.md)"
+
+
+def slugify(heading: str) -> str:
+    """Approximate GitHub's heading anchor slug for a plain heading."""
+    text = heading.strip().lower()
+    text = re.sub(r"[^\w\s-]", "", text)
+    return re.sub(r"\s+", "-", text).strip("-")
 
 
 def make_targets() -> set[str]:
@@ -120,6 +127,13 @@ def main() -> int:
     for name, text in (("README.md", canonical), ("README.vi.md", quickstart)):
         if SWITCHER not in text:
             failures.append(f"{name} is missing the language switcher")
+
+    # 7. every in-file anchor the switcher uses must land on a real heading.
+    #    The Vietnamese file is a quickstart, so its own anchor is the file root;
+    #    only the English anchor is checked.
+    english_slugs = {slugify(h) for h in re.findall(r"^#{1,6}\s+(.+)$", canonical, re.MULTILINE)}
+    if "english" not in english_slugs:
+        failures.append("README.md has no `# English` heading for the switcher anchor to land on")
 
     if failures:
         print()
