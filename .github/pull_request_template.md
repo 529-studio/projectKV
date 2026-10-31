@@ -25,5 +25,5 @@ MANDATORY ISSUE LINKING (AGENTS.md Rule 9, amended by ADR-011 D6):
 - [ ] End-to-end bug reproduction/simulation verified before fix (Rule 4)
 - [ ] Zero hardcoded secrets / credentials in code and configs (Rule 8)
 - [ ] Monochromatic, zero-emoji UI and structured backend logs (Rule 1)
-- [ ] Updated affected `docs/*`, `README.md` and `README.vi.md` if applicable (Rule 6)
+- [ ] Updated affected `docs/*` and `README.md`, plus the `README.vi.md` quickstart if commands or ports changed (Rule 6)
 - [ ] Full automated test suite passes (`make test-go`, `npm test`)

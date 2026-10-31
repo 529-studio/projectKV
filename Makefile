@@ -40,6 +40,7 @@ help:
 
 install:
 	cd services/go-server && go mod download
+	cd apps/web && (npm ci || npm install)
 	git config core.hooksPath .githooks
 	chmod +x .githooks/* || true
 
