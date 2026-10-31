@@ -62,6 +62,7 @@ is the only part an agent should read by default.
 | 55 | The Crowdsource Feedback Black Hole & Decoupled Leaf Modulith Bridging | internal/feedback is designed as a strict leaf package with zero sibling imports to preserve the... | [L55](L55-the-crowdsource-feedback-black-hole-decoupled-leaf-modulith.md) |
 | 57 | Telegram Bot Token Leak Vectors, Word-Boundary Regex Pitfalls, and Ops Script-to-Go Format Parity | telegramBotTokenRegex = \d{8,10}:[A-Za-z0-9_-]{33,36}\b in SanitizeBytes scrubs any echoed token to... | [L57](L57-telegram-bot-token-leak-vectors-word-boundary-regex.md) |
 | 58 | Parity Verification Illusion & Single-Source Alert Generation | Leaf Modulith Pure Helper (notify.BuildFloodAlert): Extracted alert building into an exported pure... | [L58](L58-parity-verification-illusion-single-source-alert-generation.md) |
+| 59 | Documentation Cross-Reference Rot: Links to Files That Were Never Merged | Mechanical Move Verification (tools/docs/verify_doc_move.py): A moved document is proven byte-identical... | [L59](L59-documentation-cross-reference-rot-links-to-never-merged-files.md) |
 
 > Numbering note: Lesson 54 does not exist in the source register. Numbers are preserved as-is because
 > other documents reference lessons by number; nothing has been renumbered.

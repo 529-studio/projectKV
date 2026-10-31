@@ -1,0 +1,15 @@
+## Lesson 59: Documentation Cross-Reference Rot — Links to Files That Were Never Merged
+
+- **Incident & Tracking:** Documentation bloat audit D4/D6 / Issue #340 (`docs/p1-2c-sprint-guide`) / follow-up #342.
+- **Symptom:**
+  1. `docs/sprint9_execution_guide.md` linked `ADR-011-sprint8-audit-and-sprint9-plan.md` and `sprint8_report.md`. Neither file existed on `dev`, and neither had ever existed on `dev` in any commit.
+  2. `ADR-011` was not an obscure reference. `AGENTS.md` Rule 9, the PR template, `README.md` (×2), `docs/labeling_guidelines.md`, a runbook and the sprint guide all cited it — 18 textual occurrences across 16 lines in 8 files. Readers were told "per ADR-011 D6" and sent to a file that renders as a dead link.
+- **Root Cause:**
+  1. **A governance artifact set was split across a merge boundary.** Commit `a2a248d` added four files that only make sense together — `ADR-010`, `ADR-011`, `sprint8_report.md`, `sprint8_execution_guide.md` — on a local branch that was never pushed. The sync that reached `dev` (`dcd2555`) carried `sprint9_execution_guide.md` and none of its three dependencies. The guide shipped with citations to documents that did not exist.
+  2. **Nothing resolved markdown links.** A relative link to a missing file is not a build failure: it renders as plain text in an editor and as a dead link on GitHub. The author reads the path, recognises the filename, and moves on. Reviewers do the same. The defect is invisible to every check the repository ran.
+  3. **Transient artifacts were filed as permanent documentation.** A per-sprint guide containing CLI prompts sat in `docs/` beside ADRs and architecture documents, where nothing signalled that it had a shelf life or that its links were unverified.
+- **Mandatory Takeaways & Engineering Resolutions:**
+  1. **Verify a move mechanically, not by reading the diff** (`tools/docs/verify_doc_move.py`): takes the pre-move file from a git ref, applies only the declared link rewrites, and demands a byte-for-byte match. It also classifies every dead link as *pre-existing* (the target never existed) or *regression* (the move broke a link that used to resolve) — a distinction that a human reading a diff cannot make reliably.
+  2. **A governance artifact set must land in one commit.** An ADR, the guide that executes it, and the report that motivated it travel together. If a commit cannot be merged whole, the missing pieces must be tracked before the surviving piece is cited from anywhere else.
+  3. **Link resolution belongs in CI, not in review.** A documentation PR that introduces a relative link to a non-existent path must fail the build. Until that gate exists, every link in every document is an unverified claim.
+  4. **Separate permanent documentation from per-sprint scaffolding.** `docs/sprints/` now carries an explicit lifecycle: a guide exists while its sprint is open, and is deleted or folded into a retrospective when the sprint closes. Scaffolding that outlives its sprint is scaffolding nobody dares delete.
