@@ -8,15 +8,15 @@
 > [#301](https://github.com/529-studio/projectKV/issues/301),
 > [#302](https://github.com/529-studio/projectKV/issues/302),
 > [#309](https://github.com/529-studio/projectKV/issues/309)),
-> bám sát [ADR-011](ADR-011-sprint8-audit-and-sprint9-plan.md) (D1-D8) và kết quả audit
-> [Sprint 8 Report](sprint8_report.md). Tài liệu sẵn sàng đưa vào vận hành.
+> bám sát [ADR-011](../ADR-011-sprint8-audit-and-sprint9-plan.md) (D1-D8) và kết quả audit
+> [Sprint 8 Report](../sprint8_report.md). Tài liệu sẵn sàng đưa vào vận hành.
 > Issue #309 (S9-T7) bổ sung ngày 2026-10-25: quá trình review E2E PolygonCanvas phát hiện
 > taxonomy hướng `dir_a`/`dir_b` mới chỉ tồn tại ở nhãn phân loại trong khi model đếm xe toàn khung hình —
 > tắc nghẽn một chiều ("kẹt 1 bên") không tách được; polygon `roadway` mang thuộc tính `direction`
 > sẽ mở khóa đếm xe theo chiều làm đầu vào cho S9-T6.
 > Theo dõi tiến độ trên GitHub Projects v2 board **ProjectKV** (ADR-011 D6; Plane Hub đã decommission).
 
-Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers thực thi toàn bộ Sprint 9 Backlog theo quy chuẩn [ADR-011](ADR-011-sprint8-audit-and-sprint9-plan.md) (Ground-Truth Segmentation Flywheel & Live Model Retraining), [GO_BACKEND_ARCHITECTURE.md](GO_BACKEND_ARCHITECTURE.md) và [AGENTS.md](../AGENTS.md).
+Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers thực thi toàn bộ Sprint 9 Backlog theo quy chuẩn [ADR-011](../ADR-011-sprint8-audit-and-sprint9-plan.md) (Ground-Truth Segmentation Flywheel & Live Model Retraining), [GO_BACKEND_ARCHITECTURE.md](../GO_BACKEND_ARCHITECTURE.md) và [AGENTS.md](../../AGENTS.md).
 
 ---
 

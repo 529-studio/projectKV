@@ -56,5 +56,6 @@ Refer directly to [`AGENTS.md`](../AGENTS.md) for the complete and authoritative
 ## 5. Documentation & Historical Reports
 
 - **Engineering Lessons Learned Index:** [`docs/lessons/INDEX.md`](lessons/INDEX.md)
+- **Sprint Guides (in flight only):** [`docs/sprints/README.md`](sprints/README.md)
 - **Historical Metrics Scorecard (as of 2026-10-30):** [`docs/reports/project-status-scorecard-2026-10-30.md`](reports/project-status-scorecard-2026-10-30.md)
 - **Documentation Audit & Remediation Status:** [`docs/reports/agent-context-bloat-audit-2026-10-30.md`](reports/agent-context-bloat-audit-2026-10-30.md)
