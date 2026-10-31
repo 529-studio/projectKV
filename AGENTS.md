@@ -2,7 +2,7 @@
 
 This document defines the core principles, design standards, and mandatory technical rules for all AI Agents and developers contributing to this codebase.
 
-1. **Design & UX Philosophy**: Minimalist, monochromatic, zero-emoji in user-facing UI and backend logs. Web UI supports bilingual i18n (`vi` default with full diacritics, `en` secondary). Codebase, documentation, commit messages, and tooling must be 100% English.
+1. **Design & UX Philosophy**: Minimalist, monochromatic, zero-emoji in user-facing UI and backend logs. Web UI supports bilingual i18n (`vi` default with full diacritics, `en` secondary). Codebase, documentation, commit messages, and tooling must be 100% English. The single sanctioned exception is `README.vi.md`, the Vietnamese translation of the canonical `README.md`, kept for Vietnamese end users; everything under `docs/`, including sprint guides and reports, is English-only.
 
 2. **Sound Solutions & Root-Cause Verification (Never Fear Effort)**: When implementing any issue or task, never shy away from implementation effort or labor. Never choose sloppy, convenient shortcuts, superficial band-aids, or quick hacks out of convenience or fear of complexity. Always investigate and resolve problems at their absolute root cause, architect the soundest, most maintainable solution for the system, and verify exhaustively end-to-end before considering any task complete.
 
@@ -15,7 +15,7 @@ This document defines the core principles, design standards, and mandatory techn
 6. **Living Documentation & Holistic Knowledge Maintenance**: Whenever any task or PR is implemented or merged, developers and AI agents MUST holistically audit and synchronize all related documentation across the repository:
    - Update any relevant topic, architecture, operational, sprint, or guideline files under `docs/` directly affected by the changes (e.g. execution guides, ADR references, data schemas, API catalogs).
    - Record a new engineering lesson as a new `docs/lessons/L<NN>-<slug>.md` plus one row in `docs/lessons/INDEX.md`. Never append to a single register file — that is how the 143 KB monolith was created.
-   - Update root `README.md` (both English and Vietnamese sections) whenever public features, developer workflows, instructions, setup commands, or system architectures are affected or expanded.
+   - Update root `README.md` (English, canonical) and its translation `README.vi.md` whenever public features, developer workflows, instructions, setup commands, or system architectures are affected or expanded. The English file is authoritative: a change that lands in only one of the two is a defect, not a partial update.
    - Codebase, git history, and PR list remain the sole source of truth; never fabricate claims.
 
 7. **Architecture Standards**: Follow leaf modulith pattern in `services/go-server` (see `GO_BACKEND_ARCHITECTURE.md`). Hand-written SQL only (no ORM). Never fetch snapshots directly from frontend; use backend proxy cache. Run `make swagger` on API route changes.

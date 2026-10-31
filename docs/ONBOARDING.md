@@ -23,7 +23,7 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 ## 3. Local Development Quickstart
 
-For detailed prerequisites, environment variables, and setup instructions, see [`README.md`](../README.md).
+For detailed prerequisites, environment variables, and setup instructions, see [`README.md`](../README.md) — English, canonical. The Vietnamese translation is [`README.vi.md`](../README.vi.md).
 
 ```bash
 # 1. Start core web and backend services:
