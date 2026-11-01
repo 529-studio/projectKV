@@ -1,7 +1,7 @@
 # Agent Context Surface Audit — Documentation Bloat & Instruction-Set Fragmentation
 
 - **Generated At**: `2026-10-30`
-- **Status Last Verified**: `2026-10-31` — P0, P1.1 and P1.2a are merged; P1.2b, P1.2c and all of P2 remain open. See §7 for the per-item status, the measured effect, and the four estimates this audit got wrong.
+- **Status Last Verified**: `2026-11-01` — P0 and all of P1 except the P1.2c translation are merged (`dev` at `4a51363`). Still open: #341 (translate the sprint guide), #342 (the stranded Sprint 8 artifacts) and all of P2. See §7 for the per-item status, the measured effect, and the six corrections this audit had to make to itself.
 - **Baseline Commit**: `010ee50` — the `dev` tip the audit measured (47 tracked markdown files, 501,618 bytes). Every figure in §1-§6 describes that commit and is **not** the current state of the tree; §7 carries the current numbers.
 - **Scope**: `AGENTS.md`, `docs/**/*.md`, `README.md`, `.agents/skills/`, `.claude/skills/`, `services/go-server/internal/GEMINI.md`, plus the context-loading behavior of the agent CLIs in use (agy/Antigravity, Claude Code, Codex CLI, zcode/GLM)
 - **Method**: byte-level measurement of every tracked markdown file; binary inspection of each installed CLI to determine which instruction files it auto-loads; cross-reference diff of the duplicated rule sets
@@ -21,7 +21,7 @@ Two defects were more serious than the raw size, because they were correctness f
 
 The remediation below is **progressive disclosure plus single source of truth**, not deletion. The engineering lessons and ADRs are genuinely valuable; they simply must not be loaded wholesale on every turn.
 
-Both correctness defects are now closed, and the two monoliths have been split. The always-read set dropped from **~94k tokens worst case to 25,095 bytes (~6.3k tokens)** at `a2d578b`, a **93% reduction**, while the historical content was preserved rather than deleted — which is why the corpus total barely moved. §7 records the status of every item below with its measured effect.
+Both correctness defects are now closed, and the two monoliths have been split. The always-read set dropped from **~94k tokens worst case to 26,422 bytes (~6.6k tokens)** at `4a51363`, a **93% reduction**, while the historical content was preserved rather than deleted — which is why the corpus total barely moved. §7 records the status of every item below with its measured effect.
 
 ---
 
@@ -129,16 +129,16 @@ The **Status** column was added on `2026-10-31`; the Action and Rationale column
 | 6 | Split `lesson_learn.md` into `docs/lessons/L01-*.md` … `L58-*.md` plus a `docs/lessons/INDEX.md` holding `number \| title \| one-line guardrail \| link` (~2 KB) | 35.7k tokens of always-read context becomes ~500 tokens; lessons open on demand. Also fixes the numbering defects | Done — #334 / #333. 142,821 B → 15,255 B INDEX + 57 files. The "~2 KB" estimate was wrong: the index is **15 KB** |
 | 7 | Rewrite Rule 6: append to the specific lesson file and add one INDEX row; explicitly forbid appending to a monolithic file | Removes the mechanism that caused the growth | Done — #334. New bullet in `AGENTS.md` Rule 6 |
 | 8 | Reduce `project_status.md` to `docs/ONBOARDING.md` (≤150 lines): purpose, service/port map, quickstart, links. Move metrics and scorecards to `docs/reports/` | 16.7k tokens of duplication with `AGENTS.md` and `README.md` | Done — #336 / #335. 66,630 B → 3,122 B onboarding + 60,680 B scorecard moved verbatim |
-| 9 | Move sprint guides to `docs/sprints/`, translate to English, archive completed sprints | Satisfies Rule 1; keeps transient artifacts out of the permanent doc set | **Open** — P1.2c. `docs/sprint9_execution_guide.md` is still 18,814 B / 284 lines, 45 of them with Vietnamese diacritics |
-| 10 | Split `README.md` into `README.md` (English, canonical) and `README.vi.md` | Removes the EN/VI duplication from every setup read | **Open** — P1.2b. `README.md` is still 41,717 B, holding the English section from L50 and the Vietnamese section from L285 |
+| 9 | Move sprint guides to `docs/sprints/`, translate to English, archive completed sprints | Satisfies Rule 1; keeps transient artifacts out of the permanent doc set | **Moved, not translated** — P1.2c (#343). `docs/sprints/sprint9_execution_guide.md` is 18,829 B / 284 lines with 406 diacritics across 49 lines. The move is byte-verified by `tools/docs/verify_doc_move.py`: +15 B, all of it `../` prefixes on four link targets. Translation is #341; archiving waits for Sprint 9 to close (#298, #300, #302, #309 still open) |
+| 10 | Split `README.md` into `README.md` (English, canonical) and `README.vi.md` | Removes the EN/VI duplication from every setup read | **Done** — P1.2b (#339). `README.md` 41,717 B → 24,254 B; `README.vi.md` is 2,183 B. The Vietnamese file shipped as a full translation and was cut to a quickstart before merge, because that translation had drifted four days after being written; `tools/docs/check_readme_vi_parity.py` now enforces the four facts that must stay in sync |
 
 ### P2 — Prevent recurrence (approximately 8 hours)
 
 | # | Action | Rationale | Status |
 |---|---|---|---|
-| 11 | Add `make docs-lint` and a CI gate enforcing: entry files ≤ 12 KB; each ADR ≤ 25 KB; unique ADR numbers; internal links resolve; no tracked file > 1 MB; `docs/**` English-only except `README.vi.md` | Catches D4, D5 and D6 automatically from now on | **Open** — must land after item 9, otherwise the English-only rule fails immediately on the Vietnamese sprint guide |
-| 12 | Add a "Context Budget" rule to `AGENTS.md`: never read a file over 25 KB wholesale — use `grep` / `sed -n` ranges; every long document must ship with an INDEX | Prevents the next monolith | **Open** — cheapest remaining item; best bundled with item 11 |
-| 13 | Reconcile ADRs: create stubs for 002/003/005/006/008/010/011 with status `Superseded` or `Merged into`, or rewrite the references; renumber the second `ADR-009` to `ADR-009b` | Removes 50+ dangling references | **Open** — re-measured on `2026-10-31`: 68 references across 29 files, and two files still share the `ADR-009` number |
+| 11 | Add `make docs-lint` and a CI gate enforcing: entry files ≤ 12 KB; each ADR ≤ 25 KB; unique ADR numbers; internal links resolve; no tracked file > 1 MB; `docs/**` English-only except `README.vi.md` | Catches D4, D5 and D6 automatically from now on | **Open** — #346. Must land after #341, otherwise the English-only rule fails immediately on the Vietnamese sprint guide |
+| 12 | Add a "Context Budget" rule to `AGENTS.md`: never read a file over 25 KB wholesale — use `grep` / `sed -n` ranges; every long document must ship with an INDEX | Prevents the next monolith | **Open** — #347, cheapest remaining item; best bundled with item 11 |
+| 13 | Reconcile ADRs: create stubs for 002/003/005/006/008/010/011 with status `Superseded` or `Merged into`, or rewrite the references; renumber the second `ADR-009` to `ADR-009b` | Removes 50+ dangling references | **Open** — re-measured on `2026-11-01`: **72 references across 31 files** (this report excluded, since it cites the defect), and two files still share the `ADR-009` number. #342 covers the four artifacts that would recover ADR-010 and ADR-011 |
 
 ### Estimate (per `AGENTS.md` Rule 3)
 
@@ -151,7 +151,7 @@ The **Status** column was added on `2026-10-31`; the Action and Rationale column
 
 Actuals so far: P0 **~2 h** as estimated. P1.1 cost **~1.5 h** instead of the 6-8 h budgeted for the whole P1 package, because the split was performed by a deterministic script (`tools/docs/split_lessons.py`) rather than by retyping 143 KB of prose. P1.2a cost **~1.5 h**.
 
-Expected outcome: baseline context cost falls from **~94k tokens to ~3-4k tokens** (`AGENTS.md` plus the lesson INDEX), and all four CLIs read **the same, correct rule set**. Measured: the always-read set is **25,095 bytes ≈ 6.3k tokens**, above the 3-4k target because the lesson index carries titles plus guardrails rather than titles alone. The 93% reduction against the 94k baseline stands.
+Expected outcome: baseline context cost falls from **~94k tokens to ~3-4k tokens** (`AGENTS.md` plus the lesson INDEX), and all four CLIs read **the same, correct rule set**. Measured: the always-read set is **26,422 bytes ≈ 6.6k tokens**, above the 3-4k target because the lesson index carries titles plus guardrails rather than titles alone. The 93% reduction against the 94k baseline stands.
 
 ---
 
@@ -184,28 +184,40 @@ ls services/go-server/internal
 sed -n '/^```$/,/^```$/p' services/go-server/internal/GEMINI.md | grep -E "→|->"
 ```
 
-Current state, for §7 (`2026-10-31`, `dev` at `a2d578b`):
+Current state, for §7 (`2026-11-01`, `dev` at `4a51363`):
 
 ```bash
 # Always-read set: the files a task actually loads before touching source
 wc -c AGENTS.md CLAUDE.md GEMINI.md docs/ONBOARDING.md docs/lessons/INDEX.md
-#  5656 + 451 + 611 + 3122 + 15255 = 25,095 bytes ~= 6.3k tokens   (at a2d578b)
+#  6330 + 451 + 611 + 3506 + 15524 = 26,422 bytes ~= 6.6k tokens   (at 4a51363)
 
 # Corpus total (moved content, not deleted)
-git ls-files -z '*.md' | xargs -0 cat | wc -c      # 756,333 bytes / 114 files at a2d578b
+git ls-files -z '*.md' | xargs -0 cat | wc -c      # 757,470 bytes / 117 files at 4a51363
+#  this refresh grows this report by ~4 KB, so a run after merge reports a slightly larger total
 
-# Item 9 still open
-wc -l -c docs/sprint9_execution_guide.md
-grep -c '[àáảãạăâđêôơư]' docs/sprint9_execution_guide.md
+# Item 9: moved, not translated (P1.2c)
+wc -l -c docs/sprints/sprint9_execution_guide.md   # 284 lines / 18,829 bytes
+python3 -c "
+import pathlib
+vi=set('ăâđêôơưàảãáạằẳẵắặầẩẫấậèẻẽéẹềểễếệìỉĩíịòỏõóọồổỗốộờởỡớợùủũúụừửữứựỳỷỹýỵ')
+t=pathlib.Path('docs/sprints/sprint9_execution_guide.md').read_text().lower()
+print(sum(t.count(c) for c in vi), 'diacritics on', sum(1 for l in t.splitlines() if any(c in vi for c in l)), 'lines')"
+#  406 diacritics on 49 lines   (grep -c '[àáảãạăâđêôơư]' undercounts: 45, the class is incomplete)
 
-# Item 10 still open
-wc -c README.md && grep -n '^# English\|^# Tiếng Việt' README.md
+# Item 10: split, and the Vietnamese half is a quickstart (P1.2b)
+wc -c README.md README.vi.md                       # 24,254 / 2,183
+python3 tools/docs/check_readme_vi_parity.py       # 6 checks, exit 0
 
-# Item 13 still open (the report itself is excluded, it names every ADR)
-for n in 002 003 005 006 008 010 011; do
-  echo "ADR-$n: $(grep -ro "ADR-$n" --include='*.md' . \
-    | grep -v agent-context-bloat-audit | wc -l) refs"
-done
+# Item 13 still open: 72 occurrences across 31 files, excluding this report
+python3 -c "
+import re,subprocess,pathlib
+d=['ADR-002','ADR-003','ADR-005','ADR-006','ADR-008','ADR-010','ADR-011']
+n=0;s=set()
+for f in subprocess.run(['git','ls-files','*.md'],capture_output=True,text=True).stdout.split():
+    if 'agent-context-bloat-audit' in f: continue
+    c=sum(len(re.findall(x,pathlib.Path(f).read_text(errors='replace'))) for x in d)
+    if c: n+=c;s.add(f)
+print(n,'occurrences across',len(s),'files')"
 ls docs/ADR-*.md
 ```
 
@@ -213,7 +225,7 @@ ls docs/ADR-*.md
 
 ## 7. Remediation Status
 
-Verified on `2026-10-31` against `dev` at `a2d578b`.
+Verified on `2026-11-01` against `dev` at `4a51363`.
 
 ### 7.1 Defects
 
@@ -222,43 +234,47 @@ Verified on `2026-10-31` against `dev` at `a2d578b`.
 | **D1** — modulith rule set duplicated and drifted | **Closed** | `services/go-server/internal/GEMINI.md` is now a 972-byte pointer to `docs/GO_BACKEND_ARCHITECTURE.md` §1-§3 and holds no copy of the import graph. `.claude/skills` is a symlink to `.agents/skills`, so the skill copy is single-source too. |
 | **D2** — skills not synchronized between CLIs | **Closed** | `.claude/skills -> ../.agents/skills`; both CLIs see `architecture-guardian`, `go-modulith` and `go-scaffolder`. |
 | **D3** — no entry point for Claude Code | **Closed in the repository, unverified at runtime** | `CLAUDE.md` (451 B) imports `AGENTS.md` and `docs/GO_BACKEND_ARCHITECTURE.md`; root `GEMINI.md` (611 B) makes the agy load set explicit. The runtime check is still outstanding — see O1. |
-| **D4** — dangling ADR references | **Open** | 68 references across 29 files to ADR-002/003/005/006/008/010/011, none of which exist. Two files still share the `ADR-009` number. |
+| **D4** — dangling ADR references | **Open, root cause identified** | **72 occurrences across 31 files** to ADR-002/003/005/006/008/010/011, none of which exist. This report is excluded from its own count, because it cites the defect repeatedly and would otherwise inflate it. The figure rose from 68/29 at `a2d578b` because two new documents describe the defect and therefore cite it (L59 +5, `docs/sprints/README.md` +1), while retiring the Vietnamese half of `README.md` removed two. #344 traced the cause: `ADR-010` and `ADR-011` were committed with the Sprint 8 report on a branch that was never pushed (`a2a248d`), and the sync that reached `dev` (`dcd2555`) carried only the sprint guide. Tracked in #342. Two files still share the `ADR-009` number. |
 | **D5** — repository hygiene | **Partly closed** | `notify-preview` gitignored (`.gitignore:56`); `.zcode/` declared once. Lesson numbers are preserved exactly and never renumbered, because other documents cite them by number; `docs/lessons/INDEX.md` documents the missing Lesson 54, and the source order (56 before 55) is kept as-is rather than silently reordered. Still tracked: 11 files / 3,313,492 B under `docs/proofs/` and `tools/geo-enrich/data/phuong_boundaries.geojson` at 18,953,890 B. |
-| **D6** — Vietnamese sprint guide | **Open** | `docs/sprint9_execution_guide.md` is still 18,814 B / 284 lines, 45 of them containing Vietnamese diacritics. |
+| **D6** — Vietnamese sprint guide | **Moved, not translated** | `docs/sprints/sprint9_execution_guide.md` is 18,829 B / 284 lines with 406 diacritics across 49 lines — unchanged prose, four `../` prefixes added by the move. Out of the permanent doc set, still a Rule 1 violation until #341 translates it. |
 
 ### 7.2 Measured effect on the always-read set
 
-This is the metric that matters, and it is the one that moved. Sizes are from `a2d578b`:
+This is the metric that matters, and it is the one that moved. Sizes are from `4a51363`:
 
 | File | Bytes | Loaded |
 |---|---|---|
-| `AGENTS.md` | 5,656 | every task |
-| `docs/lessons/INDEX.md` | 15,255 | when a lesson is relevant |
-| `docs/ONBOARDING.md` | 3,122 | onboarding and setup tasks |
+| `AGENTS.md` | 6,330 | every task |
+| `docs/lessons/INDEX.md` | 15,524 | when a lesson is relevant |
+| `docs/ONBOARDING.md` | 3,506 | onboarding and setup tasks |
 | `GEMINI.md` | 611 | agy |
 | `CLAUDE.md` | 451 | Claude Code |
-| **Total** | **25,095** | **≈ 6.3k tokens** |
+| **Total** | **26,422** | **≈ 6.6k tokens** |
 
-This status refresh adds 154 bytes to `docs/ONBOARDING.md` (one link to this report), so the live total after merge is **25,249 bytes ≈ 6.3k tokens**. The figure is pinned to a commit on purpose: any edit to these five files moves it, and a number with no commit attached is a number nobody can check.
+The total is 1,327 B larger than at `a2d578b`, and all of it is deliberate: `AGENTS.md` +674 B (Rule 1 and Rule 6 rewritten to describe the quickstart instead of a translation), `docs/ONBOARDING.md` +384 B (this report's link, the `README.vi.md` pointer, the `docs/sprints/` index), `docs/lessons/INDEX.md` +269 B (one new lesson, L59). Paying 1.3 KB of rule text to stop a 143 KB register from regrowing is the trade this audit exists to make.
+
+The figure is pinned to a commit on purpose: any edit to these five files moves it, and a number with no commit attached is a number nobody can check.
 
 Against the 377 KB / ~94k-token worst case measured in §2, that is a **93% reduction**.
 
-The corpus total did **not** fall: 47 files / 501,618 bytes at the baseline, 114 files now. That is expected and is not a regression — #327 added 231,349 bytes of genuinely new content, and #334/#336 moved roughly 208 KB of it out of the always-read set into on-demand files rather than deleting it. A corpus-size metric would have reported failure for a change that succeeded; the always-read set is the metric that actually moved.
+The corpus total did **not** fall: 47 files / 501,618 bytes at the baseline, **117 files / 757,470 bytes** now. That is expected and is not a regression — #327 added 231,349 bytes of genuinely new content, and #334/#336 moved roughly 208 KB of it out of the always-read set into on-demand files rather than deleting it. A corpus-size metric would have reported failure for a change that succeeded; the always-read set is the metric that actually moved.
 
 Two files shrank to redirect stubs so that pre-existing links keep resolving: `docs/lesson_learn.md` (142,821 B → 582 B) and `docs/project_status.md` (66,630 B → 711 B).
 
-### 7.3 Corrections to this audit's own estimates
+### 7.3 Corrections to this audit's own estimates and measurements
 
 Recorded because an audit that hides its own misses is not auditable:
 
-1. **Lesson index size.** Item 6 predicted `INDEX.md` at "~2 KB" and "~500 tokens". It is **15,255 bytes (~3.8k tokens)**, because the index carries a guardrail column extracted from each lesson, not just titles. The guardrails are what let an agent decide whether to open a lesson at all, so the extra 13 KB buys real work — but the prediction was optimistic by roughly 7x.
-2. **Target context cost.** §5 predicted a floor of "~3-4k tokens". The measured floor is **6.3k tokens**. The 93% reduction stands; the absolute target did not.
-3. **P1 effort.** Budgeted at 6-8 h for the entire package. P1.1 came in at ~1.5 h and P1.2a at ~1.5 h. The gap is methodological, not a windfall: the split was done by a deterministic script, so no model read or rewrote 143 KB of prose.
+1. **Lesson index size.** Item 6 predicted `INDEX.md` at "~2 KB" and "~500 tokens". It is **15,524 bytes (~3.9k tokens)**, because the index carries a guardrail column extracted from each lesson, not just titles. The guardrails are what let an agent decide whether to open a lesson at all, so the extra 13 KB buys real work — but the prediction was optimistic by roughly 7x.
+2. **Target context cost.** §5 predicted a floor of "~3-4k tokens". The measured floor is **6.6k tokens**. The 93% reduction stands; the absolute target did not.
+3. **P1 effort.** Budgeted at 6-8 h for the entire package. P1.1 came in at ~1.5 h, P1.2a at ~1.5 h, P1.2c at ~45 min. The gap there is methodological, not a windfall: the split and the move were done by deterministic scripts, so no model read or rewrote 143 KB of prose. **P1.2b is the exception at ~3 h**, and the extra time was not spent on the split — it went on noticing that the split preserved a document that had already drifted, and on building the check that keeps it from drifting again. Purely mechanical items are cheap; the items where the correct shape has to be decided are not.
 4. **`GEMINI.md`.** Item 2 specified a file that imports `AGENTS.md`. The shipped file is a non-importing note, because agy already loads `AGENTS.md` and an `@`-import would have loaded the same 10 rules twice.
+5. **P1.2b scope.** Item 10 read as "split the file", and the split was mechanical and correct. What it did not anticipate is that keeping the Vietnamese half intact would preserve a document that had already drifted four days after being written (`b4ad721` → `dcd2555`), and that Rule 6 as first drafted would then have made that drift a permanent parity obligation. The fix landed before merge (`47b3d3b`), but it was a scope change found by reviewing the result, not by the estimate. Estimating a documentation change by its file operations misses the question that decides whether the result is maintainable.
+6. **Vietnamese diacritic count.** D6 and item 9 reported "45 lines with Vietnamese diacritics", measured with `grep -c '[àáảãạăâđêôơư]'`. That character class is incomplete — it has no `ằẳẵắặ`, `ầẩẫấậ`, `ềểễếệ`, `ồổỗốộ`, `ờởỡớợ`, `ừửữứự` — so it undercounted. The real figure is **406 diacritics across 49 lines**. The conclusion was unaffected (the guide was Vietnamese either way), but the number in the audit was wrong, and a wrong number that nobody re-runs is how an audit stops being an audit. The reproduction block now carries the command that produces the stated figure.
 
 ### 7.4 Open questions and residual risk
 
 - **O1 — Does Claude Code actually surface `CLAUDE.md`?** `claude -p` returns no output in this environment (reproduced at baseline, with an explicit model and stdin redirected; the gateway answers 200), so the import has never been observed working. One manual `claude` session running `/memory` settles it. Until then, D3 is closed on paper only.
 - **O2 — Binary bloat is untouched.** `docs/proofs/` and the 19 MB GeoJSON are still tracked. P0 blocked one binary; it did not shrink the repository.
-- **O3 — Ordering constraint for item 11.** A `docs-lint` gate that enforces English-only `docs/**` will fail on `docs/sprint9_execution_guide.md` until item 9 lands. Item 11 must follow item 9, or the two must ship together.
+- **O3 — Ordering constraint for item 11.** A `docs-lint` gate that enforces English-only `docs/**` will fail on `docs/sprints/sprint9_execution_guide.md` until #341 lands. The placement half is resolved — the guide is out of the permanent doc set, in `docs/sprints/` with a lifecycle index — but the language half is live: item 11 must follow #341, or the two must ship together.
 - **O4 — The stubs are load-bearing.** `docs/lesson_learn.md` and `docs/project_status.md` are redirects, not empty files, because sprint reports and ADRs still link to them. Deleting them requires a link sweep first; a `docs-lint` link check (item 11) is the prerequisite.
