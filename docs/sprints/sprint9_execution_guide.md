@@ -9,7 +9,7 @@
 > [#302](https://github.com/529-studio/projectKV/issues/302),
 > [#309](https://github.com/529-studio/projectKV/issues/309)),
 > aligned with [ADR-011](../ADR-011-sprint8-audit-and-sprint9-plan.md) (D1-D8) and audit findings in
-> [Sprint 8 Report](../sprint8_report.md). Document is ready for operations.
+> [Sprint 8 Report](../reports/sprint8_report.md). Document is ready for operations.
 > Issue #309 (S9-T7) added 2026-10-25: PolygonCanvas E2E review revealed that
 > directional taxonomy `dir_a`/`dir_b` only existed in classification labels while the model counted vehicles frame-wide —
 > one-way congestion ("one-side jam") could not be isolated; `roadway` polygon with `direction` attribute
