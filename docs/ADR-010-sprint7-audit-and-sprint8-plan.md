@@ -12,10 +12,12 @@
 - [`docs/lesson_learn.md`](lesson_learn.md) (Lessons 38 through 51)
 - [`docs/project_status.md`](project_status.md) (Lifetime Status & Architecture Ledger)
 
-> **Provenance**: recovered verbatim from `docs/ADR-010-sprint7-audit-and-sprint8-plan.md` at commit `71a47f2f89b7a4d30165833153f785e5e2775e5b`
-> (branch `docs/s8-adr-010-and-execution-guide`, authored 2026-10-23). ADR-011 cited it as its input and it was never merged. Only the string edits declared in
-> `tools/docs/recover_adrs.py` were applied: `sprint7_report.md` was never merged, so its citation is plain text rather than a link to nothing. The `Status` line above is the value
-> recorded at authoring time, not a fresh decision.
+> **Provenance**: recovered from `docs/ADR-010-sprint7-audit-and-sprint8-plan.md` at commit `71a47f2f89b7a4d30165833153f785e5e2775e5b` (branch `docs/s8-adr-010-and-execution-guide`,
+> authored 2026-10-23). ADR-011 cited it as its input and it was never merged. The prose is unedited apart from the declared edits and
+> redactions in `tools/docs/recover_adrs.py`: internal host names become the role names
+> the public documentation already uses (`edge host`, `inference worker`), because
+> `scripts/check-public-safe.sh` forbids the host names in tracked files: `sprint7_report.md` was never merged, so its citation is plain text rather than a link to nothing. The
+> `Status` line above is the value recorded at authoring time, not a fresh decision.
 
 ---
 
@@ -80,16 +82,16 @@ Following Sprint 7 closure, an independent architectural and operational audit i
      ```
    - In Go, `break` inside a `select` only breaks the `select`, NOT the enclosing `for` loop. When `ctx.Done()` fires, execution proceeds directly to `wg.Add(1)` and launches a goroutine with `defer func() { <-sem; wg.Done() }()`. Because `sem <- struct{}{}` was skipped, `<-sem` drains another worker's token or blocks indefinitely, deadlocking `wg.Wait()` during container shutdown.
 
-5. **Hardware Constraints on `dev-box`**:
-   - `dev-box` (AMD Ryzen 7 6800HS) has a hard 20 GB disk limit. Automated `docker-disk-guard.sh` triggers cleanup at 80% (16 GB ceiling).
-   - The Docker container slice on `dev-box` is capped at `--cpus="2.0" --memory="2048m"`. A 2 GB RAM limit causes PyTorch dataloaders to be terminated by the Linux OOM-killer during training.
-   - **Architectural Directive**: Training must be executed off-box (workstation / Colab). Only exported OpenVINO FP16 IR artifacts (`yolov8n-seg.xml`, `yolov8n-seg.bin`, ~6.5 MB) may be deployed to `dev-box`.
+5. **Hardware Constraints on `inference worker`**:
+   - `inference worker` (AMD Ryzen 7 6800HS) has a hard 20 GB disk limit. Automated `docker-disk-guard.sh` triggers cleanup at 80% (16 GB ceiling).
+   - The Docker container slice on `inference worker` is capped at `--cpus="2.0" --memory="2048m"`. A 2 GB RAM limit causes PyTorch dataloaders to be terminated by the Linux OOM-killer during training.
+   - **Architectural Directive**: Training must be executed off-box (workstation / Colab). Only exported OpenVINO FP16 IR artifacts (`yolov8n-seg.xml`, `yolov8n-seg.bin`, ~6.5 MB) may be deployed to `inference worker`.
 
 6. **Crowdsource Black Hole**:
    - `internal/feedback` archives user flood reports to Cloudflare R2, but has zero runtime integration with `FloodHexAggregator`, `hotsetStore`, or `liveHub.Broadcast`. When a commuter reports flooding, the live map remains completely unchanged.
 
 7. **Staging Alert Paralysis (Issue #246)**:
-   - Staging (`homesrv` Stack 14) continues to run with `TELEGRAM_BOT_TOKEN=""` in simulation mode. Even if set, because the CV engine outputs `SeverityUnknown`, `dispatchFloodAlert` is never called.
+   - Staging (`edge host` Stack 14) continues to run with `TELEGRAM_BOT_TOKEN=""` in simulation mode. Even if set, because the CV engine outputs `SeverityUnknown`, `dispatchFloodAlert` is never called.
 
 ---
 
@@ -150,11 +152,11 @@ Between 2026-10-17 and 2026-10-23, the engineering team executed and merged foun
 1. **Segmentation Annotation Toolchain**:
    - Create `tools/eval/export_yolo_seg.py` converting R2 proofs and polygon labels into Ultralytics YOLO segmentation format (`images/` and `labels/` with normalized polygon vertices).
 2. **Off-Box Training & OpenVINO FP16 Deployment**:
-   - Execute model training off-box (Google Colab / external GPU) on curated HCMC rain frames to avoid `dev-box` 20 GB disk and 2 GB RAM OOM termination.
+   - Execute model training off-box (Google Colab / external GPU) on curated HCMC rain frames to avoid `inference worker` 20 GB disk and 2 GB RAM OOM termination.
    - Export best checkpoint to OpenVINO FP16 (`yolov8n-seg.xml`, `yolov8n-seg.bin`, ~6.5 MB).
    - Mount model in `services/cv-engine/server.py` and implement dual-layer physical triangulation ($R_{\text{water}} \ge 0.15$ + motorcycle wheel submersion $\ge 20\text{ cm}$) per ADR-009.
 
-### Decision 5: Live Staging Telegram Verification & Activation on `homesrv` Stack 14 (S8-T9)
+### Decision 5: Live Staging Telegram Verification & Activation on `edge host` Stack 14 (S8-T9)
 1. **Resolve Long-Deferred Issue #246**:
    - Configure live `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in Portainer Stack 14 staging environment.
    - Verify live alert dispatch on verified flood events, 30-minute sliding quiet period debouncing, token sanitization in error logs, and bilingual HTML rendering with zero emojis per Rule 1.
@@ -194,7 +196,7 @@ In accordance with **AGENTS.md Rule 2** (Sound Solutions & Root-Cause Verificati
 
 ### S8-T8 (Road Water Segmentation Toolchain)
 - [ ] `tools/eval/export_yolo_seg.py` exports R2 ground truth into Ultralytics YOLO segmentation format.
-- [ ] Exported OpenVINO FP16 model runs on `dev-box` within $\le 45\text{ ms}$ latency and $\le 250\text{ MB}$ RSS.
+- [ ] Exported OpenVINO FP16 model runs on `inference worker` within $\le 45\text{ ms}$ latency and $\le 250\text{ MB}$ RSS.
 - [ ] Re-run `make benchmark-real` verifying flood detection sensitivity on 2026-10-13 rain frames.
 
 ### S8-T9 (Live Staging Telegram Deployment)

@@ -11,10 +11,12 @@
 - [`docs/lesson_learn.md`](lesson_learn.md) (Lessons 29 through 37)
 - [`AGENTS.md`](../AGENTS.md) (Core Rules 1 through 9)
 
-> **Provenance**: recovered verbatim from `docs/ADR-008-sprint6-audit-and-sprint7-plan.md` at commit `d9f9edaa4c42e2989e31924f0c4366a3be84bbde`
-> (branch `docs/adr-008-sprint7-plan`, authored 2026-10-15). The scorecard cites it and it was never merged. Only the string edits declared in
-> `tools/docs/recover_adrs.py` were applied: `sprint6_report.md` was never merged, so its citation is plain text rather than a link to nothing. The `Status` line above is the value
-> recorded at authoring time, not a fresh decision.
+> **Provenance**: recovered from `docs/ADR-008-sprint6-audit-and-sprint7-plan.md` at commit `d9f9edaa4c42e2989e31924f0c4366a3be84bbde` (branch `docs/adr-008-sprint7-plan`,
+> authored 2026-10-15). The scorecard cites it and it was never merged. The prose is unedited apart from the declared edits and
+> redactions in `tools/docs/recover_adrs.py`: internal host names become the role names
+> the public documentation already uses (`edge host`, `inference worker`), because
+> `scripts/check-public-safe.sh` forbids the host names in tracked files: `sprint6_report.md` was never merged, so its citation is plain text rather than a link to nothing. The
+> `Status` line above is the value recorded at authoring time, not a fresh decision.
 
 ---
 
@@ -44,7 +46,7 @@ An exhaustive empirical audit of `tools/eval/label_real_batch.py` (commit `a5e1b
 2. **Active Crowdsource Feedback Flywheel (Human-in-the-Loop)**: When commuters view camera snapshots, if the model misclassifies conditions, provide a tactile `[Báo cáo ngập tại đây]` affordance. Automatically archive authentic contested production snapshots directly to Cloudflare R2 (`warded-proofs/feedback/`) with `trust: unverified` metadata and anti-spam rate limiting to continuously harvest real ground truth.
 3. **Rebuild Data Labeling Taxonomy**: Overcome the fatal flaws of naive string heuristics and whole-scene tags by introducing directional multi-lane schemas (`inbound`/`outbound`), traffic light pause states (`WAITING_RED_LIGHT`), and motorcycle wheel waterline occlusion metrics.
 4. **Map Clutter Hygiene**: Filter out 125 offline cameras (`NOT_IMAGE`/`NO_SIGNAL` black dots) by default to eliminate frustrating 503 ghost modals.
-5. **Operational Verification**: Complete live Telegram alert verification on staging (`homesrv` Stack 14).
+5. **Operational Verification**: Complete live Telegram alert verification on staging (`edge host` Stack 14).
 6. **Future Commute Alerting**: Keep the 30-minute homebound commute alert feature in the design backlog until the Valhalla/OSRM routing infrastructure spike is established.
 
 ---
@@ -54,7 +56,7 @@ An exhaustive empirical audit of `tools/eval/label_real_batch.py` (commit `a5e1b
 ### Decision 1: Transition to Autonomous Arterial Vision (50 Hot Set Cameras First)
 No cloud VLM calls will be made for traffic classification. Instead, we establish autonomous on-premise perception across the 50 arterial Hot Set cameras (Võ Văn Kiệt, Mai Chí Thọ, Điện Biên Phủ, Cộng Hòa, Trường Chinh, QL1):
 - A background worker in `services/go-server/internal/hotset/scheduler.go` polls the 50 arterial cameras every 60s.
-- Inferences are dispatched to local `cv-engine` running OpenVINO FP16 YOLOv8n on `dev-box`.
+- Inferences are dispatched to local `cv-engine` running OpenVINO FP16 YOLOv8n on `inference worker`.
 - Saturation Index ($SI$) is computed using corridor-specific capacities (S6-T2) and Schmitt trigger hysteresis (Lesson 33).
 - Results are cached in an in-memory thread-safe store (`hotset.Store`) and exposed via `GET /api/v1/cameras/hotset/status`.
 - Commuters viewing the map see dynamic colored markers without clicking individual cameras:
@@ -95,7 +97,7 @@ Claude correctly noted that stock COCO YOLOv8n has 0% flood recall, meaning pure
 - Trigger is automated: When Open-Meteo detects active rainfall ($\ge 0.10\text{mm/h}$), the Go background worker automatically verifies the 10 known flood chokepoints at a conservative rate ($\le 2\text{ RPM}$).
 - Automatically updates map markers to Blue badge `[NGẬP NƯỚC]` and dispatches Telegram alerts.
 
-### Decision 6: Live Staging Telegram Verification (Stack 14 homesrv)
+### Decision 6: Live Staging Telegram Verification (Stack 14 edge host)
 The notification subsystem (`internal/notify`, `internal/subscription`, sliding 30-min debouncer) was fully tested under unit tests in Sprint 6 (PR #241), but currently runs in simulation mode (`TELEGRAM_BOT_TOKEN=""`) on staging:
 - Deploy dedicated staging bot token to Portainer Stack 14.
 - Execute live end-to-end alert verification script `scripts/verify_staging_telegram.sh`.
@@ -112,7 +114,7 @@ Commute route monitoring (predicting route conditions 30 minutes before departur
 
 | Ticket | Summary & Scope | Dependencies | Active Effort | Delivery Window | Issue Tracker |
 |---|---|:---:|:---:|:---:|:---:|
-| **S7-T1** | `[ci+ops] Live Staging Telegram Flood Alert Verification (Stack 14 homesrv)` | None | 4h | 0.5 day | [#246](https://github.com/529-studio/projectKV/issues/246) |
+| **S7-T1** | `[ci+ops] Live Staging Telegram Flood Alert Verification (Stack 14 edge host)` | None | 4h | 0.5 day | [#246](https://github.com/529-studio/projectKV/issues/246) |
 | **S7-T2** | `[web] Hide Offline / No-Signal Cameras by Default on Map (Map Hygiene)` | None | 4h | 0.5 day | [#247](https://github.com/529-studio/projectKV/issues/247) |
 | **S7-T3** | `[web] Human-in-the-Loop "Báo cáo ngập tại đây" Button & Tactile Modal Feedback` | None | 6h | 1 day | [#248](https://github.com/529-studio/projectKV/issues/248) |
 | **S7-T4** | `[go-server] internal/feedback Leaf Package & Cloudflare R2 Archiver` | S7-T3 | 10h | 1.5 days | [#249](https://github.com/529-studio/projectKV/issues/249) |

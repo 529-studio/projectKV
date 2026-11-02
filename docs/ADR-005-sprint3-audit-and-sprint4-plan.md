@@ -4,10 +4,12 @@
 **Date**: 2026-10-05
 **Related**: ADR-004 (D6 accuracy gate, D10 provenance, Finding 1 standby hardening)
 
-> **Provenance**: recovered verbatim from `docs/ADR-005-sprint3-audit-and-sprint4-plan.md` at commit `d9f9edaa4c42e2989e31924f0c4366a3be84bbde`
-> (branch `docs/adr-008-sprint7-plan`, authored 2026-10-05). `dev` cited this decision 23 times and did not contain it. Only the string edits declared in
-> `tools/docs/recover_adrs.py` were applied. The `Status` line above is the value
-> recorded at authoring time, not a fresh decision.
+> **Provenance**: recovered from `docs/ADR-005-sprint3-audit-and-sprint4-plan.md` at commit `d9f9edaa4c42e2989e31924f0c4366a3be84bbde` (branch `docs/adr-008-sprint7-plan`,
+> authored 2026-10-05). `dev` cited this decision 23 times and did not contain it. The prose is unedited apart from the declared edits and
+> redactions in `tools/docs/recover_adrs.py`: internal host names become the role names
+> the public documentation already uses (`edge host`, `inference worker`), because
+> `scripts/check-public-safe.sh` forbids the host names in tracked files. The
+> `Status` line above is the value recorded at authoring time, not a fresh decision.
 
 ## 1. Context
 
@@ -40,7 +42,7 @@ fabricated one. This is exactly the D4/D10 honesty behavior the system is
 designed to have when a capability isn't ready yet. No violation occurred.
 
 What still stands, with the alarm removed: OpenVINO model weights have not
-been deployed to `local-homesrv` yet (Sprint 3's own Outstanding Debt item #4
+been deployed to `local edge host` yet (Sprint 3's own Outstanding Debt item #4
 confirms this is a TODO, not done), so the self-hosted vehicle detector is not
 actually producing verdicts in production. The gap is between the Sprint 3
 report's "100% Completed" / "production-grade, trustworthy" framing and this
@@ -64,7 +66,7 @@ fabricated has ever been shown to the public.**
 
 ### Finding A — Unresolved sub-question (added 2026-10-05, devops SSH audit)
 
-Devops (`@thdat-vu`) confirmed via direct SSH to `local-homesrv`: model weights
+Devops (`@thdat-vu`) confirmed via direct SSH to `local edge host`: model weights
 ARE present in the `warded-model-weights` volume (`yolov8n.bin`/`.xml`, dated
 2026-10-04), `warded-model`'s `/healthz` reports `model_loaded: true`, and a
 manual inference test against the container succeeded (~625ms latency). The
@@ -255,7 +257,7 @@ calendar days — T3 specifically has a calendar-time caveat noted inline.
 | **T6** | Resolve the container-detection gap (Finding D, Issue #186): decided per `docs/decision-container-class-gap.md` — Option (a) adopted: fold `Container` into `Truck` (PCU = 2.0) matching active COCO model and HCMC arterial daytime freight restrictions | T1 | **1 day decision + 0.5–2 days implementation** | Option (a) documented and implemented; dead code removed. |
 | **T7** | Build a small fixed smoke-test set of known-state cameras (confirmed empty vs. confirmed congested) and check model output against them as part of T4's run, not just anecdotal screenshots (Issue #187) | T2 | **0.5 day** | Implemented via `tools/eval/fixtures/smoke_test_cameras.json` (10 cameras), `tools/eval/verify_smoke_set.py`, and `tools/eval/smoke_test_cameras.md`. Ready for T4. |
 | **T8** | Add mandatory "live production check" to both issue templates' Definition of Done (§5) (Issue #188 / PR #190) | None | **0.5 day** | Merged to dev. |
-| **T9** | Decision: keep self-hosted OpenVINO for traffic given T4's real numbers, or revert some/all affected cameras to the VLM adapter (Issue #197) | T4 | **0.5 day** | Decided per `docs/decision-openvino-vs-vlm.md`: Option (c) adopted — KEEP self-hosted OpenVINO as the authoritative continuous traffic engine (24.01 FPS on dev-box, $0 API cost, zero rate limits) and adopt Decoupled Hybrid Architecture (resolution upgrade to 416x416 for motorcycle recall; VLM reserved for on-demand modal checks and rain-triggered flood audits). Unblocks Sprint 5. |
+| **T9** | Decision: keep self-hosted OpenVINO for traffic given T4's real numbers, or revert some/all affected cameras to the VLM adapter (Issue #197) | T4 | **0.5 day** | Decided per `docs/decision-openvino-vs-vlm.md`: Option (c) adopted — KEEP self-hosted OpenVINO as the authoritative continuous traffic engine (24.01 FPS on inference worker, $0 API cost, zero rate limits) and adopt Decoupled Hybrid Architecture (resolution upgrade to 416x416 for motorcycle recall; VLM reserved for on-demand modal checks and rain-triggered flood audits). Unblocks Sprint 5. |
 
 **Total active effort**: roughly 6–8 days, likely spread over 2–3 calendar
 weeks due to T3's data-accumulation dependency. All Sprint 4 backlog items (T1–T9) are completed or decided.

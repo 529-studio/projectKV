@@ -4,16 +4,18 @@
 **Date**: 2026-10-10
 **Related**: ADR-004 (D6 accuracy gate, D7 storage trigger), ADR-005 (Sprint 3/4 audit), `docs/sprint4_audit_qa.md` (source of findings below)
 
-> **Provenance**: recovered verbatim from `docs/ADR-006-sprint4-audit-and-sprint5-plan.md` at commit `d9f9edaa4c42e2989e31924f0c4366a3be84bbde`
-> (branch `docs/adr-008-sprint7-plan`, authored 2026-10-10). `dev` cited this decision 8 times and did not contain it. Only the string edits declared in
-> `tools/docs/recover_adrs.py` were applied. The `Status` line above is the value
-> recorded at authoring time, not a fresh decision.
+> **Provenance**: recovered from `docs/ADR-006-sprint4-audit-and-sprint5-plan.md` at commit `d9f9edaa4c42e2989e31924f0c4366a3be84bbde` (branch `docs/adr-008-sprint7-plan`,
+> authored 2026-10-10). `dev` cited this decision 8 times and did not contain it. The prose is unedited apart from the declared edits and
+> redactions in `tools/docs/recover_adrs.py`: internal host names become the role names
+> the public documentation already uses (`edge host`, `inference worker`), because
+> `scripts/check-public-safe.sh` forbids the host names in tracked files. The
+> `Status` line above is the value recorded at authoring time, not a fresh decision.
 
 ## 1. Context
 
 Sprint 4 closed all 9 backlog items (T1-T9) and additionally shipped an
-unplanned infrastructure migration (CV inference moved from `local-homesrv`
-to a new worker, `dev-box`). A follow-up audit (`sprint4_audit_qa.md`)
+unplanned infrastructure migration (CV inference moved from `local edge host`
+to a new worker, `inference worker`). A follow-up audit (`sprint4_audit_qa.md`)
 found that T9's "keep self-hosted OpenVINO" decision was reached from a
 theoretical diagnosis (uncalibrated `CapacityFloor`) that was never
 re-verified empirically after the fix (T5) was applied — violating the
@@ -95,8 +97,8 @@ the rest of S5-T4.
 |---|---|---|---:|---|---|
 | **S5-T1** | Re-run `benchmark.py` (D6) and `verify_smoke_set.py` against the 764 labeled frames with current (post-T5) PCU weights; publish updated `eval_report_d6_real.md` and `smoke_eval_d6_real.md` | None | **0.5 day** | [#207](https://github.com/529-studio/projectKV/issues/207) | Execution only, no new code. Closed on 2026-10-10. |
 | **S5-T2** | Object-detection audit: investigate false-positive vehicle hallucination (background/night reflections) and missed detections on occluded queues, using S5-T1's fresh per-camera breakdown | S5-T1 | **1-2 days** | [#208](https://github.com/529-studio/projectKV/issues/208) | Scope narrows based on what S5-T1 actually shows — don't pre-commit to a fix before seeing the new numbers. |
-| **S5-T3** | Decoupled Hybrid Flood pipeline: event-driven VLM dispatch on rain-radar trigger + on-demand dispatch on camera-modal click; curate a real `flood_chokepoint_cameras.json` from authentic municipal flood data (replacing the fabricated "10 chokepoints" reference); correct the rainfall-threshold mismatch between `decision-openvino-vs-vlm.md` (2.0mm/h, unverified) and the actual code thresholds (`rainHexUtils.ts`: 1.0/4.0/15.0mm) — pick one, document the real basis or mark it explicitly as a heuristic pending calibration | None (independent of T1/T2), but hold start until S5-T1 lands per project discipline | **2-3 days** | [#209](https://github.com/529-studio/projectKV/issues/209) | This is real feature work — the first since Sprint 2's H0 hotfix era. Scope it carefully; do not let it expand informally the way `dev-box` did in Sprint 4. |
-| **S5-T4 (Failover)** | Physical disconnection test: `tailscale down` on `dev-box` against live staging, confirm graceful degrade-to-`unknown` end-to-end (not just unit-tested); verify or fix the `profiles: ["model-local"]` fallback mentioned in the Sprint 4 audit but not confirmed working | None | **1 day** | [#210](https://github.com/529-studio/projectKV/issues/210) | Closes the one gap Q6/Q7 explicitly flagged as untested. |
+| **S5-T3** | Decoupled Hybrid Flood pipeline: event-driven VLM dispatch on rain-radar trigger + on-demand dispatch on camera-modal click; curate a real `flood_chokepoint_cameras.json` from authentic municipal flood data (replacing the fabricated "10 chokepoints" reference); correct the rainfall-threshold mismatch between `decision-openvino-vs-vlm.md` (2.0mm/h, unverified) and the actual code thresholds (`rainHexUtils.ts`: 1.0/4.0/15.0mm) — pick one, document the real basis or mark it explicitly as a heuristic pending calibration | None (independent of T1/T2), but hold start until S5-T1 lands per project discipline | **2-3 days** | [#209](https://github.com/529-studio/projectKV/issues/209) | This is real feature work — the first since Sprint 2's H0 hotfix era. Scope it carefully; do not let it expand informally the way `inference worker` did in Sprint 4. |
+| **S5-T4 (Failover)** | Physical disconnection test: `tailscale down` on `inference worker` against live staging, confirm graceful degrade-to-`unknown` end-to-end (not just unit-tested); verify or fix the `profiles: ["model-local"]` fallback mentioned in the Sprint 4 audit but not confirmed working | None | **1 day** | [#210](https://github.com/529-studio/projectKV/issues/210) | Closes the one gap Q6/Q7 explicitly flagged as untested. |
 | **S5-T4 (R2 Storage)** | Cloudflare R2 (S3-compatible) blob storage: upload archiver frames to `warded-proofs`; build a minimal shared web labeler reading from R2 so the team labels from one common source instead of per-machine local copies | None technically, but rotate R2 credentials FIRST (see §3b) before any other work | **1.5-2 days** | [#214](https://github.com/529-studio/projectKV/issues/214) | Justified by collaborative-labeling need (§3b), not the D7 disk-volume trigger, which has not been hit — note this distinction in the ticket itself so it isn't misread later as "D7 threshold reached." |
 
 ## 5. Documentation corrections to make alongside S5-T3
@@ -104,7 +106,7 @@ the rest of S5-T4.
 - `docs/decision-openvino-vs-vlm.md`: correct the "10 known flood chokepoints"
   reference — it was a conflation with the unrelated 10-camera traffic
   smoke-test set (`smoke_test_cameras.json`), not a real flood-chokepoint list.
-- Same file: the "$0 cost" framing for `dev-box` should be qualified as
+- Same file: the "$0 cost" framing for `inference worker` should be qualified as
   API/SaaS cost only — physical hosting (power, bandwidth, hardware wear on
   a team-owned homelab machine) is a real, non-zero cost not previously
   disclosed in the decision record.

@@ -9,13 +9,15 @@
 - [`docs/ADR-010-sprint7-audit-and-sprint8-plan.md`](../ADR-010-sprint7-audit-and-sprint8-plan.md) (Sprint 8 Roadmap: Ground-Truth Perception, Concurrency Resilience & Real-Time Alert Dispatch)
 - `docs/sprint8_execution_guide.md` (Sprint 8 Multi-Wave Execution Guide)
 - [`docs/project_status.md`](../project_status.md) & [`docs/lesson_learn.md`](../lesson_learn.md) (Lessons 52–57)
-- 529 Studio Outline Wiki — `[Arch] Cấu Hình Phần Cứng & Hệ Thống (home-srv & dev-box)`, `[Arch] Tổng Quan Kiến Trúc Hạ Tầng & Danh Mục Dịch Vụ (Self-Infras 2026)` (hardware and topology ground truth)
+- 529 Studio Outline Wiki — `[Arch] Cấu Hình Phần Cứng & Hệ Thống (edge host & inference worker)`, `[Arch] Tổng Quan Kiến Trúc Hạ Tầng & Danh Mục Dịch Vụ (Self-Infras 2026)` (hardware and topology ground truth)
 - GitHub PR ledger: `origin/dev`, PRs #276 → #296
 
-> **Provenance**: recovered verbatim from `docs/sprint8_report.md` at commit `a2a248df8d9138b6a08d062918e1db03969d5a64`
-> (branch `docs/sprint8-report-and-sprint9-plan`, authored 2026-10-24). The live Sprint 9 guide links it as its predecessor's record. Only the string edits declared in
-> `tools/docs/recover_adrs.py` were applied (paths rebased into `docs/reports/`, and the closed sprint's execution guide downgraded to plain text per the lifecycle in `docs/sprints/README.md`). The `Status` line above is the value
-> recorded at authoring time, not a fresh decision.
+> **Provenance**: recovered from `docs/sprint8_report.md` at commit `a2a248df8d9138b6a08d062918e1db03969d5a64` (branch `docs/sprint8-report-and-sprint9-plan`,
+> authored 2026-10-24). The live Sprint 9 guide links it as its predecessor's record. The prose is unedited apart from the declared edits and
+> redactions in `tools/docs/recover_adrs.py`: internal host names become the role names
+> the public documentation already uses (`edge host`, `inference worker`), because
+> `scripts/check-public-safe.sh` forbids the host names in tracked files (paths rebased into `docs/reports/`, and the closed sprint's execution guide downgraded to plain text per the lifecycle in `docs/sprints/README.md`). The
+> `Status` line above is the value recorded at authoring time, not a fresh decision.
 
 ---
 
@@ -26,7 +28,7 @@ Sprint 8 executed three architectural fronts defined by ADR-010: **Concurrency &
 Delivered in this sprint window (PRs #276 → #295 merged; #296 open):
 
 1. **ADR-009 Technical Design Spike (PR #276)**: Self-hosted flood segmentation design document closing Sprint 7's T9 spike.
-2. **CI/CD Runner Resilience (PRs #277, #278)**: dev-box self-hosted runner routing with graceful fallback when offline and paused daily audits.
+2. **CI/CD Runner Resilience (PRs #277, #278)**: inference worker self-hosted runner routing with graceful fallback when offline and paused daily audits.
 3. **Archiver Performance (PR #280)**: `ListDates` optimized with S3 Delimiter scans, eliminating Cloudflare 524 timeouts.
 4. **Cloudflare Zero Trust Access (PR #282)**: OIDC authentication with Dev Token fallback for internal endpoints.
 5. **Waterway Camera Exclusion (PR #284)**: bridge-footing hydrological cameras hidden from map and perception pipeline (Lesson 50).
@@ -123,12 +125,12 @@ An end-to-end audit of the perception/labeling/training loop (repository + Outli
 - Five files merged in #294/#295 are not `gofmt`-clean (`internal/live/constants.go`, `flood_hex.go`, `flood_hex_test.go`, `hub_test.go`, `internal/feedback/feedback_test.go`). CI does not enforce `gofmt`; to be cleaned in Sprint 9.
 
 ### F8. Governance Drift: Plane Hub Decommissioned
-- AGENTS.md Rule 9 still mandates `closes [KV-<card-id>]` Plane Kanban linking, but the 529 Studio Hub (Plane CE) was decommissioned in 10/2026 (RAM reclamation on `home-srv`); project tracking moved to GitHub Projects v2. Sprint 9 amends Rule 9 (ADR-011 D6).
+- AGENTS.md Rule 9 still mandates `closes [KV-<card-id>]` Plane Kanban linking, but the 529 Studio Hub (Plane CE) was decommissioned in 10/2026 (RAM reclamation on `edge host`); project tracking moved to GitHub Projects v2. Sprint 9 amends Rule 9 (ADR-011 D6).
 
 ### F9. Hardware & Topology Ground Truth (Outline docs, for Sprint 9 planning)
-- **dev-box** (Ryzen 7 6800HS, 4 vCPU AVX2, 3.8 GB RAM, 19 GB SSD): hosts `warded-cv-engine` (Stack 17, 2 vCPU / 2 GB cgroup) and the GitHub Actions self-hosted runner. Measured YOLOv8n inference p50 = 16.17 ms; 50-camera batch = 2.24 s — 10–20× faster than `home-srv`.
-- **home-srv** (ZOTAC ZBOX CI320NANO, Celeron N2930 4C non-AVX, 8 GB DDR3L + zram, HDD 5400 RPM): staging ingress (`warded-stg.529studio.site`), Traefik, Redis, SQLite; internal `warded-model` fallback only.
-- Backend → dev-box inference round trip over Tailscale ≈ 110 ms (94 ms RTT + 16 ms compute), with automatic fallback to the internal Celeron-served copy when the mesh is down. SAM-assisted pre-labeling belongs on dev-box only (non-AVX Celeron is disqualified).
+- **inference worker** (Ryzen 7 6800HS, 4 vCPU AVX2, 3.8 GB RAM, 19 GB SSD): hosts `warded-cv-engine` (Stack 17, 2 vCPU / 2 GB cgroup) and the GitHub Actions self-hosted runner. Measured YOLOv8n inference p50 = 16.17 ms; 50-camera batch = 2.24 s — 10–20× faster than `edge host`.
+- **edge host** (ZOTAC ZBOX CI320NANO, Celeron N2930 4C non-AVX, 8 GB DDR3L + zram, HDD 5400 RPM): staging ingress (`warded-stg.529studio.site`), Traefik, Redis, SQLite; internal `warded-model` fallback only.
+- Backend → inference worker inference round trip over Tailscale ≈ 110 ms (94 ms RTT + 16 ms compute), with automatic fallback to the internal Celeron-served copy when the mesh is down. SAM-assisted pre-labeling belongs on inference worker only (non-AVX Celeron is disqualified).
 
 ---
 

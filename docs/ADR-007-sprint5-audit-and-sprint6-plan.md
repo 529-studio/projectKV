@@ -11,10 +11,12 @@
 - [`docs/reports/eval_report_d6_real.md`](reports/eval_report_d6_real.md) (764-Frame Real Ground-Truth Baseline)
 - [`docs/lesson_learn.md`](lesson_learn.md) (Lesson 19, Lesson 22, Lesson 27, Lesson 28)
 
-> **Provenance**: recovered verbatim from `docs/ADR-007-sprint5-audit-and-sprint6-plan.md` at commit `d9f9edaa4c42e2989e31924f0c4366a3be84bbde`
-> (branch `docs/adr-008-sprint7-plan`, authored 2026-10-13). ADR-008 cited it as its input and it was never merged. Only the string edits declared in
-> `tools/docs/recover_adrs.py` were applied: `sprint5_report.md` was never merged, so its two citations are plain text rather than links to nothing. The `Status` line above is the value
-> recorded at authoring time, not a fresh decision.
+> **Provenance**: recovered from `docs/ADR-007-sprint5-audit-and-sprint6-plan.md` at commit `d9f9edaa4c42e2989e31924f0c4366a3be84bbde` (branch `docs/adr-008-sprint7-plan`,
+> authored 2026-10-13). ADR-008 cited it as its input and it was never merged. The prose is unedited apart from the declared edits and
+> redactions in `tools/docs/recover_adrs.py`: internal host names become the role names
+> the public documentation already uses (`edge host`, `inference worker`), because
+> `scripts/check-public-safe.sh` forbids the host names in tracked files: `sprint5_report.md` was never merged, so its two citations are plain text rather than links to nothing. The
+> `Status` line above is the value recorded at authoring time, not a fresh decision.
 
 ---
 
@@ -47,7 +49,7 @@ As codified in **Lesson 19 ("The Unit-Test Verification Trap & The Parameter Cal
 No downstream traffic features or route-level analysis will be developed until the three core CV fixes are implemented in `services/cv-engine/server.py` and benchmarked across all 764 authentic ground-truth frames:
 1. Standard Non-Maximum Suppression (`IoU <= 0.45`, `conf >= 0.25`) to collapse multi-scale anchor activations into discrete physical instances.
 2. 16:9 aspect-preserving letterboxing with neutral gray padding `(114, 114, 114)` to maintain convolutional priors.
-3. Input resolution upgrade to 416x416 utilizing available compute headroom on `dev-box`.
+3. Input resolution upgrade to 416x416 utilizing available compute headroom on `inference worker`.
 4. Execution of `tools/eval/benchmark.py` across all 764 frozen frames to publish a definitive post-fix Macro F1 and class-by-class confusion matrix.
 
 ### Decision 2: Corridor-Specific Capacity Calibration & Persistent Peak Storage (S6-T2)
