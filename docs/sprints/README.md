@@ -25,14 +25,8 @@ permanent directory made readers pay for a document with a shelf life.
    planned it, the issues that executed it, and the lessons that came out of it.
    The guide is scaffolding, not the building.
 
-## Known gaps
-
-- **Not in English yet.** Rule 1 requires English documentation. This guide is
-  still Vietnamese, which costs roughly twice the tokens of the same content in
-  English. Translation is tracked in #341; until it lands the violation is
-  recorded here rather than left unnoticed.
-- **Two dead links.** The guide links `../ADR-011-sprint8-audit-and-sprint9-plan.md`
-  and `../sprint8_report.md`. Neither file exists on `dev`: they were committed
-  together with this guide on the local branch `docs/sprint8-report-and-sprint9-plan`
-  (`a2a248d`), and the sync that reached `dev` (`dcd2555`) took the guide alone.
-  Tracked in #342.
+Sprint 8's guide was never merged to `dev` and is not recovered here: the sprint is
+closed, and this policy deletes closed-sprint scaffolding rather than archiving it.
+Its decision record ([ADR-011](../ADR-011-sprint8-audit-and-sprint9-plan.md)) and its
+completion report ([`docs/reports/sprint8_report.md`](../reports/sprint8_report.md))
+carry everything durable from that sprint.

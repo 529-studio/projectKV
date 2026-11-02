@@ -1,6 +1,6 @@
 ## Lesson 59: Documentation Cross-Reference Rot — Links to Files That Were Never Merged
 
-- **Incident & Tracking:** Documentation bloat audit D4/D6 / Issue #340 (`docs/p1-2c-sprint-guide`) / follow-up #342.
+- **Incident & Tracking:** Documentation bloat audit D4/D6 / Issue #340 (`docs/p1-2c-sprint-guide`) / follow-up #342, resolved in #354 by recovering the artifacts instead of rewriting the references.
 - **Symptom:**
   1. `docs/sprint9_execution_guide.md` linked `ADR-011-sprint8-audit-and-sprint9-plan.md` and `sprint8_report.md`. Neither file existed on `dev`, and neither had ever existed on `dev` in any commit.
   2. `ADR-011` was not an obscure reference. `AGENTS.md` Rule 9, the PR template, `README.md` (×2), `docs/labeling_guidelines.md`, a runbook and the sprint guide all cited it — 18 textual occurrences across 16 lines in 8 files. Readers were told "per ADR-011 D6" and sent to a file that renders as a dead link.
