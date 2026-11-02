@@ -56,6 +56,7 @@ Refer directly to [`AGENTS.md`](../AGENTS.md) for the complete and authoritative
 ## 5. Documentation & Historical Reports
 
 - **Engineering Lessons Learned Index:** [`docs/lessons/INDEX.md`](lessons/INDEX.md)
+- **Reading large documents:** the context budget (always-loaded set ≤ 32 KB, on-demand files ≤ 25 KB) is defined in [`AGENTS.md`](../AGENTS.md) Rule 11. Enter a long document through its table of contents or a companion INDEX and read the range you need; never load it wholesale.
 - **Sprint Guides (in flight only):** [`docs/sprints/README.md`](sprints/README.md)
 - **Historical Metrics Scorecard (as of 2026-10-30):** [`docs/reports/project-status-scorecard-2026-10-30.md`](reports/project-status-scorecard-2026-10-30.md)
 - **Documentation Audit & Remediation Status:** [`docs/reports/agent-context-bloat-audit-2026-10-30.md`](reports/agent-context-bloat-audit-2026-10-30.md)
