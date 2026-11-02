@@ -1,6 +1,6 @@
-# Sprint 9 — Hướng dẫn thực thi agy CLI theo từng Wave
+# Sprint 9 — Wave-by-Wave agy CLI Execution Guide
 
-> **Trạng thái**: Toàn bộ 7 ticket đã có issue chính thức trên GitHub
+> **Status**: All 7 tickets have official issues on GitHub
 > ([#297](https://github.com/529-studio/projectKV/issues/297),
 > [#298](https://github.com/529-studio/projectKV/issues/298),
 > [#299](https://github.com/529-studio/projectKV/issues/299),
@@ -8,47 +8,47 @@
 > [#301](https://github.com/529-studio/projectKV/issues/301),
 > [#302](https://github.com/529-studio/projectKV/issues/302),
 > [#309](https://github.com/529-studio/projectKV/issues/309)),
-> bám sát [ADR-011](../ADR-011-sprint8-audit-and-sprint9-plan.md) (D1-D8) và kết quả audit
-> [Sprint 8 Report](../sprint8_report.md). Tài liệu sẵn sàng đưa vào vận hành.
-> Issue #309 (S9-T7) bổ sung ngày 2026-10-25: quá trình review E2E PolygonCanvas phát hiện
-> taxonomy hướng `dir_a`/`dir_b` mới chỉ tồn tại ở nhãn phân loại trong khi model đếm xe toàn khung hình —
-> tắc nghẽn một chiều ("kẹt 1 bên") không tách được; polygon `roadway` mang thuộc tính `direction`
-> sẽ mở khóa đếm xe theo chiều làm đầu vào cho S9-T6.
-> Theo dõi tiến độ trên GitHub Projects v2 board **ProjectKV** (ADR-011 D6; Plane Hub đã decommission).
+> aligned with [ADR-011](../ADR-011-sprint8-audit-and-sprint9-plan.md) (D1-D8) and audit findings in
+> [Sprint 8 Report](../sprint8_report.md). Document is ready for operations.
+> Issue #309 (S9-T7) added 2026-10-25: PolygonCanvas E2E review revealed that
+> directional taxonomy `dir_a`/`dir_b` only existed in classification labels while the model counted vehicles frame-wide —
+> one-way congestion ("one-side jam") could not be isolated; `roadway` polygon with `direction` attribute
+> unlocks per-direction vehicle counting as input for S9-T6.
+> Track progress on GitHub Projects v2 board **ProjectKV** (ADR-011 D6; Plane Hub decommissioned).
 
-Tài liệu hướng dẫn vận hành cho AI agents (`agy` CLI) và developers thực thi toàn bộ Sprint 9 Backlog theo quy chuẩn [ADR-011](../ADR-011-sprint8-audit-and-sprint9-plan.md) (Ground-Truth Segmentation Flywheel & Live Model Retraining), [GO_BACKEND_ARCHITECTURE.md](../GO_BACKEND_ARCHITECTURE.md) và [AGENTS.md](../../AGENTS.md).
+Operational guide for AI agents (`agy` CLI) and developers executing the entire Sprint 9 Backlog per [ADR-011](../ADR-011-sprint8-audit-and-sprint9-plan.md) (Ground-Truth Segmentation Flywheel & Live Model Retraining), [GO_BACKEND_ARCHITECTURE.md](../GO_BACKEND_ARCHITECTURE.md), and [AGENTS.md](../../AGENTS.md).
 
 ---
 
 ## 1. Issue Map & Epics Grouping
 
-### Danh sách Epics Sprint 9
+### Sprint 9 Epic List
 
-| Epic | Tên Epic | Issues con | Mục tiêu chính |
+| Epic | Epic Name | Child Issues | Primary Objective |
 |---|---|---|---|
-| **epic:eval-tooling** | `[Epic] Ground-Truth Segmentation Flywheel` | S9-T1, S9-T2, S9-T4, S9-T7 | Polygon annotation contract + canvas editor, SAM-assisted pre-labeling trên inference worker, huấn luyện segmentation lần đầu với mAP gate và deploy weights; polygon roadway theo chiều (`direction`) làm nền đo tắc nghẽn một chiều |
-| **epic:infra-resilience** | `[Epic] Autonomous Staging & Alert Hygiene` | S9-T3, S9-T5 | Harvester chạy tự chủ theo giờ cố định trên staging + observability không cần terminal; vá parity bug script Telegram |
-| **(mở rộng)** | `[Epic] Forecast Foundation` (stretch) | S9-T6 (tiêu thụ đầu ra S9-T7) | Prototype dự báo tắc đường 10-30 phút từ chuỗi PCU (tách được theo chiều khi S9-T7 xong), vượt baseline persistence |
+| **epic:eval-tooling** | `[Epic] Ground-Truth Segmentation Flywheel` | S9-T1, S9-T2, S9-T4, S9-T7 | Polygon annotation contract + canvas editor, SAM-assisted pre-labeling on inference worker, first segmentation training with mAP gate and weights deployment; directional roadway polygons (`direction`) as baseline for per-direction congestion measurement |
+| **epic:infra-resilience** | `[Epic] Autonomous Staging & Alert Hygiene` | S9-T3, S9-T5 | Autonomous harvester running on scheduled hours on staging + terminal-free observability; fix Telegram script parity bug |
+| **(stretch)** | `[Epic] Forecast Foundation` (stretch) | S9-T6 (consumes S9-T7 output) | 10-30 min traffic congestion forecast prototype from PCU time-series (direction-separated once S9-T7 completes), beating persistence baseline |
 
 ---
 
-### Bảng phân bố Wave thực thi
+### Execution Wave Distribution Table
 
-| Wave | ID | GitHub Issue | Title | Epic | Labels | Ước lượng (Rule 3) | Phụ thuộc |
+| Wave | ID | GitHub Issue | Title | Epic | Labels | Estimate (Rule 3) | Dependencies |
 |:---:|:---:|:---:|---|---|---|:---:|:---:|
-| **0** | **S9-T1** | [#297](https://github.com/529-studio/projectKV/issues/297) | `[go-server + web + tooling] S9-T1: Segmentation Polygon Annotation Contract & Canvas Editor in /labeler` | epic:eval-tooling | `backend, frontend, cross-cutting` | 16-20h (3d) | Bắt đầu ngay (backend contract đã dở dang trên branch `feat/polygon-labeler-annotation-contract`) |
+| **0** | **S9-T1** | [#297](https://github.com/529-studio/projectKV/issues/297) | `[go-server + web + tooling] S9-T1: Segmentation Polygon Annotation Contract & Canvas Editor in /labeler` | epic:eval-tooling | `backend, frontend, cross-cutting` | 16-20h (3d) | Start immediately (backend contract in progress on branch `feat/polygon-labeler-annotation-contract`) |
 | **1** | **S9-T2** | [#298](https://github.com/529-studio/projectKV/issues/298) | `[tooling] S9-T2: SAM-Assisted Polygon Pre-Labeling Batch Toolchain (inference worker offline)` | epic:eval-tooling | `tooling` | 8-10h (1.5d) | S9-T1 |
-| **1** | **S9-T3** | [#299](https://github.com/529-studio/projectKV/issues/299) | `[ops + go-server] S9-T3: Staging Autonomous Data Flywheel — Scheduled Harvester, Auto-Label & Status Observability` | epic:infra-resilience | `tooling, backend, cross-cutting` | 6-8h (1.5d) | Bắt đầu ngay (chạy song song Wave 0) |
+| **1** | **S9-T3** | [#299](https://github.com/529-studio/projectKV/issues/299) | `[ops + go-server] S9-T3: Staging Autonomous Data Flywheel — Scheduled Harvester, Auto-Label & Status Observability` | epic:infra-resilience | `tooling, backend, cross-cutting` | 6-8h (1.5d) | Start immediately (runs parallel to Wave 0) |
 | **2** | **S9-T4** | [#300](https://github.com/529-studio/projectKV/issues/300) | `[tooling + cv-engine] S9-T4: First Off-Box YOLOv8-Seg Training, mAP Benchmark Gate & Staging Weights Deployment` | epic:eval-tooling | `tooling, cross-cutting` | 10-12h (2d) | S9-T1, S9-T2, S9-T3 |
-| **3** | **S9-T5** | [#301](https://github.com/529-studio/projectKV/issues/301) | `[go-server + ops] S9-T5: Telegram Verification Script Single-Source Parity Rework (notify-preview)` | epic:infra-resilience | `backend, tooling` | 4h (0.5d) | **Hoàn thành (PR #327)**: `internal/notify.BuildFloodAlert` + `cmd/notify-preview` CLI + script Check 3 single-source parity |
-| **3** | **S9-T7** | [#309](https://github.com/529-studio/projectKV/issues/309) | `[go-server + web + tooling] S9-T7: Directional Roadway Polygons (direction attribute) for Per-Direction Congestion Ground Truth` | epic:eval-tooling | `backend, frontend, cross-cutting` | 6-8h (1d) | S9-T1 (đã merge); nên hoàn thành trước S9-T6 |
-| **3** | **S9-T6** | [#302](https://github.com/529-studio/projectKV/issues/302) | `[go-server] S9-T6: Short-Horizon Congestion Forecast Prototype (PCU Time-Series, 10-30 min) — stretch` | (mở rộng) | `backend, enhancement` | 12h (2d) | Chỉ khởi động khi Wave 0-2 không chặn; chuỗi PCU tách chiều nếu S9-T7 đã xong |
+| **3** | **S9-T5** | [#301](https://github.com/529-studio/projectKV/issues/301) | `[go-server + ops] S9-T5: Telegram Verification Script Single-Source Parity Rework (notify-preview)` | epic:infra-resilience | `backend, tooling` | 4h (0.5d) | **Completed (PR #327)**: `internal/notify.BuildFloodAlert` + `cmd/notify-preview` CLI + script Check 3 single-source parity |
+| **3** | **S9-T7** | [#309](https://github.com/529-studio/projectKV/issues/309) | `[go-server + web + tooling] S9-T7: Directional Roadway Polygons (direction attribute) for Per-Direction Congestion Ground Truth` | epic:eval-tooling | `backend, frontend, cross-cutting` | 6-8h (1d) | S9-T1 (merged); should complete before S9-T6 |
+| **3** | **S9-T6** | [#302](https://github.com/529-studio/projectKV/issues/302) | `[go-server] S9-T6: Short-Horizon Congestion Forecast Prototype (PCU Time-Series, 10-30 min) — stretch` | (stretch) | `backend, enhancement` | 12h (2d) | Start only when Wave 0-2 unblocked; directional PCU time-series if S9-T7 completed |
 
 ---
 
-## 2. Chuẩn bị môi trường
+## 2. Environment Preparation
 
-Trước khi thực thi bất kỳ ticket nào, đồng bộ nhánh `dev` mới nhất:
+Before executing any ticket, sync the latest `dev` branch:
 
 ```bash
 cd ~/repos/projectKV
@@ -56,15 +56,15 @@ git checkout dev
 git pull origin dev
 ```
 
-Sự thật phần cứng cần nhớ (ADR-011 §1.6, Outline `[Arch]` docs):
-- **inference worker** (Ryzen 7 6800HS, AVX2): mọi batch inference (SAM pre-label, benchmark) chạy ở đây, ngoài giờ cao điểm.
-- **edge host** (Celeron N2930, non-AVX): chỉ ingress + fallback; cấm chạy PyTorch/ONNX prebuilt và SAM.
+Hardware facts to remember (ADR-011 §1.6, Outline `[Arch]` docs):
+- **inference worker** (Ryzen 7 6800HS, AVX2): all batch inference (SAM pre-label, benchmark) runs here, off-peak hours.
+- **edge host** (Celeron N2930, non-AVX): ingress + fallback only; forbidden from running prebuilt PyTorch/ONNX and SAM.
 
 ---
 
 ## Wave 0 — Critical Path: Polygon Contract & Canvas Editor (S9-T1)
 
-### Terminal 1 — S9-T1 (Contract polygon + Canvas editor trong /labeler — Đóng Issue #297)
+### Terminal 1 — S9-T1 (Polygon Contract + Canvas Editor in /labeler — Closes Issue #297)
 
 ```bash
 cd ~/repos/projectKV
@@ -99,11 +99,11 @@ PR Description: Must strictly start with 'Close #297' per AGENTS.md Rule 9 (GitH
 
 ---
 
-## Wave 1 — Tăng tốc dữ liệu & Flywheel tự chủ (S9-T2, S9-T3)
+## Wave 1 — Data Acceleration & Autonomous Flywheel (S9-T2, S9-T3)
 
-Hai ticket chạy song song: T2 phụ thuộc T1, T3 độc lập (ops).
+Two tickets run in parallel: T2 depends on T1, T3 is independent (ops).
 
-### Terminal 1 — S9-T2 (SAM-assisted pre-labeling offline trên inference worker)
+### Terminal 1 — S9-T2 (Offline SAM-assisted pre-labeling on inference worker)
 
 ```bash
 cd ~/repos/projectKV
@@ -126,7 +126,7 @@ PR Title: feat(tooling): SAM-assisted polygon pre-labeling batch toolchain
 PR Description: Must strictly start with 'Close #298'. Do NOT merge."
 ```
 
-### Terminal 2 — S9-T3 (Harvester tự chủ trên staging + observability)
+### Terminal 2 — S9-T3 (Autonomous harvester on staging + observability)
 
 ```bash
 cd ~/repos/projectKV
@@ -154,9 +154,9 @@ PR Description: Must strictly start with 'Close #299'. Do NOT merge."
 
 ---
 
-## Wave 2 — Huấn luyện lần đầu & Deploy (S9-T4)
+## Wave 2 — First Training & Deploy (S9-T4)
 
-Sau khi Wave 0 + 1 merge và staging flywheel đã chạy (có dữ liệu mask thật).
+After Wave 0 + 1 merge and staging flywheel is running (real mask data available).
 
 ### Terminal 1 — S9-T4 (Train off-box, mAP gate, deploy weights)
 
@@ -185,9 +185,9 @@ PR Description: Must strictly start with 'Close #300'. Do NOT merge."
 
 ---
 
-## Wave 3 — Dọn nợ, Ground Truth Theo Chiều & Stretch (S9-T5, S9-T7, S9-T6)
+## Wave 3 — Debt Cleanup, Directional Ground Truth & Stretch (S9-T5, S9-T7, S9-T6)
 
-### Terminal 1 — S9-T5 (Vá parity script Telegram bằng notify-preview)
+### Terminal 1 — S9-T5 (Fix Telegram script parity via notify-preview)
 
 ```bash
 cd ~/repos/projectKV
@@ -213,7 +213,7 @@ PR Title: fix(notify): single-source staging verification message via notify-pre
 PR Description: Must strictly start with 'Close #301'. Do NOT merge."
 ```
 
-### Terminal 2 — S9-T7 (Polygon roadway theo chiều — direction attribute)
+### Terminal 2 — S9-T7 (Directional roadway polygons — direction attribute)
 
 ```bash
 cd ~/repos/projectKV
@@ -246,7 +246,7 @@ PR Title: feat(labeler): directional roadway polygon semantics for per-direction
 PR Description: Must strictly start with 'Close #309'. Do NOT merge."
 ```
 
-### Terminal 3 — S9-T6 (Prototype forecast — stretch, chỉ chạy khi Wave 0-2 xong)
+### Terminal 3 — S9-T6 (Forecast prototype — stretch, run only when Wave 0-2 complete)
 
 ```bash
 cd ~/repos/projectKV
@@ -270,15 +270,15 @@ PR Description: Must strictly start with 'Close #302'. Do NOT merge."
 
 ---
 
-## 3. Checklist Tuân Thủ Bắt Buộc (Mandatory Rules 1-9)
+## 3. Compliance Checklist (Mandatory Rules 1-9)
 
-Mọi PR trong Sprint 9 bắt buộc phải tự kiểm tra danh sách này trước khi yêu cầu review:
+Every PR in Sprint 9 must self-check this list before requesting review:
 
-- [ ] **Rule 1 (Zero-Emoji & Đa Ngôn Ngữ)**: Tuyệt đối không có emoji trong UI, toast, modal, log server, hay thông báo Telegram.
-- [ ] **Rule 2 (Giải pháp gốc rễ)**: Không dùng mẹo vá tạm (no monkey-patching). Phải sửa tận gốc nguyên nhân kỹ thuật.
-- [ ] **Rule 3 (Ước lượng bắt buộc)**: Luôn ghi rõ thời gian thực thi (active hours) và thời hạn bàn giao (delivery window) trong PR description.
-- [ ] **Rule 5 (Git Flow)**: Tạo nhánh riêng (`feat/*`, `fix/*`, `ops/*`), mở PR vào `dev`. Không bao giờ tự merge PR.
-- [ ] **Rule 6 (Tài liệu sống)**: Cập nhật đồng thời `docs/project_status.md`, `docs/lesson_learn.md` và `README.md` (cả tiếng Anh và tiếng Việt) nếu tính năng hoặc kiến trúc thay đổi.
-- [ ] **Rule 7 (Chuẩn Leaf Modulith)**: Không import chéo giữa các package con trong `services/go-server/internal/`. Chỉ dùng SQL thuần (không ORM).
-- [ ] **Rule 8 (Bảo mật bí mật)**: Không hardcode token, API key, kể cả đường dẫn weights mang tính credential. Giá trị fallback trong code bắt buộc là `""`.
-- [ ] **Rule 9 (Cú pháp liên kết PR — cập nhật theo ADR-011 D6)**: Mô tả PR bắt buộc bắt đầu bằng `Close #<issue-number>`. Format Kanban `closes [KV-<card-id>]` đã retire vì Plane Hub decommission (10/2026); tiến độ theo dõi trên GitHub Projects v2 board ProjectKV.
+- [ ] **Rule 1 (Zero-Emoji & Multilingual)**: Absolutely zero emojis in UI, toast, modal, server logs, or Telegram notifications.
+- [ ] **Rule 2 (Root-Cause Solutions)**: No temporary workarounds (no monkey-patching). Must resolve technical problems at their root cause.
+- [ ] **Rule 3 (Mandatory Estimation)**: Always state explicit active hours and delivery window in the PR description.
+- [ ] **Rule 5 (Git Flow)**: Create dedicated branches (`feat/*`, `fix/*`, `ops/*`), open PR targeting `dev`. Never auto-merge PRs.
+- [ ] **Rule 6 (Living Documentation)**: Concurrently update `docs/project_status.md`, `docs/lesson_learn.md`, and `README.md` (both English and Vietnamese) if features or architecture change.
+- [ ] **Rule 7 (Leaf Modulith Standard)**: No cross-imports between sub-packages in `services/go-server/internal/`. Use hand-written SQL only (no ORM).
+- [ ] **Rule 8 (Secret Security)**: Do not hardcode tokens, API keys, or credential-bearing weights paths. Fallback value in code must strictly be `""`.
+- [ ] **Rule 9 (PR Linking Syntax — Updated per ADR-011 D6)**: PR description must strictly start with `Close #<issue-number>`. Kanban format `closes [KV-<card-id>]` is retired due to Plane Hub decommission (10/2026); track progress on GitHub Projects v2 board ProjectKV.
