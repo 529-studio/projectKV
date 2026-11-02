@@ -278,7 +278,7 @@ Every PR in Sprint 9 must self-check this list before requesting review:
 - [ ] **Rule 2 (Root-Cause Solutions)**: No temporary workarounds (no monkey-patching). Must resolve technical problems at their root cause.
 - [ ] **Rule 3 (Mandatory Estimation)**: Always state explicit active hours and delivery window in the PR description.
 - [ ] **Rule 5 (Git Flow)**: Create dedicated branches (`feat/*`, `fix/*`, `ops/*`), open PR targeting `dev`. Never auto-merge PRs.
-- [ ] **Rule 6 (Living Documentation)**: Concurrently update `docs/project_status.md`, `docs/lesson_learn.md`, and `README.md` (both English and Vietnamese) if features or architecture change.
+- [ ] **Rule 6 (Living Documentation)**: Update affected `docs/*` and `README.md`; mirror the `README.vi.md` quickstart only when prerequisites, make targets, ports or endpoints change; record each lesson as a new `docs/lessons/L<NN>-*.md` plus one INDEX row, never appended to a monolithic register.
 - [ ] **Rule 7 (Leaf Modulith Standard)**: No cross-imports between sub-packages in `services/go-server/internal/`. Use hand-written SQL only (no ORM).
 - [ ] **Rule 8 (Secret Security)**: Do not hardcode tokens, API keys, or credential-bearing weights paths. Fallback value in code must strictly be `""`.
 - [ ] **Rule 9 (PR Linking Syntax — Updated per ADR-011 D6)**: PR description must strictly start with `Close #<issue-number>`. Kanban format `closes [KV-<card-id>]` is retired due to Plane Hub decommission (10/2026); track progress on GitHub Projects v2 board ProjectKV.
