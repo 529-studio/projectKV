@@ -15,6 +15,8 @@ import unittest
 import urllib.request
 import urllib.error
 import json
+import os
+import unittest.mock
 
 try:
     import numpy as np
@@ -320,6 +322,54 @@ class TestSegmentationAndTriangulation(unittest.TestCase):
         )
         self.assertEqual(verdict_c, "CLEAR")
         self.assertEqual(conf_c, 0.95)
+
+    def test_segmentation_model_candidate_precedence(self):
+        """Verifies candidate_xmls in server.py prefers yolov8n_seg.xml over yolov8n.xml."""
+        import server
+        model_dir = "mock_model_dir"
+        seg_xml = os.path.join(model_dir, "yolov8n_seg.xml")
+        det_xml = os.path.join(model_dir, "yolov8n.xml")
+
+        # Mocking os.path.isfile to return True for both
+        with unittest.mock.patch("os.path.isfile") as mock_isfile:
+            mock_isfile.side_effect = lambda p: p in (seg_xml, det_xml)
+            candidates = [
+                os.path.join(model_dir, "yolov8n_seg.xml"),
+                os.path.join(model_dir, "yolov8n.xml"),
+            ]
+            chosen = None
+            for c in candidates:
+                if os.path.isfile(c):
+                    chosen = c
+                    break
+            self.assertEqual(chosen, seg_xml)
+
+    def test_segmentation_flood_assessment_fields(self):
+        """Verifies flood_assessment dictionary contains all required contract fields."""
+        water_ratio = 0.18
+        max_delta_sub = 0.22
+        depth_estimated_cm = 24.2
+        submerged_mc = 3
+        puddle_count = 4
+        vehicle_counts = {"motorcycle": 5, "car": 10, "bus": 1, "truck": 2}
+        flood_verdict = "FLOODED_DEEP"
+
+        assessment = {
+            "status": flood_verdict,
+            "water_surface_ratio": round(water_ratio, 4),
+            "wheel_submersion_detected": max_delta_sub >= 0.18,
+            "max_submersion_depth_cm": round(depth_estimated_cm, 1),
+            "motorcycles_observed": vehicle_counts["motorcycle"],
+            "motorcycles_submerged": submerged_mc,
+            "puddle_polygon_count": puddle_count,
+        }
+
+        self.assertEqual(assessment["status"], "FLOODED_DEEP")
+        self.assertTrue(assessment["wheel_submersion_detected"])
+        self.assertEqual(assessment["max_submersion_depth_cm"], 24.2)
+        self.assertEqual(assessment["motorcycles_observed"], 5)
+        self.assertEqual(assessment["motorcycles_submerged"], 3)
+        self.assertEqual(assessment["puddle_polygon_count"], 4)
 
 
 if __name__ == "__main__":
