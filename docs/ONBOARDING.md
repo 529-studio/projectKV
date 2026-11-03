@@ -57,6 +57,7 @@ Refer directly to [`AGENTS.md`](../AGENTS.md) for the complete and authoritative
 
 - **Engineering Lessons Learned Index:** [`docs/lessons/INDEX.md`](lessons/INDEX.md)
 - **Reading large documents:** the context budget (always-loaded set ≤ 32 KB, on-demand files ≤ 25 KB) is defined in [`AGENTS.md`](../AGENTS.md) Rule 11. Enter a long document through its table of contents or a companion INDEX and read the range you need; never load it wholesale.
+- **Documentation gate:** `make docs-lint` enforces Rule 11's budgets, unique ADR numbers, relative-link resolution, the 1 MB tracked-file ceiling and English prose in tracked markdown. `.docs-lint-baseline.txt` is a **ratchet, not a whitelist**: it records the violations that already existed when the gate landed. Fixing one means deleting its line in the same pull request; a stale line fails the gate, so the file can only shrink. Never add a line to silence a regression.
 - **Sprint Guides (in flight only):** [`docs/sprints/README.md`](sprints/README.md)
 - **Historical Metrics Scorecard (as of 2026-10-30):** [`docs/reports/project-status-scorecard-2026-10-30.md`](reports/project-status-scorecard-2026-10-30.md)
 - **Documentation Audit & Remediation Status:** [`docs/reports/agent-context-bloat-audit-2026-10-30.md`](reports/agent-context-bloat-audit-2026-10-30.md)

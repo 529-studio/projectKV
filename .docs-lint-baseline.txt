@@ -1,0 +1,27 @@
+# Docs-lint baseline: violations that already existed when the gate landed.
+#
+# This is a ratchet, not a whitelist. Fixing a violation means deleting its
+# line here in the same pull request; a stale line fails the gate, so this file
+# can only shrink. Never add a line to silence a regression.
+#
+# Format: <check>\t<path>\t<detail>  (no line numbers, so edits do not churn it)
+adr-number	docs/ADR-009-self-hosted-flood-segmentation-and-directional-pcu.md	ADR-009
+adr-number	docs/ADR-009-zero-vlm-flood-segmentation.md	ADR-009
+doc-budget	docs/ADR-004-route-check-and-snapshot-archive.md
+doc-budget	docs/reports/agent-context-bloat-audit-2026-10-30.md
+doc-budget	docs/reports/eval_report_d6_pre_t5.md
+doc-budget	docs/reports/eval_report_d6_real.md
+doc-budget	docs/reports/eval_report_d6_sprint6.md
+doc-budget	docs/reports/project-status-scorecard-2026-10-30.md
+english	docs/reports/bench_solution1_report.md
+file-size	apps/web/public/warded-dockUI.jpg
+file-size	tools/geo-enrich/data/phuong_boundaries.geojson
+links	docs/lessons/L20-vpn-spof-graceful-degradation-decoupling-cloud-daily.md	runbook_dev_box_failover.md
+links	docs/reports/project-status-scorecard-2026-10-30.md	reports/eval_report_d6_sprint6.md
+links	docs/reports/project-status-scorecard-2026-10-30.md	reports/rain_collection_report_2026-10-13.md
+links	docs/reports/project-status-scorecard-2026-10-30.md	sprint4_audit_qa.md
+links	docs/reports/project-status-scorecard-2026-10-30.md	sprint4_report.md
+links	docs/reports/project-status-scorecard-2026-10-30.md	sprint5_execution_guide.md
+links	docs/reports/project-status-scorecard-2026-10-30.md	sprint6_execution_guide.md
+links	docs/reports/project-status-scorecard-2026-10-30.md	sprint6_report.md
+links	docs/reports/project-status-scorecard-2026-10-30.md	sprint7_report.md
