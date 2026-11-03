@@ -191,6 +191,11 @@ make dev-all
 The project incorporates an end-to-end active learning and computer vision pipeline — spanning automated snapshot harvesting, interactive quadrilateral/polygon ground-truth annotation, YOLOv8 segmentation dataset export, model training, and OpenVINO optimization.
 
 #### Step 1: Frame Annotation & Directional Ground Truth (`/labeler`)
+
+<p align="center">
+  <img src="docs/proofs/s9_t7_directional_roadway_polygons.png" alt="Collaborative Labeler - Directional Roadway Polygon Ground Truth" width="100%">
+</p>
+
 Access the Collaborative Labeler at `http://localhost:3001/labeler`:
 *   **Dual-Trigger Harvesting**: Frames are ingested continuously via scheduled peak harvests and weather-triggered rain watchers (`internal/harvester`), streamed to Cloudflare R2 object storage (`warded-proofs`).
 *   **Assisted Pre-Labeling (SAM)**: Run `make prelabel-sam` (`tools/seg/prelabel_sam.py`) to stream R2 frames and generate MobileSAM + YOLOv8n polygon segment candidates for human review.
