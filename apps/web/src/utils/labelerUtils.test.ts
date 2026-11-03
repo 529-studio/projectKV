@@ -313,12 +313,45 @@ describe('Segmentation Polygon Contract (Issue #297 / ADR-011 D1)', () => {
 
   test('validatePolygonAnnotations accepts a valid annotation set', () => {
     const ok: PolygonAnnotation[] = [
-      { class: 'roadway', polygon: [[0.1, 0.9], [0.9, 0.9], [0.5, 0.4]], source: 'human' },
+      { class: 'roadway', direction: 'a', polygon: [[0.1, 0.9], [0.45, 0.9], [0.3, 0.5]], source: 'human' },
+      { class: 'roadway', direction: 'b', polygon: [[0.55, 0.9], [0.9, 0.9], [0.7, 0.5]], source: 'human' },
       { class: 'water_puddle', polygon: [[0.2, 0.8], [0.8, 0.8], [0.5, 0.5]] },
     ];
     assert.equal(validatePolygonAnnotations(ok), null);
     assert.equal(validatePolygonAnnotations([]), null);
     assert.equal(validatePolygonAnnotations(undefined), null);
+  });
+
+  test('validatePolygonAnnotations enforces directional roadway rules', () => {
+    // Direction set on non-roadway class
+    const badClass: PolygonAnnotation[] = [
+      { class: 'car', direction: 'a', polygon: [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]] },
+    ];
+    assert.match(
+      validatePolygonAnnotations(badClass) ?? '',
+      /direction may only be set when class is roadway/
+    );
+
+    // Unknown direction value
+    const badDir: PolygonAnnotation[] = [
+      { class: 'roadway', direction: 'c' as unknown as 'a', polygon: [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]] },
+    ];
+    assert.match(
+      validatePolygonAnnotations(badDir) ?? '',
+      /unknown direction/
+    );
+  });
+
+  test('LABELER_I18N contains directional roadway keys in vi and en without emojis', () => {
+    for (const locale of ['vi', 'en'] as const) {
+      const dict = LABELER_I18N[locale];
+      assert.ok(dict.segDirectionLabel);
+      assert.ok(dict.segDirectionNone);
+      assert.ok(dict.segDirectionA);
+      assert.ok(dict.segDirectionB);
+      assert.ok(dict.segDirectionBadgeA);
+      assert.ok(dict.segDirectionBadgeB);
+    }
   });
 
   test('validatePolygonAnnotations rejects contract violations with messages', () => {

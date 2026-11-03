@@ -156,6 +156,11 @@
           },
           "description": "Vertices as [[x, y], ...] normalized to [0, 1] against image natural size."
         },
+        "direction": {
+          "type": "string",
+          "enum": ["a", "b"],
+          "description": "Optional roadway direction ('a' = approaching/near carriageway, 'b' = receding/far carriageway). Valid only when class is roadway."
+        },
         "source": {
           "type": "string",
           "maxLength": 32,

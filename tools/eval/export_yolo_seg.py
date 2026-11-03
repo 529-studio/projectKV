@@ -81,6 +81,18 @@ CLASS_ALIASES = {
     "lorry": "truck",
 }
 
+# Roadway direction aliases (Issue #309 / S9-T7)
+DIRECTION_ALIASES = {
+    "a": "a",
+    "dir_a": "a",
+    "traffic_dir_a": "a",
+    "near": "a",
+    "b": "b",
+    "dir_b": "b",
+    "traffic_dir_b": "b",
+    "far": "b",
+}
+
 
 def normalize_class_name(name: str) -> Optional[int]:
     """Resolves arbitrary class string to standard target class id (0..5)."""
@@ -90,6 +102,14 @@ def normalize_class_name(name: str) -> Optional[int]:
     if norm in CLASS_ALIASES:
         return CLASS_NAME_TO_ID[CLASS_ALIASES[norm]]
     return None
+
+
+def normalize_direction(raw: Any) -> Optional[str]:
+    """Resolves arbitrary direction string to canonical 'a' or 'b' (Issue #309 / S9-T7)."""
+    if not raw or not isinstance(raw, str):
+        return None
+    norm = raw.strip().lower()
+    return DIRECTION_ALIASES.get(norm)
 
 
 def bbox_to_polygon_norm(
@@ -192,12 +212,11 @@ def parse_label_file(
     repo_root: Path,
     images_dir: Optional[Path] = None,
     allow_synthetic: bool = False,
-) -> Tuple[Optional[Path], List[Tuple[int, List[float]]], bool]:
+) -> Tuple[Optional[Path], List[Tuple[int, List[float]]], bool, List[Dict[str, Any]]]:
     """
     Parses a single ground-truth JSON label file.
     Returns (resolved_image_path, list_of_(class_id, normalized_polygon_floats),
-    used_synthetic) where used_synthetic is True when the segments were
-    synthesized from classification metadata instead of explicit annotations.
+    used_synthetic, directional_roadway_regions).
     By default synthetic geometry is DISABLED (ADR-011 D2): labels without
     explicit polygon annotations return an empty segment list so the exporter
     skips them instead of training on fabricated shapes.
@@ -229,8 +248,9 @@ def parse_label_file(
     # Get dimensions
     img_w, img_h = get_image_dimensions(resolved_img) if resolved_img else (1920, 1080)
 
-    # 2. Extract polygon segments
+    # 2. Extract polygon segments and directional roadway regions (Issue #309 / S9-T7)
     segments: List[Tuple[int, List[float]]] = []
+    directional_regions: List[Dict[str, Any]] = []
 
     # Check explicit polygon annotations
     raw_annotations = (
@@ -254,6 +274,7 @@ def parse_label_file(
 
             if pts and isinstance(pts, list) and len(pts) >= 3:
                 flat_poly: List[float] = []
+                norm_pts: List[List[float]] = []
                 for pt in pts:
                     if isinstance(pt, (list, tuple)) and len(pt) >= 2:
                         px, py = float(pt[0]), float(pt[1])
@@ -268,8 +289,17 @@ def parse_label_file(
                     px = max(0.0, min(1.0, px))
                     py = max(0.0, min(1.0, py))
                     flat_poly.extend([round(px, 6), round(py, 6)])
+                    norm_pts.append([round(px, 6), round(py, 6)])
                 if len(flat_poly) >= 6:
                     segments.append((cls_id, flat_poly))
+                    if cls_id == 0:  # roadway
+                        norm_dir = normalize_direction(ann.get("direction"))
+                        if norm_dir:
+                            directional_regions.append({
+                                "direction": norm_dir,
+                                "polygon": norm_pts,
+                                "coordinates": norm_pts,
+                            })
             elif bbox and isinstance(bbox, list) and len(bbox) == 4:
                 flat_poly = bbox_to_polygon_norm(
                     [float(b) for b in bbox],
@@ -285,9 +315,9 @@ def parse_label_file(
         labels_meta = data.get("labels", {})
         synthesized = synthesize_polygons_from_metadata(labels_meta)
         segments.extend(synthesized)
-        return resolved_img, segments, True
+        return resolved_img, segments, True, []
 
-    return resolved_img, segments, False
+    return resolved_img, segments, False, directional_regions
 
 
 def export_dataset(
@@ -338,18 +368,21 @@ def export_dataset(
         "val_samples": 0,
         "images_copied": 0,
         "class_counts": {name: 0 for name in TARGET_CLASSES.values()},
+        "directional_roadway_regions": 0,
         "skipped_no_annotations": 0,
         "synthesized_labels": 0,
         "allow_synthetic": allow_synthetic,
         "errors": [],
     }
 
+    directional_by_split: Dict[str, List[Dict[str, Any]]] = {"train": [], "val": []}
+
     for lf in shuffled:
         split = "val" if lf in val_files else "train"
         base_name = lf.stem
 
         try:
-            resolved_img, segments, used_synthetic = parse_label_file(
+            resolved_img, segments, used_synthetic, dir_regions = parse_label_file(
                 lf, repo_root=repo_root, images_dir=images_dir, allow_synthetic=allow_synthetic
             )
         except Exception as exc:
@@ -366,6 +399,15 @@ def export_dataset(
             continue
         if used_synthetic:
             stats["synthesized_labels"] += 1
+
+        if dir_regions:
+            for reg in dir_regions:
+                directional_by_split[split].append({
+                    "label_id": base_name,
+                    "direction": reg["direction"],
+                    "polygon": reg["polygon"],
+                    "coordinates": reg["coordinates"],
+                })
 
         # Write YOLO segmentation label txt
         label_out = output_dir / "labels" / split / f"{base_name}.txt"
@@ -390,6 +432,29 @@ def export_dataset(
             stats["train_samples"] += 1
         else:
             stats["val_samples"] += 1
+
+    # Write roadway_regions.json sidecars per split if directional regions present (Issue #309 / S9-T7)
+    total_directional = 0
+    all_directional: List[Dict[str, Any]] = []
+    for split in ("train", "val"):
+        regions = directional_by_split[split]
+        if regions:
+            total_directional += len(regions)
+            split_sidecar = output_dir / "labels" / split / "roadway_regions.json"
+            with open(split_sidecar, "w", encoding="utf-8") as f_side:
+                json.dump(regions, f_side, indent=2)
+            split_root_sidecar = output_dir / f"roadway_regions_{split}.json"
+            with open(split_root_sidecar, "w", encoding="utf-8") as f_side:
+                json.dump(regions, f_side, indent=2)
+            for r in regions:
+                all_directional.append({**r, "split": split})
+
+    if all_directional:
+        root_sidecar = output_dir / "roadway_regions.json"
+        with open(root_sidecar, "w", encoding="utf-8") as f_side:
+            json.dump(all_directional, f_side, indent=2)
+
+    stats["directional_roadway_regions"] = total_directional
 
     # Write dataset.yaml
     dataset_yaml_path = output_dir / "dataset.yaml"

@@ -23,9 +23,10 @@ type GroundTruthManifest struct {
 // expressed in normalized image coordinates [0, 1] (ADR-011 D1 contract,
 // consumed by tools/eval/export_yolo_seg.py).
 type ManifestPolygon struct {
-	Class   string      `json:"class"`            // canonical: roadway, water_puddle, motorcycle, car, bus, truck
-	Polygon [][]float64 `json:"polygon"`          // [[x, y], ...] normalized to [0, 1]
-	Source  string      `json:"source,omitempty"` // provenance, e.g. "sam_prelabel"
+	Class     string      `json:"class"`               // canonical: roadway, water_puddle, motorcycle, car, bus, truck
+	Polygon   [][]float64 `json:"polygon"`             // [[x, y], ...] normalized to [0, 1]
+	Direction string      `json:"direction,omitempty"` // optional: "a" | "b" (valid only when class == "roadway")
+	Source    string      `json:"source,omitempty"`    // provenance, e.g. "sam_prelabel"
 }
 
 // LabelsPayload represents the structured annotations payload inside GroundTruthManifest.
@@ -127,6 +128,11 @@ var (
 		"truck":        {},
 	}
 )
+
+// Validate delegates to ValidateDraft07 for convenient struct validation.
+func (m *GroundTruthManifest) Validate() error {
+	return ValidateDraft07(m)
+}
 
 // ValidateDraft07 validates that m conforms strictly to tools/eval/label_schema.json (Draft-07).
 func ValidateDraft07(m *GroundTruthManifest) error {
@@ -231,6 +237,14 @@ func ValidateDraft07(m *GroundTruthManifest) error {
 	for i, ann := range m.Annotations {
 		if _, ok := validPolygonClasses[ann.Class]; !ok {
 			return fmt.Errorf("invalid 'annotations[%d].class' value %q (must be canonical: roadway, water_puddle, motorcycle, car, bus, truck)", i, ann.Class)
+		}
+		if ann.Direction != "" {
+			if ann.Class != "roadway" {
+				return fmt.Errorf("invalid 'annotations[%d].direction': direction is only permitted on 'roadway' class, got %q", i, ann.Class)
+			}
+			if ann.Direction != "a" && ann.Direction != "b" {
+				return fmt.Errorf("invalid 'annotations[%d].direction' value %q (must be 'a' or 'b')", i, ann.Direction)
+			}
 		}
 		if len(ann.Polygon) < 3 || len(ann.Polygon) > 64 {
 			return fmt.Errorf("invalid 'annotations[%d].polygon': must have 3 to 64 vertices, got %d", i, len(ann.Polygon))

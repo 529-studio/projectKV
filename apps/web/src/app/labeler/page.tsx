@@ -29,6 +29,7 @@ import {
   type LabelPayload,
   type SnapshotItem,
   type PolygonClass,
+  type PolygonDirection,
 } from '@/utils/labelerUtils';
 import PolygonCanvas, { POLYGON_CLASS_COLORS } from '@/components/PolygonCanvas';
 import { getApiUrl } from '@/config/constants';
@@ -62,6 +63,7 @@ export default function LabelerPage() {
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [segMode, setSegMode] = useState<boolean>(false);
   const [activeSegClass, setActiveSegClass] = useState<PolygonClass>('roadway');
+  const [activeSegDirection, setActiveSegDirection] = useState<PolygonDirection | ''>('');
   const [segError, setSegError] = useState<string | null>(null);
 
   const { cameras } = useCameras();
@@ -482,6 +484,9 @@ export default function LabelerPage() {
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) {
+        return;
+      }
       // Do not capture shortcuts when user is typing in form inputs
       const target = e.target as HTMLElement;
       if (
@@ -948,6 +953,7 @@ export default function LabelerPage() {
                     annotations={currentDraft.annotations || []}
                     onChange={(next) => setCurrentDraft((d) => ({ ...d, annotations: next }))}
                     activeClass={activeSegClass}
+                    activeDirection={activeSegClass === 'roadway' && activeSegDirection ? activeSegDirection : null}
                     enabled={segMode}
                     labels={{
                       hint: t.segModeHint,
@@ -955,6 +961,8 @@ export default function LabelerPage() {
                       empty: t.segEmpty,
                       deleteBtn: t.segDeleteBtn,
                       autoBadge: t.segAutoBadge,
+                      directionBadgeA: t.segDirectionBadgeA,
+                      directionBadgeB: t.segDirectionBadgeB,
                     }}
                   />
                 ) : (
@@ -1044,6 +1052,31 @@ export default function LabelerPage() {
                     </button>
                   ))}
                 </div>
+                {activeSegClass === 'roadway' && (
+                  <div className="flex flex-col gap-1 mt-1 pt-1 border-t border-zinc-800">
+                    <span className="text-[11px] text-zinc-500 font-mono">{t.segDirectionLabel}</span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { val: '' as const, label: t.segDirectionNone },
+                        { val: 'a' as const, label: t.segDirectionA },
+                        { val: 'b' as const, label: t.segDirectionB },
+                      ].map((opt) => (
+                        <button
+                          key={opt.val}
+                          type="button"
+                          onClick={() => setActiveSegDirection(opt.val)}
+                          className={`px-1.5 py-1 rounded border text-[10px] font-mono transition text-center ${
+                            activeSegDirection === opt.val
+                              ? 'border-zinc-300 bg-zinc-800 text-zinc-100 font-bold'
+                              : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {segError && (

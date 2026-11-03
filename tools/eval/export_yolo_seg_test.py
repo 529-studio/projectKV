@@ -22,6 +22,7 @@ from export_yolo_seg import (
     bbox_to_polygon_norm,
     export_dataset,
     normalize_class_name,
+    normalize_direction,
     parse_label_file,
     synthesize_polygons_from_metadata,
     verify_dataset,
@@ -60,6 +61,27 @@ class TestExportYoloSeg(unittest.TestCase):
         # Unknown
         self.assertIsNone(normalize_class_name("pedestrian"))
         self.assertIsNone(normalize_class_name("traffic_light"))
+
+    def test_normalize_direction(self):
+        # Canonical values
+        self.assertEqual(normalize_direction("a"), "a")
+        self.assertEqual(normalize_direction("b"), "b")
+        self.assertEqual(normalize_direction("A"), "a")
+        self.assertEqual(normalize_direction("B"), "b")
+
+        # Aliases
+        self.assertEqual(normalize_direction("dir_a"), "a")
+        self.assertEqual(normalize_direction("traffic_dir_a"), "a")
+        self.assertEqual(normalize_direction("near"), "a")
+        self.assertEqual(normalize_direction("dir_b"), "b")
+        self.assertEqual(normalize_direction("traffic_dir_b"), "b")
+        self.assertEqual(normalize_direction("far"), "b")
+
+        # Unknown / invalid
+        self.assertIsNone(normalize_direction(""))
+        self.assertIsNone(normalize_direction(None))
+        self.assertIsNone(normalize_direction("c"))
+        self.assertIsNone(normalize_direction("north"))
 
     def test_bbox_to_polygon_norm(self):
         # Normalized [xmin, ymin, xmax, ymax]
@@ -163,7 +185,7 @@ class TestExportYoloSeg(unittest.TestCase):
         with open(label_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
-        _, segments, used_synthetic = parse_label_file(label_file, repo_root=self.tmp_path)
+        _, segments, used_synthetic, dir_regions = parse_label_file(label_file, repo_root=self.tmp_path)
         self.assertEqual(len(segments), 3)
         self.assertFalse(used_synthetic)
         self.assertEqual(segments[0][0], 0)  # roadway
@@ -172,6 +194,7 @@ class TestExportYoloSeg(unittest.TestCase):
         self.assertEqual(len(segments[1][1]), 6)
         self.assertEqual(segments[2][0], 2)  # motorcycle
         self.assertEqual(len(segments[2][1]), 8)
+        self.assertEqual(len(dir_regions), 0)  # No direction attribute specified
 
     def test_parse_label_file_synthetic_is_opt_in(self):
         label_file = self.tmp_path / "meta_only_label.json"
@@ -187,16 +210,18 @@ class TestExportYoloSeg(unittest.TestCase):
             json.dump(data, f)
 
         # Default: NO synthetic geometry (ADR-011 D2) — empty segments.
-        _, segments, used_synthetic = parse_label_file(label_file, repo_root=self.tmp_path)
+        _, segments, used_synthetic, dir_regions = parse_label_file(label_file, repo_root=self.tmp_path)
         self.assertEqual(segments, [])
         self.assertFalse(used_synthetic)
+        self.assertEqual(dir_regions, [])
 
         # Opt-in: metadata-derived geometry is returned and flagged.
-        _, segments_opt, used_synthetic_opt = parse_label_file(
+        _, segments_opt, used_synthetic_opt, dir_regions_opt = parse_label_file(
             label_file, repo_root=self.tmp_path, allow_synthetic=True
         )
         self.assertTrue(len(segments_opt) >= 2)  # roadway + shallow puddle
         self.assertTrue(used_synthetic_opt)
+        self.assertEqual(dir_regions_opt, [])
 
     def test_export_dataset_skips_labels_without_annotations_by_default(self):
         labels_dir = self.tmp_path / "labels_default"
@@ -292,6 +317,145 @@ class TestExportYoloSeg(unittest.TestCase):
         valid, errs = verify_dataset(output_dir)
         self.assertTrue(valid)
         self.assertEqual(len(errs), 0)
+
+    def test_parse_label_file_directional_roadway(self):
+        label_file = self.tmp_path / "directional_roadway.json"
+        data = {
+            "frame_id": "frame_dual_dir",
+            "annotations": [
+                {
+                    "class": "roadway",
+                    "direction": "near",  # alias for 'a'
+                    "polygon": [[0.1, 0.9], [0.45, 0.9], [0.3, 0.5]],
+                },
+                {
+                    "class": "roadway",
+                    "direction": "dir_b",  # alias for 'b'
+                    "polygon": [[0.55, 0.9], [0.9, 0.9], [0.7, 0.5]],
+                },
+                {
+                    "class": "car",
+                    "polygon": [[0.2, 0.7], [0.3, 0.7], [0.25, 0.6]],
+                },
+            ],
+        }
+        with open(label_file, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        _, segments, used_synthetic, dir_regions = parse_label_file(label_file, repo_root=self.tmp_path)
+        self.assertEqual(len(segments), 3)
+        self.assertFalse(used_synthetic)
+        self.assertEqual(len(dir_regions), 2)
+        self.assertEqual(dir_regions[0]["direction"], "a")
+        self.assertEqual(dir_regions[0]["polygon"], [[0.1, 0.9], [0.45, 0.9], [0.3, 0.5]])
+        self.assertEqual(dir_regions[1]["direction"], "b")
+        self.assertEqual(dir_regions[1]["polygon"], [[0.55, 0.9], [0.9, 0.9], [0.7, 0.5]])
+
+    def test_export_dataset_emits_roadway_regions_sidecar(self):
+        labels_dir = self.tmp_path / "labels_dir"
+        labels_dir.mkdir()
+        output_dir = self.tmp_path / "output_dir"
+
+        # Create labels with directional roadway annotations
+        for i in range(5):
+            lf = labels_dir / f"cam_{i:03d}.json"
+            data = {
+                "frame_id": f"cam_{i:03d}",
+                "annotations": [
+                    {
+                        "class": "roadway",
+                        "direction": "a",
+                        "polygon": [[0.1, 0.9], [0.45, 0.9], [0.3, 0.5]],
+                    },
+                    {
+                        "class": "roadway",
+                        "direction": "b",
+                        "polygon": [[0.55, 0.9], [0.9, 0.9], [0.7, 0.5]],
+                    },
+                ],
+            }
+            with open(lf, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+
+        stats = export_dataset(
+            labels_dir=labels_dir,
+            output_dir=output_dir,
+            val_split=0.2,
+            seed=42,
+            copy_images=False,
+            verify=True,
+        )
+
+        self.assertEqual(stats["total_labels"], 5)
+        self.assertEqual(stats["directional_roadway_regions"], 10)  # 5 labels * 2 directions
+
+        # Check that YOLO txt is standard (roadway remains class 0)
+        train_txts = list((output_dir / "labels" / "train").glob("*.txt"))
+        self.assertTrue(len(train_txts) > 0)
+        with open(train_txts[0], "r", encoding="utf-8") as f:
+            lines = [line.strip() for line in f if line.strip()]
+        for line in lines:
+            self.assertTrue(line.startswith("0 "))  # class 0 for roadway
+
+        # Check sidecar emission in train split
+        train_sidecar = output_dir / "labels" / "train" / "roadway_regions.json"
+        self.assertTrue(train_sidecar.is_file())
+        with open(train_sidecar, "r", encoding="utf-8") as f:
+            train_regions = json.load(f)
+        self.assertTrue(len(train_regions) > 0)
+        for r in train_regions:
+            self.assertIn("label_id", r)
+            self.assertIn(r["direction"], ("a", "b"))
+            self.assertIn("polygon", r)
+            self.assertIn("coordinates", r)
+
+        # Check sidecar emission in val split
+        val_sidecar = output_dir / "labels" / "val" / "roadway_regions.json"
+        self.assertTrue(val_sidecar.is_file())
+
+        # Check root sidecar
+        root_sidecar = output_dir / "roadway_regions.json"
+        self.assertTrue(root_sidecar.is_file())
+        with open(root_sidecar, "r", encoding="utf-8") as f:
+            all_regions = json.load(f)
+        self.assertEqual(len(all_regions), 10)
+
+    def test_export_dataset_sidecar_skip_when_absent(self):
+        labels_dir = self.tmp_path / "labels_nodir"
+        labels_dir.mkdir()
+        output_dir = self.tmp_path / "output_nodir"
+
+        # Labels with standard annotations but NO direction attribute
+        for i in range(4):
+            lf = labels_dir / f"cam_{i:03d}.json"
+            data = {
+                "frame_id": f"cam_{i:03d}",
+                "annotations": [
+                    {
+                        "class": "roadway",
+                        "polygon": [[0.1, 0.9], [0.9, 0.9], [0.5, 0.5]],
+                    },
+                ],
+            }
+            with open(lf, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+
+        stats = export_dataset(
+            labels_dir=labels_dir,
+            output_dir=output_dir,
+            val_split=0.2,
+            seed=42,
+            copy_images=False,
+            verify=True,
+        )
+
+        self.assertEqual(stats["total_labels"], 4)
+        self.assertEqual(stats["directional_roadway_regions"], 0)
+
+        # Sidecar files MUST NOT exist (skip-when-absent)
+        self.assertFalse((output_dir / "labels" / "train" / "roadway_regions.json").exists())
+        self.assertFalse((output_dir / "labels" / "val" / "roadway_regions.json").exists())
+        self.assertFalse((output_dir / "roadway_regions.json").exists())
 
     def test_verify_dataset_detects_malformed_entries(self):
         output_dir = self.tmp_path / "malformed_yolo"

@@ -34,6 +34,13 @@ Every camera frame is evaluated with directional awareness:
   $$\text{Global Severity} = \max(\text{Severity}(\text{Dir A}), \text{Severity}(\text{Dir B}))$$
   However, the camera inspection modal and corridor dock MUST present the directional breakdown (e.g., `Direction A: CONGESTED | Direction B: CLEAR`).
 
+### 2.1.1. Directional Roadway Polygons (Issue #309 / S9-T7)
+
+To translate scene-level directional labels into geometric ground truth, annotators can attach `direction: "a"` or `direction: "b"` to `roadway` segmentation polygons:
+- **Direction A Polygon (`direction: "a"`)**: Masks the drivable carriageway for the near / approaching traffic flow.
+- **Direction B Polygon (`direction: "b"`)**: Masks the drivable carriageway for the far / receding traffic flow.
+- **Sidecar Export**: Emitted by `tools/eval/export_yolo_seg.py` into `roadway_regions.json` per split, providing polygon boundaries without altering the standard single-class YOLO segmentation format.
+
 ### 2.2. Traffic Severity Levels & Physical Indicators
 
 | Severity Level | Flow Characteristic | Vehicle Headway | Signal Queue Behavior | Physical Visual Indicators |
