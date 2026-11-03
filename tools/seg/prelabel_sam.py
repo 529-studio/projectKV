@@ -203,7 +203,7 @@ def enforce_host_guard(allow_unsafe: bool) -> bool:
     """
     Refuses to run when AVX2 is absent unless the operator passes
     --allow-unsafe-host (a deliberate, loudly-logged override for capable
-    non-x86 development machines; production pre-labeling targets dev-box).
+    non-x86 development machines; production pre-labeling targets inference worker).
     Returns True when execution may proceed.
     """
     supported, host_desc = host_has_avx2()
@@ -213,12 +213,12 @@ def enforce_host_guard(allow_unsafe: bool) -> bool:
         logger.warning(
             "HOST GUARD OVERRIDE: host %s has no AVX2; continuing only because "
             "--allow-unsafe-host was passed explicitly. Production pre-labeling "
-            "must run on the AVX2 dev-box (ADR-011 D3).", host_desc
+            "must run on the AVX2 inference worker (ADR-011 D3).", host_desc
         )
         return True
     logger.error(
         "HOST GUARD: refusing to run on %s without AVX2. SAM pre-labeling is "
-        "authorized on the dev-box only; pass --allow-unsafe-host to override "
+        "authorized on the inference worker only; pass --allow-unsafe-host to override "
         "on a capable development machine.", host_desc
     )
     return False

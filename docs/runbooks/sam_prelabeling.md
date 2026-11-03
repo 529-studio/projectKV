@@ -17,8 +17,8 @@ Hand-drawing 500+ segmentation masks on raw traffic camera frames requires signi
 ## 2. Infrastructure & Host Guardrails
 
 To protect production stability and enforce hardware standards (ADR-011 D3 / AGENTS.md Rule 2):
-1. **Host Disqualification**: The production ingress host (`home-srv` Intel Celeron) lacks AVX2 vector instructions and must never execute batch AI annotation workloads that could degrade the live 30-second camera polling loop.
-2. **Authorized Host**: Inference runs offline on `dev-box` (AMD Ryzen 7 6800HS with AVX2), sharing cgroups with the CV engine and GitHub Actions runner.
+1. **Host Disqualification**: The production ingress host (Intel Celeron) lacks AVX2 vector instructions and must never execute batch AI annotation workloads that could degrade the live 30-second camera polling loop.
+2. **Authorized Host**: Inference runs offline on `inference worker` (AMD Ryzen 7 6800HS with AVX2), sharing cgroups with the CV engine and GitHub Actions runner.
 3. **Host Guard**: `prelabel_sam.py` inspects host CPU flags. On Linux x86_64, missing AVX2 halts execution immediately with an exit code. On developer machines (e.g. macOS Apple Silicon), pass `--allow-unsafe-host` to bypass the x86 guard for local development.
 
 ---
