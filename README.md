@@ -128,8 +128,6 @@ hcm-traffic-cameras/
 └── README.md                          # Project documentation
 ```
 
-> **Migration note**: `services/node-server` (the original Express.js proxy) is being retired in favor of `services/go-server`. The migration is incremental — new components (Hot Set Scheduler, Notification Adapter, SQLite state store) are Go-native from the start; the existing snapshot proxy/cache is ported once the new components are verified stable. See ADR-002 for the full rationale.
-
 ## 2. Quick Start
 
 ### 2.1. Basic Mode (UI & Backend without Local Model Inference)
@@ -186,6 +184,40 @@ make dev-all
 *   **Browser Access**:
     *   Full Application (Backend + Web): `http://localhost:3000`
     *   Standalone Frontend Dev: `http://localhost:3001`
+    *   Collaborative Labeler: `http://localhost:3001/labeler`
+
+### 2.3. Dataset Labeling & Model Training Workflow
+
+The project incorporates an end-to-end active learning and computer vision pipeline — spanning automated snapshot harvesting, interactive quadrilateral/polygon ground-truth annotation, YOLOv8 segmentation dataset export, model training, and OpenVINO optimization.
+
+#### Step 1: Frame Annotation & Directional Ground Truth (`/labeler`)
+Access the Collaborative Labeler at `http://localhost:3001/labeler`:
+*   **Dual-Trigger Harvesting**: Frames are ingested continuously via scheduled peak harvests and weather-triggered rain watchers (`internal/harvester`), streamed to Cloudflare R2 object storage (`warded-proofs`).
+*   **Assisted Pre-Labeling (SAM)**: Run `make prelabel-sam` (`tools/seg/prelabel_sam.py`) to stream R2 frames and generate MobileSAM + YOLOv8n polygon segment candidates for human review.
+*   **Quadrilateral Roadway & Flood Polygons**: Annotators switch to polygon mode (`S`) to outline drivable roadways and inundation zones directly on camera snapshots:
+    *   **Directional Roadway Polygons**: For the `roadway` class, annotators draw quadrilateral/polygon lane boundaries and assign directional flow — **Direction A** (`Chiều A`, near/approaching lane) or **Direction B** (`Chiều B`, far/receding lane). This isolates opposing traffic corridors for per-direction saturation and PCU ground truth.
+    *   **Water & Flood Masks**: Delineate localized water bodies (`water_puddle`, `water_severe`) anchored to physical tire-depth markers.
+    *   **Review Acceleration**: In-memory partition caching, hotkey accelerators (`Shift+Enter` to approve, `1`–`4` for traffic severity), and facet filtering (Rain, Daylight, Hot Set).
+
+#### Step 2: Dataset Compilation & Directional Sidecar Export
+Export annotated labels from `tools/eval/labels_gold_standard` into YOLO segmentation format:
+```bash
+make export-seg
+# Runs: python3 tools/eval/export_yolo_seg.py --labels-dir tools/eval/labels_gold_standard --output-dir data/yolo_seg --verify
+```
+*   **Standard YOLO Polygon Labels**: Normalizes polygon vertices into standard Ultralytics YOLO segmentation `.txt` format (`0: roadway`) split into train/val/test partitions.
+*   **Directional Roadway Sidecars**: Emits `roadway_regions.json` alongside masks, preserving exact normalized coordinates and lane flow (`a` vs `b`) for downstream traffic forecasting.
+
+#### Step 3: Off-Box Training & OpenVINO Deployment
+Train and export optimized inference weights:
+```bash
+# Fine-tune YOLOv8-seg and export Intel OpenVINO FP16 IR
+make train-seg
+
+# Verify PCU saturation and flood segmentation accuracy against ground-truth benchmarks
+make benchmark-real
+```
+Trained OpenVINO models (`.xml` / `.bin`) deploy directly to `services/cv-engine/models/` for low-latency live inference (< 38.5ms latency).
 
 ## 3. Key Highlights
 
@@ -214,14 +246,14 @@ make dev-all
 
 ### Tech Stack & Core Libraries
 
-| Layer | Technologies & Badges | Purpose |
+| Layer | Technologies | Purpose |
 |---|---|---|
-| **Frontend** | [![Next.js](https://img.shields.io/badge/Next.js-15.5+-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/) [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4+-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/) [![Framer Motion](https://img.shields.io/badge/Framer_Motion-11+-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion/) [![Leaflet](https://img.shields.io/badge/Leaflet-1.9+-199900?logo=leaflet&logoColor=white)](https://leafletjs.com/) | Next.js App Router, TypeScript, Tailwind CSS, Framer Motion animations, Leaflet interactive mapping |
-| **Backend** | [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![Gin](https://img.shields.io/badge/Gin-1.10+-008ECF?logo=go&logoColor=white)](https://gin-gonic.com/) [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/) [![SSE](https://img.shields.io/badge/SSE-Live_Stream-FFA500?logo=html5&logoColor=white)](docs/ADR-001-flood-alert-architecture.md#adr-003-sprint-1-scope--live-updates-sse-hot-set-scoped-congestion-colors-phường-based-filter) | Single static binary, Gin HTTP router, SQLite state persistence, in-memory TTL proxy caching, Server-Sent Events (SSE) live streaming |
-| **Cloud Storage & CDN** | [![Cloudflare R2](https://img.shields.io/badge/Cloudflare_R2-Object_Storage-F38020?logo=cloudflare&logoColor=white)](https://www.cloudflare.com/developer-platform/r2/) [![AWS SDK v2](https://img.shields.io/badge/AWS_SDK_v2-Go-FF9900?logo=amazonwebservices&logoColor=white)](https://github.com/aws/aws-sdk-go-v2) | Cloudflare R2 S3-compatible object storage (`warded-proofs`), public edge delivery (`file.529studio.site`), centralized proof snapshots repository |
-| **Computer Vision** | [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/) [![OpenCV](https://img.shields.io/badge/OpenCV-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/) [![OpenVINO](https://img.shields.io/badge/Intel_OpenVINO-Runtime-0071C5?logo=intel&logoColor=white)](https://openvino.ai/) | Python 3.11+, OpenVINO IR YOLOv8n FP16 inference, pluggable traffic congestion and flood alert analyzers |
-| **Weather & Radar APIs** | [![Open-Meteo](https://img.shields.io/badge/Open--Meteo-Weather_API-FF8C00?logo=weatherdotcom&logoColor=white)](https://open-meteo.com/) [![RainViewer](https://img.shields.io/badge/RainViewer-Radar_API-0284C7?logo=radar&logoColor=white)](https://www.rainviewer.com/api.html) | Real-time weather, temperature, humidity, rainfall metrics (Open-Meteo) and live composite weather radar precipitation tiles (RainViewer) |
-| **DevOps & Tooling** | [![CI](https://img.shields.io/badge/GitHub_Actions-CI-2ea44f?logo=githubactions&logoColor=white)](https://github.com/features/actions) [![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](LICENSE) [![Geo-Enrich](https://img.shields.io/badge/Geo--Enrich-Point--in--Polygon-708090?logo=python&logoColor=white)](tools/geo-enrich) | GitHub Actions CI/CD workflows, golangci-lint, ESLint, unified Makefile, batch Phường point-in-polygon enrichment |
+| **Frontend** | [Next.js 15.5+](https://nextjs.org/), [TypeScript 5](https://www.typescriptlang.org/), [Tailwind CSS 3.4](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/), [Leaflet](https://leafletjs.com/) | Next.js App Router client, responsive UI, interactive GIS mapping |
+| **Backend** | [Go 1.26+](https://go.dev/), [Gin](https://gin-gonic.com/), [SQLite 3](https://sqlite.org/), [SSE](docs/ADR-001-flood-alert-architecture.md#adr-003-sprint-1-scope--live-updates-sse-hot-set-scoped-congestion-colors-phường-based-filter) | Single static binary, proxy caching, Hot Set scheduler, live streams |
+| **Cloud Storage** | [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/), [AWS SDK v2 (Go)](https://github.com/aws/aws-sdk-go-v2) | S3-compatible snapshot proofs (`warded-proofs`), public edge delivery |
+| **Computer Vision** | [Python 3.11+](https://python.org/), [PyTorch](https://pytorch.org/), [OpenCV](https://opencv.org/), [Intel OpenVINO](https://openvino.ai/) | High-throughput vehicle detection and road surface water segmentation |
+| **Weather & Radar** | [Open-Meteo](https://open-meteo.com/), [RainViewer API](https://www.rainviewer.com/api.html) | Real-time rainfall metrics and composite Doppler radar reflectivity tiles |
+| **Tooling & Ops** | [GitHub Actions](https://github.com/features/actions), [AGPLv3](LICENSE), [Shapely](tools/geo-enrich) | CI/CD automation, golangci-lint, point-in-polygon boundary enrichment |
 
 ### Configuration Reference
 
@@ -281,8 +313,6 @@ Detailed architectural decisions are documented in:
 **[`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md)** — flood-alert feasibility, notification channels, and the Go backend migration decision (ADR-002)
 **[`docs/ADR-009-zero-vlm-flood-segmentation.md`](docs/ADR-009-zero-vlm-flood-segmentation.md)** — self-hosted flood segmentation, OpenVINO model selection benchmarks, and dual-layer physical triangulation (Zero-VLM)
 
-*   **Computer Vision Integration**: Traffic congestion + flood detection via a **Pluggable Adapter** pattern (Mock ➔ Cloud Vision API ➔ Self-hosted YOLO/ONNX), orchestrated from Go, model inference in Python.
-*   **Real-Time Flood Alerting**: Zone-based subscriptions with a pluggable **Notification Adapter** — Telegram (Phase 1), Zalo OA (Phase 2), Web Push, SMS — because a rider on a motorbike cannot open a browser tab to check a map.
 ## License
 
 This project is licensed under the **GNU Affero General Public License v3.0**
