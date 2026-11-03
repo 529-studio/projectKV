@@ -56,4 +56,5 @@ Danh sách đầy đủ các biến nằm ở mục **Configuration Reference** 
 
 - Kiến trúc backend Go: [`docs/GO_BACKEND_ARCHITECTURE.md`](docs/GO_BACKEND_ARCHITECTURE.md)
 - Điểm bắt đầu cho developer: [`docs/ONBOARDING.md`](docs/ONBOARDING.md)
+- Quy trình gán nhãn & huấn luyện mô hình: Mục 2.3 trong [`README.md`](README.md#23-dataset-labeling--model-training-workflow)
 - Quy tắc bắt buộc của dự án: [`AGENTS.md`](AGENTS.md)
