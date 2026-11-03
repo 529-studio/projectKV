@@ -311,7 +311,17 @@ func (a *CloudVisionAnalyzer) callGemini(ctx context.Context, imgBytes []byte, m
 
 	var vj verdictJSON
 	if err := json.Unmarshal([]byte(text), &vj); err != nil {
-		return nil, fmt.Errorf("unmarshal VLM verdict JSON (%q): %w", text, err)
+		// Defensive fallback: Gemini occasionally returns a JSON array [ { ... } ]
+		// even when instructed to produce a single JSON object.
+		var arr []verdictJSON
+		if arrErr := json.Unmarshal([]byte(text), &arr); arrErr == nil {
+			if len(arr) == 0 {
+				return nil, fmt.Errorf("gemini returned empty verdict array (%q)", text)
+			}
+			vj = arr[0]
+		} else {
+			return nil, fmt.Errorf("unmarshal VLM verdict JSON (%q): %w", text, err)
+		}
 	}
 
 	return &vj, nil

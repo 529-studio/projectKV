@@ -201,6 +201,129 @@ func TestCloudVisionAnalyzer_Analyze_MarkdownWrappedJSON(t *testing.T) {
 	}
 }
 
+func TestCloudVisionAnalyzer_Analyze_ArrayWrappedJSON(t *testing.T) {
+	ctx := context.Background()
+	cam := hotset.Camera{
+		ID:          "cam-103b",
+		SnapshotURL: "http://proxy.test/snapshot/cam-103b.jpg",
+	}
+
+	arrayJSON := `[
+  {
+    "traffic_severity": "CLEAR",
+    "flood_severity": "DRY",
+    "confidence": 0.95,
+    "description": "Traffic is flowing freely with minimal vehicles visible on dry roads at the intersection."
+  }
+]`
+
+	mockClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.String(), "snapshot") {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte("jpeg-bytes"))),
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(mockGeminiResponse(arrayJSON))),
+			}, nil
+		}),
+	}
+
+	analyzer := cvclient.NewCloudVisionAnalyzer("test-key", cvclient.WithHTTPClient(mockClient))
+	v, err := analyzer.Analyze(ctx, cam)
+	if err != nil {
+		t.Fatalf("unexpected error parsing array-wrapped JSON: %v", err)
+	}
+
+	if v.Severity != hotset.SeverityClear {
+		t.Errorf("expected CLEAR, got %q", v.Severity)
+	}
+	if v.FloodSeverity != hotset.SeverityDry {
+		t.Errorf("expected DRY, got %q", v.FloodSeverity)
+	}
+	if v.Confidence != 0.95 {
+		t.Errorf("expected 0.95, got %f", v.Confidence)
+	}
+}
+
+func TestCloudVisionAnalyzer_Analyze_ArrayWrappedJSON_EmptyArray_Fails(t *testing.T) {
+	ctx := context.Background()
+	cam := hotset.Camera{
+		ID:          "cam-103c",
+		SnapshotURL: "http://proxy.test/snapshot/cam-103c.jpg",
+	}
+
+	emptyArrayJSON := `[]`
+
+	mockClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.String(), "snapshot") {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte("jpeg-bytes"))),
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(mockGeminiResponse(emptyArrayJSON))),
+			}, nil
+		}),
+	}
+
+	analyzer := cvclient.NewCloudVisionAnalyzer("test-key", cvclient.WithHTTPClient(mockClient))
+	_, err := analyzer.Analyze(ctx, cam)
+	if err == nil {
+		t.Fatal("expected error on empty array, got nil")
+	}
+	if !strings.Contains(err.Error(), "empty verdict array") {
+		t.Errorf("expected 'empty verdict array' in error message, got %v", err)
+	}
+}
+
+func TestCloudVisionAnalyzer_Analyze_ArrayWrappedJSON_MarkdownFenced(t *testing.T) {
+	ctx := context.Background()
+	cam := hotset.Camera{
+		ID:          "cam-103d",
+		SnapshotURL: "http://proxy.test/snapshot/cam-103d.jpg",
+	}
+
+	fencedArray := "```json\n[\n  {\n    \"traffic_severity\": \"HEAVY\",\n    \"flood_severity\": \"FLOODED_SHALLOW\",\n    \"confidence\": 0.91,\n    \"description\": \"Water covering road and slow moving cars.\"\n  }\n]\n```"
+
+	mockClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.String(), "snapshot") {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte("jpeg-bytes"))),
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(mockGeminiResponse(fencedArray))),
+			}, nil
+		}),
+	}
+
+	analyzer := cvclient.NewCloudVisionAnalyzer("test-key", cvclient.WithHTTPClient(mockClient))
+	v, err := analyzer.Analyze(ctx, cam)
+	if err != nil {
+		t.Fatalf("unexpected error parsing fenced array JSON: %v", err)
+	}
+
+	if v.Severity != hotset.SeverityHeavy {
+		t.Errorf("expected HEAVY, got %q", v.Severity)
+	}
+	if v.FloodSeverity != hotset.SeverityFloodedShallow {
+		t.Errorf("expected FLOODED_SHALLOW, got %q", v.FloodSeverity)
+	}
+	if v.Confidence != 0.91 {
+		t.Errorf("expected 0.91, got %f", v.Confidence)
+	}
+}
+
 func TestCloudVisionAnalyzer_Analyze_UnknownSeverityString(t *testing.T) {
 	ctx := context.Background()
 	cam := hotset.Camera{
