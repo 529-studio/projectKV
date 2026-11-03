@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons test-eval test-train export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs test-eval test-train export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label
 
 help:
 	@echo "========================================================"
@@ -28,6 +28,8 @@ help:
 	@echo "  make curate-hotset   - Curate Hot Set vehicle-detection camera list (S2)"
 	@echo "  make hex-polygons    - Precompute H3 hex polygon boundaries"
 	@echo "  make test-enrich     - Run unit tests for geo-enrich tool"
+	@echo "  make docs-lint       - Enforce the context budget, ADR numbers, links and prose rules"
+	@echo "  make test-docs       - Run unit tests for the docs-lint gate"
 	@echo "  make test-eval       - Run unit tests for eval benchmark harness"
 	@echo "  make benchmark-mock  - Run AI benchmark harness in mock mode"
 	@echo "  make benchmark-real  - Run AI benchmark harness against live OpenVINO cv-engine (T4)"
@@ -104,6 +106,12 @@ hex-polygons:
 
 test-enrich:
 	python3 -m unittest discover -s tools/geo-enrich -p "test_*.py"
+
+docs-lint:
+	python3 tools/docs/docs_lint.py
+
+test-docs:
+	python3 -m unittest discover -s tools/docs -p "*_test.py"
 
 test-eval:
 	python3 -m unittest discover -s tools/eval -p "*_test.py"

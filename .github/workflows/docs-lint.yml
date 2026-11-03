@@ -1,0 +1,39 @@
+name: Docs Lint
+
+# Enforces the context budget, unique ADR numbers, link resolution, tracked file size
+# and English-prose rules. Runs on every pull request without path filters, for the
+# same reason as public-safety: a filter on `docs/**` would let a change to this
+# workflow bypass the gate it defines.
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Enforce documentation rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify the gate itself
+        run: python3 -m unittest discover -s tools/docs -p "*_test.py"
+
+      - name: Run docs-lint
+        run: python3 tools/docs/docs_lint.py
