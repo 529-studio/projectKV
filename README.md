@@ -92,6 +92,10 @@ hcm-traffic-cameras/
 │       └── api.py                     # Multi-threaded OpenVINO detection endpoint (:8000)
 │
 ├── tools/
+│   ├── seg/                           # [SEGMENTATION PRE-LABELING] SAM-assisted batch toolchain (S9-T2)
+│   │   ├── prelabel_sam.py            # Stream frames from R2, run MobileSAM + YOLOv8n, upload candidates
+│   │   ├── sam_runtime.py             # ONNX runtime wrappers for ViT encoder & promptable decoder
+│   │   └── contract.py                # Polygon annotation schema & validation contract
 │   ├── eval/                          # [EVALUATION] Ground-truth benchmarks & label curation
 │   │   ├── auto_harvest.py            # Standalone automated frame harvester & Draft-07 labeler CLI
 │   │   ├── export_yolo_seg.py         # Standalone YOLO segmentation dataset exporter CLI (ADR-009)
