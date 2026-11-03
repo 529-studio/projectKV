@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs test-eval test-train export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs test-eval test-seg test-train export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam
 
 help:
 	@echo "========================================================"
@@ -31,6 +31,7 @@ help:
 	@echo "  make docs-lint       - Enforce the context budget, ADR numbers, links and prose rules"
 	@echo "  make test-docs       - Run unit tests for the docs-lint gate"
 	@echo "  make test-eval       - Run unit tests for eval benchmark harness"
+	@echo "  make test-seg        - Run unit tests for SAM pre-labeling toolchain (S9-T2)"
 	@echo "  make benchmark-mock  - Run AI benchmark harness in mock mode"
 	@echo "  make benchmark-real  - Run AI benchmark harness against live OpenVINO cv-engine (T4)"
 	@echo "  make smoke-eval      - Run known-state smoke camera verification (mock dry-run)"
@@ -115,6 +116,12 @@ test-docs:
 
 test-eval:
 	python3 -m unittest discover -s tools/eval -p "*_test.py"
+
+test-seg:
+	python3 -m unittest discover -s tools/seg -p "*_test.py"
+
+prelabel-sam:
+	python3 tools/seg/prelabel_sam.py --date $(DATE) $(LIMIT) $(EXTRA)
 
 test-train:
 	python3 -m unittest discover -s tools/train -p "*_test.py"
