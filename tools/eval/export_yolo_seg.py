@@ -315,6 +315,8 @@ def export_dataset(
 
     label_files = sorted(list(labels_dir.glob("*.json")))
     if not label_files:
+        label_files = sorted(list(labels_dir.rglob("*.json")))
+    if not label_files:
         raise ValueError(f"No JSON label files found in {labels_dir}")
 
     # Prepare output directories
