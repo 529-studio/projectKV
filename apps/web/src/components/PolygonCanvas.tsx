@@ -6,6 +6,7 @@ import {
   MIN_POLYGON_POINTS,
   type PolygonAnnotation,
   type PolygonClass,
+  type PolygonDirection,
   type PolygonPoint,
 } from '@/utils/labelerUtils';
 
@@ -28,6 +29,7 @@ interface PolygonCanvasProps {
   annotations: PolygonAnnotation[];
   onChange: (next: PolygonAnnotation[]) => void;
   activeClass: PolygonClass;
+  activeDirection?: PolygonDirection | null;
   enabled: boolean;
   labels: {
     hint: string;
@@ -35,6 +37,8 @@ interface PolygonCanvasProps {
     empty: string;
     deleteBtn: string;
     autoBadge: string;
+    directionBadgeA?: string;
+    directionBadgeB?: string;
   };
 }
 
@@ -55,6 +59,7 @@ export default function PolygonCanvas({
   annotations,
   onChange,
   activeClass,
+  activeDirection,
   enabled,
   labels,
 }: PolygonCanvasProps) {
@@ -107,9 +112,15 @@ export default function PolygonCanvas({
   const closeDraft = useCallback(() => {
     if (draft.length < MIN_POLYGON_POINTS) return;
     if (annotations.length >= MAX_ANNOTATIONS_PER_LABEL) return;
-    onChange([...annotations, { class: activeClass, polygon: draft, source: 'human' }]);
+    const newAnn: PolygonAnnotation = {
+      class: activeClass,
+      polygon: draft,
+      source: 'human',
+      ...(activeClass === 'roadway' && activeDirection ? { direction: activeDirection } : {}),
+    };
+    onChange([...annotations, newAnn]);
     setDraft([]);
-  }, [draft, annotations, activeClass, onChange]);
+  }, [draft, annotations, activeClass, activeDirection, onChange]);
 
   // Enter closes the draft polygon; Escape discards it.
   useEffect(() => {
@@ -119,6 +130,7 @@ export default function PolygonCanvas({
         setDraft([]);
       } else if (e.key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         closeDraft();
       }
     };
@@ -272,6 +284,13 @@ export default function PolygonCanvas({
                   style={{ backgroundColor: POLYGON_CLASS_COLORS[ann.class] }}
                 />
                 {ann.class} ({ann.polygon.length})
+                {ann.direction && (
+                  <span className="px-1 py-0.5 rounded bg-zinc-800 text-[10px] text-zinc-300 font-mono border border-zinc-700">
+                    {ann.direction === 'a'
+                      ? (labels.directionBadgeA || 'Dir A')
+                      : (labels.directionBadgeB || 'Dir B')}
+                  </span>
+                )}
                 {ann.source === 'sam_prelabel' && (
                   <span className="text-zinc-500">{labels.autoBadge}</span>
                 )}

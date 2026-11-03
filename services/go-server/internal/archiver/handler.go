@@ -54,6 +54,13 @@ var polygonClassAliases = map[string]string{
 	"container": "truck", "lorry": "truck",
 }
 
+// polygonDirectionAliases accepts alternate direction conventions and maps them onto
+// canonical "a" or "b" (Issue #309 / S9-T7).
+var polygonDirectionAliases = map[string]string{
+	"dir_a": "a", "traffic_dir_a": "a", "near": "a",
+	"dir_b": "b", "traffic_dir_b": "b", "far": "b",
+}
+
 // normalizePolygonClass resolves a raw class string to a canonical class id.
 func normalizePolygonClass(raw string) string {
 	norm := strings.ToLower(strings.TrimSpace(raw))
@@ -66,15 +73,37 @@ func normalizePolygonClass(raw string) string {
 	return ""
 }
 
+// normalizePolygonDirection resolves a raw direction string to "a" or "b", or "" if invalid.
+func normalizePolygonDirection(raw string) string {
+	norm := strings.ToLower(strings.TrimSpace(raw))
+	if norm == "a" || norm == "b" {
+		return norm
+	}
+	if canonical, ok := polygonDirectionAliases[norm]; ok {
+		return canonical
+	}
+	return ""
+}
+
 // validateAnnotations enforces the polygon geometry contract: canonical class,
-// 3-64 vertices, and pixel-free normalized coordinates in [0, 1].
+// 3-64 vertices, pixel-free normalized coordinates in [0, 1], and optional direction
+// restricted strictly to roadway class with canonical values a/b.
 func validateAnnotations(anns []PolygonAnnotation) error {
 	if len(anns) > maxAnnotationsPerLabel {
 		return fmt.Errorf("too many polygon annotations: %d (max %d)", len(anns), maxAnnotationsPerLabel)
 	}
 	for i, ann := range anns {
-		if normalizePolygonClass(ann.Class) == "" {
+		normClass := normalizePolygonClass(ann.Class)
+		if normClass == "" {
 			return fmt.Errorf("annotation[%d]: unknown class %q (must be one of roadway, water_puddle, motorcycle, car, bus, truck)", i, ann.Class)
+		}
+		if ann.Direction != "" {
+			if normClass != "roadway" {
+				return fmt.Errorf("annotation[%d] (%s): direction may only be set when class is roadway, got %q", i, ann.Class, ann.Direction)
+			}
+			if ann.Direction != "a" && ann.Direction != "b" {
+				return fmt.Errorf("annotation[%d] (%s): unknown direction %q (must be one of a, b)", i, ann.Class, ann.Direction)
+			}
 		}
 		if len(ann.Polygon) < minPolygonPoints || len(ann.Polygon) > maxPolygonPoints {
 			return fmt.Errorf("annotation[%d] (%s): polygon must have between %d and %d vertices, got %d",
@@ -128,10 +157,12 @@ type SnapshotListResponse struct {
 // PolygonAnnotation represents a single segmentation polygon drawn over a
 // snapshot, expressed in normalized image coordinates [0.0, 1.0] following the
 // YOLO segmentation export contract consumed by tools/eval/export_yolo_seg.py.
+// Direction is optional and valid only for roadway polygons (Issue #309 / S9-T7).
 type PolygonAnnotation struct {
-	Class   string      `json:"class"`            // canonical: roadway, water_puddle, motorcycle, car, bus, truck
-	Polygon [][]float64 `json:"polygon"`          // [[x, y], ...] normalized to [0, 1]
-	Source  string      `json:"source,omitempty"` // provenance: "human" | "sam_prelabel" | model id
+	Class     string      `json:"class"`               // canonical: roadway, water_puddle, motorcycle, car, bus, truck
+	Polygon   [][]float64 `json:"polygon"`             // [[x, y], ...] normalized to [0, 1]
+	Direction string      `json:"direction,omitempty"` // optional: "a" | "b" (valid only when class == roadway)
+	Source    string      `json:"source,omitempty"`    // provenance: "human" | "sam_prelabel" | model id
 }
 
 // LabelPayload represents human-annotated ground truth for a snapshot.
@@ -477,10 +508,15 @@ func (h *Handler) SaveLabel(c *gin.Context) {
 	}
 
 	// Normalize polygon classes to the canonical taxonomy and enforce the
-	// geometry contract before persisting.
+	// geometry contract before persisting. Canonicalize direction for roadway polygons.
 	for i := range payload.Annotations {
 		payload.Annotations[i].Class = normalizePolygonClass(payload.Annotations[i].Class)
 		payload.Annotations[i].Source = strings.TrimSpace(payload.Annotations[i].Source)
+		if payload.Annotations[i].Direction != "" {
+			if normDir := normalizePolygonDirection(payload.Annotations[i].Direction); normDir != "" {
+				payload.Annotations[i].Direction = normDir
+			}
+		}
 	}
 	if err := validateAnnotations(payload.Annotations); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

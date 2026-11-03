@@ -101,10 +101,12 @@ export const MAX_ANNOTATIONS_PER_LABEL = 32;
 export const POLYGON_PROVENANCE_SAM = 'sam_prelabel';
 
 export type PolygonPoint = [number, number];
+export type PolygonDirection = 'a' | 'b';
 
 export interface PolygonAnnotation {
   class: PolygonClass;
   polygon: PolygonPoint[];
+  direction?: PolygonDirection;
   source?: string;
 }
 
@@ -148,6 +150,14 @@ export function validatePolygonAnnotations(anns: PolygonAnnotation[] | undefined
     const ann = anns[i];
     if (!POLYGON_CLASSES.includes(ann.class)) {
       return `annotation[${i}]: unknown class "${ann.class}"`;
+    }
+    if (ann.direction !== undefined && ann.direction !== null && (ann.direction as string) !== '') {
+      if (ann.class !== 'roadway') {
+        return `annotation[${i}] (${ann.class}): direction may only be set when class is roadway, got "${ann.direction}"`;
+      }
+      if (ann.direction !== 'a' && ann.direction !== 'b') {
+        return `annotation[${i}] (${ann.class}): unknown direction "${ann.direction}" (must be "a" or "b")`;
+      }
     }
     if (ann.polygon.length < MIN_POLYGON_POINTS || ann.polygon.length > MAX_POLYGON_POINTS) {
       return `annotation[${i}] (${ann.class}): polygon must have ${MIN_POLYGON_POINTS}-${MAX_POLYGON_POINTS} vertices`;
@@ -459,6 +469,12 @@ export const LABELER_I18N = {
     segModeToggle: 'Chế độ phân vùng',
     segModeHint: 'Nhấp để thêm đỉnh, nhấp đỉnh đầu hoặc Enter để đóng polygon, Esc để hủy',
     segClassLabel: 'Lớp phân vùng',
+    segDirectionLabel: 'Hướng đường',
+    segDirectionNone: 'Không phân hướng',
+    segDirectionA: 'Chiều A (Làn gần)',
+    segDirectionB: 'Chiều B (Làn xa)',
+    segDirectionBadgeA: 'Chiều A',
+    segDirectionBadgeB: 'Chiều B',
     segPolygonsLabel: 'Polygon đã vẽ',
     segEmpty: 'Chưa có polygon nào',
     segAutoBadge: '[Tự động: SAM]',
@@ -542,6 +558,12 @@ export const LABELER_I18N = {
     segModeToggle: 'Segmentation mode',
     segModeHint: 'Click to add vertices, click the first vertex or press Enter to close, Esc to cancel',
     segClassLabel: 'Segmentation class',
+    segDirectionLabel: 'Roadway direction',
+    segDirectionNone: 'None',
+    segDirectionA: 'Direction A (near lane)',
+    segDirectionB: 'Direction B (far lane)',
+    segDirectionBadgeA: 'Dir A',
+    segDirectionBadgeB: 'Dir B',
     segPolygonsLabel: 'Drawn polygons',
     segEmpty: 'No polygons yet',
     segAutoBadge: '[Auto: SAM]',

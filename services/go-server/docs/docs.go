@@ -1346,6 +1346,10 @@ const docTemplate = `{
                     "description": "canonical: roadway, water_puddle, motorcycle, car, bus, truck",
                     "type": "string"
                 },
+                "direction": {
+                    "description": "optional: \"a\" | \"b\" (valid only when class == roadway)",
+                    "type": "string"
+                },
                 "polygon": {
                     "description": "[[x, y], ...] normalized to [0, 1]",
                     "type": "array",

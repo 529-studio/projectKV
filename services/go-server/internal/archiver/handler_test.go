@@ -427,6 +427,16 @@ func TestHandler_SaveLabel_PolygonAnnotations(t *testing.T) {
 			ann:  PolygonAnnotation{Class: "bus", Polygon: [][]float64{{0.1, 0.1, 0.1}, {0.2, 0.2}, {0.3, 0.3}}},
 			want: "[x, y] pair",
 		},
+		{
+			name: "direction on non-roadway class rejected",
+			ann:  PolygonAnnotation{Class: "car", Direction: "a", Polygon: [][]float64{{0.1, 0.1}, {0.2, 0.2}, {0.3, 0.3}}},
+			want: "direction may only be set when class is roadway",
+		},
+		{
+			name: "unknown direction rejected",
+			ann:  PolygonAnnotation{Class: "roadway", Direction: "north", Polygon: [][]float64{{0.1, 0.1}, {0.2, 0.2}, {0.3, 0.3}}},
+			want: "unknown direction",
+		},
 	}
 	for _, tc := range cases {
 		bad := validLabel
@@ -441,6 +451,94 @@ func TestHandler_SaveLabel_PolygonAnnotations(t *testing.T) {
 		}
 		if !strings.Contains(wBad.Body.String(), tc.want) {
 			t.Errorf("%s: expected error mentioning %q, got: %s", tc.name, tc.want, wBad.Body.String())
+		}
+	}
+}
+
+// TestHandler_SaveLabel_DirectionalRoadwayPolygons verifies S9-T7 (Issue #309):
+// roadway polygons accept direction with alias canonicalization, round-trip
+// accurately through GetLabels, and maintain backward compatibility when direction is absent.
+func TestHandler_SaveLabel_DirectionalRoadwayPolygons(t *testing.T) {
+	router, _ := setupTestRouter(t)
+
+	// 1. Dual directional roadway polygons with aliases (dir_a -> a, far -> b)
+	dualDirLabel := LabelPayload{
+		Date:         "2026-10-12",
+		CameraID:     "cam1",
+		SnapshotKey:  "2026-10-12/cam1/1791560000_sample.jpg",
+		Annotator:    "reviewer_s9",
+		FloodLevel:   "none",
+		TrafficLevel: "moderate",
+		Weather:      "clear",
+		TimeOfDay:    "day",
+		Annotations: []PolygonAnnotation{
+			{
+				Class:     "roadway",
+				Direction: "dir_a",
+				Polygon:   [][]float64{{0.1, 0.9}, {0.45, 0.9}, {0.45, 0.5}, {0.2, 0.5}},
+				Source:    "human",
+			},
+			{
+				Class:     "roadway",
+				Direction: "far",
+				Polygon:   [][]float64{{0.55, 0.9}, {0.9, 0.9}, {0.8, 0.5}, {0.55, 0.5}},
+				Source:    "human",
+			},
+		},
+	}
+
+	body, _ := json.Marshal(dualDirLabel)
+	wPost := httptest.NewRecorder()
+	reqPost, _ := http.NewRequest("POST", "/api/archiver/labels", bytes.NewReader(body))
+	reqPost.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(wPost, reqPost)
+	if wPost.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", wPost.Code, wPost.Body.String())
+	}
+
+	// Fetch back and assert canonicalization
+	wGet := httptest.NewRecorder()
+	reqGet, _ := http.NewRequest("GET", "/api/archiver/labels?date=2026-10-12", nil)
+	router.ServeHTTP(wGet, reqGet)
+	if wGet.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", wGet.Code, wGet.Body.String())
+	}
+	var resp LabelListResponse
+	if err := json.Unmarshal(wGet.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal labels response: %v", err)
+	}
+	if resp.Total != 1 || len(resp.Labels[0].Annotations) != 2 {
+		t.Fatalf("expected 1 label with 2 annotations, got total=%d annotations=%d", resp.Total, len(resp.Labels[0].Annotations))
+	}
+	ann0 := resp.Labels[0].Annotations[0]
+	ann1 := resp.Labels[0].Annotations[1]
+	if ann0.Direction != "a" {
+		t.Errorf("expected alias 'dir_a' canonicalized to 'a', got %q", ann0.Direction)
+	}
+	if ann1.Direction != "b" {
+		t.Errorf("expected alias 'far' canonicalized to 'b', got %q", ann1.Direction)
+	}
+
+	// 2. Alias testing matrix: all aliases map onto 'a' or 'b'
+	aliasTests := []struct {
+		input string
+		want  string
+	}{
+		{"a", "a"},
+		{"A", "a"},
+		{"dir_a", "a"},
+		{"traffic_dir_a", "a"},
+		{"near", "a"},
+		{"b", "b"},
+		{"B", "b"},
+		{"dir_b", "b"},
+		{"traffic_dir_b", "b"},
+		{"far", "b"},
+	}
+	for _, tc := range aliasTests {
+		got := normalizePolygonDirection(tc.input)
+		if got != tc.want {
+			t.Errorf("normalizePolygonDirection(%q) = %q, want %q", tc.input, got, tc.want)
 		}
 	}
 }
