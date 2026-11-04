@@ -9,14 +9,16 @@ from __future__ import annotations
 import socket
 import struct
 import sys
+import tempfile
 import threading
 import time
 import unittest
 import urllib.request
 import urllib.error
 import json
-import os
 import unittest.mock
+from io import BytesIO
+from pathlib import Path
 
 try:
     import numpy as np
@@ -27,9 +29,13 @@ except ImportError:
     np = None
     Image = None
 
+import server
 from server import (
     CVServer,
     CVRequestHandler,
+    DET_MODEL_XML,
+    SEG_MODEL_XML,
+    WHEEL_SUBMERSION_DELTA,
     letterbox,
     nms_cpu,
     decode_mask_prototypes,
@@ -323,53 +329,226 @@ class TestSegmentationAndTriangulation(unittest.TestCase):
         self.assertEqual(verdict_c, "CLEAR")
         self.assertEqual(conf_c, 0.95)
 
-    def test_segmentation_model_candidate_precedence(self):
-        """Verifies candidate_xmls in server.py prefers yolov8n_seg.xml over yolov8n.xml."""
-        import server
-        model_dir = "mock_model_dir"
-        seg_xml = os.path.join(model_dir, "yolov8n_seg.xml")
-        det_xml = os.path.join(model_dir, "yolov8n.xml")
 
-        # Mocking os.path.isfile to return True for both
-        with unittest.mock.patch("os.path.isfile") as mock_isfile:
-            mock_isfile.side_effect = lambda p: p in (seg_xml, det_xml)
-            candidates = [
-                os.path.join(model_dir, "yolov8n_seg.xml"),
-                os.path.join(model_dir, "yolov8n.xml"),
-            ]
-            chosen = None
-            for c in candidates:
-                if os.path.isfile(c):
-                    chosen = c
-                    break
-            self.assertEqual(chosen, seg_xml)
+class TestSegmentationModelSelection(unittest.TestCase):
+    """Exercises server.select_model_xml() directly.
 
-    def test_segmentation_flood_assessment_fields(self):
-        """Verifies flood_assessment dictionary contains all required contract fields."""
-        water_ratio = 0.18
-        max_delta_sub = 0.22
-        depth_estimated_cm = 24.2
-        submerged_mc = 3
-        puddle_count = 4
-        vehicle_counts = {"motorcycle": 5, "car": 10, "bus": 1, "truck": 2}
-        flood_verdict = "FLOODED_DEEP"
+    This decides which weights the service runs: choosing the generic detector over
+    the fine-tuned segmentation model silently drops mask output. Re-implementing the
+    precedence loop inside a test (as the previous version did) asserts nothing about
+    production code, so every case below calls the real function.
+    """
 
-        assessment = {
-            "status": flood_verdict,
-            "water_surface_ratio": round(water_ratio, 4),
-            "wheel_submersion_detected": max_delta_sub >= 0.18,
-            "max_submersion_depth_cm": round(depth_estimated_cm, 1),
-            "motorcycles_observed": vehicle_counts["motorcycle"],
-            "motorcycles_submerged": submerged_mc,
-            "puddle_polygon_count": puddle_count,
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.model_dir = Path(self._tmp.name)
+
+    def _touch(self, name):
+        path = self.model_dir / name
+        path.write_bytes(b"<net/>")
+        return str(path)
+
+    def test_prefers_segmentation_weights_when_both_exist(self):
+        self._touch(DET_MODEL_XML)
+        seg = self._touch(SEG_MODEL_XML)
+        self.assertEqual(server.select_model_xml(str(self.model_dir)), seg)
+
+    def test_falls_back_to_detection_weights(self):
+        det = self._touch(DET_MODEL_XML)
+        self.assertEqual(server.select_model_xml(str(self.model_dir)), det)
+
+    def test_uses_any_xml_when_names_are_unconventional(self):
+        custom = self._touch("custom_city_model.xml")
+        self.assertEqual(server.select_model_xml(str(self.model_dir)), custom)
+
+    def test_multiple_unconventional_xmls_resolve_deterministically(self):
+        # os.listdir order is filesystem-dependent, so an unsorted fallback would pick
+        # a different model on a different host for the same directory contents.
+        first = self._touch("aaa_model.xml")
+        self._touch("zzz_model.xml")
+        self.assertEqual(server.select_model_xml(str(self.model_dir)), first)
+        self.assertEqual(
+            server.select_model_xml(str(self.model_dir)),
+            server.select_model_xml(str(self.model_dir)),
+        )
+
+    def test_ignores_non_xml_weight_files(self):
+        self._touch("yolov8n.bin")
+        self._touch("yolov8n.onnx")
+        with self.assertLogs("cv-engine", level="INFO") as logs:
+            self.assertIsNone(server.select_model_xml(str(self.model_dir)))
+        self.assertIn("No OpenVINO model XML found", "\n".join(logs.output))
+
+    def test_missing_directory_logs_and_returns_none(self):
+        missing = self.model_dir / "not_mounted"
+        with self.assertLogs("cv-engine", level="INFO") as logs:
+            self.assertIsNone(server.select_model_xml(str(missing)))
+        self.assertIn("does not exist", "\n".join(logs.output))
+
+
+class TestFloodAssessmentContract(unittest.TestCase):
+    """Asserts the flood_assessment wire contract against production code."""
+
+    CONTRACT_KEYS = frozenset({
+        "status",
+        "water_surface_ratio",
+        "wheel_submersion_detected",
+        "max_submersion_depth_cm",
+        "motorcycles_observed",
+        "motorcycles_submerged",
+        "puddle_polygon_count",
+    })
+
+    def _build(self, **overrides):
+        kwargs = {
+            "verdict": "CLEAR",
+            "water_ratio": 0.0,
+            "max_delta_sub": 0.0,
+            "depth_estimated_cm": 0.0,
+            "motorcycles_observed": 0,
+            "motorcycles_submerged": 0,
+            "puddle_polygon_count": 0,
         }
+        kwargs.update(overrides)
+        return server.build_flood_assessment(**kwargs)
 
+    def test_emits_exactly_the_documented_keys(self):
+        self.assertEqual(set(self._build()), set(self.CONTRACT_KEYS))
+
+    def test_rounds_and_passes_through_measurements(self):
+        assessment = self._build(
+            verdict="FLOODED_DEEP",
+            water_ratio=0.18456,
+            max_delta_sub=0.2222,
+            depth_estimated_cm=24.24,
+            motorcycles_observed=5,
+            motorcycles_submerged=3,
+            puddle_polygon_count=4,
+        )
         self.assertEqual(assessment["status"], "FLOODED_DEEP")
+        self.assertAlmostEqual(assessment["water_surface_ratio"], 0.1846)
+        self.assertAlmostEqual(assessment["max_submersion_depth_cm"], 24.2)
         self.assertTrue(assessment["wheel_submersion_detected"])
-        self.assertEqual(assessment["max_submersion_depth_cm"], 24.2)
         self.assertEqual(assessment["motorcycles_observed"], 5)
         self.assertEqual(assessment["motorcycles_submerged"], 3)
         self.assertEqual(assessment["puddle_polygon_count"], 4)
+
+    def test_wheel_flag_flips_at_the_shared_threshold(self):
+        below = self._build(max_delta_sub=WHEEL_SUBMERSION_DELTA - 0.001)
+        at = self._build(max_delta_sub=WHEEL_SUBMERSION_DELTA)
+        self.assertFalse(below["wheel_submersion_detected"])
+        self.assertTrue(at["wheel_submersion_detected"])
+
+    def test_wheel_flag_never_contradicts_the_verdict_engine(self):
+        for delta in (0.0, 0.1, 0.17, 0.18, 0.4):
+            verdict, _ = triangulate_flood_verdict(
+                water_ratio=0.4, max_delta_sub=delta, depth_estimated_cm=0.0
+            )
+            assessment = self._build(verdict=verdict, water_ratio=0.4, max_delta_sub=delta)
+            if assessment["wheel_submersion_detected"]:
+                self.assertEqual(verdict, "FLOODED_DEEP", f"delta={delta}")
+
+    def test_depth_alone_can_flood_without_wheel_submersion(self):
+        # Layer 2 has two independent signals. Deep water measured by depth must still
+        # be FLOODED_DEEP even when no wheel is under water, and the wheel flag must
+        # stay False rather than being coerced to agree.
+        verdict, _ = triangulate_flood_verdict(
+            water_ratio=0.4, max_delta_sub=0.05, depth_estimated_cm=25.0
+        )
+        assessment = self._build(
+            verdict=verdict, water_ratio=0.4, max_delta_sub=0.05, depth_estimated_cm=25.0
+        )
+        self.assertEqual(verdict, "FLOODED_DEEP")
+        self.assertFalse(assessment["wheel_submersion_detected"])
+
+
+class _FakeResults:
+    """Minimal stand-in for OpenVINO's OVDict: subscriptable, but not a dict."""
+
+    def __init__(self, outputs):
+        self._outputs = outputs
+
+    def __getitem__(self, key):
+        return self._outputs[key]
+
+    def __len__(self):
+        return len(self._outputs)
+
+
+class _FakeInput:
+    shape = (1, 3, 416, 416)
+
+
+class _FakeInferRequest:
+    def infer(self, feeds):
+        # 42 rows = the 6-class segmentation head; all scores below threshold.
+        return _FakeResults({0: np.zeros((1, 42, 8400), dtype=np.float32)})
+
+
+class _FakeCompiledModel:
+    def input(self, index):
+        return _FakeInput()
+
+    def create_infer_request(self):
+        return _FakeInferRequest()
+
+
+@unittest.skipUnless(HAS_CV_DEPS, "numpy and Pillow are required for the inference payload test")
+class TestPredictPayload(unittest.TestCase):
+    """Drives a real POST /predict and inspects the JSON the handler emits."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.httpd = CVServer(("127.0.0.1", 0), CVRequestHandler)
+        cls.port = cls.httpd.server_address[1]
+        cls.httpd_thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
+        cls.httpd_thread.start()
+        cls.base_url = f"http://127.0.0.1:{cls.port}"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+
+    def setUp(self):
+        saved = server.compiled_model
+        server.compiled_model = _FakeCompiledModel()
+        self.addCleanup(setattr, server, "compiled_model", saved)
+
+    def _post_predict(self):
+        buffer = BytesIO()
+        Image.new("RGB", (32, 32), (90, 90, 90)).save(buffer, format="JPEG")
+        request = urllib.request.Request(
+            f"{self.base_url}/predict",
+            data=buffer.getvalue(),
+            headers={"Content-Type": "image/jpeg"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5.0) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+
+    def test_response_carries_the_contract_block(self):
+        status, payload = self._post_predict()
+        self.assertEqual(status, 200)
+        assessment = payload["flood_assessment"]
+        self.assertEqual(set(assessment), set(TestFloodAssessmentContract.CONTRACT_KEYS))
+        self.assertEqual(assessment["status"], payload["flood_severity"])
+        self.assertFalse(assessment["wheel_submersion_detected"])
+        self.assertEqual(assessment["motorcycles_observed"], 0)
+        self.assertEqual(assessment["puddle_polygon_count"], 0)
+
+    def test_handler_delegates_to_build_flood_assessment(self):
+        # If the handler ever re-inlines the dict, the contract tests stop covering the
+        # response and this test fails.
+        sentinel = {"status": "SENTINEL"}
+        with unittest.mock.patch.object(
+            server, "build_flood_assessment", return_value=sentinel
+        ) as spy:
+            status, payload = self._post_predict()
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["flood_assessment"], sentinel)
+        spy.assert_called_once()
 
 
 if __name__ == "__main__":

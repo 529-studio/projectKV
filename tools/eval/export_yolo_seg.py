@@ -112,6 +112,21 @@ def normalize_direction(raw: Any) -> Optional[str]:
     return DIRECTION_ALIASES.get(norm)
 
 
+# Sidecar filenames this exporter writes (`roadway_regions.json` at the output root and
+# per split, plus `roadway_regions_{split}.json`). They hold region ground truth keyed
+# to an existing split, not frame labels, so they must never be read back as input.
+ROADWAY_SIDECAR_NAME = "roadway_regions.json"
+ROADWAY_SIDECAR_PREFIX = "roadway_regions_"
+
+
+def is_roadway_sidecar(path: Path) -> bool:
+    """True for any roadway_regions sidecar this exporter emits."""
+    name = path.name
+    return name == ROADWAY_SIDECAR_NAME or (
+        name.startswith(ROADWAY_SIDECAR_PREFIX) and name.endswith(".json")
+    )
+
+
 def bbox_to_polygon_norm(
     bbox: List[float],
     img_w: float = 1.0,
@@ -335,6 +350,13 @@ def export_dataset(
     By default, labels without explicit polygon annotations are SKIPPED and
     counted in `skipped_no_annotations` (ADR-011 D2). Pass allow_synthetic=True
     (CLI: --allow-synthetic) to opt into metadata-derived geometry.
+
+    Only `labels_dir` itself is scanned. Subdirectories are deliberately ignored:
+    a tree that already contains train/ and val/ is an existing split, and re-reading
+    it would shuffle those frames into a different random split (val_split below is a
+    hash-free RNG draw), silently breaking reproducibility with the weights trained on
+    the original split. Roadway sidecars are also skipped: they are region ground truth
+    bound to a split, not frame labels.
     """
     repo_root = Path(__file__).resolve().parent.parent.parent
     labels_dir = labels_dir.resolve()
@@ -343,11 +365,20 @@ def export_dataset(
     if not labels_dir.is_dir():
         raise FileNotFoundError(f"Labels directory not found: {labels_dir}")
 
-    label_files = sorted(list(labels_dir.glob("*.json")))
+    discovered = sorted(labels_dir.glob("*.json"))
+    label_files = [path for path in discovered if not is_roadway_sidecar(path)]
+    ignored_sidecars = len(discovered) - len(label_files)
+    if ignored_sidecars:
+        logging.info(
+            "Ignoring %d roadway_regions sidecar file(s) in %s",
+            ignored_sidecars,
+            labels_dir,
+        )
     if not label_files:
-        label_files = sorted(list(labels_dir.rglob("*.json")))
-    if not label_files:
-        raise ValueError(f"No JSON label files found in {labels_dir}")
+        raise ValueError(
+            f"No JSON label files found in {labels_dir} (subdirectories are not "
+            "scanned; re-reading an existing train/val split would re-split it)."
+        )
 
     # Prepare output directories
     for split in ("train", "val"):

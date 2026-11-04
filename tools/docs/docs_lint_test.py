@@ -90,6 +90,23 @@ class EntryBudgetTest(LintCase):
         self.stage()
         self.assertEqual([v.detail for v in self.checks("entry-budget")], ["missing"])
 
+    def test_index_gets_the_larger_ceiling(self) -> None:
+        docs_lint.ENTRY_FILES = ("AGENTS.md", "docs/lessons/INDEX.md")
+        self.write_bytes("AGENTS.md", 1024)
+        # Over the shared 16 KB cap, inside the index's 18 KB one.
+        self.write_bytes("docs/lessons/INDEX.md", docs_lint.ENTRY_FILE_BUDGET + 1024)
+        self.stage()
+        self.assertEqual(self.checks("entry-budget"), [])
+
+    def test_index_ceiling_still_binds(self) -> None:
+        docs_lint.ENTRY_FILES = ("docs/lessons/INDEX.md",)
+        index_budget = docs_lint.ENTRY_FILE_BUDGET_OVERRIDE["docs/lessons/INDEX.md"]
+        self.write_bytes("docs/lessons/INDEX.md", index_budget + 1)
+        self.stage()
+        found = self.checks("entry-budget")
+        self.assertEqual([v.detail for v in found], ["per-file"])
+        self.assertIn(f"> {index_budget} B", found[0].measured)
+
 
 class DocBudgetTest(LintCase):
     def test_flags_document_over_ceiling(self) -> None:

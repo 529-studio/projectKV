@@ -159,7 +159,11 @@ and must NOT be masked as water.
 Dataset export: `python3 tools/eval/export_yolo_seg.py --labels-dir <dir> --verify`
 consumes `annotations` directly. Labels without polygons are skipped by default;
 `--allow-synthetic` (fabricated geometry, smoke tests only) is opt-in per Lesson 58.
-When directional roadway polygons are present, the exporter writes standard YOLO segmentation
-txt files (`roadway` remains class 0) and additionally generates a `roadway_regions.json`
-sidecar per split mapping normalized directional regions (`direction`, `polygon`, `label_id`)
-for per-direction congestion and PCU aggregation.
+The exporter reads `<dir>` itself and nothing below it: a tree that already contains
+`train/` and `val/` is refused instead of being re-shuffled into a new split, and
+`roadway_regions*` sidecars are ignored because they are split-bound region ground
+truth, not frame labels. When directional roadway polygons are present, the exporter
+writes standard YOLO segmentation txt files (`roadway` remains class 0) and additionally
+generates a `roadway_regions.json` sidecar per split mapping normalized directional
+regions (`direction`, `polygon`, `label_id`) for per-direction congestion and PCU
+aggregation.
