@@ -283,6 +283,52 @@ func TestCloudVisionAnalyzer_Analyze_ArrayWrappedJSON_EmptyArray_Fails(t *testin
 	}
 }
 
+func TestCloudVisionAnalyzer_Analyze_ArrayWrappedJSON_MultipleVerdicts_Rejected(t *testing.T) {
+	ctx := context.Background()
+	cam := hotset.Camera{
+		ID:          "cam-103e",
+		SnapshotURL: "http://proxy.test/snapshot/cam-103e.jpg",
+	}
+
+	// Two contradictory verdicts for one image. Accepting the first element would
+	// record an arbitrary severity as ground truth, so the analyzer must refuse.
+	twoVerdicts := `[
+  {"traffic_severity": "CLEAR", "flood_severity": "DRY", "confidence": 0.95, "description": "Empty road."},
+  {"traffic_severity": "CONGESTED", "flood_severity": "FLOODED_DEEP", "confidence": 0.93, "description": "Gridlock in deep water."}
+]`
+
+	mockClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.String(), "snapshot") {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte("jpeg-bytes"))),
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(mockGeminiResponse(twoVerdicts))),
+			}, nil
+		}),
+	}
+
+	analyzer := cvclient.NewCloudVisionAnalyzer("test-key", cvclient.WithHTTPClient(mockClient))
+	v, err := analyzer.Analyze(ctx, cam)
+	if err == nil {
+		t.Fatal("expected error on multiple verdicts, got nil")
+	}
+	if !strings.Contains(err.Error(), "2 verdicts") {
+		t.Errorf("expected '2 verdicts' in error message, got %v", err)
+	}
+	// Fail closed: no severity from the rejected response may leak into the verdict.
+	if v.Severity != hotset.SeverityUnknown {
+		t.Errorf("expected UNKNOWN severity on rejection, got %q", v.Severity)
+	}
+	if v.FloodSeverity != hotset.SeverityUnknown {
+		t.Errorf("expected UNKNOWN flood severity on rejection, got %q", v.FloodSeverity)
+	}
+}
+
 func TestCloudVisionAnalyzer_Analyze_ArrayWrappedJSON_MarkdownFenced(t *testing.T) {
 	ctx := context.Background()
 	cam := hotset.Camera{

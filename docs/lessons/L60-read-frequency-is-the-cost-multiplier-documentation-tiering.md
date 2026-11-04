@@ -43,6 +43,8 @@ So the rule pairs the ceiling with a shape requirement: over 25 KB means a table
 
 `AGENTS.md` Rule 11 fixes the numbers (always-loaded set ≤ 32 KB with a 16 KB per-file cap, on-demand files ≤ 25 KB, 100 KB is a defect) and the partial-reading discipline; `make docs-lint` is the gate that will enforce the numbers once it lands, and review enforces the behavior today. When a document grows, ask first which tier it is in — the same edit is cheap in one and expensive in the other.
 
+> Update (2026-11-04): the prediction in this lesson came true, and the index was given its own 18 KB ceiling as a result. Adding four lessons between L62 and L65 required rewriting 48 of 61 existing rows, and the row for L38 lost the function name that made its guardrail actionable. Rule 11 now caps `docs/lessons/INDEX.md` at 18 KB while every other entry file stays at 16 KB, and the set total still bounds the recurring cost. Lesson L66 records the review that measured the erosion.
+
 ## Why this is worth a rule and not a cleanup
 
 The 143 KB register and the 41 KB bilingual README were not written by careless people. Both were written by appending to the obvious place, one reasonable paragraph at a time, and both were cheap to write and expensive to read. Nothing in the rules made the accumulating cost visible, so nobody saw it until an audit measured it. The ceiling makes the cost visible at the moment of the edit, which is the only moment it is cheap to avoid.

@@ -21,6 +21,7 @@ from export_yolo_seg import (
     TARGET_CLASSES,
     bbox_to_polygon_norm,
     export_dataset,
+    is_roadway_sidecar,
     normalize_class_name,
     normalize_direction,
     parse_label_file,
@@ -456,6 +457,85 @@ class TestExportYoloSeg(unittest.TestCase):
         self.assertFalse((output_dir / "labels" / "train" / "roadway_regions.json").exists())
         self.assertFalse((output_dir / "labels" / "val" / "roadway_regions.json").exists())
         self.assertFalse((output_dir / "roadway_regions.json").exists())
+
+    # --- label discovery (review of the 2026-11-03 merges) ---------------------
+
+    def _write_label(self, path: Path, frame_id: str) -> None:
+        data = {
+            "frame_id": frame_id,
+            "annotations": [
+                {"class": "roadway", "polygon": [[0.1, 0.9], [0.45, 0.9], [0.3, 0.5]]}
+            ],
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+    def test_is_roadway_sidecar_matches_only_what_the_exporter_writes(self):
+        for name in (
+            "roadway_regions.json",
+            "roadway_regions_train.json",
+            "roadway_regions_val.json",
+        ):
+            self.assertTrue(is_roadway_sidecar(Path(name)), name)
+        for name in ("cam_001.json", "roadway.json", "roadway_regions.csv", "regions_roadway.json"):
+            self.assertFalse(is_roadway_sidecar(Path(name)), name)
+
+    def test_export_dataset_refuses_to_rescan_an_existing_split_tree(self):
+        """Regression: the rglob fallback re-split an existing train/val tree.
+
+        Pointing --labels-dir at a tree that already had train/ and val/ used to
+        collect both directories and shuffle every frame into a fresh random split:
+        with seed=0 a frame that had lived in val/ was exported into train/, which
+        silently breaks comparability with weights trained on the original split.
+        """
+        labels_dir = self.tmp_path / "existing_split"
+        self._write_label(labels_dir / "train" / "f0.json", "f0")
+        self._write_label(labels_dir / "val" / "f1.json", "f1")
+
+        with self.assertRaises(ValueError) as ctx:
+            export_dataset(
+                labels_dir=labels_dir,
+                output_dir=self.tmp_path / "existing_split_out",
+                copy_images=False,
+            )
+        self.assertIn("subdirectories are not scanned", str(ctx.exception))
+
+    def test_export_dataset_refuses_directory_with_only_sidecars(self):
+        labels_dir = self.tmp_path / "sidecar_only"
+        labels_dir.mkdir()
+        with open(labels_dir / "roadway_regions.json", "w", encoding="utf-8") as f:
+            json.dump([{"label_id": "x", "direction": "a"}], f)
+
+        with self.assertRaises(ValueError):
+            export_dataset(
+                labels_dir=labels_dir,
+                output_dir=self.tmp_path / "sidecar_only_out",
+                copy_images=False,
+            )
+
+    def test_export_dataset_ignores_sidecars_beside_real_labels(self):
+        labels_dir = self.tmp_path / "mixed"
+        labels_dir.mkdir()
+        self._write_label(labels_dir / "cam_000.json", "cam_000")
+        self._write_label(labels_dir / "cam_001.json", "cam_001")
+        for name in (
+            "roadway_regions.json",
+            "roadway_regions_train.json",
+            "roadway_regions_val.json",
+        ):
+            with open(labels_dir / name, "w", encoding="utf-8") as f:
+                json.dump([{"label_id": "x", "direction": "b"}], f)
+
+        stats = export_dataset(
+            labels_dir=labels_dir,
+            output_dir=self.tmp_path / "mixed_out",
+            copy_images=False,
+        )
+
+        self.assertEqual(stats["total_labels"], 2)
+        self.assertEqual(stats["errors"], [])
+        self.assertEqual(stats["train_samples"] + stats["val_samples"], 2)
 
     def test_verify_dataset_detects_malformed_entries(self):
         output_dir = self.tmp_path / "malformed_yolo"

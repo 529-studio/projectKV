@@ -131,12 +131,13 @@ func WithLogger(l *slog.Logger) VLMOption {
 func (a *CloudVisionAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hotset.Verdict, error) {
 	now := time.Now()
 	unknown := hotset.Verdict{
-		CameraID:   cam.ID,
-		Severity:   hotset.SeverityUnknown,
-		Confidence: 0,
-		Source:     "vlm",
-		ObservedAt: now,
-		Timestamp:  now,
+		CameraID:      cam.ID,
+		Severity:      hotset.SeverityUnknown,
+		FloodSeverity: hotset.SeverityUnknown,
+		Confidence:    0,
+		Source:        "vlm",
+		ObservedAt:    now,
+		Timestamp:     now,
 	}
 
 	// 1. Fetch snapshot image.
@@ -314,13 +315,22 @@ func (a *CloudVisionAnalyzer) callGemini(ctx context.Context, imgBytes []byte, m
 		// Defensive fallback: Gemini occasionally returns a JSON array [ { ... } ]
 		// even when instructed to produce a single JSON object.
 		var arr []verdictJSON
-		if arrErr := json.Unmarshal([]byte(text), &arr); arrErr == nil {
-			if len(arr) == 0 {
-				return nil, fmt.Errorf("gemini returned empty verdict array (%q)", text)
-			}
-			vj = arr[0]
-		} else {
+		if arrErr := json.Unmarshal([]byte(text), &arr); arrErr != nil {
 			return nil, fmt.Errorf("unmarshal VLM verdict JSON (%q): %w", text, err)
+		}
+		switch len(arr) {
+		case 0:
+			return nil, fmt.Errorf("gemini returned empty verdict array (%q)", text)
+		case 1:
+			vj = arr[0]
+		default:
+			// One image produced several verdicts. Nothing in the response says which
+			// one applies, so picking the first would persist an arbitrary congestion
+			// or flood label as ground truth. Refuse; the caller degrades to UNKNOWN.
+			return nil, fmt.Errorf(
+				"gemini returned %d verdicts for a single image; refusing to pick one (%q)",
+				len(arr), text,
+			)
 		}
 	}
 

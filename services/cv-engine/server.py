@@ -48,35 +48,56 @@ except ImportError:
     logger.warning("Pillow/NumPy not installed. Image decoding in standby mode.")
 
 
+# Preferred weight filenames, in precedence order. The fine-tuned segmentation model
+# must win over the generic detector: they produce different output shapes and only
+# the segmentation model emits masks, so picking the wrong one silently downgrades
+# the service to bounding boxes.
+SEG_MODEL_XML = "yolov8n_seg.xml"
+DET_MODEL_XML = "yolov8n.xml"
+
+
+def select_model_xml(model_dir: str) -> Optional[str]:
+    """Return the OpenVINO XML to load from `model_dir`, or None if none is mounted.
+
+    Precedence: segmentation weights, then detection weights, then any single XML in
+    the directory. Extracted from load_model() so the decision that determines which
+    weights the service actually runs is directly testable; keeping it inline is what
+    allowed a test to re-implement the loop and assert against its own copy.
+    """
+    for name in (SEG_MODEL_XML, DET_MODEL_XML):
+        candidate = os.path.join(model_dir, name)
+        if os.path.isfile(candidate):
+            return candidate
+
+    if not os.path.isdir(model_dir):
+        logger.info("Model directory %s does not exist. Ready for dynamic model mounting.", model_dir)
+        return None
+
+    xml_files = sorted(f for f in os.listdir(model_dir) if f.endswith(".xml"))
+    if not xml_files:
+        logger.info("No OpenVINO model XML found in %s. Ready for dynamic model mounting.", model_dir)
+        return None
+
+    if len(xml_files) > 1:
+        # os.listdir order is filesystem-dependent. Sorting makes the choice
+        # reproducible, and the warning makes an unexpected extra weight visible.
+        logger.warning(
+            "Multiple unrecognised OpenVINO XML files in %s; loading %s (sorted order)",
+            model_dir,
+            xml_files[0],
+        )
+    return os.path.join(model_dir, xml_files[0])
+
+
 def load_model():
     """Attempt to load and compile OpenVINO model if model files exist."""
     global compiled_model
     if not OPENVINO_AVAILABLE or not core:
         return
 
-    # Look for segmentation model first, then detection model
-    candidate_xmls = [
-        os.path.join(MODEL_DIR, "yolov8n_seg.xml"),
-        os.path.join(MODEL_DIR, "yolov8n.xml"),
-    ]
-    model_xml = None
-    for candidate in candidate_xmls:
-        if os.path.isfile(candidate):
-            model_xml = candidate
-            break
-
+    model_xml = select_model_xml(MODEL_DIR)
     if not model_xml:
-        # Look for any .xml file in MODEL_DIR
-        if os.path.isdir(MODEL_DIR):
-            xml_files = [f for f in os.listdir(MODEL_DIR) if f.endswith(".xml")]
-            if xml_files:
-                model_xml = os.path.join(MODEL_DIR, xml_files[0])
-            else:
-                logger.info("No OpenVINO model XML found in %s. Ready for dynamic model mounting.", MODEL_DIR)
-                return
-        else:
-            logger.info("Model directory %s does not exist. Ready for dynamic model mounting.", MODEL_DIR)
-            return
+        return
 
     try:
         start_t = time.perf_counter()
@@ -260,6 +281,14 @@ def calculate_motorcycle_submersion(
     return round(max_delta, 4), max_depth_cm, submerged_count
 
 
+# Wheel submersion ratio at which a wheel is considered physically under water, and
+# the absolute depth that is unambiguously a flooded road. Both the verdict engine and
+# the flood_assessment payload read these, so `wheel_submersion_detected` can never
+# contradict a FLOODED_DEEP verdict produced by the wheel-depth signal.
+WHEEL_SUBMERSION_DELTA = 0.18
+FLOOD_DEPTH_CM = 20.0
+
+
 def triangulate_flood_verdict(
     water_ratio: float,
     max_delta_sub: float,
@@ -270,10 +299,12 @@ def triangulate_flood_verdict(
     """
     Dual-Layer Physical Triangulation Decision Engine (ADR-009 §5).
     Layer 1: Road water ratio >= 0.15 activates Layer 2.
-    Layer 2: delta_sub >= 0.18 (depth >= 20cm) triggers FLOODED_DEEP.
+    Layer 2: delta_sub >= WHEEL_SUBMERSION_DELTA (depth >= 20cm) triggers FLOODED_DEEP.
     Returns (verdict_str, confidence_float).
     """
-    if water_ratio >= 0.15 and (max_delta_sub >= 0.18 or depth_estimated_cm >= 20.0):
+    if water_ratio >= 0.15 and (
+        max_delta_sub >= WHEEL_SUBMERSION_DELTA or depth_estimated_cm >= FLOOD_DEPTH_CM
+    ):
         conf = min(0.95, 0.85 + (water_ratio * 0.2))
         return "FLOODED_DEEP", round(conf, 2)
 
@@ -291,6 +322,33 @@ def triangulate_flood_verdict(
         return "WET", 0.75
 
     return "CLEAR", 0.95
+
+
+def build_flood_assessment(
+    verdict: str,
+    water_ratio: float,
+    max_delta_sub: float,
+    depth_estimated_cm: float,
+    motorcycles_observed: int,
+    motorcycles_submerged: int,
+    puddle_polygon_count: int,
+) -> Dict[str, Any]:
+    """
+    Builds the `flood_assessment` block of the /predict payload.
+
+    Extracted from the request handler so the wire contract can be asserted against
+    production code. The previous inline dict had a test that rebuilt the same
+    dict and asserted on its own copy, which passes even when this contract changes.
+    """
+    return {
+        "status": verdict,
+        "water_surface_ratio": round(water_ratio, 4),
+        "wheel_submersion_detected": max_delta_sub >= WHEEL_SUBMERSION_DELTA,
+        "max_submersion_depth_cm": round(depth_estimated_cm, 1),
+        "motorcycles_observed": motorcycles_observed,
+        "motorcycles_submerged": motorcycles_submerged,
+        "puddle_polygon_count": puddle_polygon_count,
+    }
 
 
 class CVServer(ThreadingHTTPServer):
@@ -597,15 +655,15 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                         "confidence": round(float(flood_conf if flood_verdict != "CLEAR" else 0.88), 2),
                         "latency_ms": round(latency, 2),
                         "model": model_tag,
-                        "flood_assessment": {
-                            "status": flood_verdict,
-                            "water_surface_ratio": round(water_ratio, 4),
-                            "wheel_submersion_detected": max_delta_sub >= 0.18,
-                            "max_submersion_depth_cm": round(depth_estimated_cm, 1),
-                            "motorcycles_observed": vehicle_counts["motorcycle"],
-                            "motorcycles_submerged": submerged_mc,
-                            "puddle_polygon_count": puddle_count,
-                        },
+                        "flood_assessment": build_flood_assessment(
+                            verdict=flood_verdict,
+                            water_ratio=water_ratio,
+                            max_delta_sub=max_delta_sub,
+                            depth_estimated_cm=depth_estimated_cm,
+                            motorcycles_observed=vehicle_counts["motorcycle"],
+                            motorcycles_submerged=submerged_mc,
+                            puddle_polygon_count=puddle_count,
+                        ),
                     })
                     return
                 except Exception as exc:
