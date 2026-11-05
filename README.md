@@ -224,6 +224,10 @@ make benchmark-real
 ```
 Trained OpenVINO models (`.xml` / `.bin`) deploy directly to `services/cv-engine/models/` for low-latency live inference (< 38.5ms latency).
 
+### 2.4. Short-Horizon Forecast Backtest (Prototype)
+
+Issue #302 (S9-T6) compares persistence, a historical median, and ridge regression at 10/20/30 minutes on a strictly chronological 70/30 split with one common evaluation set. Run `make test-forecast`; `tools/forecast/backtest.py --input <features.csv>` writes JSON and Markdown, and exits `3` if the candidate fails to beat persistence on any horizon. No endpoint or UI is exposed until the gate passes on real history. Method and provenance: [`docs/reports/forecast_prototype_v1.md`](docs/reports/forecast_prototype_v1.md).
+
 ## 3. Key Highlights
 
 *   **Monochromatic & Intuitive Interface**: Minimalist high-contrast design using black, dark gray, and white tones.

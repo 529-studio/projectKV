@@ -292,6 +292,71 @@ definitions:
       remaining_rpm:
         type: integer
     type: object
+  forecast.ConfidenceIntervals:
+    properties:
+      saturation_index:
+        $ref: '#/definitions/forecast.Interval'
+      speed_kmh:
+        $ref: '#/definitions/forecast.Interval'
+    type: object
+  forecast.Interval:
+    properties:
+      lower_95:
+        type: number
+      upper_95:
+        type: number
+    type: object
+  forecast.ModelMetadata:
+    properties:
+      mae:
+        type: number
+      name:
+        type: string
+      target_mode:
+        type: string
+      version:
+        type: string
+    type: object
+  forecast.Response:
+    properties:
+      base_time:
+        type: string
+      camera_id:
+        type: string
+      confidence:
+        type: number
+      confidence_intervals:
+        $ref: '#/definitions/forecast.ConfidenceIntervals'
+      current_saturation_index:
+        type: number
+      horizon_minutes:
+        type: integer
+      model:
+        $ref: '#/definitions/forecast.ModelMetadata'
+      predicted_saturation_index:
+        type: number
+      predicted_severity:
+        type: string
+      predicted_speed_kmh:
+        type: number
+      road_key:
+        type: string
+      segment_id:
+        type: string
+      source_data:
+        $ref: '#/definitions/forecast.SourceData'
+      target_time:
+        type: string
+    type: object
+  forecast.SourceData:
+    properties:
+      last_observed_at:
+        type: string
+      sample_count:
+        type: integer
+      stale:
+        type: boolean
+    type: object
   harvester.RainWatcherStatus:
     properties:
       cooldown_minutes:
@@ -884,6 +949,79 @@ paths:
       summary: Snapshot of all active crowdsourced user flood reports
       tags:
       - Flood
+  /api/forecast:
+    get:
+      description: Returns short-horizon congestion forecasts (10, 20, 30 min) for
+        a camera segment using Ridge delta regression or baseline models.
+      parameters:
+      - description: Camera ID (or segment_id, node_id, edge_id)
+        in: query
+        name: camera_id
+        type: string
+      - description: Alias for camera_id
+        in: query
+        name: segment_id
+        type: string
+      - description: Topology node alias
+        in: query
+        name: node_id
+        type: string
+      - description: Topology edge alias
+        in: query
+        name: edge_id
+        type: string
+      - description: Forecast horizon minutes (10, 20, 30; default 10)
+        in: query
+        name: horizon
+        type: integer
+      - description: Alias for horizon
+        in: query
+        name: horizon_minutes
+        type: integer
+      - description: Base timestamp in RFC3339 format (default current UTC)
+        in: query
+        name: timestamp
+        type: string
+      - description: Model selector (ridge_delta, persistence, historical_median;
+          default ridge_delta)
+        in: query
+        name: model
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/forecast.Response'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Short-horizon congestion forecast
+      tags:
+      - Forecast
+      - Traffic
   /api/live/stream:
     get:
       description: 'Server-Sent Events (SSE) stream delivering real-time Hot Set verdict
