@@ -818,3 +818,64 @@ func TestCoordinator_StatusSnapshot(t *testing.T) {
 		t.Errorf("unexpected rain watcher status: %+v", status.RainWatcher)
 	}
 }
+
+func TestCoordinator_MissedSlotWatchdog(t *testing.T) {
+	fetcher := &mockSnapshotFetcher{frames: map[string][]byte{"c1": generateMockJPEG(25000)}}
+	predictor := &mockVisionPredictor{result: &harvester.PredictionResult{TrafficSeverity: "CLEAR"}}
+	storage := &mockStorageUploader{uploads: make(map[string][]byte)}
+
+	loc := time.FixedZone("ICT", 7*3600)
+	now := time.Now().In(loc)
+
+	// Configure a slot that was due 1 hour ago
+	pastHour := (now.Hour() + 23) % 24
+	pastMin := now.Minute()
+	slotStr := fmt.Sprintf("%02d:%02d", pastHour, pastMin)
+
+	coord, err := harvester.New(harvester.Config{
+		Enabled:             true,
+		ScheduleHours:       slotStr,
+		RainCooldownMinutes: 60,
+		Concurrency:         2,
+		TimeLocation:        loc,
+	}, harvester.Dependencies{
+		Weather:       &mockWeatherProvider{},
+		Fetcher:       fetcher,
+		Predictor:     predictor,
+		Storage:       storage,
+		HotsetCameras: []harvester.Camera{{ID: "c1"}},
+		RainCameras:   []harvester.Camera{{ID: "c1"}},
+	})
+	if err != nil {
+		t.Fatalf("failed to construct coordinator: %v", err)
+	}
+
+	// Because slot was 1 hour ago and not run, watchdog must flag it in MissedSlots
+	status := coord.Status()
+	found := false
+	for _, s := range status.MissedSlots {
+		if s == slotStr {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected slot %s to be flagged in MissedSlots, got %v", slotStr, status.MissedSlots)
+	}
+	if status.LastSuccessAt != nil {
+		t.Errorf("expected nil LastSuccessAt before any runs, got %v", status.LastSuccessAt)
+	}
+
+	// Now execute a successful run for this slot
+	if _, err := coord.RunScheduledHarvest(context.Background()); err != nil {
+		t.Fatalf("run harvest: %v", err)
+	}
+
+	status = coord.Status()
+	if status.LastSuccessAt == nil {
+		t.Errorf("expected non-nil LastSuccessAt after successful run")
+	}
+	if status.HistoryCoverageHours < 0 {
+		t.Errorf("expected non-negative HistoryCoverageHours, got %f", status.HistoryCoverageHours)
+	}
+}

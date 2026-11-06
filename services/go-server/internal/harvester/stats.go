@@ -36,28 +36,32 @@ type RainWatcherStatus struct {
 	LastTriggerAt   *time.Time `json:"last_trigger_at,omitempty"`
 }
 
-// Status is the JSON payload served by GET /api/harvester/status (Issue #299).
+// Status is the JSON payload served by GET /api/harvester/status (Issue #299 / ADR-012 D2).
 type Status struct {
-	Enabled       bool                 `json:"enabled"`
-	ScheduleSlots []string             `json:"schedule_slots"`
-	NextSlot      string               `json:"next_slot,omitempty"`
-	NextSlotAt    time.Time            `json:"next_slot_at,omitempty"`
-	SlotRuns      map[string]RunRecord `json:"slot_runs,omitempty"`
-	LastRain      *RunRecord           `json:"last_rain,omitempty"`
-	Totals        RunTotals            `json:"totals"`
-	RainWatcher   RainWatcherStatus    `json:"rain_watcher"`
-	StartedAt     time.Time            `json:"started_at"`
-	RecentErrors  []string             `json:"recent_errors"`
+	Enabled              bool                 `json:"enabled"`
+	ScheduleSlots        []string             `json:"schedule_slots"`
+	NextSlot             string               `json:"next_slot,omitempty"`
+	NextSlotAt           time.Time            `json:"next_slot_at,omitempty"`
+	SlotRuns             map[string]RunRecord `json:"slot_runs,omitempty"`
+	LastRain             *RunRecord           `json:"last_rain,omitempty"`
+	Totals               RunTotals            `json:"totals"`
+	RainWatcher          RainWatcherStatus    `json:"rain_watcher"`
+	StartedAt            time.Time            `json:"started_at"`
+	RecentErrors         []string             `json:"recent_errors"`
+	MissedSlots          []string             `json:"missed_slots"`
+	LastSuccessAt        *time.Time           `json:"last_success_at,omitempty"`
+	HistoryCoverageHours float64              `json:"history_coverage_hours"`
 }
 
 // runStats is the thread-safe run bookkeeping behind Status.
 type runStats struct {
-	mu           sync.Mutex
-	startedAt    time.Time
-	slotRuns     map[string]RunRecord
-	lastRain     *RunRecord
-	totals       RunTotals
-	recentErrors []string
+	mu            sync.Mutex
+	startedAt     time.Time
+	slotRuns      map[string]RunRecord
+	lastRain      *RunRecord
+	lastSuccessAt *time.Time
+	totals        RunTotals
+	recentErrors  []string
 }
 
 func newRunStats() *runStats {
@@ -87,12 +91,17 @@ func (r *runStats) record(rec RunRecord) {
 	r.totals.CamerasHarvested += rec.Harvested
 	r.totals.CamerasFailed += rec.Failed
 
+	if rec.Harvested > 0 {
+		t := rec.StartedAt
+		r.lastSuccessAt = &t
+	}
+
 	if rec.Error != "" && len(r.recentErrors) < maxRecentErrors {
 		r.recentErrors = append(r.recentErrors, rec.StartedAt.Format(time.RFC3339)+" "+rec.Scope+" "+rec.Slot+": "+rec.Error)
 	}
 }
 
-func (r *runStats) snapshot() (map[string]RunRecord, *RunRecord, RunTotals, []string, time.Time) {
+func (r *runStats) snapshot() (map[string]RunRecord, *RunRecord, *time.Time, RunTotals, []string, time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	slots := make(map[string]RunRecord, len(r.slotRuns))
@@ -104,7 +113,12 @@ func (r *runStats) snapshot() (map[string]RunRecord, *RunRecord, RunTotals, []st
 		cp := *r.lastRain
 		rain = &cp
 	}
+	var lastSuccess *time.Time
+	if r.lastSuccessAt != nil {
+		cp := *r.lastSuccessAt
+		lastSuccess = &cp
+	}
 	errs := make([]string, len(r.recentErrors))
 	copy(errs, r.recentErrors)
-	return slots, rain, r.totals, errs, r.startedAt
+	return slots, rain, lastSuccess, r.totals, errs, r.startedAt
 }

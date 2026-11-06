@@ -549,8 +549,16 @@ definitions:
     properties:
       enabled:
         type: boolean
+      history_coverage_hours:
+        type: number
       last_rain:
         $ref: '#/definitions/harvester.RunRecord'
+      last_success_at:
+        type: string
+      missed_slots:
+        items:
+          type: string
+        type: array
       next_slot:
         type: string
       next_slot_at:
@@ -573,6 +581,37 @@ definitions:
         type: string
       totals:
         $ref: '#/definitions/harvester.RunTotals'
+    type: object
+  hotset.CoverageReport:
+    properties:
+      bin_interval_minutes:
+        type: integer
+      camera_id:
+        type: string
+      cameras_count:
+        type: integer
+      coverage_ratio:
+        type: number
+      expected_bins:
+        type: integer
+      history_coverage_hours:
+        type: number
+      horizon_eligibility:
+        additionalProperties:
+          type: boolean
+        type: object
+      longest_gap_seconds:
+        type: integer
+      observation_bounds:
+        $ref: '#/definitions/hotset.ObservationBounds'
+      observed_bins:
+        type: integer
+      status:
+        type: string
+      total_observations:
+        type: integer
+      window:
+        type: string
     type: object
   hotset.DirectionalVerdict:
     properties:
@@ -615,6 +654,13 @@ definitions:
       total:
         type: integer
       updated_at:
+        type: string
+    type: object
+  hotset.ObservationBounds:
+    properties:
+      earliest:
+        type: string
+      latest:
         type: string
     type: object
   hotset.TrafficStatusResponse:
@@ -1572,6 +1618,42 @@ paths:
       tags:
       - Cameras
       - Traffic
+  /api/v1/hotset/history/coverage:
+    get:
+      description: Reports observation bounds, 10m bin counts, coverage ratio, longest
+        gap, and per-horizon prediction eligibility across a trailing window (default
+        72h).
+      parameters:
+      - description: Camera ID (empty for aggregate across all cameras)
+        in: query
+        name: camera_id
+        type: string
+      - description: Time window duration (e.g. 72h, 24h, 60m; default 72h)
+        in: query
+        name: window
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/hotset.CoverageReport'
+        "400":
+          description: invalid window format
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: coverage provider unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Hot Set time-series data accumulation and bin coverage
+      tags:
+      - Traffic
   /api/weather:
     get:
       description: Returns current temperature, humidity, WMO weather condition code,
@@ -1725,30 +1807,28 @@ paths:
       - harvester
   /health:
     get:
-      description: Liveness and readiness probe
+      description: Liveness and readiness probe reporting system and schema readiness
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: string
+            additionalProperties: true
             type: object
       summary: Health check
       tags:
       - System
   /healthz:
     get:
-      description: Liveness and readiness probe
+      description: Liveness and readiness probe reporting system and schema readiness
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: string
+            additionalProperties: true
             type: object
       summary: Health check
       tags:

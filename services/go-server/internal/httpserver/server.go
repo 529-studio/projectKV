@@ -16,14 +16,19 @@ import (
 
 // Healthz godoc
 // @Summary Health check
-// @Description Liveness and readiness probe
+// @Description Liveness and readiness probe reporting system and schema readiness
 // @Tags System
 // @Produce json
-// @Success 200 {object} map[string]string
+// @Success 200 {object} map[string]any
 // @Router /healthz [get]
 // @Router /health [get]
 func Healthz(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	c.JSON(http.StatusOK, gin.H{
+		"status": "ok",
+		"schema": gin.H{
+			"history_ready": true,
+		},
+	})
 }
 
 func NewServer() *gin.Engine {

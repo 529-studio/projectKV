@@ -1,6 +1,7 @@
 package hotset_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -498,5 +499,94 @@ func TestGetHotsetStatus_Sub5msLatency(t *testing.T) {
 	// DoD Requirement: Sub-5ms latency
 	if avgLatency >= 5*time.Millisecond {
 		t.Errorf("expected average latency < 5ms, got %v", avgLatency)
+	}
+}
+
+type mockCoverageProvider struct {
+	report *hotset.CoverageReport
+	err    error
+}
+
+func (m *mockCoverageProvider) GetCoverage(ctx context.Context, cameraID string, window time.Duration, now time.Time) (*hotset.CoverageReport, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.report, nil
+}
+
+func TestGetHistoryCoverage_Success(t *testing.T) {
+	st := &mockStorer{}
+	h := hotset.NewHandler(st)
+	now := time.Now().UTC()
+	h.SetCoverageProvider(&mockCoverageProvider{
+		report: &hotset.CoverageReport{
+			CameraID:           "cam-123",
+			Window:             "72h0m0s",
+			BinIntervalMinutes: 10,
+			ExpectedBins:       432,
+			ObservedBins:       380,
+			CoverageRatio:      0.8796,
+			TotalObservations:  380,
+			ObservationBounds: hotset.ObservationBounds{
+				Earliest: &now,
+				Latest:   &now,
+			},
+			LongestGapSeconds: 900,
+			HorizonEligibility: map[string]bool{
+				"10m":              true,
+				"20m":              true,
+				"30m":              true,
+				"serving_eligible": true,
+				"refit_eligible":   true,
+			},
+			HistoryCoverageHours: 72.0,
+			Status:               "ok",
+		},
+	})
+	r := newTestRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/hotset/history/coverage?camera_id=cam-123&window=72h", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var rep hotset.CoverageReport
+	if err := json.Unmarshal(w.Body.Bytes(), &rep); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if rep.CameraID != "cam-123" || rep.CoverageRatio != 0.8796 || rep.Status != "ok" {
+		t.Errorf("unexpected report: %+v", rep)
+	}
+}
+
+func TestGetHistoryCoverage_InvalidWindow(t *testing.T) {
+	st := &mockStorer{}
+	h := hotset.NewHandler(st)
+	h.SetCoverageProvider(&mockCoverageProvider{})
+	r := newTestRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/hotset/history/coverage?window=not_a_duration", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid window, got %d", w.Code)
+	}
+}
+
+func TestGetHistoryCoverage_ProviderUnavailable(t *testing.T) {
+	st := &mockStorer{}
+	h := hotset.NewHandler(st) // coverage not set
+	r := newTestRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/hotset/history/coverage", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when provider nil, got %d", w.Code)
 	}
 }

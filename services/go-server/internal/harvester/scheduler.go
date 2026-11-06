@@ -111,6 +111,14 @@ func (s *Scheduler) Slots() []TimeSlot {
 	return out
 }
 
+// Location returns the timezone location configured for the scheduler.
+func (s *Scheduler) Location() *time.Location {
+	if s == nil || s.loc == nil {
+		return time.FixedZone("ICT", 7*3600)
+	}
+	return s.loc
+}
+
 // NextSlot computes the label and absolute time of the next scheduled slot
 // strictly after `now` (in scheduler-local time); today's remaining slots
 // first, otherwise tomorrow's earliest slot.

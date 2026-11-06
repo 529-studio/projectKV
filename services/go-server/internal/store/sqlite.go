@@ -147,3 +147,77 @@ func applyMigration(db *sql.DB, version int, query string) error {
 
 	return tx.Commit()
 }
+
+// TableSchemaSpec defines a required table and its essential columns.
+type TableSchemaSpec struct {
+	TableName string
+	Columns   []string
+}
+
+// CriticalTables defines the schema assertions that must pass at startup (ADR-012 D2).
+var CriticalTables = []TableSchemaSpec{
+	{
+		TableName: "schema_migrations",
+		Columns:   []string{"version", "applied_at"},
+	},
+	{
+		TableName: "hotset_verdict_history",
+		Columns:   []string{"camera_id", "direction", "region_id", "pcu_total", "saturation_index", "severity", "observed_at"},
+	},
+	{
+		TableName: "camera_verdicts",
+		Columns:   []string{"camera_id", "observed_at", "severity", "flood_severity"},
+	},
+	{
+		TableName: "camera_capacities",
+		Columns:   []string{"camera_id", "learned_max"},
+	},
+	{
+		TableName: "flood_subscriptions",
+		Columns:   []string{"id", "channel_name", "chat_id", "target_type", "target_id"},
+	},
+}
+
+// AssertSchemaReady verifies that all essential database tables and columns exist.
+// Returns an error if any table or required column is absent (ADR-012 D2).
+func AssertSchemaReady(db *sql.DB) error {
+	if db == nil {
+		return fmt.Errorf("schema assertion failed: database handle is nil")
+	}
+
+	for _, spec := range CriticalTables {
+		var exists int
+		err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", spec.TableName).Scan(&exists)
+		if err != nil {
+			return fmt.Errorf("schema assertion failed for table %s: %w", spec.TableName, err)
+		}
+		if exists == 0 {
+			return fmt.Errorf("schema assertion failed: table %q is missing (ensure migrations are applied)", spec.TableName)
+		}
+
+		rows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", spec.TableName))
+		if err != nil {
+			return fmt.Errorf("schema assertion failed querying columns for table %s: %w", spec.TableName, err)
+		}
+
+		existingCols := make(map[string]bool)
+		for rows.Next() {
+			var cid int
+			var name, colType string
+			var notNull, pk int
+			var dflt sql.NullString
+			if err := rows.Scan(&cid, &name, &colType, &notNull, &dflt, &pk); err == nil {
+				existingCols[name] = true
+			}
+		}
+		rows.Close() //nolint:errcheck
+
+		for _, col := range spec.Columns {
+			if !existingCols[col] {
+				return fmt.Errorf("schema assertion failed: table %q is missing required column %q", spec.TableName, col)
+			}
+		}
+	}
+
+	return nil
+}

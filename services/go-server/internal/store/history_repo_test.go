@@ -458,3 +458,183 @@ func TestVerdictHistoryRepo_DirectionalObservations(t *testing.T) {
 		t.Errorf("unexpected dir B observation: %+v", obsB[0])
 	}
 }
+
+func TestAssertSchemaReady_Success(t *testing.T) {
+	_, db := openTestHistoryDB(t)
+	if err := store.AssertSchemaReady(db); err != nil {
+		t.Fatalf("expected AssertSchemaReady to succeed on fresh migrated DB, got: %v", err)
+	}
+}
+
+func TestAssertSchemaReady_MissingTable(t *testing.T) {
+	_, db := openTestHistoryDB(t)
+	if _, err := db.Exec("DROP TABLE hotset_verdict_history;"); err != nil {
+		t.Fatalf("drop table: %v", err)
+	}
+
+	err := store.AssertSchemaReady(db)
+	if err == nil {
+		t.Fatalf("expected AssertSchemaReady to fail when table missing, got nil")
+	}
+	expectedSub := "table \"hotset_verdict_history\" is missing"
+	if err.Error() == "" || !containsSubstring(err.Error(), expectedSub) {
+		t.Errorf("expected error containing %q, got %q", expectedSub, err.Error())
+	}
+}
+
+func TestAssertSchemaReady_MissingColumn(t *testing.T) {
+	_, db := openTestHistoryDB(t)
+	// Drop and recreate table without 'direction' column
+	if _, err := db.Exec("DROP TABLE hotset_verdict_history;"); err != nil {
+		t.Fatalf("drop table: %v", err)
+	}
+	if _, err := db.Exec(`CREATE TABLE hotset_verdict_history (
+		id INTEGER PRIMARY KEY,
+		camera_id TEXT NOT NULL,
+		pcu_total REAL,
+		saturation_index REAL,
+		severity TEXT NOT NULL,
+		observed_at TEXT NOT NULL
+	);`); err != nil {
+		t.Fatalf("create partial table: %v", err)
+	}
+
+	err := store.AssertSchemaReady(db)
+	if err == nil {
+		t.Fatalf("expected AssertSchemaReady to fail when column missing, got nil")
+	}
+	expectedSub := "missing required column \"direction\""
+	if !containsSubstring(err.Error(), expectedSub) {
+		t.Errorf("expected error containing %q, got %q", expectedSub, err.Error())
+	}
+}
+
+func TestVerdictHistoryRepo_GetCoverage(t *testing.T) {
+	repo, _ := openTestHistoryDB(t)
+	ctx := context.Background()
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	camID := "cam-coverage-test"
+
+	// Insert 6 observations across trailing 60 minutes (every 10m: 11:00, 11:10, 11:20, 11:30, 11:40, 11:50)
+	for i := 0; i < 6; i++ {
+		obsTime := now.Add(-time.Duration(60-i*10) * time.Minute)
+		err := repo.Record(ctx, store.VerdictHistory{
+			CameraID:        camID,
+			PCUTotal:        25.0,
+			SaturationIndex: 0.50,
+			Severity:        "MODERATE",
+			Confidence:      0.90,
+			Source:          "onnx",
+			ObservedAt:      obsTime,
+		})
+		if err != nil {
+			t.Fatalf("failed to record: %v", err)
+		}
+	}
+
+	// 1. Single-camera coverage over 1 hour
+	rep, err := repo.GetCoverage(ctx, camID, time.Hour, now)
+	if err != nil {
+		t.Fatalf("GetCoverage failed: %v", err)
+	}
+	if rep.ObservedBins != 6 {
+		t.Errorf("expected 6 observed bins, got %d", rep.ObservedBins)
+	}
+	if rep.CoverageRatio < 0.99 {
+		t.Errorf("expected 1.0 coverage ratio, got %f", rep.CoverageRatio)
+	}
+	if rep.Status != "ok" {
+		t.Errorf("expected status 'ok', got %q", rep.Status)
+	}
+	if !rep.HorizonEligibility["serving_eligible"] {
+		t.Errorf("expected serving_eligible to be true")
+	}
+	if !rep.HorizonEligibility["10m"] {
+		t.Errorf("expected 10m horizon to be true")
+	}
+	if !rep.HorizonEligibility["30m"] {
+		t.Errorf("expected 30m horizon to be true with 50m span")
+	}
+
+	// 2. Aggregate coverage query
+	aggRep, err := repo.GetCoverage(ctx, "", time.Hour, now)
+	if err != nil {
+		t.Fatalf("aggregate GetCoverage failed: %v", err)
+	}
+	if aggRep.CamerasCount != 1 {
+		t.Errorf("expected 1 camera, got %d", aggRep.CamerasCount)
+	}
+	if aggRep.CoverageRatio < 0.99 {
+		t.Errorf("expected aggregate coverage ratio 1.0, got %f", aggRep.CoverageRatio)
+	}
+}
+
+func TestVerdictHistoryRepo_PurgeOlderThan(t *testing.T) {
+	repo, _ := openTestHistoryDB(t)
+	ctx := context.Background()
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	cutoff := now.Add(-30 * 24 * time.Hour) // 30 days ago
+
+	// Insert 12 old observations (older than 30 days)
+	for i := 0; i < 12; i++ {
+		err := repo.Record(ctx, store.VerdictHistory{
+			CameraID:        "cam-purge-old",
+			PCUTotal:        10.0,
+			SaturationIndex: 0.20,
+			Severity:        "CLEAR",
+			Confidence:      0.90,
+			Source:          "onnx",
+			ObservedAt:      cutoff.Add(-time.Duration(i+1) * time.Hour),
+		})
+		if err != nil {
+			t.Fatalf("record old observation: %v", err)
+		}
+	}
+
+	// Insert 3 fresh observations (younger than 30 days)
+	for i := 0; i < 3; i++ {
+		err := repo.Record(ctx, store.VerdictHistory{
+			CameraID:        "cam-purge-fresh",
+			PCUTotal:        15.0,
+			SaturationIndex: 0.30,
+			Severity:        "CLEAR",
+			Confidence:      0.90,
+			Source:          "onnx",
+			ObservedAt:      cutoff.Add(time.Duration(i+1) * time.Hour),
+		})
+		if err != nil {
+			t.Fatalf("record fresh observation: %v", err)
+		}
+	}
+
+	// Purge with small batch size of 5 to test multiple chunk loops
+	deleted, err := repo.PurgeOlderThan(ctx, cutoff, 5)
+	if err != nil {
+		t.Fatalf("PurgeOlderThan failed: %v", err)
+	}
+	if deleted != 12 {
+		t.Errorf("expected 12 rows deleted, got %d", deleted)
+	}
+
+	// Verify fresh observations remain intact
+	fresh, err := repo.GetRecentByCameraBefore(ctx, "cam-purge-fresh", now, 35*24*time.Hour, 10)
+	if err != nil {
+		t.Fatalf("query fresh: %v", err)
+	}
+	if len(fresh) != 3 {
+		t.Errorf("expected 3 fresh observations retained, got %d", len(fresh))
+	}
+}
+
+func containsSubstring(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || stringContains(s, sub))
+}
+
+func stringContains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}
