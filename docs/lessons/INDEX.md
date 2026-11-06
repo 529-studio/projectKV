@@ -76,6 +76,7 @@ is the only part an agent should read by default.
 | 70 | Semantic Taxonomy Drift & Notification Black Holes | Reconcile two-tier zone & ward taxonomy; alias normalization, quarantine table (0010), and audit tool. | [L70](L70-canonical-zone-and-ward-subscription-taxonomy.md) |
 | 71 | Directional Runtime Ingestion & Worst-Direction Pinning | Polygon assignment in cv-engine, per-direction PCU, worst-direction severity pinning, migration 0008. | [L71](L71-directional-runtime-ingestion-and-worst-direction-pinning.md) |
 | 72 | Schema Assertions & Non-Blocking Batch Retention | Assert migration readiness at boot; 10m bin coverage observability; chunked rowid retention (LIMIT 5000). | [L72](L72-fail-fast-schema-assertions-and-nonblocking-batch-retention.md) |
+| 75 | Segmentation Dataset v2 Group Splitting & Retraining Gate | Group split by camera/date (0 leakage); 550 frames; IoU >= 0.612, mAP50-95 >= 0.496, p95 <= 25ms, rollback test. | [L75](L75-segmentation-dataset-v2-group-splitting-and-retraining-gates.md) |
 
 > Numbering note: Lesson 54 does not exist in the source register. Numbers are preserved as-is because
 > other documents reference lessons by number; nothing has been renumbered.

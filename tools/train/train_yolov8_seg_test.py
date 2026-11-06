@@ -16,10 +16,14 @@ if str(TRAIN_DIR) not in sys.path:
     sys.path.insert(0, str(TRAIN_DIR))
 
 from train_yolov8_seg import (
+    V1_BASELINE_METRICS,
+    V2_GATE_THRESHOLDS,
     check_host_compute_headroom,
+    evaluate_retraining_gate,
     export_to_openvino_fp16,
     train_yolov8_seg,
     validate_dataset_manifest,
+    verify_operational_rollback,
 )
 
 
@@ -120,6 +124,71 @@ names:
         self.assertLess(stats["model_size_mb"], 10.0)
         self.assertTrue(Path(stats["xml_path"]).is_file())
         self.assertTrue(Path(stats["bin_path"]).is_file())
+
+    def test_evaluate_retraining_gate_passes_canonical(self):
+        passed, summary, failures = evaluate_retraining_gate()
+        self.assertTrue(passed)
+        self.assertEqual(summary["verdict"], "PASSED")
+        self.assertEqual(len(failures), 0)
+        self.assertGreaterEqual(summary["puddle_iou"], V2_GATE_THRESHOLDS["water_puddle_iou_min"])
+        self.assertGreaterEqual(summary["mask_map50_95"], V2_GATE_THRESHOLDS["mask_map50_95_min"])
+
+    def test_evaluate_retraining_gate_rejects_degradations(self):
+        # 1. Puddle IoU drop below threshold
+        bad_metrics = {
+            "mask_map50": 0.70,
+            "mask_map50_95": 0.50,
+            "class_iou": {
+                "roadway": 0.75,
+                "water_puddle": 0.59,  # Below 0.612
+                "motorcycle": 0.62,
+                "car": 0.68,
+                "bus": 0.71,
+                "truck": 0.65,
+            },
+        }
+        passed, _, failures = evaluate_retraining_gate(bad_metrics)
+        self.assertFalse(passed)
+        self.assertTrue(any("water_puddle IoU" in f for f in failures))
+
+        # 2. Individual class IoU drop beyond 0.02 vs v1 baseline (0.741 -> 0.710 = -0.031)
+        degraded_roadway = {
+            "mask_map50": 0.75,
+            "mask_map50_95": 0.52,
+            "class_iou": {
+                "roadway": 0.710,  # Dropped by 0.031
+                "water_puddle": 0.620,
+                "motorcycle": 0.621,
+                "car": 0.684,
+                "bus": 0.710,
+                "truck": 0.655,
+            },
+        }
+        passed2, _, failures2 = evaluate_retraining_gate(degraded_roadway)
+        self.assertFalse(passed2)
+        self.assertTrue(any("Class 'roadway' IoU dropped" in f for f in failures2))
+
+        # 3. Latency exceeding 25ms
+        passed3, _, failures3 = evaluate_retraining_gate(p95_latency_ms=28.5)
+        self.assertFalse(passed3)
+        self.assertTrue(any("p95 latency" in f for f in failures3))
+
+        # 4. Model size exceeding 10MB
+        passed4, _, failures4 = evaluate_retraining_gate(model_size_mb=12.4)
+        self.assertFalse(passed4)
+        self.assertTrue(any("Model size" in f for f in failures4))
+
+    def test_verify_operational_rollback(self):
+        model_dir = self.tmp_path / "rollback_test_models"
+        model_dir.mkdir()
+        seg_xml = model_dir / "yolov8n_seg.xml"
+        seg_xml.write_text("<net name='seg'/>", encoding="utf-8")
+
+        # Rollback test simulates rename to .bak, verifies fallback, and restores
+        passed, errs = verify_operational_rollback(model_dir)
+        self.assertTrue(passed)
+        self.assertEqual(len(errs), 0)
+        self.assertTrue(seg_xml.is_file())
 
 
 if __name__ == "__main__":
