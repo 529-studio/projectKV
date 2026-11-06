@@ -399,6 +399,29 @@ func (a *harvesterWeatherAdapter) GetWeather(ctx context.Context) (*harvester.We
 	}, nil
 }
 
+// weatherStoreAdapter adapts *store.WeatherRepo to weather.Persister (ADR-012 D3).
+type weatherStoreAdapter struct {
+	repo *store.WeatherRepo
+}
+
+func (a *weatherStoreAdapter) RecordObservation(ctx context.Context, obs weather.ObservationRecord) error {
+	if a.repo == nil {
+		return fmt.Errorf("weather store adapter: repo is nil")
+	}
+	return a.repo.Record(ctx, &store.WeatherObservation{
+		PrecipitationMm: obs.PrecipitationMm,
+		WeatherCode:     obs.WeatherCode,
+		TemperatureC:    obs.TemperatureC,
+		HumidityPct:     obs.HumidityPct,
+		RadarActive:     obs.RadarActive,
+		RadarFrameAgeS:  obs.RadarFrameAgeS,
+		Source:          obs.Source,
+		PayloadHash:     obs.PayloadHash,
+		ObservedAt:      obs.ObservedAt,
+		RecordedAt:      obs.RecordedAt,
+	})
+}
+
 // harvesterSnapshotFetcher adapts proxycache.Cache and HTTP client to harvester.SnapshotFetcher.
 type harvesterSnapshotFetcher struct {
 	cache        *proxycache.Cache
@@ -635,6 +658,7 @@ func main() {
 	}
 	verdictRepo := store.NewVerdictRepo(db)
 	verdictHistoryRepo := store.NewVerdictHistoryRepo(db)
+	weatherRepo := store.NewWeatherRepo(db)
 	subStore := subscription.NewSQLiteStore(db)
 	var taxonomyProv subscription.TaxonomyProvider
 	if camCatalog != nil {
@@ -884,6 +908,16 @@ func main() {
 	// 5c. Initialize live weather forecast and RainViewer radar metadata service (Issue #120).
 	weatherService := weather.NewService()
 	weatherHandler := weather.NewHandler(weatherService)
+
+	// 5d. Start 10-minute weather sampling ticker for feature store v2 (ADR-012 D3 / Issue #376).
+	weatherSampler := weather.NewSampler(
+		weatherService,
+		&weatherStoreAdapter{repo: weatherRepo},
+		slog.Default(),
+	)
+	weatherCtx, cancelWeather := context.WithCancel(context.Background())
+	defer cancelWeather()
+	go weatherSampler.Start(weatherCtx, 10*time.Minute)
 
 	// 6. Initialize WebSocket Hub for real-time verdict streaming (Issue #9).
 	// Kept in place — will be retired after D1 (EventSource migration) is verified.

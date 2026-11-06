@@ -54,12 +54,14 @@ from zoneinfo import ZoneInfo
 
 LOG = logging.getLogger("forecast.backtest")
 
-SCRIPT_VERSION = "1.0.0"
+SCRIPT_VERSION = "2.0.0"
 BACKTEST_SCHEMA_VERSION = 1
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_JSON_OUT = REPO_ROOT / "docs" / "reports" / "forecast_prototype_v1.json"
 DEFAULT_MARKDOWN_OUT = REPO_ROOT / "docs" / "reports" / "forecast_prototype_v1.md"
+DEFAULT_ABLATION_MARKDOWN_OUT = REPO_ROOT / "docs" / "reports" / "forecast_ablation_v2.md"
+DEFAULT_ABLATION_JSON_OUT = REPO_ROOT / "docs" / "reports" / "forecast_ablation_v2.json"
 
 DEFAULT_HORIZONS_MINUTES = (10, 20, 30)
 DEFAULT_FEATURE_COLUMNS = (
@@ -69,6 +71,25 @@ DEFAULT_FEATURE_COLUMNS = (
     "rolling_mean_15m",
     "hour_of_day",
     "day_of_week",
+)
+
+VARIANT_A_COLUMNS = DEFAULT_FEATURE_COLUMNS
+WEATHER_COLUMNS = (
+    "precip_mm_15m",
+    "precip_mm_60m",
+    "rain_flag",
+    "hours_since_rain",
+    "weather_code_class",
+    "radar_active",
+)
+DIRECTIONAL_COLUMNS = (
+    "peer_si",
+    "si_delta_ab",
+)
+VARIANT_B_COLUMNS = VARIANT_A_COLUMNS + WEATHER_COLUMNS
+VARIANT_C_COLUMNS = VARIANT_B_COLUMNS + DIRECTIONAL_COLUMNS
+ALL_ABLATION_COLUMNS = tuple(
+    sorted(set(VARIANT_A_COLUMNS + WEATHER_COLUMNS + DIRECTIONAL_COLUMNS))
 )
 DEFAULT_TRAIN_RATIO = 0.70
 DEFAULT_RIDGE_LAMBDA = 1.0
@@ -113,10 +134,21 @@ class FeatureRecord:
     hour_of_day: int
     day_of_week: int
     feature_values: tuple[Optional[float], ...]
+    direction: str = ""
+    feature_map: Optional[dict[str, Optional[float]]] = None
+
+    @property
+    def series_id(self) -> str:
+        return f"{self.camera_id}:{self.direction}" if self.direction else self.camera_id
 
     @property
     def features_complete(self) -> bool:
         return all(value is not None for value in self.feature_values)
+
+    def is_complete_for(self, columns: Sequence[str]) -> bool:
+        if self.feature_map is None:
+            return self.features_complete
+        return all(self.feature_map.get(col) is not None for col in columns)
 
     def feature_vector(self) -> tuple[float, ...]:
         values: list[float] = []
@@ -128,6 +160,20 @@ class FeatureRecord:
                 )
             values.append(value)
         return tuple(values)
+
+    def feature_vector_for(self, columns: Sequence[str]) -> tuple[float, ...]:
+        if self.feature_map is None:
+            return self.feature_vector()
+        vals: list[float] = []
+        for col in columns:
+            v = self.feature_map.get(col)
+            if v is None:
+                raise BacktestError(
+                    f"incomplete feature {col} for series {self.series_id} at "
+                    f"{self.bin_start.isoformat()}"
+                )
+            vals.append(v)
+        return tuple(vals)
 
 
 @dataclass(frozen=True)
@@ -457,6 +503,17 @@ def load_feature_records(
                 upper=6,
             )
 
+            direction = str(raw.get("direction") or "").strip()
+            series_id = f"{camera_id}:{direction}" if direction else camera_id
+
+            feature_map: dict[str, Optional[float]] = {
+                "hour_of_day": float(hour_of_day),
+                "day_of_week": float(day_of_week),
+            }
+            for col_name, val_str in raw.items():
+                if col_name not in feature_map:
+                    feature_map[col_name] = parse_float(val_str)
+
             source_values: dict[str, Optional[float]] = {}
             for column in feature_columns:
                 if column == "hour_of_day":
@@ -467,11 +524,13 @@ def load_feature_records(
                     source_values[column] = parse_float(raw.get(column))
             feature_values = tuple(source_values[column] for column in feature_columns)
 
-            key = (camera_id, bin_start)
+            key = (series_id, bin_start)
             if key in seen:
+                dup_label = (
+                    f"camera {series_id}" if direction else f"camera {camera_id}"
+                )
                 raise BacktestError(
-                    "duplicate feature row for camera "
-                    f"{camera_id} at {bin_start.isoformat()}"
+                    f"duplicate feature row for {dup_label} at {bin_start.isoformat()}"
                 )
             seen.add(key)
 
@@ -491,6 +550,8 @@ def load_feature_records(
                     hour_of_day=hour_of_day,
                     day_of_week=day_of_week,
                     feature_values=feature_values,
+                    direction=direction,
+                    feature_map=feature_map,
                 )
             )
             stats["accepted_rows"] += 1
@@ -555,14 +616,18 @@ def chronological_split(
 def build_saturation_index(
     records: Sequence[FeatureRecord],
 ) -> dict[tuple[str, datetime], float]:
-    """Index saturation index by camera and exact bin start."""
+    """Index saturation index by camera/direction and exact bin start."""
     index: dict[tuple[str, datetime], float] = {}
     for record in records:
-        key = (record.camera_id, record.bin_start)
+        key = (record.series_id, record.bin_start)
         if key in index:
+            dup_label = (
+                f"camera {record.series_id}"
+                if record.direction
+                else f"camera {record.camera_id}"
+            )
             raise BacktestError(
-                "duplicate saturation-index key for camera "
-                f"{record.camera_id} at {record.bin_start.isoformat()}"
+                f"duplicate saturation-index key for {dup_label} at {record.bin_start.isoformat()}"
             )
         index[key] = record.saturation_index
     return index
@@ -573,6 +638,7 @@ def build_evaluation_samples(
     saturation_index: dict[tuple[str, datetime], float],
     split: ChronologicalSplit,
     horizon_minutes: int,
+    feature_columns: Optional[Sequence[str]] = None,
 ) -> EvaluationSamples:
     """Align current rows with their same-camera future target.
 
@@ -605,7 +671,7 @@ def build_evaluation_samples(
         if is_train and target_time >= split.cutoff:
             stats["train_purged_boundary"] += 1
             continue
-        target = saturation_index.get((record.camera_id, target_time))
+        target = saturation_index.get((record.series_id, target_time))
         if target is None:
             stats[f"{side}_missing_target"] += 1
             continue
@@ -615,13 +681,18 @@ def build_evaluation_samples(
             target=target,
             target_time=target_time,
         )
+        is_complete = (
+            record.is_complete_for(feature_columns)
+            if feature_columns
+            else record.features_complete
+        )
         if is_train:
             train_all.append(sample)
-            if record.features_complete:
+            if is_complete:
                 train.append(sample)
             else:
                 stats["train_missing_features"] += 1
-        elif record.features_complete:
+        elif is_complete:
             test.append(sample)
         else:
             stats["test_missing_features"] += 1
@@ -889,7 +960,11 @@ def evaluate_horizon(
 ) -> dict[str, Any]:
     """Fit and score all models on one horizon over a common evaluation set."""
     samples = build_evaluation_samples(
-        records, saturation_index, split, horizon_minutes
+        records,
+        saturation_index,
+        split,
+        horizon_minutes,
+        feature_columns=config.feature_columns,
     )
     if not samples.train:
         raise BacktestError(
@@ -910,7 +985,10 @@ def evaluate_horizon(
     # training target. The ridge candidate keeps the feature-complete subset.
     median_model = HistoricalMedianModel().fit(samples.train_all, local_tz)
 
-    train_features = [sample.record.feature_vector() for sample in samples.train]
+    train_features = [
+        sample.record.feature_vector_for(config.feature_columns)
+        for sample in samples.train
+    ]
     if config.target_mode == "delta":
         train_targets = [sample.target - sample.current for sample in samples.train]
     else:
@@ -932,7 +1010,9 @@ def evaluate_horizon(
         median = _clamp_prediction(
             median_model.predict_one(sample.record.camera_id, target_hour)
         )
-        raw_candidate = ridge.predict_row(sample.record.feature_vector())
+        raw_candidate = ridge.predict_row(
+            sample.record.feature_vector_for(config.feature_columns)
+        )
         if config.target_mode == "delta":
             candidate = _clamp_prediction(current + raw_candidate)
         else:
@@ -950,6 +1030,23 @@ def evaluate_horizon(
         )
         for model_id, values in predictions.items()
     }
+
+    directional_metrics: dict[str, dict[str, Any]] = {}
+    directions = sorted(
+        {s.record.direction for s in samples.test if s.record.direction}
+    )
+    if directions:
+        for d in directions:
+            d_idx = [i for i, s in enumerate(samples.test) if s.record.direction == d]
+            if d_idx:
+                d_currents = [currents[i] for i in d_idx]
+                d_targets = [targets[i] for i in d_idx]
+                directional_metrics[d] = {}
+                for m_id, m_preds in predictions.items():
+                    d_preds = [m_preds[i] for i in d_idx]
+                    directional_metrics[d][m_id] = compute_metrics(
+                        d_preds, d_currents, d_targets, epsilon=config.direction_epsilon
+                    ).to_dict()
 
     persistence_mae = metrics["persistence"].mae
     candidate_mae = metrics[config.candidate_id].mae
@@ -1020,6 +1117,7 @@ def evaluate_horizon(
             "test_cameras": len(test_cameras),
         },
         "models": model_results,
+        "directional_metrics": directional_metrics,
         "gate": gate,
     }
 
@@ -1348,6 +1446,382 @@ def _write_outputs(
                 pass
 
 
+def run_ablation(
+    records: Sequence[FeatureRecord],
+    input_summary: dict[str, Any],
+    train_ratio: float = DEFAULT_TRAIN_RATIO,
+    horizons: Sequence[int] = DEFAULT_HORIZONS_MINUTES,
+    ridge_lambda: float = DEFAULT_RIDGE_LAMBDA,
+    target_mode: str = DEFAULT_TARGET_MODE,
+    timezone_name: str = DEFAULT_TIMEZONE,
+    data_note: str = "",
+    command: str = "",
+    generated_at: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Execute 3-way ablation: Variant A (lags), Variant B (+weather), Variant C (+directional)."""
+    split = chronological_split(records, train_ratio)
+    saturation_index = build_saturation_index(records)
+
+    cfg_a = BacktestConfig(
+        train_ratio=train_ratio,
+        horizons_minutes=horizons,
+        feature_columns=VARIANT_A_COLUMNS,
+        ridge_lambda=ridge_lambda,
+        target_mode=target_mode,
+        timezone=timezone_name,
+    )
+    cfg_b = BacktestConfig(
+        train_ratio=train_ratio,
+        horizons_minutes=horizons,
+        feature_columns=VARIANT_B_COLUMNS,
+        ridge_lambda=ridge_lambda,
+        target_mode=target_mode,
+        timezone=timezone_name,
+    )
+    cfg_c = BacktestConfig(
+        train_ratio=train_ratio,
+        horizons_minutes=horizons,
+        feature_columns=VARIANT_C_COLUMNS,
+        ridge_lambda=ridge_lambda,
+        target_mode=target_mode,
+        timezone=timezone_name,
+    )
+
+    results_a: dict[str, Any] = {}
+    results_b: dict[str, Any] = {}
+    results_c: dict[str, Any] = {}
+    horizon_comparisons: dict[str, Any] = {}
+
+    for h in horizons:
+        res_a = evaluate_horizon(records, saturation_index, split, h, cfg_a)
+        res_b = evaluate_horizon(records, saturation_index, split, h, cfg_b)
+        res_c = evaluate_horizon(records, saturation_index, split, h, cfg_c)
+        results_a[str(h)] = res_a
+        results_b[str(h)] = res_b
+        results_c[str(h)] = res_c
+
+        cand_id = cfg_a.candidate_id
+        p_mae = res_a["models"]["persistence"]["metrics"]["mae"]
+        p_rmse = res_a["models"]["persistence"]["metrics"]["rmse"]
+        p_da = res_a["models"]["persistence"]["metrics"]["directional_accuracy"]
+
+        a_m = res_a["models"][cand_id]["metrics"]
+        b_m = res_b["models"][cand_id]["metrics"]
+        c_m = res_c["models"][cand_id]["metrics"]
+
+        delta_b_vs_a_abs = a_m["mae"] - b_m["mae"]
+        delta_b_vs_a_pct = (
+            (delta_b_vs_a_abs / a_m["mae"] * 100.0) if a_m["mae"] > 0 else 0.0
+        )
+
+        delta_c_vs_b_abs = b_m["mae"] - c_m["mae"]
+        delta_c_vs_b_pct = (
+            (delta_c_vs_b_abs / b_m["mae"] * 100.0) if b_m["mae"] > 0 else 0.0
+        )
+
+        horizon_comparisons[str(h)] = {
+            "horizon_minutes": h,
+            "persistence": {
+                "mae": p_mae,
+                "rmse": p_rmse,
+                "directional_accuracy": p_da,
+            },
+            "variant_a": {
+                "mae": a_m["mae"],
+                "rmse": a_m["rmse"],
+                "directional_accuracy": a_m["directional_accuracy"],
+            },
+            "variant_b": {
+                "mae": b_m["mae"],
+                "rmse": b_m["rmse"],
+                "directional_accuracy": b_m["directional_accuracy"],
+                "delta_b_vs_a_abs": round(delta_b_vs_a_abs, 8),
+                "delta_b_vs_a_pct": round(delta_b_vs_a_pct, 4),
+            },
+            "variant_c": {
+                "mae": c_m["mae"],
+                "rmse": c_m["rmse"],
+                "directional_accuracy": c_m["directional_accuracy"],
+                "delta_c_vs_b_abs": round(delta_c_vs_b_abs, 8),
+                "delta_c_vs_b_pct": round(delta_c_vs_b_pct, 4),
+            },
+            "sample_counts": res_b["sample_accounting"],
+        }
+
+    horizon_checks: dict[str, Any] = {}
+    for h_str, comp in horizon_comparisons.items():
+        delta_pct = comp["variant_b"]["delta_b_vs_a_pct"]
+        horizon_checks[h_str] = {
+            "delta_b_vs_a_pct": delta_pct,
+            "improves_ge_2pct": delta_pct >= 2.0,
+            "degrades_gt_5pct": delta_pct < -5.0,
+        }
+
+    improves_ge_2pct = any(
+        chk["improves_ge_2pct"] for chk in horizon_checks.values()
+    )
+    degrades_gt_5pct = any(
+        chk["degrades_gt_5pct"] for chk in horizon_checks.values()
+    )
+    gate_passed = improves_ge_2pct and not degrades_gt_5pct
+
+    gate = {
+        "rule": (
+            "Variant B improves MAE by >= 2% on at least one horizon without "
+            "degrading any horizon by > 5%"
+        ),
+        "passed": gate_passed,
+        "improves_ge_2pct": improves_ge_2pct,
+        "degrades_gt_5pct": degrades_gt_5pct,
+        "horizon_checks": horizon_checks,
+        "retained": gate_passed,
+        "decision": (
+            "PASSED: Weather features retained (+2% MAE improvement achieved without >5% regression)"
+            if gate_passed
+            else "NULL_RESULT: Weather features did not meet the +2% improvement threshold or degraded a horizon > 5%; retained null result, weather columns stay unused"
+        ),
+    }
+
+    train_row_count = sum(1 for record in records if record.bin_start < split.cutoff)
+    test_row_count = len(records) - train_row_count
+    generated = generated_at or datetime.now(timezone.utc)
+
+    return {
+        "schema_version": BACKTEST_SCHEMA_VERSION,
+        "script_version": SCRIPT_VERSION,
+        "report_type": "3-way-ablation",
+        "generated_at_utc": (
+            generated.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        ),
+        "command": command,
+        "data_provenance": {
+            "input": str(input_summary.get("path", "")),
+            "sha256": input_summary.get("sha256"),
+            "note": data_note.strip(),
+        },
+        "input_summary": input_summary,
+        "split": {
+            "strategy": "global_chronological_by_bin_start_utc",
+            "train_ratio": train_ratio,
+            "cutoff_utc": split.cutoff.isoformat().replace("+00:00", "Z"),
+            "train_timestamp_count": len(split.train_times),
+            "test_timestamp_count": len(split.test_times),
+            "train_row_count": train_row_count,
+            "test_row_count": test_row_count,
+        },
+        "variants": {
+            "variant_a": {"features": list(VARIANT_A_COLUMNS), "results": results_a},
+            "variant_b": {"features": list(VARIANT_B_COLUMNS), "results": results_b},
+            "variant_c": {"features": list(VARIANT_C_COLUMNS), "results": results_c},
+        },
+        "horizon_comparisons": horizon_comparisons,
+        "gate": gate,
+    }
+
+
+def render_ablation_markdown(result: dict[str, Any]) -> str:
+    """Render empirical 3-way forecast ablation report into GitHub-flavored Markdown."""
+    lines = [
+        "# Short-Horizon Congestion Forecast Ablation Report v2",
+        "",
+        (
+            f"Ablation backtest report for Issue #376 (S10-T5) Part 2. "
+            f"Generated by `tools/forecast/backtest.py` (script version `{result['script_version']}`) "
+            f"at `{result['generated_at_utc']}`."
+        ),
+        "",
+        "Feature store contract: `docs/reports/forecast_feature_store_v2.md`.",
+        "",
+        "## 1. Data provenance",
+        "",
+        "| Field | Value |",
+        "| --- | --- |",
+        f"| Input CSV | `{result['data_provenance']['input']}` |",
+        f"| SHA-256 | `{result['data_provenance']['sha256']}` |",
+        (
+            f"| Rows (accepted / total) | {result['input_summary']['accepted_rows']} / "
+            f"{result['input_summary']['total_rows']} |"
+        ),
+        (
+            f"| Invalid rows / rows without saturation index | "
+            f"{result['input_summary']['invalid_rows']} / "
+            f"{result['input_summary']['rows_without_saturation_index']} |"
+        ),
+        f"| Cameras | {result['input_summary']['camera_count']} |",
+        (
+            f"| Bin width | {result['input_summary']['bin_minutes']} minutes "
+            f"(source: {result['input_summary']['bin_minutes_source']}) |"
+        ),
+        (
+            f"| Time range (UTC) | {result['input_summary']['time_range_utc']['min']} "
+            f"to {result['input_summary']['time_range_utc']['max']} |"
+        ),
+    ]
+    if result["data_provenance"]["note"]:
+        lines.append(f"| Provenance note | {result['data_provenance']['note']} |")
+
+    lines.extend(
+        [
+            "",
+            "## 2. Method & 3-Way Ablation Protocol",
+            "",
+            "- Chronological split: 70% train / 30% test over distinct `bin_start_utc` timestamps. Rows are never shuffled.",
+            f"- Cutoff: `{result['split']['cutoff_utc']}`; {result['split']['train_timestamp_count']} train timestamps, {result['split']['test_timestamp_count']} test timestamps.",
+            "- Training samples whose target lands at or after the cutoff are purged per horizon to eliminate boundary leakage.",
+            "- Three model variants evaluated on the identical test split:",
+            "  - **Variant A (Baseline)**: Traffic lags only (`lag_5m`, `lag_10m`, `lag_15m`, `rolling_mean_15m`, `hour_of_day`, `day_of_week`).",
+            "  - **Variant B (+Weather)**: Variant A + meteorological observations (`precip_mm_15m`, `precip_mm_60m`, `rain_flag`, `hours_since_rain`, `weather_code_class`, `radar_active`).",
+            "  - **Variant C (+Directional)**: Variant B + directional roadway polygon signals (`peer_si`, `si_delta_ab`).",
+            "- As-of join discipline: strict 30-minute age bound on weather data; missing observations remain null without forward fill (ADR-012 D3, Lesson 67).",
+            "",
+            "## 3. Results across Horizons",
+            "",
+            "| Horizon | Model | MAE | RMSE | Directional Accuracy | Delta vs A (%) |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+
+    comparisons = result["horizon_comparisons"]
+    for h_str in sorted(comparisons.keys(), key=int):
+        comp = comparisons[h_str]
+        h = comp["horizon_minutes"]
+        p = comp["persistence"]
+        a = comp["variant_a"]
+        b = comp["variant_b"]
+        c = comp["variant_c"]
+
+        lines.append(
+            f"| {h} min | Persistence | {p['mae']:.4f} | {p['rmse']:.4f} | {p['directional_accuracy'] * 100.0:.1f}% | - |"
+        )
+        lines.append(
+            f"| {h} min | Variant A (lags) | {a['mae']:.4f} | {a['rmse']:.4f} | {a['directional_accuracy'] * 100.0:.1f}% | baseline |"
+        )
+        delta_b_sign = "+" if b["delta_b_vs_a_pct"] >= 0 else ""
+        lines.append(
+            f"| {h} min | Variant B (+weather) | {b['mae']:.4f} | {b['rmse']:.4f} | {b['directional_accuracy'] * 100.0:.1f}% | {delta_b_sign}{b['delta_b_vs_a_pct']:.2f}% |"
+        )
+        delta_c_sign = "+" if c["delta_c_vs_b_pct"] >= 0 else ""
+        lines.append(
+            f"| {h} min | Variant C (+directional) | {c['mae']:.4f} | {c['rmse']:.4f} | {c['directional_accuracy'] * 100.0:.1f}% | {delta_c_sign}{c['delta_c_vs_b_pct']:.2f}% (vs B) |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## 4. Directional Roadway Breakdown",
+            "",
+            "| Horizon | Direction | Variant A MAE | Variant B MAE | Variant C MAE | Best Variant |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+
+    for h_str in sorted(comparisons.keys(), key=int):
+        h = int(h_str)
+        res_a_dir = result["variants"]["variant_a"]["results"][h_str].get(
+            "directional_metrics", {}
+        )
+        res_b_dir = result["variants"]["variant_b"]["results"][h_str].get(
+            "directional_metrics", {}
+        )
+        res_c_dir = result["variants"]["variant_c"]["results"][h_str].get(
+            "directional_metrics", {}
+        )
+        dirs = sorted(
+            set(res_a_dir.keys()) | set(res_b_dir.keys()) | set(res_c_dir.keys())
+        )
+        if not dirs:
+            dirs = ["(frame-wide)"]
+        for d in dirs:
+            mae_a = None
+            for k, m in res_a_dir.get(d, {}).items():
+                if k.startswith("ridge"):
+                    mae_a = m.get("mae")
+            mae_b = None
+            for k, m in res_b_dir.get(d, {}).items():
+                if k.startswith("ridge"):
+                    mae_b = m.get("mae")
+            mae_c = None
+            for k, m in res_c_dir.get(d, {}).items():
+                if k.startswith("ridge"):
+                    mae_c = m.get("mae")
+            if mae_a is not None and mae_b is not None and mae_c is not None:
+                best = (
+                    "Variant C"
+                    if mae_c <= min(mae_a, mae_b)
+                    else ("Variant B" if mae_b <= mae_a else "Variant A")
+                )
+                lines.append(
+                    f"| {h} min | {d} | {mae_a:.4f} | {mae_b:.4f} | {mae_c:.4f} | {best} |"
+                )
+            else:
+                lines.append(f"| {h} min | {d} | - | - | - | - |")
+
+    gate = result["gate"]
+    status_str = "PASSED" if gate["passed"] else "NULL_RESULT"
+    lines.extend(
+        [
+            "",
+            "## 5. Verification Gate & Ablation Protocol",
+            "",
+            "Criterion: Weather features are retained only if Variant B improves MAE by >= 2% on at least one horizon without degrading any horizon by > 5% (ADR-012 D3).",
+            "",
+            "| Horizon | Variant A MAE | Variant B MAE | Delta MAE | Delta % | Meets >= 2% Target | No Regression > 5% |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+
+    for h_str in sorted(comparisons.keys(), key=int):
+        comp = comparisons[h_str]
+        h = comp["horizon_minutes"]
+        chk = gate["horizon_checks"][h_str]
+        d_pct = chk["delta_b_vs_a_pct"]
+        d_abs = comp["variant_b"]["delta_b_vs_a_abs"]
+        m2 = "yes" if chk["improves_ge_2pct"] else "no"
+        no_reg = "yes" if not chk["degrades_gt_5pct"] else "FAILED"
+        sign = "+" if d_pct >= 0 else ""
+        lines.append(
+            f"| {h} min | {comp['variant_a']['mae']:.4f} | {comp['variant_b']['mae']:.4f} | {sign}{d_abs:.4f} | {sign}{d_pct:.2f}% | {m2} | {no_reg} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            f"**Gate Result**: {status_str}.",
+            f"**Decision**: {gate['decision']}.",
+            "",
+            "## 6. Sample Accounting",
+            "",
+            "| Horizon | Train Samples | Test Samples | Boundary Purged | Missing Target (Train/Test) | Missing Features (Train/Test) |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+
+    for h_str in sorted(comparisons.keys(), key=int):
+        h = int(h_str)
+        ac = comparisons[h_str]["sample_counts"]
+        lines.append(
+            f"| {h} min | {ac['train_samples']} | {ac['test_samples']} | "
+            f"{ac['train_purged_boundary']} | {ac['train_missing_target']} / {ac['test_missing_target']} | "
+            f"{ac['train_missing_features']} / {ac['test_missing_features']} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## 7. Reproduce",
+            "",
+            "```bash",
+            (
+                result.get("command")
+                or "python3 tools/forecast/backtest.py --input <features.csv> --ablation"
+            ),
+            "```",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _parse_horizons(raw: str) -> tuple[int, ...]:
     values: list[int] = []
     for part in raw.split(","):
@@ -1424,6 +1898,29 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--ablation",
+        action="store_true",
+        help="Run 3-way ablation comparison: Variant A (lags), Variant B (+weather), Variant C (+directional)",
+    )
+    parser.add_argument(
+        "--ablation-markdown-out",
+        type=Path,
+        default=DEFAULT_ABLATION_MARKDOWN_OUT,
+        help=f"Ablation Markdown report path (default: {DEFAULT_ABLATION_MARKDOWN_OUT})",
+    )
+    parser.add_argument(
+        "--ablation-json-out",
+        type=Path,
+        default=DEFAULT_ABLATION_JSON_OUT,
+        help=f"Ablation JSON report path (default: {DEFAULT_ABLATION_JSON_OUT})",
+    )
+    parser.add_argument(
+        "--variant",
+        choices=("A", "B", "C", "all"),
+        default=None,
+        help="Feature variant to evaluate: A (lags), B (+weather), C (+directional), or all (ablation)",
+    )
+    parser.add_argument(
         "--data-note",
         default="",
         help="Optional provenance note embedded in the JSON and Markdown report",
@@ -1470,6 +1967,67 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
         LOG.error("--json-out and --markdown-out must be different files")
         return EXIT_CONFIG_ERROR
 
+    raw_argv = list(argv) if argv is not None else sys.argv[1:]
+    command = "python3 tools/forecast/backtest.py " + shlex.join(raw_argv)
+
+    if args.ablation or args.variant == "all":
+        if args.ablation_json_out.resolve() == args.ablation_markdown_out.resolve():
+            LOG.error(
+                "--ablation-json-out and --ablation-markdown-out must be different files"
+            )
+            return EXIT_CONFIG_ERROR
+
+        try:
+            records, stats = load_feature_records(
+                args.input,
+                feature_columns=ALL_ABLATION_COLUMNS,
+                timezone_name=config.timezone,
+            )
+        except BacktestError as exc:
+            LOG.error("%s", exc)
+            return EXIT_DATA_ERROR
+
+        input_summary = {"path": str(args.input), **stats}
+        try:
+            ablation_result = run_ablation(
+                records=records,
+                input_summary=input_summary,
+                train_ratio=args.train_ratio,
+                horizons=horizons,
+                ridge_lambda=args.ridge_lambda,
+                target_mode=args.target_mode,
+                timezone_name=args.timezone,
+                data_note=args.data_note,
+                command=command.strip(),
+            )
+        except BacktestError as exc:
+            LOG.error("%s", exc)
+            return EXIT_MODEL_ERROR
+
+        md_text = render_ablation_markdown(ablation_result)
+        json_text = json.dumps(ablation_result, indent=2, sort_keys=True) + "\n"
+        _write_outputs(
+            args.ablation_json_out,
+            json_text,
+            args.ablation_markdown_out,
+            md_text,
+        )
+
+        LOG.info(
+            "Ablation backtest complete; results written to %s and %s (Gate: %s)",
+            args.ablation_json_out,
+            args.ablation_markdown_out,
+            ablation_result["gate"]["decision"],
+        )
+        return EXIT_OK
+
+    if args.variant == "A":
+        config.feature_columns = VARIANT_A_COLUMNS
+    elif args.variant == "B":
+        config.feature_columns = VARIANT_B_COLUMNS
+    elif args.variant == "C":
+        config.feature_columns = VARIANT_C_COLUMNS
+
     try:
         records, stats = load_feature_records(
             args.input,
@@ -1480,8 +2038,6 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
         LOG.error("%s", exc)
         return EXIT_DATA_ERROR
 
-    raw_argv = list(argv) if argv is not None else sys.argv[1:]
-    command = "python3 tools/forecast/backtest.py " + shlex.join(raw_argv)
     input_summary = {"path": str(args.input), **stats}
 
     try:
