@@ -1,6 +1,7 @@
 package hotset
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -17,6 +18,34 @@ type VerdictStorer interface {
 	// GetLatest returns the most recent Verdict for every camera currently
 	// tracked in the store (all rows in camera_verdicts).
 	GetLatest() []Verdict
+}
+
+// HistoryCoverageProvider defines consumer access to time-series data coverage (ADR-012 D2).
+type HistoryCoverageProvider interface {
+	GetCoverage(ctx context.Context, cameraID string, window time.Duration, now time.Time) (*CoverageReport, error)
+}
+
+// ObservationBounds holds the boundary timestamps for an observation window.
+type ObservationBounds struct {
+	Earliest *time.Time `json:"earliest,omitempty"`
+	Latest   *time.Time `json:"latest,omitempty"`
+}
+
+// CoverageReport represents the continuous data accumulation and bin coverage statistics (ADR-012 D2).
+type CoverageReport struct {
+	CameraID             string            `json:"camera_id,omitempty"`
+	Window               string            `json:"window"`
+	BinIntervalMinutes   int               `json:"bin_interval_minutes"`
+	ExpectedBins         int               `json:"expected_bins"`
+	ObservedBins         int               `json:"observed_bins"`
+	CoverageRatio        float64           `json:"coverage_ratio"`
+	TotalObservations    int               `json:"total_observations"`
+	ObservationBounds    ObservationBounds `json:"observation_bounds"`
+	LongestGapSeconds    int64             `json:"longest_gap_seconds"`
+	HorizonEligibility   map[string]bool   `json:"horizon_eligibility"`
+	HistoryCoverageHours float64           `json:"history_coverage_hours"`
+	Status               string            `json:"status"`
+	CamerasCount         int               `json:"cameras_count,omitempty"`
 }
 
 // TrafficStatusResponse represents the response payload for GET /api/traffic-status.
@@ -44,6 +73,7 @@ type HotsetStatusResponse struct {
 // docs/GO_BACKEND_ARCHITECTURE.md.
 type Handler struct {
 	storer          VerdictStorer
+	coverage        HistoryCoverageProvider
 	analysisEnabled bool
 	appEnv          string
 	staleTTL        time.Duration
@@ -64,6 +94,11 @@ func NewHandlerWithConfig(storer VerdictStorer, analysisEnabled bool, appEnv str
 	}
 }
 
+// SetCoverageProvider attaches a HistoryCoverageProvider to the Handler.
+func (h *Handler) SetCoverageProvider(cp HistoryCoverageProvider) {
+	h.coverage = cp
+}
+
 // SetStaleTTL sets the duration after which a verdict is marked stale.
 func (h *Handler) SetStaleTTL(d time.Duration) {
 	if d > 0 {
@@ -78,6 +113,8 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/config", h.GetConfig)
 	rg.GET(RouteHotsetStatus, h.GetHotsetStatus)
 	rg.GET("/v1"+RouteHotsetStatus, h.GetHotsetStatus)
+	rg.GET("/v1/hotset/history/coverage", h.GetHistoryCoverage)
+	rg.GET("/hotset/history/coverage", h.GetHistoryCoverage)
 }
 
 // GetTrafficStatus godoc
@@ -254,4 +291,48 @@ func (h *Handler) GetHotsetStatus(c *gin.Context) {
 		UpdatedAt: time.Now(),
 		Cameras:   filtered,
 	})
+}
+
+// GetHistoryCoverage godoc
+// @Summary      Get Hot Set time-series data accumulation and bin coverage
+// @Description  Reports observation bounds, 10m bin counts, coverage ratio, longest gap, and per-horizon prediction eligibility across a trailing window (default 72h).
+// @Tags         Traffic
+// @Produce      json
+// @Param        camera_id query string false "Camera ID (empty for aggregate across all cameras)"
+// @Param        window query string false "Time window duration (e.g. 72h, 24h, 60m; default 72h)"
+// @Success      200 {object} hotset.CoverageReport
+// @Failure      400 {object} map[string]string "invalid window format"
+// @Failure      503 {object} map[string]string "coverage provider unavailable"
+// @Router       /api/v1/hotset/history/coverage [get]
+func (h *Handler) GetHistoryCoverage(c *gin.Context) {
+	if h.coverage == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "history coverage provider unavailable",
+		})
+		return
+	}
+
+	camID := strings.TrimSpace(c.Query("camera_id"))
+	windowStr := strings.TrimSpace(c.Query("window"))
+	window := 72 * time.Hour
+	if windowStr != "" {
+		w, err := time.ParseDuration(windowStr)
+		if err != nil || w <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("invalid window %q: must be a positive duration string (e.g. 72h, 24h, 60m)", windowStr),
+			})
+			return
+		}
+		window = w
+	}
+
+	rep, err := h.coverage.GetCoverage(c.Request.Context(), camID, window, time.Now().UTC())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": fmt.Sprintf("failed to get history coverage: %v", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, rep)
 }

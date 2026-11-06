@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"sync"
 	"time"
 )
@@ -268,7 +269,7 @@ func (c *Coordinator) runRainHarvestWithWeather(ctx context.Context, weather *We
 
 // Status assembles the observability snapshot served by GET /api/harvester/status.
 func (c *Coordinator) Status() Status {
-	slotRuns, lastRain, totals, recentErrs, startedAt := c.stats.snapshot()
+	slotRuns, lastRain, lastSuccess, totals, recentErrs, startedAt := c.stats.snapshot()
 
 	slots := c.scheduler.Slots()
 	labels := make([]string, 0, len(slots))
@@ -286,17 +287,45 @@ func (c *Coordinator) Status() Status {
 		}
 	}
 
+	// Detect missed slots (ADR-012 D2: surface slots missed beyond two intervals or overdue)
+	loc := c.scheduler.Location()
+	cur := time.Now().In(loc)
+	today := time.Date(cur.Year(), cur.Month(), cur.Day(), 0, 0, 0, 0, loc)
+
+	var missedSlots []string
+	for _, sl := range slots {
+		slotTime := today.Add(time.Duration(sl.Hour)*time.Hour + time.Duration(sl.Minute)*time.Minute)
+		if cur.Sub(slotTime) >= 15*time.Minute {
+			rec, exists := slotRuns[sl.String()]
+			if !exists || rec.StartedAt.In(loc).Before(today) || (rec.Harvested == 0 && rec.Error != "") {
+				missedSlots = append(missedSlots, sl.String())
+			}
+		}
+	}
+	if missedSlots == nil {
+		missedSlots = []string{}
+	}
+
+	var coverageHours float64
+	if lastSuccess != nil {
+		span := time.Since(startedAt).Hours()
+		coverageHours = math.Round(span*100) / 100
+	}
+
 	return Status{
-		Enabled:       c.cfg.Enabled,
-		ScheduleSlots: labels,
-		NextSlot:      nextLabel,
-		NextSlotAt:    nextAt.UTC(),
-		SlotRuns:      slotRuns,
-		LastRain:      lastRain,
-		Totals:        totals,
-		RainWatcher:   rain,
-		StartedAt:     startedAt,
-		RecentErrors:  recentErrs,
+		Enabled:              c.cfg.Enabled,
+		ScheduleSlots:        labels,
+		NextSlot:             nextLabel,
+		NextSlotAt:           nextAt.UTC(),
+		SlotRuns:             slotRuns,
+		LastRain:             lastRain,
+		Totals:               totals,
+		RainWatcher:          rain,
+		StartedAt:            startedAt,
+		RecentErrors:         recentErrs,
+		MissedSlots:          missedSlots,
+		LastSuccessAt:        lastSuccess,
+		HistoryCoverageHours: coverageHours,
 	}
 }
 

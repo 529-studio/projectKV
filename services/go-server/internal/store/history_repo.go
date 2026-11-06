@@ -201,3 +201,342 @@ func (r *VerdictHistoryRepo) GetRecentByCameraAndDirection(ctx context.Context, 
 
 	return results, nil
 }
+
+// ObservationBounds holds the boundary timestamps for an observation window.
+type ObservationBounds struct {
+	Earliest *time.Time `json:"earliest,omitempty"`
+	Latest   *time.Time `json:"latest,omitempty"`
+}
+
+// CoverageReport represents the continuous data accumulation and bin coverage statistics (ADR-012 D2).
+type CoverageReport struct {
+	CameraID             string            `json:"camera_id,omitempty"`
+	Window               string            `json:"window"`
+	BinIntervalMinutes   int               `json:"bin_interval_minutes"`
+	ExpectedBins         int               `json:"expected_bins"`
+	ObservedBins         int               `json:"observed_bins"`
+	CoverageRatio        float64           `json:"coverage_ratio"`
+	TotalObservations    int               `json:"total_observations"`
+	ObservationBounds    ObservationBounds `json:"observation_bounds"`
+	LongestGapSeconds    int64             `json:"longest_gap_seconds"`
+	HorizonEligibility   map[string]bool   `json:"horizon_eligibility"`
+	HistoryCoverageHours float64           `json:"history_coverage_hours"`
+	Status               string            `json:"status"`
+	CamerasCount         int               `json:"cameras_count,omitempty"`
+}
+
+// GetCoverage evaluates continuous time-series history for cameraID (or all cameras if empty)
+// over window ending at now (defaults to time.Now().UTC()). Bin interval is fixed to 10 minutes.
+func (r *VerdictHistoryRepo) GetCoverage(ctx context.Context, cameraID string, window time.Duration, now time.Time) (*CoverageReport, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("verdict history repo db is nil")
+	}
+	if window <= 0 {
+		window = 72 * time.Hour
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+
+	binIntervalMinutes := 10
+	expectedBins := int(math.Ceil(window.Minutes() / float64(binIntervalMinutes)))
+	if expectedBins < 1 {
+		expectedBins = 1
+	}
+	since := now.Add(-window)
+
+	sinceStr := since.UTC().Format(TimestampFixedLayout)
+	nowStr := now.UTC().Format(TimestampFixedLayout)
+
+	if cameraID != "" {
+		query := fmt.Sprintf(`SELECT observed_at FROM %s
+			WHERE camera_id = ? AND direction = '' AND observed_at >= ? AND observed_at <= ? AND saturation_index IS NOT NULL
+			ORDER BY observed_at ASC`, TableHotsetVerdictHistory)
+
+		rows, err := r.db.QueryContext(ctx, query, cameraID, sinceStr, nowStr)
+		if err != nil {
+			return nil, fmt.Errorf("query coverage timestamps for %s: %w", cameraID, err)
+		}
+		defer rows.Close()
+
+		var timestamps []time.Time
+		for rows.Next() {
+			var obsStr string
+			if err := rows.Scan(&obsStr); err != nil {
+				return nil, fmt.Errorf("scan coverage timestamp: %w", err)
+			}
+			t, err := time.Parse(time.RFC3339Nano, obsStr)
+			if err != nil {
+				t, err = time.Parse(time.RFC3339, obsStr)
+			}
+			if err == nil {
+				timestamps = append(timestamps, t.UTC())
+			}
+		}
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate coverage timestamps: %w", err)
+		}
+
+		return calculateCameraCoverage(cameraID, window, binIntervalMinutes, expectedBins, since, now, timestamps), nil
+	}
+
+	// Aggregate across all cameras
+	query := fmt.Sprintf(`SELECT camera_id, observed_at FROM %s
+		WHERE direction = '' AND observed_at >= ? AND observed_at <= ? AND saturation_index IS NOT NULL
+		ORDER BY observed_at ASC`, TableHotsetVerdictHistory)
+
+	rows, err := r.db.QueryContext(ctx, query, sinceStr, nowStr)
+	if err != nil {
+		return nil, fmt.Errorf("query aggregate coverage timestamps: %w", err)
+	}
+	defer rows.Close()
+
+	byCam := make(map[string][]time.Time)
+	for rows.Next() {
+		var camID, obsStr string
+		if err := rows.Scan(&camID, &obsStr); err != nil {
+			return nil, fmt.Errorf("scan aggregate coverage timestamp: %w", err)
+		}
+		t, err := time.Parse(time.RFC3339Nano, obsStr)
+		if err != nil {
+			t, err = time.Parse(time.RFC3339, obsStr)
+		}
+		if err == nil {
+			byCam[camID] = append(byCam[camID], t.UTC())
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate aggregate coverage timestamps: %w", err)
+	}
+
+	if len(byCam) == 0 {
+		return &CoverageReport{
+			Window:             window.String(),
+			BinIntervalMinutes: binIntervalMinutes,
+			ExpectedBins:       expectedBins,
+			ObservedBins:       0,
+			CoverageRatio:      0.0,
+			TotalObservations:  0,
+			LongestGapSeconds:  int64(window.Seconds()),
+			HorizonEligibility: map[string]bool{
+				"10m":              false,
+				"20m":              false,
+				"30m":              false,
+				"serving_eligible": false,
+				"refit_eligible":   false,
+			},
+			HistoryCoverageHours: 0.0,
+			Status:               "insufficient_history",
+			CamerasCount:         0,
+		}, nil
+	}
+
+	totalObs := 0
+	sumRatio := 0.0
+	sumBins := 0
+	var globalEarliest, globalLatest *time.Time
+	maxGap := int64(0)
+	servingCount := 0
+
+	for camID, tsList := range byCam {
+		rep := calculateCameraCoverage(camID, window, binIntervalMinutes, expectedBins, since, now, tsList)
+		totalObs += rep.TotalObservations
+		sumRatio += rep.CoverageRatio
+		sumBins += rep.ObservedBins
+		if rep.LongestGapSeconds > maxGap {
+			maxGap = rep.LongestGapSeconds
+		}
+		if rep.HorizonEligibility["serving_eligible"] {
+			servingCount++
+		}
+		if rep.ObservationBounds.Earliest != nil {
+			if globalEarliest == nil || rep.ObservationBounds.Earliest.Before(*globalEarliest) {
+				globalEarliest = rep.ObservationBounds.Earliest
+			}
+		}
+		if rep.ObservationBounds.Latest != nil {
+			if globalLatest == nil || rep.ObservationBounds.Latest.After(*globalLatest) {
+				globalLatest = rep.ObservationBounds.Latest
+			}
+		}
+	}
+
+	camCount := len(byCam)
+	avgRatio := sumRatio / float64(camCount)
+	avgBins := int(math.Round(float64(sumBins) / float64(camCount)))
+
+	historyHours := 0.0
+	if globalEarliest != nil && globalLatest != nil {
+		span := globalLatest.Sub(*globalEarliest).Hours()
+		if span > window.Hours() {
+			span = window.Hours()
+		}
+		historyHours = span
+	}
+
+	servingEligible := avgRatio >= 0.80 && servingCount >= int(float64(camCount)*0.75)
+	refitEligible := window >= 72*time.Hour && avgRatio >= 0.70 && totalObs >= 30*camCount
+
+	status := "ok"
+	if !servingEligible {
+		status = "insufficient_history"
+	}
+
+	return &CoverageReport{
+		Window:             window.String(),
+		BinIntervalMinutes: binIntervalMinutes,
+		ExpectedBins:       expectedBins,
+		ObservedBins:       avgBins,
+		CoverageRatio:      math.Round(avgRatio*10000) / 10000,
+		TotalObservations:  totalObs,
+		ObservationBounds:  ObservationBounds{Earliest: globalEarliest, Latest: globalLatest},
+		LongestGapSeconds:  maxGap,
+		HorizonEligibility: map[string]bool{
+			"10m":              servingEligible,
+			"20m":              servingEligible && historyHours >= 0.5,
+			"30m":              servingEligible && historyHours >= 0.75,
+			"serving_eligible": servingEligible,
+			"refit_eligible":   refitEligible,
+		},
+		HistoryCoverageHours: math.Round(historyHours*100) / 100,
+		Status:               status,
+		CamerasCount:         camCount,
+	}, nil
+}
+
+func calculateCameraCoverage(cameraID string, window time.Duration, binIntervalMinutes int, expectedBins int, since time.Time, now time.Time, timestamps []time.Time) *CoverageReport {
+	if len(timestamps) == 0 {
+		return &CoverageReport{
+			CameraID:           cameraID,
+			Window:             window.String(),
+			BinIntervalMinutes: binIntervalMinutes,
+			ExpectedBins:       expectedBins,
+			ObservedBins:       0,
+			CoverageRatio:      0.0,
+			TotalObservations:  0,
+			LongestGapSeconds:  int64(window.Seconds()),
+			HorizonEligibility: map[string]bool{
+				"10m":              false,
+				"20m":              false,
+				"30m":              false,
+				"serving_eligible": false,
+				"refit_eligible":   false,
+			},
+			HistoryCoverageHours: 0.0,
+			Status:               "insufficient_history",
+		}
+	}
+
+	binSet := make(map[int]bool)
+	longestGap := int64(0)
+
+	for i, t := range timestamps {
+		b := int(t.Sub(since).Minutes() / float64(binIntervalMinutes))
+		if b >= 0 && b < expectedBins {
+			binSet[b] = true
+		}
+		if i > 0 {
+			gap := int64(t.Sub(timestamps[i-1]).Seconds())
+			if gap > longestGap {
+				longestGap = gap
+			}
+		}
+	}
+
+	observedBins := len(binSet)
+	coverageRatio := float64(observedBins) / float64(expectedBins)
+	if coverageRatio > 1.0 {
+		coverageRatio = 1.0
+	}
+
+	earliest := timestamps[0]
+	latest := timestamps[len(timestamps)-1]
+	spanHours := latest.Sub(earliest).Hours()
+	if spanHours > window.Hours() {
+		spanHours = window.Hours()
+	}
+
+	// Trailing 60-minute coverage evaluation (ADR-012 D2: >= 80% coverage over trailing 60m and >= 15m valid history)
+	trailing60mSince := now.Add(-60 * time.Minute)
+	trailingBins := make(map[int]bool)
+	for _, t := range timestamps {
+		if !t.Before(trailing60mSince) && !t.After(now) {
+			tb := int(t.Sub(trailing60mSince).Minutes() / float64(binIntervalMinutes))
+			if tb >= 0 && tb < 6 {
+				trailingBins[tb] = true
+			}
+		}
+	}
+	trailingRatio := float64(len(trailingBins)) / 6.0
+	validSpanMinutes := latest.Sub(earliest).Minutes()
+
+	servingEligible := trailingRatio >= 0.80 && validSpanMinutes >= 15.0
+	refitEligible := window >= 72*time.Hour && coverageRatio >= 0.70 && len(timestamps) >= 30
+
+	status := "ok"
+	if !servingEligible {
+		status = "insufficient_history"
+	}
+
+	return &CoverageReport{
+		CameraID:           cameraID,
+		Window:             window.String(),
+		BinIntervalMinutes: binIntervalMinutes,
+		ExpectedBins:       expectedBins,
+		ObservedBins:       observedBins,
+		CoverageRatio:      math.Round(coverageRatio*10000) / 10000,
+		TotalObservations:  len(timestamps),
+		ObservationBounds:  ObservationBounds{Earliest: &earliest, Latest: &latest},
+		LongestGapSeconds:  longestGap,
+		HorizonEligibility: map[string]bool{
+			"10m":              servingEligible,
+			"20m":              servingEligible && validSpanMinutes >= 30.0,
+			"30m":              servingEligible && validSpanMinutes >= 45.0,
+			"serving_eligible": servingEligible,
+			"refit_eligible":   refitEligible,
+		},
+		HistoryCoverageHours: math.Round(spanHours*100) / 100,
+		Status:               status,
+	}
+}
+
+// PurgeOlderThan deletes observations older than cutoff in chunks of batchSize to avoid long table locks (ADR-012 D2).
+// Returns the total number of deleted rows.
+func (r *VerdictHistoryRepo) PurgeOlderThan(ctx context.Context, cutoff time.Time, batchSize int) (int64, error) {
+	if r == nil || r.db == nil {
+		return 0, fmt.Errorf("verdict history repo db is nil")
+	}
+	if cutoff.IsZero() {
+		return 0, fmt.Errorf("cutoff time is zero")
+	}
+	if batchSize <= 0 {
+		batchSize = 5000
+	}
+
+	cutoffStr := cutoff.UTC().Format(TimestampFixedLayout)
+	var totalDeleted int64
+
+	for {
+		// Use rowid limit batching to avoid long SQLite write transactions
+		query := fmt.Sprintf(`DELETE FROM %s WHERE rowid IN (
+			SELECT rowid FROM %s WHERE observed_at < ? LIMIT ?
+		)`, TableHotsetVerdictHistory, TableHotsetVerdictHistory)
+
+		res, err := r.db.ExecContext(ctx, query, cutoffStr, batchSize)
+		if err != nil {
+			return totalDeleted, fmt.Errorf("purge batch: %w", err)
+		}
+
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return totalDeleted, fmt.Errorf("rows affected: %w", err)
+		}
+
+		totalDeleted += rowsAffected
+		if rowsAffected < int64(batchSize) {
+			break
+		}
+	}
+
+	return totalDeleted, nil
+}

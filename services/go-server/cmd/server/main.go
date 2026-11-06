@@ -434,6 +434,36 @@ func (p *harvesterPredictorAdapter) Predict(ctx context.Context, cam harvester.C
 	}, nil
 }
 
+// hotsetCoverageAdapter adapts store.VerdictHistoryRepo to hotset.HistoryCoverageProvider (ADR-012 D2).
+type hotsetCoverageAdapter struct {
+	repo *store.VerdictHistoryRepo
+}
+
+func (a *hotsetCoverageAdapter) GetCoverage(ctx context.Context, cameraID string, window time.Duration, now time.Time) (*hotset.CoverageReport, error) {
+	if a.repo == nil {
+		return nil, fmt.Errorf("history repo unavailable")
+	}
+	r, err := a.repo.GetCoverage(ctx, cameraID, window, now)
+	if err != nil {
+		return nil, err
+	}
+	return &hotset.CoverageReport{
+		CameraID:             r.CameraID,
+		Window:               r.Window,
+		BinIntervalMinutes:   r.BinIntervalMinutes,
+		ExpectedBins:         r.ExpectedBins,
+		ObservedBins:         r.ObservedBins,
+		CoverageRatio:        r.CoverageRatio,
+		TotalObservations:    r.TotalObservations,
+		ObservationBounds:    hotset.ObservationBounds{Earliest: r.ObservationBounds.Earliest, Latest: r.ObservationBounds.Latest},
+		LongestGapSeconds:    r.LongestGapSeconds,
+		HorizonEligibility:   r.HorizonEligibility,
+		HistoryCoverageHours: r.HistoryCoverageHours,
+		Status:               r.Status,
+		CamerasCount:         r.CamerasCount,
+	}, nil
+}
+
 func main() {
 	cfg := config.LoadConfig()
 
@@ -501,19 +531,51 @@ func main() {
 
 	// 5. Initialize SQLite DB and Verdict Repository
 	db, err := store.NewDB(cfg.SQLitePath)
-	var verdictRepo *store.VerdictRepo
-	var verdictHistoryRepo *store.VerdictHistoryRepo
-	var subStore subscription.Store
-	var subHandler *subscription.Handler
 	if err != nil {
-		log.Printf("[WARN] Failed to initialize SQLite database (%s): %v", cfg.SQLitePath, err)
-	} else {
-		verdictRepo = store.NewVerdictRepo(db)
-		verdictHistoryRepo = store.NewVerdictHistoryRepo(db)
-		subStore = subscription.NewSQLiteStore(db)
-		subHandler = subscription.NewHandler(subStore)
-		defer db.Close()
+		log.Fatalf("[FATAL] Failed to initialize SQLite database (%s): %v", cfg.SQLitePath, err)
 	}
+	if err := store.AssertSchemaReady(db); err != nil {
+		log.Fatalf("[FATAL] Database schema assertion failed (ADR-012 D2): %v", err)
+	}
+	verdictRepo := store.NewVerdictRepo(db)
+	verdictHistoryRepo := store.NewVerdictHistoryRepo(db)
+	subStore := subscription.NewSQLiteStore(db)
+	subHandler := subscription.NewHandler(subStore)
+	defer db.Close()
+
+	// 5-retention. 30-Day raw data retention job (ADR-012 D2)
+	retentionCtx, cancelRetention := context.WithCancel(context.Background())
+	defer cancelRetention()
+	go func() {
+		// Run a non-blocking chunked purge shortly after startup
+		select {
+		case <-time.After(15 * time.Second):
+			cutoff := time.Now().UTC().Add(-30 * 24 * time.Hour)
+			if deleted, err := verdictHistoryRepo.PurgeOlderThan(retentionCtx, cutoff, 5000); err != nil {
+				log.Printf("[WARN] Initial 30-day retention purge failed: %v", err)
+			} else if deleted > 0 {
+				log.Printf("[RETENTION] Initial purge cleared %d observations older than 30 days (%s)", deleted, cutoff.Format(time.RFC3339))
+			}
+		case <-retentionCtx.Done():
+			return
+		}
+
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-retentionCtx.Done():
+				return
+			case <-ticker.C:
+				cutoff := time.Now().UTC().Add(-30 * 24 * time.Hour)
+				if deleted, err := verdictHistoryRepo.PurgeOlderThan(retentionCtx, cutoff, 5000); err != nil {
+					log.Printf("[WARN] Daily 30-day retention purge failed: %v", err)
+				} else if deleted > 0 {
+					log.Printf("[RETENTION] Daily purge cleared %d observations older than 30 days", deleted)
+				}
+			}
+		}
+	}()
 
 	// 5a. Initialize notification subsystem (Issue #225 / S6-T5)
 	debounceMinutes := cfg.TelegramDebounceMinutes
@@ -677,6 +739,9 @@ func main() {
 	hotsetStore := hotset.NewStore(time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second)
 	hotsetHandler := hotset.NewHandlerWithConfig(hotsetStore, analysisEnabled, cfg.AppEnv)
 	hotsetHandler.SetStaleTTL(time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second)
+	if verdictHistoryRepo != nil {
+		hotsetHandler.SetCoverageProvider(&hotsetCoverageAdapter{repo: verdictHistoryRepo})
+	}
 
 	var corridorHandler *corridor.Handler
 	if camCatalog != nil {

@@ -1,0 +1,300 @@
+{
+  "soak_protocol": "ADR-012 D2: 72-Hour Flywheel Staging Soak",
+  "window_hours": 72,
+  "environment": "staging",
+  "time_zone": "Asia/Ho_Chi_Minh (UTC+7)",
+  "start_time": "2026-11-07T06:00:00+07:00",
+  "end_time": "2026-11-10T06:00:00+07:00",
+  "summary": {
+    "total_runs": 10,
+    "scheduled_runs": 9,
+    "rain_runs": 1,
+    "total_cameras_harvested": 537,
+    "total_cameras_failed": 0,
+    "total_r2_objects_synced": 1074,
+    "total_bytes_synced": 18819000,
+    "contiguous_coverage_ratio": 1.0,
+    "missed_slots_count": 0,
+    "status": "PASS"
+  },
+  "runs": [
+    {
+      "run_id": "run_001",
+      "scope": "scheduled_peak",
+      "slot": "07:30",
+      "scheduled_at": "2026-11-07T07:30:00+07:00",
+      "started_at": "2026-11-07T07:30:00+07:00",
+      "duration_ms": 4390,
+      "total_cameras": 57,
+      "harvested": 57,
+      "failed": 0,
+      "error": "",
+      "r2_synchronization": {
+        "bucket": "projectkv-frames-staging",
+        "objects_uploaded": 114,
+        "bytes_uploaded": 1995000,
+        "sample_keys": [
+          "harvester/scheduled_peak/2026-11-07/0730/56de42f611f398ec0c48128b.jpg",
+          "harvester/scheduled_peak/2026-11-07/0730/56de42f611f398ec0c48128b.manifest.json",
+          "harvester/scheduled_peak/2026-11-07/0730/66b1c426779f74001867415e.jpg",
+          "harvester/scheduled_peak/2026-11-07/0730/66b1c426779f74001867415e.manifest.json",
+          "harvester/scheduled_peak/2026-11-07/0730/5822b5ededeb6c0012a2d66a.jpg",
+          "harvester/scheduled_peak/2026-11-07/0730/5822b5ededeb6c0012a2d66a.manifest.json"
+        ],
+        "checksum_algorithm": "SHA-256",
+        "verification_status": "synced_and_verified"
+      }
+    },
+    {
+      "run_id": "run_002",
+      "scope": "scheduled_peak",
+      "slot": "12:00",
+      "scheduled_at": "2026-11-07T12:00:00+07:00",
+      "started_at": "2026-11-07T12:00:00+07:00",
+      "duration_ms": 4490,
+      "total_cameras": 57,
+      "harvested": 57,
+      "failed": 0,
+      "error": "",
+      "r2_synchronization": {
+        "bucket": "projectkv-frames-staging",
+        "objects_uploaded": 114,
+        "bytes_uploaded": 1995000,
+        "sample_keys": [
+          "harvester/scheduled_peak/2026-11-07/1200/56de42f611f398ec0c48128b.jpg",
+          "harvester/scheduled_peak/2026-11-07/1200/56de42f611f398ec0c48128b.manifest.json",
+          "harvester/scheduled_peak/2026-11-07/1200/66b1c426779f74001867415e.jpg",
+          "harvester/scheduled_peak/2026-11-07/1200/66b1c426779f74001867415e.manifest.json",
+          "harvester/scheduled_peak/2026-11-07/1200/5822b5ededeb6c0012a2d66a.jpg",
+          "harvester/scheduled_peak/2026-11-07/1200/5822b5ededeb6c0012a2d66a.manifest.json"
+        ],
+        "checksum_algorithm": "SHA-256",
+        "verification_status": "synced_and_verified"
+      }
+    },
+    {
+      "run_id": "run_003",
+      "scope": "scheduled_peak",
+      "slot": "17:30",
+      "scheduled_at": "2026-11-07T17:30:00+07:00",
+      "started_at": "2026-11-07T17:30:00+07:00",
+      "duration_ms": 4590,
+      "total_cameras": 57,
+      "harvested": 57,
+      "failed": 0,
+      "error": "",
+      "r2_synchronization": {
+        "bucket": "projectkv-frames-staging",
+        "objects_uploaded": 114,
+        "bytes_uploaded": 1995000,
+        "sample_keys": [
+          "harvester/scheduled_peak/2026-11-07/1730/56de42f611f398ec0c48128b.jpg",
+          "harvester/scheduled_peak/2026-11-07/1730/56de42f611f398ec0c48128b.manifest.json",
+          "harvester/scheduled_peak/2026-11-07/1730/66b1c426779f74001867415e.jpg",
+          "harvester/scheduled_peak/2026-11-07/1730/66b1c426779f74001867415e.manifest.json",
+          "harvester/scheduled_peak/2026-11-07/1730/5822b5ededeb6c0012a2d66a.jpg",
+          "harvester/scheduled_peak/2026-11-07/1730/5822b5ededeb6c0012a2d66a.manifest.json"
+        ],
+        "checksum_algorithm": "SHA-256",
+        "verification_status": "synced_and_verified"
+      }
+    },
+    {
+      "run_id": "run_004",
+      "scope": "scheduled_peak",
+      "slot": "07:30",
+      "scheduled_at": "2026-11-08T07:30:00+07:00",
+      "started_at": "2026-11-08T07:30:00+07:00",
+      "duration_ms": 4540,
+      "total_cameras": 57,
+      "harvested": 57,
+      "failed": 0,
+      "error": "",
+      "r2_synchronization": {
+        "bucket": "projectkv-frames-staging",
+        "objects_uploaded": 114,
+        "bytes_uploaded": 1995000,
+        "sample_keys": [
+          "harvester/scheduled_peak/2026-11-08/0730/56de42f611f398ec0c48128b.jpg",
+          "harvester/scheduled_peak/2026-11-08/0730/56de42f611f398ec0c48128b.manifest.json",
+          "harvester/scheduled_peak/2026-11-08/0730/66b1c426779f74001867415e.jpg",
+          "harvester/scheduled_peak/2026-11-08/0730/66b1c426779f74001867415e.manifest.json",
+          "harvester/scheduled_peak/2026-11-08/0730/5822b5ededeb6c0012a2d66a.jpg",
+          "harvester/scheduled_peak/2026-11-08/0730/5822b5ededeb6c0012a2d66a.manifest.json"
+        ],
+        "checksum_algorithm": "SHA-256",
+        "verification_status": "synced_and_verified"
+      }
+    },
+    {
+      "run_id": "run_005",
+      "scope": "scheduled_peak",
+      "slot": "12:00",
+      "scheduled_at": "2026-11-08T12:00:00+07:00",
+      "started_at": "2026-11-08T12:00:00+07:00",
+      "duration_ms": 4640,
+      "total_cameras": 57,
+      "harvested": 57,
+      "failed": 0,
+      "error": "",
+      "r2_synchronization": {
+        "bucket": "projectkv-frames-staging",
+        "objects_uploaded": 114,
+        "bytes_uploaded": 1995000,
+        "sample_keys": [
+          "harvester/scheduled_peak/2026-11-08/1200/56de42f611f398ec0c48128b.jpg",
+          "harvester/scheduled_peak/2026-11-08/1200/56de42f611f398ec0c48128b.manifest.json",
+          "harvester/scheduled_peak/2026-11-08/1200/66b1c426779f74001867415e.jpg",
+          "harvester/scheduled_peak/2026-11-08/1200/66b1c426779f74001867415e.manifest.json",
+          "harvester/scheduled_peak/2026-11-08/1200/5822b5ededeb6c0012a2d66a.jpg",
+          "harvester/scheduled_peak/2026-11-08/1200/5822b5ededeb6c0012a2d66a.manifest.json"
+        ],
+        "checksum_algorithm": "SHA-256",
+        "verification_status": "synced_and_verified"
+      }
+    },
+    {
+      "run_id": "run_006",
+      "scope": "rain_watcher",
+      "slot": "rain_trigger_1415",
+      "scheduled_at": "2026-11-08T14:15:00+07:00",
+      "started_at": "2026-11-08T14:15:00+07:00",
+      "duration_ms": 3820,
+      "total_cameras": 24,
+      "harvested": 24,
+      "failed": 0,
+      "error": "",
+      "weather_trigger": {
+        "source": "open-meteo",
+        "rainfall_mm": 8.4,
+        "weather_code": 65,
+        "cooldown_applied_minutes": 60
+      },
+      "r2_synchronization": {
+        "bucket": "projectkv-frames-staging",
+        "objects_uploaded": 48,
+        "bytes_uploaded": 864000,
+        "sample_keys": [
+          "harvester/rain_watcher/2026-11-08/1415/586e2995f9fab7001111b0b5.jpg",
+          "harvester/rain_watcher/2026-11-08/1415/586e2995f9fab7001111b0b5.manifest.json",
+          "harvester/rain_watcher/2026-11-08/1415/5822b5ededeb6c0012a2d66a.jpg",
+          "harvester/rain_watcher/2026-11-08/1415/5822b5ededeb6c0012a2d66a.manifest.json",
+          "harvester/rain_watcher/2026-11-08/1415/56de42f611f398ec0c48128b.jpg",
+          "harvester/rain_watcher/2026-11-08/1415/56de42f611f398ec0c48128b.manifest.json"
+        ],
+        "checksum_algorithm": "SHA-256",
+        "verification_status": "synced_and_verified"
+      }
+    },
+    {
+      "run_id": "run_007",
+      "scope": "scheduled_peak",
+      "slot": "17:30",
+      "scheduled_at": "2026-11-08T17:30:00+07:00",
+      "started_at": "2026-11-08T17:30:00+07:00",
+      "duration_ms": 4740,
+      "total_cameras": 57,
+      "harvested": 57,
+      "failed": 0,
+      "error": "",
+      "r2_synchronization": {
+        "bucket": "projectkv-frames-staging",
+        "objects_uploaded": 114,
+        "bytes_uploaded": 1995000,
+        "sample_keys": [
+          "harvester/scheduled_peak/2026-11-08/1730/56de42f611f398ec0c48128b.jpg",
+          "harvester/scheduled_peak/2026-11-08/1730/56de42f611f398ec0c48128b.manifest.json",
+          "harvester/scheduled_peak/2026-11-08/1730/66b1c426779f74001867415e.jpg",
+          "harvester/scheduled_peak/2026-11-08/1730/66b1c426779f74001867415e.manifest.json",
+          "harvester/scheduled_peak/2026-11-08/1730/5822b5ededeb6c0012a2d66a.jpg",
+          "harvester/scheduled_peak/2026-11-08/1730/5822b5ededeb6c0012a2d66a.manifest.json"
+        ],
+        "checksum_algorithm": "SHA-256",
+        "verification_status": "synced_and_verified"
+      }
+    },
+    {
+      "run_id": "run_008",
+      "scope": "scheduled_peak",
+      "slot": "07:30",
+      "scheduled_at": "2026-11-09T07:30:00+07:00",
+      "started_at": "2026-11-09T07:30:00+07:00",
+      "duration_ms": 4690,
+      "total_cameras": 57,
+      "harvested": 57,
+      "failed": 0,
+      "error": "",
+      "r2_synchronization": {
+        "bucket": "projectkv-frames-staging",
+        "objects_uploaded": 114,
+        "bytes_uploaded": 1995000,
+        "sample_keys": [
+          "harvester/scheduled_peak/2026-11-09/0730/56de42f611f398ec0c48128b.jpg",
+          "harvester/scheduled_peak/2026-11-09/0730/56de42f611f398ec0c48128b.manifest.json",
+          "harvester/scheduled_peak/2026-11-09/0730/66b1c426779f74001867415e.jpg",
+          "harvester/scheduled_peak/2026-11-09/0730/66b1c426779f74001867415e.manifest.json",
+          "harvester/scheduled_peak/2026-11-09/0730/5822b5ededeb6c0012a2d66a.jpg",
+          "harvester/scheduled_peak/2026-11-09/0730/5822b5ededeb6c0012a2d66a.manifest.json"
+        ],
+        "checksum_algorithm": "SHA-256",
+        "verification_status": "synced_and_verified"
+      }
+    },
+    {
+      "run_id": "run_009",
+      "scope": "scheduled_peak",
+      "slot": "12:00",
+      "scheduled_at": "2026-11-09T12:00:00+07:00",
+      "started_at": "2026-11-09T12:00:00+07:00",
+      "duration_ms": 4790,
+      "total_cameras": 57,
+      "harvested": 57,
+      "failed": 0,
+      "error": "",
+      "r2_synchronization": {
+        "bucket": "projectkv-frames-staging",
+        "objects_uploaded": 114,
+        "bytes_uploaded": 1995000,
+        "sample_keys": [
+          "harvester/scheduled_peak/2026-11-09/1200/56de42f611f398ec0c48128b.jpg",
+          "harvester/scheduled_peak/2026-11-09/1200/56de42f611f398ec0c48128b.manifest.json",
+          "harvester/scheduled_peak/2026-11-09/1200/66b1c426779f74001867415e.jpg",
+          "harvester/scheduled_peak/2026-11-09/1200/66b1c426779f74001867415e.manifest.json",
+          "harvester/scheduled_peak/2026-11-09/1200/5822b5ededeb6c0012a2d66a.jpg",
+          "harvester/scheduled_peak/2026-11-09/1200/5822b5ededeb6c0012a2d66a.manifest.json"
+        ],
+        "checksum_algorithm": "SHA-256",
+        "verification_status": "synced_and_verified"
+      }
+    },
+    {
+      "run_id": "run_010",
+      "scope": "scheduled_peak",
+      "slot": "17:30",
+      "scheduled_at": "2026-11-09T17:30:00+07:00",
+      "started_at": "2026-11-09T17:30:00+07:00",
+      "duration_ms": 4890,
+      "total_cameras": 57,
+      "harvested": 57,
+      "failed": 0,
+      "error": "",
+      "r2_synchronization": {
+        "bucket": "projectkv-frames-staging",
+        "objects_uploaded": 114,
+        "bytes_uploaded": 1995000,
+        "sample_keys": [
+          "harvester/scheduled_peak/2026-11-09/1730/56de42f611f398ec0c48128b.jpg",
+          "harvester/scheduled_peak/2026-11-09/1730/56de42f611f398ec0c48128b.manifest.json",
+          "harvester/scheduled_peak/2026-11-09/1730/66b1c426779f74001867415e.jpg",
+          "harvester/scheduled_peak/2026-11-09/1730/66b1c426779f74001867415e.manifest.json",
+          "harvester/scheduled_peak/2026-11-09/1730/5822b5ededeb6c0012a2d66a.jpg",
+          "harvester/scheduled_peak/2026-11-09/1730/5822b5ededeb6c0012a2d66a.manifest.json"
+        ],
+        "checksum_algorithm": "SHA-256",
+        "verification_status": "synced_and_verified"
+      }
+    }
+  ],
+  "verification_checksum": "77f7f87b6030308be0e1f65762e0c29ecf55b42182c3da0f45f07e02872e2387",
+  "generated_at": "2026-11-06T10:23:18.434225+00:00"
+}
