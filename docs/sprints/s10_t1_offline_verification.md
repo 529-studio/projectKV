@@ -1,13 +1,13 @@
 # S10-T1 (#372) Offline Verification Plan
 
 Applies to [#372](https://github.com/529-studio/projectKV/issues/372) while the
-dev-box infra node is offline. Companion to
+remote infra worker node is offline. Companion to
 [`s10_t1_forecast_contract_spec.md`](s10_t1_forecast_contract_spec.md), which remains
 the contract authority. This file only narrows what may be claimed as evidence.
 
 ## 1. Constraint
 
-The dev-box infra node is offline (power outage). Implementation happens on a local Mac.
+The remote infra worker node is offline (power outage). Implementation happens on a local Mac.
 Consequences that matter to the Definition of Done:
 
 - No populated `hotset_verdict_history` for the 57 catalogued cameras, no harvester
