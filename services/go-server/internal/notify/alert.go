@@ -13,7 +13,7 @@ import (
 type FloodAlert struct {
 	CameraID       string    `json:"camera_id"`
 	CameraName     string    `json:"camera_name"`
-	District       string    `json:"district"`
+	Zone           string    `json:"zone"`
 	Ward           string    `json:"ward,omitempty"`
 	FloodSeverity  string    `json:"flood_severity"` // "FLOODED_SHALLOW" | "FLOODED_DEEP"
 	TypicalDepthCm int       `json:"typical_depth_cm,omitempty"`

@@ -6,12 +6,12 @@ import (
 )
 
 // BuildFloodAlert assembles a FloodAlert from already-resolved camera fields and
-// chokepoint data. camName, district, ward, snapshotURL may be empty if camera metadata
+// chokepoint data. camName, zone, ward, snapshotURL may be empty if camera metadata
 // is absent. typicalDepthCm may be 0. If observedAt is zero, it falls back to time.Now().
 func BuildFloodAlert(
 	cameraID string,
 	camName string,
-	district string,
+	zone string,
 	ward string,
 	snapshotURL string,
 	typicalDepthCm int,
@@ -26,7 +26,7 @@ func BuildFloodAlert(
 	return FloodAlert{
 		CameraID:       cameraID,
 		CameraName:     camName,
-		District:       district,
+		Zone:           zone,
 		Ward:           ward,
 		FloodSeverity:  severity,
 		TypicalDepthCm: typicalDepthCm,
