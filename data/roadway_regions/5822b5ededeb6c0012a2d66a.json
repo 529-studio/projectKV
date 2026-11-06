@@ -1,0 +1,58 @@
+{
+  "camera_id": "5822b5ededeb6c0012a2d66a",
+  "corridor_name": "Mai Chí Thọ - Nguyễn Cơ Thạch 1",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "5822b5ededeb6c0012a2d66a_dir_a",
+      "direction": "a",
+      "description": "Eastbound carriageway (towards Cat Lai)",
+      "polygon": [
+        [
+          0.05,
+          0.95
+        ],
+        [
+          0.49,
+          0.95
+        ],
+        [
+          0.45,
+          0.4
+        ],
+        [
+          0.1,
+          0.4
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "5822b5ededeb6c0012a2d66a_dir_b",
+      "direction": "b",
+      "description": "Westbound carriageway (towards Thu Thiem Tunnel)",
+      "polygon": [
+        [
+          0.51,
+          0.95
+        ],
+        [
+          0.95,
+          0.95
+        ],
+        [
+          0.88,
+          0.4
+        ],
+        [
+          0.53,
+          0.4
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "pilot_mct_nct1_202611"
+  ]
+}

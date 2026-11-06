@@ -11,18 +11,7 @@ import (
 
 // VehicleCounts represents detected vehicle counts broken down by classification.
 // Output from S3's OpenVINO / YOLO object detector.
-type VehicleCounts struct {
-	Motorcycle int `json:"motorcycle"`
-	Car        int `json:"car"`
-	Bus        int `json:"bus"`
-	Truck      int `json:"truck"`
-	Container  int `json:"container"`
-}
-
-// Total returns the raw sum of all vehicle counts regardless of class.
-func (v VehicleCounts) Total() int {
-	return v.Motorcycle + v.Car + v.Bus + v.Truck + v.Container
-}
+type VehicleCounts = hotset.VehicleCounts
 
 // PCUWeights defines the passenger car equivalent units for each vehicle class.
 //
@@ -120,12 +109,13 @@ type PCUCalculator struct {
 	capacityFloor   float64
 	hysteresisDelta float64
 
-	mu             sync.RWMutex
-	capacities     map[string]float64
-	baseCapacities map[string]float64
-	lastSeverities map[string]string
-	store          CapacityStore
-	persistWG      sync.WaitGroup
+	mu                sync.RWMutex
+	capacities        map[string]float64
+	baseCapacities    map[string]float64
+	lastSeverities    map[string]string
+	lastDirSeverities map[string]map[string]string
+	store             CapacityStore
+	persistWG         sync.WaitGroup
 }
 
 // NewPCUCalculator constructs a PCUCalculator initialized with cfg.
@@ -139,13 +129,14 @@ func NewPCUCalculator(cfg PCUConfig) *PCUCalculator {
 		delta = 0.05
 	}
 	return &PCUCalculator{
-		weights:         cfg.Weights,
-		thresholds:      cfg.Thresholds,
-		capacityFloor:   floor,
-		hysteresisDelta: delta,
-		capacities:      make(map[string]float64),
-		baseCapacities:  make(map[string]float64),
-		lastSeverities:  make(map[string]string),
+		weights:           cfg.Weights,
+		thresholds:        cfg.Thresholds,
+		capacityFloor:     floor,
+		hysteresisDelta:   delta,
+		capacities:        make(map[string]float64),
+		baseCapacities:    make(map[string]float64),
+		lastSeverities:    make(map[string]string),
+		lastDirSeverities: make(map[string]map[string]string),
 	}
 }
 
@@ -210,6 +201,120 @@ func (c *PCUCalculator) WaitPersist() {
 	c.persistWG.Wait()
 }
 
+// ComputePCU calculates the passenger car equivalent score for the provided counts.
+func (c *PCUCalculator) ComputePCU(counts VehicleCounts) float64 {
+	containerWeight := c.weights.Container
+	if containerWeight <= 0 {
+		containerWeight = c.weights.Truck
+	}
+	return float64(counts.Motorcycle)*c.weights.Motorcycle +
+		float64(counts.Car)*c.weights.Car +
+		float64(counts.Bus)*c.weights.Bus +
+		float64(counts.Truck)*c.weights.Truck +
+		float64(counts.Container)*containerWeight
+}
+
+// DirectionalInput packages per-region counts and geometry for directional calculation.
+type DirectionalInput struct {
+	RegionID      string
+	Direction     string
+	CapacityShare float64
+	Counts        VehicleCounts
+	WaterRatio    float64
+}
+
+// DirectionalOutput holds the calculated directional metrics and worst-direction pinning.
+type DirectionalOutput struct {
+	Directions    []hotset.DirectionalVerdict
+	WorstSeverity string
+	WorstSI       float64
+	TotalPCU      float64
+}
+
+// CalculateDirectional computes directional saturation indices and pins overall severity
+// to the worst direction (ADR-012 D1).
+func (c *PCUCalculator) CalculateDirectional(cameraID string, baseCapacity float64, inputs []DirectionalInput) DirectionalOutput {
+	if len(inputs) == 0 {
+		return DirectionalOutput{WorstSeverity: hotset.SeverityClear}
+	}
+
+	c.mu.Lock()
+	effectiveCap := c.capacities[cameraID]
+	baseFloor := c.capacityFloor
+	if base, ok := c.baseCapacities[cameraID]; ok && base > 0 {
+		baseFloor = base
+	} else if baseCapacity > 0 {
+		baseFloor = baseCapacity
+	}
+	if effectiveCap < baseFloor {
+		effectiveCap = baseFloor
+	}
+	if effectiveCap < 1.0 {
+		effectiveCap = 1.0
+	}
+
+	if c.lastDirSeverities[cameraID] == nil {
+		c.lastDirSeverities[cameraID] = make(map[string]string)
+	}
+	dirMap := c.lastDirSeverities[cameraID]
+	c.mu.Unlock()
+
+	out := DirectionalOutput{
+		Directions:    make([]hotset.DirectionalVerdict, 0, len(inputs)),
+		WorstSeverity: hotset.SeverityClear,
+		WorstSI:       0.0,
+	}
+
+	worstRank := -1
+
+	for _, input := range inputs {
+		pcu := c.ComputePCU(input.Counts)
+		out.TotalPCU += pcu
+
+		share := input.CapacityShare
+		if share <= 0.0 || share > 1.0 {
+			share = 1.0 / float64(len(inputs))
+		}
+
+		dirCapacity := effectiveCap * share
+		if dirCapacity < 1.0 {
+			dirCapacity = 1.0
+		}
+		dirSI := pcu / dirCapacity
+
+		c.mu.Lock()
+		prevSev := dirMap[input.Direction]
+		dirSev := c.mapSeverityWithHysteresis(dirSI, prevSev)
+		dirMap[input.Direction] = dirSev
+		c.mu.Unlock()
+
+		dv := hotset.DirectionalVerdict{
+			Direction:       input.Direction,
+			RegionID:        input.RegionID,
+			Severity:        dirSev,
+			SaturationIndex: dirSI,
+			PCUTotal:        pcu,
+			CapacityShare:   share,
+			VehicleCounts:   input.Counts,
+			WaterRatio:      input.WaterRatio,
+		}
+		out.Directions = append(out.Directions, dv)
+
+		rank := hotset.SeverityRank(dirSev)
+		if rank > worstRank || (rank == worstRank && dirSI > out.WorstSI) {
+			worstRank = rank
+			out.WorstSeverity = dirSev
+			out.WorstSI = dirSI
+		}
+	}
+
+	c.mu.Lock()
+	c.lastSeverities[cameraID] = out.WorstSeverity
+	c.mu.Unlock()
+
+	return out
+}
+
 // Calculate computes the total PCU score and Saturation Index (SI) for cameraID,
 // returning the corresponding traffic severity label (CLEAR, MODERATE, HEAVY, CONGESTED).
 //
@@ -221,15 +326,7 @@ func (c *PCUCalculator) Calculate(cameraID string, counts VehicleCounts, fallbac
 	// Step 1: Compute total PCU.
 	// Container count is weighted using c.weights.Container (defaults to c.weights.Truck = 2.0).
 	if counts.Total() > 0 {
-		containerWeight := c.weights.Container
-		if containerWeight <= 0 {
-			containerWeight = c.weights.Truck
-		}
-		pcuTotal = float64(counts.Motorcycle)*c.weights.Motorcycle +
-			float64(counts.Car)*c.weights.Car +
-			float64(counts.Bus)*c.weights.Bus +
-			float64(counts.Truck)*c.weights.Truck +
-			float64(counts.Container)*containerWeight
+		pcuTotal = c.ComputePCU(counts)
 	} else if fallbackTotal > 0 {
 		// Fallback for detectors without class separation: treat each vehicle as a standard car.
 		pcuTotal = float64(fallbackTotal) * c.weights.Car

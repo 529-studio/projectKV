@@ -379,6 +379,56 @@ class TestEndToEnd(unittest.TestCase):
         self.assertEqual(metadata["row_count"], 3)
         self.assertEqual(metadata["camera_count"], 1)
 
+    def test_load_sqlite_observations_directional_compatibility(self):
+        """Migration 0008 adds direction; extract_features must filter to direction = ''."""
+        db_path = self.root / "directional.db"
+        conn = sqlite3.connect(db_path)
+        tz = ZoneInfo("Asia/Ho_Chi_Minh")
+        conn.execute(
+            """
+            CREATE TABLE hotset_verdict_history (
+                id INTEGER PRIMARY KEY,
+                camera_id TEXT,
+                direction TEXT,
+                region_id TEXT,
+                pcu_total REAL,
+                saturation_index REAL,
+                severity TEXT,
+                confidence REAL,
+                source TEXT,
+                observed_at TIMESTAMP
+            )
+            """
+        )
+        # Insert 1 frame-wide row and 2 directional rows for same timestamp
+        t_str = "2026-11-06T10:00:00.000000000Z"
+        conn.execute(
+            """INSERT INTO hotset_verdict_history
+            (camera_id, direction, region_id, pcu_total, saturation_index, severity, confidence, source, observed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ("cam-dir", "", "", 30.0, 0.60, "MODERATE", 0.9, "onnx", t_str),
+        )
+        conn.execute(
+            """INSERT INTO hotset_verdict_history
+            (camera_id, direction, region_id, pcu_total, saturation_index, severity, confidence, source, observed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ("cam-dir", "a", "cam-dir_a", 25.0, 1.00, "CONGESTED", 0.9, "onnx", t_str),
+        )
+        conn.execute(
+            """INSERT INTO hotset_verdict_history
+            (camera_id, direction, region_id, pcu_total, saturation_index, severity, confidence, source, observed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ("cam-dir", "b", "cam-dir_b", 5.0, 0.20, "CLEAR", 0.9, "onnx", t_str),
+        )
+        conn.commit()
+        conn.close()
+
+        obs, stats = load_sqlite_observations(db_path, tz)
+        # Must only load the 1 frame-wide observation (direction = '')
+        self.assertEqual(len(obs), 1)
+        self.assertEqual(obs[0].saturation_index, 0.60)
+        self.assertEqual(stats["rows"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

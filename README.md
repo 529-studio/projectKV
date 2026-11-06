@@ -250,7 +250,7 @@ Issue #302 (S9-T6) compares persistence, a historical median, and ridge regressi
 |---|---|:---:|---|---|
 | **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `edge host` | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal corridor dock, bilingual UI (`vi` / `en`). |
 | **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` | Snapshot proxy cache (15s TTL), camera catalog, hotset scheduler (30s cycle), crowdsourced flood report archiver (`internal/feedback`), PCU Saturation Index, SSE stream, Cloudflare R2 storage integration. |
-| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n-seg FP16 | `8000` | `inference worker` | High-throughput vehicle detection & road water segmentation (`POST /predict`), Dual-Layer Physical Triangulation (Layer 1 surface water ratio, Layer 2 motorcycle wheel submersion), `GET /healthz` healthchecks (< 38.5ms latency). |
+| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n-seg FP16 | `8000` | `inference worker` | High-throughput vehicle detection, directional roadway polygon assignment & road water segmentation (`POST /predict` supporting multipart metadata), Dual-Layer Physical Triangulation (Layer 1 surface water ratio, Layer 2 motorcycle wheel submersion), `GET /healthz` healthchecks (< 38.5ms latency). |
 | **Storage & Edge CDN** | Cloudflare R2, AWS Signature V4 | `443` | Cloudflare Edge (`file.529studio.site`) | S3-compatible snapshot proof repository (`warded-proofs`), Vietnam ICT (`UTC+7`) key hierarchy (`YYYY-MM-DD/<camera_id>/<unix_ts>_<reason>.jpg`). |
 
 ### Tech Stack & Core Libraries

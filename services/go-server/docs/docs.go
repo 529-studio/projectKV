@@ -1491,6 +1491,9 @@ const docTemplate = `{
                 "base_capacity": {
                     "type": "number"
                 },
+                "direction_coverage": {
+                    "type": "string"
+                },
                 "displayName": {
                     "type": "string"
                 },
@@ -1530,6 +1533,12 @@ const docTemplate = `{
                 "phuong_type": {
                     "type": "string"
                 },
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/camera.RoadwayRegion"
+                    }
+                },
                 "road_key": {
                     "type": "string"
                 },
@@ -1566,6 +1575,32 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "camera.RoadwayRegion": {
+            "type": "object",
+            "properties": {
+                "capacity_share": {
+                    "type": "number"
+                },
+                "direction": {
+                    "description": "\"a\" (approaching/near) or \"b\" (receding/far)",
+                    "type": "string"
+                },
+                "polygon": {
+                    "description": "Normalized [[x, y], ...] in [0, 1] range",
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "number",
+                            "format": "float64"
+                        }
+                    }
+                },
+                "region_id": {
                     "type": "string"
                 }
             }
@@ -2130,6 +2165,37 @@ const docTemplate = `{
                 }
             }
         },
+        "hotset.DirectionalVerdict": {
+            "type": "object",
+            "properties": {
+                "capacity_share": {
+                    "type": "number"
+                },
+                "direction": {
+                    "description": "\"a\" or \"b\"",
+                    "type": "string"
+                },
+                "pcu_total": {
+                    "type": "number"
+                },
+                "region_id": {
+                    "type": "string"
+                },
+                "saturation_index": {
+                    "type": "number"
+                },
+                "severity": {
+                    "description": "\"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\"",
+                    "type": "string"
+                },
+                "vehicle_counts": {
+                    "$ref": "#/definitions/hotset.VehicleCounts"
+                },
+                "water_ratio": {
+                    "type": "number"
+                }
+            }
+        },
         "hotset.FloodStatusResponse": {
             "type": "object",
             "properties": {
@@ -2181,6 +2247,26 @@ const docTemplate = `{
                 }
             }
         },
+        "hotset.VehicleCounts": {
+            "type": "object",
+            "properties": {
+                "bus": {
+                    "type": "integer"
+                },
+                "car": {
+                    "type": "integer"
+                },
+                "container": {
+                    "type": "integer"
+                },
+                "motorcycle": {
+                    "type": "integer"
+                },
+                "truck": {
+                    "type": "integer"
+                }
+            }
+        },
         "hotset.Verdict": {
             "type": "object",
             "properties": {
@@ -2189,6 +2275,12 @@ const docTemplate = `{
                 },
                 "confidence": {
                     "type": "number"
+                },
+                "directions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/hotset.DirectionalVerdict"
+                    }
                 },
                 "flood_severity": {
                     "description": "Flood severity: \"DRY\" | \"WET\" | \"FLOODED_SHALLOW\" | \"FLOODED_DEEP\" | \"UNKNOWN\"",

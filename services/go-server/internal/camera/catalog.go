@@ -29,28 +29,30 @@ type Reader interface {
 
 // Camera represents a single traffic camera entity.
 type Camera struct {
-	ID           string   `json:"id"`
-	Title        string   `json:"title"`
-	DisplayName  string   `json:"displayName"`
-	Status       string   `json:"status"`
-	IsOnline     bool     `json:"isOnline"`
-	Latitude     float64  `json:"latitude"`
-	Longitude    float64  `json:"longitude"`
-	SnapshotURL  string   `json:"snapshotUrl"`
-	Zone         string   `json:"zone,omitempty"`
-	DuplicateOf  string   `json:"duplicateOf,omitempty"`
-	IsGhost      bool     `json:"isGhost,omitempty"`
-	IsWaterway   bool     `json:"isWaterway,omitempty"`
-	PhuongID     *string  `json:"phuong_id,omitempty"`
-	PhuongType   string   `json:"phuong_type,omitempty"`
-	PhuongName   string   `json:"phuong_name,omitempty"`
-	RoadType     string   `json:"road_type,omitempty"`
-	RoadName     string   `json:"road_name,omitempty"`
-	H3Res7       string   `json:"h3_res7,omitempty"`
-	H3Res9       string   `json:"h3_res9,omitempty"`
-	RoadKey      string   `json:"road_key,omitempty"`
-	RoadKeys     []string `json:"road_keys,omitempty"`
-	BaseCapacity float64  `json:"base_capacity,omitempty"`
+	ID                string          `json:"id"`
+	Title             string          `json:"title"`
+	DisplayName       string          `json:"displayName"`
+	Status            string          `json:"status"`
+	IsOnline          bool            `json:"isOnline"`
+	Latitude          float64         `json:"latitude"`
+	Longitude         float64         `json:"longitude"`
+	SnapshotURL       string          `json:"snapshotUrl"`
+	Zone              string          `json:"zone,omitempty"`
+	DuplicateOf       string          `json:"duplicateOf,omitempty"`
+	IsGhost           bool            `json:"isGhost,omitempty"`
+	IsWaterway        bool            `json:"isWaterway,omitempty"`
+	PhuongID          *string         `json:"phuong_id,omitempty"`
+	PhuongType        string          `json:"phuong_type,omitempty"`
+	PhuongName        string          `json:"phuong_name,omitempty"`
+	RoadType          string          `json:"road_type,omitempty"`
+	RoadName          string          `json:"road_name,omitempty"`
+	H3Res7            string          `json:"h3_res7,omitempty"`
+	H3Res9            string          `json:"h3_res9,omitempty"`
+	RoadKey           string          `json:"road_key,omitempty"`
+	RoadKeys          []string        `json:"road_keys,omitempty"`
+	BaseCapacity      float64         `json:"base_capacity,omitempty"`
+	Regions           []RoadwayRegion `json:"regions,omitempty"`
+	DirectionCoverage string          `json:"direction_coverage,omitempty"`
 }
 
 // KnownDuplicateStreams maps secondary camera IDs to their primary canonical camera ID.
@@ -83,10 +85,11 @@ var KnownWaterwayCameras = map[string]bool{
 
 // Catalog holds an in-memory repository of traffic cameras with fast index lookups.
 type Catalog struct {
-	list    []Camera
-	dict    map[string]*Camera
-	zones   []string
-	phuongs []Phuong
+	list            []Camera
+	dict            map[string]*Camera
+	zones           []string
+	phuongs         []Phuong
+	roadwayRegistry RoadwayRegistry
 }
 
 // Ensure Catalog implements Reader.
@@ -94,19 +97,27 @@ var _ Reader = (*Catalog)(nil)
 
 // NewCatalog constructs a Catalog using the default zone classifier.
 func NewCatalog(cameras []Camera) *Catalog {
-	return NewCatalogWithClassifier(cameras, NewDefaultZoneClassifier())
+	return NewCatalogWithRegistry(cameras, NewDefaultZoneClassifier(), nil)
 }
 
 // NewCatalogWithClassifier constructs a Catalog with an injected ZoneClassifier.
 // (Dependency Inversion Principle: Catalog depends on ZoneClassifier abstraction)
 func NewCatalogWithClassifier(cameras []Camera, classifier ZoneClassifier) *Catalog {
+	return NewCatalogWithRegistry(cameras, classifier, nil)
+}
+
+// NewCatalogWithRegistry constructs a Catalog with an injected ZoneClassifier and RoadwayRegistry.
+// When reg is non-nil, cameras matching registered corridors are enriched with directional
+// roadway polygons and capacity shares (ADR-012 D1).
+func NewCatalogWithRegistry(cameras []Camera, classifier ZoneClassifier, reg RoadwayRegistry) *Catalog {
 	if classifier == nil {
 		classifier = NewDefaultZoneClassifier()
 	}
 
 	c := &Catalog{
-		list: make([]Camera, len(cameras)),
-		dict: make(map[string]*Camera, len(cameras)),
+		list:            make([]Camera, len(cameras)),
+		dict:            make(map[string]*Camera, len(cameras)),
+		roadwayRegistry: reg,
 	}
 
 	copy(c.list, cameras)
@@ -126,6 +137,21 @@ func NewCatalogWithClassifier(cameras []Camera, classifier ZoneClassifier) *Cata
 			cam.IsOnline = false
 			cam.Status = "WATERWAY_MONITOR"
 		}
+
+		// Directional roadway geometry ingestion (ADR-012 D1)
+		if reg != nil {
+			if roadway, ok := reg.GetCameraRoadway(cam.ID); ok && len(roadway.Regions) > 0 {
+				cam.Regions = roadway.Regions
+				cam.DirectionCoverage = roadway.DirectionCoverage
+				if cam.DirectionCoverage == "" {
+					cam.DirectionCoverage = DirectionCoverageDual
+				}
+			}
+		}
+		if cam.DirectionCoverage == "" {
+			cam.DirectionCoverage = DirectionCoverageNone
+		}
+
 		c.dict[cam.ID] = cam
 		if cam.Zone != "" {
 			zoneSet[cam.Zone] = struct{}{}
@@ -176,9 +202,18 @@ func LoadCatalogWithClassifier(path string, classifier ZoneClassifier) (*Catalog
 		}
 	}
 
+	var reg RoadwayRegistry
+	if regPath := findRoadwayRegistryPath(path); regPath != "" {
+		if loaded, err := LoadRoadwayRegistry(regPath); err == nil {
+			reg = loaded
+		} else {
+			slog.Warn("camera: failed to load roadway registry", "path", regPath, "err", err)
+		}
+	}
+
 	var list []Camera
 	if err := json.Unmarshal(data, &list); err == nil {
-		return NewCatalogWithClassifier(list, classifier), nil
+		return NewCatalogWithRegistry(list, classifier, reg), nil
 	}
 
 	// Try object envelope {"cameras": [...]}
@@ -186,7 +221,7 @@ func LoadCatalogWithClassifier(path string, classifier ZoneClassifier) (*Catalog
 		Cameras []Camera `json:"cameras"`
 	}
 	if err := json.Unmarshal(data, &envelope); err == nil && len(envelope.Cameras) > 0 {
-		return NewCatalogWithClassifier(envelope.Cameras, classifier), nil
+		return NewCatalogWithRegistry(envelope.Cameras, classifier, reg), nil
 	}
 
 	// Try map[string]Camera
@@ -196,10 +231,15 @@ func LoadCatalogWithClassifier(path string, classifier ZoneClassifier) (*Catalog
 		for _, v := range mapData {
 			list = append(list, v)
 		}
-		return NewCatalogWithClassifier(list, classifier), nil
+		return NewCatalogWithRegistry(list, classifier, reg), nil
 	}
 
 	return nil, fmt.Errorf("unmarshal json: %s", ErrInvalidCatalogJSON)
+}
+
+// RoadwayRegistry returns the injected RoadwayRegistry, or nil if none was configured.
+func (c *Catalog) RoadwayRegistry() RoadwayRegistry {
+	return c.roadwayRegistry
 }
 
 // All returns a slice of all cameras in the catalog.
@@ -297,6 +337,24 @@ func findFallbackCatalogPath(requestedPath string) string {
 
 	for _, candidate := range candidates {
 		if fi, err := os.Stat(candidate); err == nil && !fi.IsDir() {
+			return candidate
+		}
+	}
+	return ""
+}
+
+// findRoadwayRegistryPath locates the roadway_regions directory relative to the catalog file or working dir.
+func findRoadwayRegistryPath(catalogPath string) string {
+	candidates := []string{
+		filepath.Join(filepath.Dir(catalogPath), "data", "roadway_regions"),
+		filepath.Join(filepath.Dir(catalogPath), "roadway_regions"),
+		filepath.Join("data", "roadway_regions"),
+		filepath.Join("..", "data", "roadway_regions"),
+		filepath.Join("..", "..", "data", "roadway_regions"),
+	}
+
+	for _, candidate := range candidates {
+		if fi, err := os.Stat(candidate); err == nil && fi.IsDir() {
 			return candidate
 		}
 	}

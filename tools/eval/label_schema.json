@@ -161,6 +161,12 @@
           "enum": ["a", "b"],
           "description": "Optional roadway direction ('a' = approaching/near carriageway, 'b' = receding/far carriageway). Valid only when class is roadway."
         },
+        "capacity_share": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Portion of corridor capacity allocated to this directional carriageway (sum across directions must be 1.0 +- 0.01)."
+        },
         "source": {
           "type": "string",
           "maxLength": 32,

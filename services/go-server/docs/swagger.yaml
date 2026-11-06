@@ -122,6 +122,8 @@ definitions:
     properties:
       base_capacity:
         type: number
+      direction_coverage:
+        type: string
       displayName:
         type: string
       duplicateOf:
@@ -148,6 +150,10 @@ definitions:
         type: string
       phuong_type:
         type: string
+      regions:
+        items:
+          $ref: '#/definitions/camera.RoadwayRegion'
+        type: array
       road_key:
         type: string
       road_keys:
@@ -172,6 +178,24 @@ definitions:
       name:
         type: string
       type:
+        type: string
+    type: object
+  camera.RoadwayRegion:
+    properties:
+      capacity_share:
+        type: number
+      direction:
+        description: '"a" (approaching/near) or "b" (receding/far)'
+        type: string
+      polygon:
+        description: Normalized [[x, y], ...] in [0, 1] range
+        items:
+          items:
+            format: float64
+            type: number
+          type: array
+        type: array
+      region_id:
         type: string
     type: object
   corridor.CameraVerdict:
@@ -550,6 +574,27 @@ definitions:
       totals:
         $ref: '#/definitions/harvester.RunTotals'
     type: object
+  hotset.DirectionalVerdict:
+    properties:
+      capacity_share:
+        type: number
+      direction:
+        description: '"a" or "b"'
+        type: string
+      pcu_total:
+        type: number
+      region_id:
+        type: string
+      saturation_index:
+        type: number
+      severity:
+        description: '"CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED"'
+        type: string
+      vehicle_counts:
+        $ref: '#/definitions/hotset.VehicleCounts'
+      water_ratio:
+        type: number
+    type: object
   hotset.FloodStatusResponse:
     properties:
       analysis_enabled:
@@ -583,12 +628,29 @@ definitions:
           $ref: '#/definitions/hotset.Verdict'
         type: array
     type: object
+  hotset.VehicleCounts:
+    properties:
+      bus:
+        type: integer
+      car:
+        type: integer
+      container:
+        type: integer
+      motorcycle:
+        type: integer
+      truck:
+        type: integer
+    type: object
   hotset.Verdict:
     properties:
       camera_id:
         type: string
       confidence:
         type: number
+      directions:
+        items:
+          $ref: '#/definitions/hotset.DirectionalVerdict'
+        type: array
       flood_severity:
         description: 'Flood severity: "DRY" | "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP"
           | "UNKNOWN"'

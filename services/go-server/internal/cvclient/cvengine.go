@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"time"
@@ -22,18 +23,30 @@ const (
 	defaultPredictBackoff  = 300 * time.Millisecond
 )
 
+// cvPredictRegion represents per-direction inference metrics returned by cv-engine (ADR-012 D1).
+type cvPredictRegion struct {
+	RegionID         string        `json:"region_id"`
+	Direction        string        `json:"direction"`
+	CapacityShare    float64       `json:"capacity_share"`
+	VehicleCounts    VehicleCounts `json:"vehicle_counts"`
+	VehiclesDetected int           `json:"vehicles_detected"`
+	WaterRatio       float64       `json:"water_ratio"`
+}
+
 // cvPredictResponse is the JSON payload returned by POST /predict when the
 // OpenVINO model is loaded and inference succeeds.
 type cvPredictResponse struct {
 	TrafficSeverity  string        `json:"traffic_severity"`
+	FloodSeverity    string        `json:"flood_severity,omitempty"`
 	Confidence       float64       `json:"confidence"`
 	VehiclesDetected int           `json:"vehicles_detected"`
 	VehicleCounts    VehicleCounts `json:"vehicle_counts,omitempty"`
 	LatencyMs        float64       `json:"latency_ms"`
 	Model            string        `json:"model"`
 	// Source is present only on standby responses; non-empty means no-model.
-	Source string `json:"source"`
-	Mode   string `json:"mode"`
+	Source  string            `json:"source"`
+	Mode    string            `json:"mode"`
+	Regions []cvPredictRegion `json:"regions,omitempty"`
 }
 
 // CVEngineOption configures an optional parameter for CVEngineAnalyzer.
@@ -115,9 +128,43 @@ func unknownVerdict(camID string) hotset.Verdict {
 	}
 }
 
+// buildMultipartBody constructs a multipart/form-data payload containing the
+// frame image bytes and directional roadway regions metadata (ADR-012 D1).
+func buildMultipartBody(jpeg []byte, regions []hotset.RoadwayRegion) ([]byte, string, error) {
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+
+	part, err := w.CreateFormFile("frame", "frame.jpg")
+	if err != nil {
+		return nil, "", fmt.Errorf("create frame form file: %w", err)
+	}
+	if _, err := part.Write(jpeg); err != nil {
+		return nil, "", fmt.Errorf("write frame bytes: %w", err)
+	}
+
+	metaJSON, err := json.Marshal(map[string]any{"regions": regions})
+	if err != nil {
+		return nil, "", fmt.Errorf("marshal regions metadata: %w", err)
+	}
+	metaPart, err := w.CreateFormField("meta")
+	if err != nil {
+		return nil, "", fmt.Errorf("create meta form field: %w", err)
+	}
+	if _, err := metaPart.Write(metaJSON); err != nil {
+		return nil, "", fmt.Errorf("write meta bytes: %w", err)
+	}
+
+	if err := w.Close(); err != nil {
+		return nil, "", fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	return b.Bytes(), w.FormDataContentType(), nil
+}
+
 // Analyze fetches the camera snapshot via cam.SnapshotURL, then POSTs the
-// raw JPEG bytes to the cv-engine /predict endpoint and maps the response to
-// a hotset.Verdict. The caller-supplied ctx is propagated to both HTTP calls.
+// frame bytes to the cv-engine /predict endpoint and maps the response to
+// a hotset.Verdict. When cam has registered directional regions, it forwards
+// them via multipart metadata and pins overall severity to the worst direction.
 func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hotset.Verdict, error) {
 	// Step 1: fetch the cached snapshot frame.
 	snapReq, err := http.NewRequestWithContext(ctx, http.MethodGet, cam.SnapshotURL, nil)
@@ -143,10 +190,19 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: snapshot body is empty")
 	}
 
-	// Step 2: POST raw JPEG bytes to /predict, retrying transient transport
-	// failures such as the inference worker restarting mid-deploy.
+	// Step 2: POST bytes to /predict. If cam carries directional regions, send
+	// multipart metadata; otherwise keep legacy application/octet-stream body.
 	predictURL := a.url + "/predict"
-	predResp, err := a.postPredict(ctx, predictURL, jpegBytes)
+	var predResp *http.Response
+	if len(cam.Regions) > 0 {
+		mpBody, contentType, err := buildMultipartBody(jpegBytes, cam.Regions)
+		if err != nil {
+			return unknownVerdict(cam.ID), err
+		}
+		predResp, err = a.postPredict(ctx, predictURL, mpBody, contentType)
+	} else {
+		predResp, err = a.postPredict(ctx, predictURL, jpegBytes, "application/octet-stream")
+	}
 	if err != nil {
 		return unknownVerdict(cam.ID), err
 	}
@@ -176,7 +232,36 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 	severity := resp.TrafficSeverity
 	var pcuTotal float64
 	var saturationIndex float64
-	if a.calculator != nil {
+	var directions []hotset.DirectionalVerdict
+
+	if len(resp.Regions) > 0 && a.calculator != nil {
+		dirInputs := make([]DirectionalInput, len(resp.Regions))
+		for i, r := range resp.Regions {
+			share := r.CapacityShare
+			if share <= 0 {
+				for _, cr := range cam.Regions {
+					if cr.RegionID == r.RegionID || cr.Direction == r.Direction {
+						share = cr.CapacityShare
+						break
+					}
+				}
+			}
+			dirInputs[i] = DirectionalInput{
+				RegionID:      r.RegionID,
+				Direction:     r.Direction,
+				CapacityShare: share,
+				Counts:        r.VehicleCounts,
+				WaterRatio:    r.WaterRatio,
+			}
+		}
+		dirOut := a.calculator.CalculateDirectional(cam.ID, cam.BaseCapacity, dirInputs)
+		if dirOut.WorstSeverity != "" {
+			severity = dirOut.WorstSeverity
+		}
+		saturationIndex = dirOut.WorstSI
+		pcuTotal = dirOut.TotalPCU
+		directions = dirOut.Directions
+	} else if a.calculator != nil {
 		if cam.BaseCapacity > 0 && a.calculator.GetBaseCapacity(cam.ID) == a.calculator.CapacityFloor() {
 			a.calculator.SetBaseCapacity(cam.ID, cam.BaseCapacity)
 		}
@@ -188,11 +273,16 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 		saturationIndex = satIdx
 	}
 
+	floodSev := resp.FloodSeverity
+	if floodSev == "" {
+		floodSev = hotset.SeverityUnknown
+	}
+
 	now := time.Now()
 	return hotset.Verdict{
 		CameraID:        cam.ID,
 		Severity:        severity,
-		FloodSeverity:   hotset.SeverityUnknown, // cv-engine v1 does not detect flood
+		FloodSeverity:   floodSev,
 		Confidence:      resp.Confidence,
 		Source:          "onnx",
 		Timestamp:       now,
@@ -200,25 +290,28 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 		RawFrame:        jpegBytes,
 		SaturationIndex: saturationIndex,
 		PCUTotal:        pcuTotal,
+		Directions:      directions,
 	}, nil
 }
 
-// postPredict sends the JPEG bytes to the predict endpoint, retrying only
-// transport-level failures with linear backoff. HTTP responses (including 503
-// standby) are returned to the caller unretried because they are deterministic.
-func (a *CVEngineAnalyzer) postPredict(ctx context.Context, url string, jpeg []byte) (*http.Response, error) {
+// postPredict sends body to the predict endpoint with contentType, retrying
+// only transport-level failures with linear backoff.
+func (a *CVEngineAnalyzer) postPredict(ctx context.Context, url string, body []byte, contentType string) (*http.Response, error) {
 	attempts := a.attempts
 	if attempts < 1 {
 		attempts = 1
 	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
 
 	var lastErr error
 	for attempt := 1; attempt <= attempts; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jpeg))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 		if err != nil {
 			return nil, fmt.Errorf("cv-engine: build predict request: %w", err)
 		}
-		req.Header.Set("Content-Type", "application/octet-stream")
+		req.Header.Set("Content-Type", contentType)
 
 		resp, err := a.client.Do(req)
 		if err == nil {

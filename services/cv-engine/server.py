@@ -213,6 +213,34 @@ def calculate_water_ratio(
     return float(np.sum(water_mask)) / total_pixels
 
 
+def point_in_polygon(px: float, py: float, polygon: List[List[float]]) -> bool:
+    """Ray casting algorithm testing if 2D normalized point (px, py) is inside polygon (ADR-012 D1)."""
+    inside = False
+    n = len(polygon)
+    if n < 3:
+        return False
+    j = n - 1
+    for i in range(n):
+        xi, yi = polygon[i][0], polygon[i][1]
+        xj, yj = polygon[j][0], polygon[j][1]
+        if ((yi > py) != (yj > py)) and (px < (xj - xi) * (py - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+
+def rasterize_polygon_mask(polygon: List[List[float]], shape: Tuple[int, int]) -> np.ndarray:
+    """Rasterizes a normalized [0, 1] polygon onto a 2D boolean mask of dimensions shape (H, W)."""
+    h, w = shape
+    if not PIL_AVAILABLE or len(polygon) < 3:
+        return np.zeros((h, w), dtype=bool)
+    from PIL import ImageDraw
+    img = Image.new("L", (w, h), 0)
+    pts = [(int(round(pt[0] * w)), int(round(pt[1] * h))) for pt in polygon]
+    ImageDraw.Draw(img).polygon(pts, outline=1, fill=1)
+    return np.array(img, dtype=bool)
+
+
 def calculate_motorcycle_submersion(
     motorcycle_boxes: np.ndarray,
     water_mask: np.ndarray,
@@ -429,10 +457,45 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                 return
             start_t = time.perf_counter()
 
+            content_type = self.headers.get("Content-Type", "")
+            regions: List[Dict[str, Any]] = []
+            image_bytes = post_data
+
+            # Ingest multipart/form-data containing frame and optional meta (ADR-012 D1)
+            if "multipart/form-data" in content_type:
+                try:
+                    from email.parser import BytesParser
+                    from email.policy import default
+
+                    msg = BytesParser(policy=default).parsebytes(
+                        b"Content-Type: " + content_type.encode("latin1", errors="replace") + b"\r\n\r\n" + post_data
+                    )
+                    found_image = False
+                    for part in msg.iter_parts():
+                        name = part.get_param("name", header="content-disposition")
+                        if name in ("frame", "image", "file", "snapshot") or (not found_image and part.get_filename()):
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                image_bytes = payload
+                                found_image = True
+                        elif name in ("meta", "metadata", "regions"):
+                            raw_meta = part.get_payload(decode=True)
+                            if raw_meta:
+                                try:
+                                    meta_json = json.loads(raw_meta.decode("utf-8"))
+                                    if isinstance(meta_json, dict) and "regions" in meta_json:
+                                        regions = meta_json["regions"]
+                                    elif isinstance(meta_json, list):
+                                        regions = meta_json
+                                except Exception as meta_exc:
+                                    logger.warning("Failed to parse multipart meta JSON: %s", meta_exc)
+                except Exception as mp_exc:
+                    logger.warning("Failed to parse multipart payload: %s", mp_exc)
+
             # If model is loaded and image decoding is available, execute inference
             if compiled_model is not None and PIL_AVAILABLE:
                 try:
-                    image = Image.open(BytesIO(post_data)).convert("RGB")
+                    image = Image.open(BytesIO(image_bytes)).convert("RGB")
                     target_w, target_h = 416, 416
                     if compiled_model is not None:
                         try:
@@ -483,12 +546,15 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                     IOU_THRESH = 0.45
                     vehicles = 0
                     kept_motorcycles = []
+                    kept_vehicles: List[Tuple[str, np.ndarray]] = []
                     water_ratio = 0.0
                     max_delta_sub = 0.0
                     depth_estimated_cm = 0.0
                     submerged_mc = 0
                     puddle_count = 0
                     model_tag = f"yolov8n_openvino_{target_w}"
+                    road_mask = None
+                    water_mask = None
 
                     if output_data is not None and hasattr(output_data, "shape"):
                         if output_data.ndim == 3:
@@ -526,6 +592,8 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                                     candidate_scores = scores[valid_indices]
                                     keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
                                     vehicle_counts[cls_name] = len(keep)
+                                    for k in keep:
+                                        kept_vehicles.append((cls_name, candidate_boxes[k]))
                                     if cls_name == "motorcycle" and len(keep) > 0:
                                         kept_motorcycles = candidate_boxes[keep]
                                 else:
@@ -535,8 +603,6 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                             vehicles = sum(vehicle_counts.values())
 
                             # Segmentation mask decoding & triangulation
-                            road_mask = None
-                            water_mask = None
                             if proto_data is not None:
                                 # Roadway mask (class 0, row 4)
                                 road_scores = data[4, :]
@@ -588,6 +654,8 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                                     candidate_scores = scores[valid_indices]
                                     keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
                                     vehicle_counts[cls_name] = len(keep)
+                                    for k in keep:
+                                        kept_vehicles.append((cls_name, candidate_boxes[k]))
                                     if cls_name == "motorcycle" and len(keep) > 0:
                                         kept_motorcycles = candidate_boxes[keep]
                                 else:
@@ -619,6 +687,8 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                                     candidate_scores = scores[valid_indices]
                                     keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
                                     vehicle_counts[cls_name] = len(keep)
+                                    for k in keep:
+                                        kept_vehicles.append((cls_name, candidate_boxes[k]))
                                 else:
                                     vehicle_counts[cls_name] = 0
 
@@ -644,7 +714,52 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                         motorcycles_observed=vehicle_counts["motorcycle"],
                     )
 
-                    self._send_json(200, {
+                    # Directional polygon assignment & water reconciliation (ADR-012 D1)
+                    region_results: List[Dict[str, Any]] = []
+                    if regions:
+                        for reg in regions:
+                            reg_id = reg.get("region_id", "")
+                            direction = reg.get("direction", "")
+                            poly = reg.get("polygon", [])
+                            share = reg.get("capacity_share", 0.5)
+
+                            reg_counts = {
+                                "motorcycle": 0,
+                                "car": 0,
+                                "bus": 0,
+                                "truck": 0,
+                                "container": 0,
+                            }
+                            for cls_name, box in kept_vehicles:
+                                cx, cy, w, h = box[0], box[1], box[2], box[3]
+                                norm_cx = cx / float(target_w)
+                                norm_by = (cy + h / 2.0) / float(target_h)
+                                if point_in_polygon(norm_cx, norm_by, poly) or point_in_polygon(norm_cx, cy / float(target_h), poly):
+                                    reg_counts[cls_name] = reg_counts.get(cls_name, 0) + 1
+
+                            reg_water_ratio = 0.0
+                            if water_mask is not None and water_mask.size > 0:
+                                reg_mask = rasterize_polygon_mask(poly, water_mask.shape)
+                                if road_mask is not None and road_mask.size == water_mask.size:
+                                    reg_road = np.logical_and(road_mask, reg_mask)
+                                    reg_road_sum = float(np.sum(reg_road))
+                                    if reg_road_sum > 0:
+                                        reg_water = np.logical_and(water_mask, reg_road)
+                                        reg_water_ratio = float(np.sum(reg_water)) / reg_road_sum
+                                elif np.sum(reg_mask) > 0:
+                                    reg_water = np.logical_and(water_mask, reg_mask)
+                                    reg_water_ratio = float(np.sum(reg_water)) / float(np.sum(reg_mask))
+
+                            region_results.append({
+                                "region_id": reg_id,
+                                "direction": direction,
+                                "capacity_share": share,
+                                "vehicle_counts": reg_counts,
+                                "vehicles_detected": sum(reg_counts.values()),
+                                "water_ratio": round(reg_water_ratio, 4),
+                            })
+
+                    response_payload = {
                         "service": "projectkv-cv-engine",
                         "vehicles_detected": vehicles,
                         "vehicle_counts": vehicle_counts,
@@ -664,7 +779,11 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                             motorcycles_submerged=submerged_mc,
                             puddle_polygon_count=puddle_count,
                         ),
-                    })
+                    }
+                    if region_results:
+                        response_payload["regions"] = region_results
+
+                    self._send_json(200, response_payload)
                     return
                 except Exception as exc:
                     logger.error("Inference execution error: %s", exc)
@@ -674,13 +793,26 @@ class CVRequestHandler(BaseHTTPRequestHandler):
             # Standby mode: no model loaded — return 503 to prevent Go client from
             # treating this as a real inference result (ADR-004 §14 Finding 1).
             latency = (time.perf_counter() - start_t) * 1000
-            self._send_json(503, {
+            standby_payload = {
                 "source": "standby_dummy",
                 "confidence": 0.0,
                 "latency_ms": round(latency, 2),
                 "mode": "standby_ready",
                 "note": "OpenVINO engine ready. Model weights mountable at runtime."
-            })
+            }
+            if regions:
+                standby_payload["regions"] = [
+                    {
+                        "region_id": r.get("region_id", ""),
+                        "direction": r.get("direction", ""),
+                        "capacity_share": r.get("capacity_share", 0.5),
+                        "vehicle_counts": {"motorcycle": 0, "car": 0, "bus": 0, "truck": 0, "container": 0},
+                        "vehicles_detected": 0,
+                        "water_ratio": 0.0,
+                    }
+                    for r in regions
+                ]
+            self._send_json(503, standby_payload)
             return
 
         self._send_json(404, {"error": "not found"})

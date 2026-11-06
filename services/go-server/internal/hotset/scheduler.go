@@ -13,6 +13,42 @@ import (
 	"time"
 )
 
+// RoadwayRegion represents a directional carriageway polygon and its allocated
+// capacity share forwarded to the inference engine (ADR-012 D1).
+type RoadwayRegion struct {
+	RegionID      string      `json:"region_id"`
+	Direction     string      `json:"direction"` // "a" (approaching/near) or "b" (receding/far)
+	Polygon       [][]float64 `json:"polygon"`   // Normalized [[x, y], ...] in [0, 1] range
+	CapacityShare float64     `json:"capacity_share"`
+}
+
+// VehicleCounts represents detected vehicle counts broken down by classification.
+type VehicleCounts struct {
+	Motorcycle int `json:"motorcycle"`
+	Car        int `json:"car"`
+	Bus        int `json:"bus"`
+	Truck      int `json:"truck"`
+	Container  int `json:"container"`
+}
+
+// Total returns the raw sum of all vehicle counts regardless of class.
+func (v VehicleCounts) Total() int {
+	return v.Motorcycle + v.Car + v.Bus + v.Truck + v.Container
+}
+
+// DirectionalVerdict captures traffic and flood metrics for one directional
+// carriageway of a corridor (ADR-012 D1).
+type DirectionalVerdict struct {
+	Direction       string        `json:"direction"` // "a" or "b"
+	RegionID        string        `json:"region_id"`
+	Severity        string        `json:"severity"` // "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED"
+	SaturationIndex float64       `json:"saturation_index"`
+	PCUTotal        float64       `json:"pcu_total"`
+	CapacityShare   float64       `json:"capacity_share"`
+	VehicleCounts   VehicleCounts `json:"vehicle_counts,omitempty"`
+	WaterRatio      float64       `json:"water_ratio,omitempty"`
+}
+
 // Camera is the minimal identity needed to schedule analysis for a feed.
 // SnapshotURL points at the already-cached proxy endpoint (services/node-server
 // or its Go successor), never directly at the upstream DOT portal.
@@ -22,8 +58,10 @@ type Camera struct {
 	SnapshotURL string
 	// Zone is used later by the notification layer to route alerts to
 	// subscribers of that geographic area (see internal/notify).
-	Zone         string
-	BaseCapacity float64
+	Zone              string
+	BaseCapacity      float64
+	Regions           []RoadwayRegion
+	DirectionCoverage string
 }
 
 // Analyzer is the pluggable adapter interface. Concrete implementations:
@@ -41,17 +79,34 @@ type Analyzer interface {
 // congestion analysis and flood detection — only the Analyzer implementation
 // and the meaning of Severity differ.
 type Verdict struct {
-	CameraID        string    `json:"camera_id"`
-	Severity        string    `json:"severity"`                 // Traffic severity: e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED"
-	FloodSeverity   string    `json:"flood_severity,omitempty"` // Flood severity: "DRY" | "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP" | "UNKNOWN"
-	Confidence      float64   `json:"confidence"`
-	Source          string    `json:"source"` // "mock" | "vlm" | "onnx"
-	ObservedAt      time.Time `json:"observed_at"`
-	Stale           bool      `json:"stale"`
-	Timestamp       time.Time `json:"timestamp"`
-	RawFrame        []byte    `json:"-"` // Direct analyzed frame bytes (unexported from JSON)
-	SaturationIndex float64   `json:"saturation_index"`
-	PCUTotal        float64   `json:"pcu_total"`
+	CameraID        string               `json:"camera_id"`
+	Severity        string               `json:"severity"`                 // Traffic severity: e.g. "CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED"
+	FloodSeverity   string               `json:"flood_severity,omitempty"` // Flood severity: "DRY" | "WET" | "FLOODED_SHALLOW" | "FLOODED_DEEP" | "UNKNOWN"
+	Confidence      float64              `json:"confidence"`
+	Source          string               `json:"source"` // "mock" | "vlm" | "onnx"
+	ObservedAt      time.Time            `json:"observed_at"`
+	Stale           bool                 `json:"stale"`
+	Timestamp       time.Time            `json:"timestamp"`
+	RawFrame        []byte               `json:"-"` // Direct analyzed frame bytes (unexported from JSON)
+	SaturationIndex float64              `json:"saturation_index"`
+	PCUTotal        float64              `json:"pcu_total"`
+	Directions      []DirectionalVerdict `json:"directions,omitempty"`
+}
+
+// SeverityRank maps severity strings to a numerical rank for worst-direction pinning (ADR-012 D1).
+func SeverityRank(s string) int {
+	switch s {
+	case SeverityCongested:
+		return 4
+	case SeverityHeavy:
+		return 3
+	case SeverityModerate:
+		return 2
+	case SeverityClear:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // OnVerdict is called for every successful analysis result. The caller

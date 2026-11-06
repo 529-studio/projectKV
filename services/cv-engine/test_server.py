@@ -481,17 +481,25 @@ class _FakeInput:
 
 
 class _FakeInferRequest:
+    def __init__(self, output=None):
+        self.output = output
+
     def infer(self, feeds):
+        if self.output is not None:
+            return _FakeResults(self.output)
         # 42 rows = the 6-class segmentation head; all scores below threshold.
         return _FakeResults({0: np.zeros((1, 42, 8400), dtype=np.float32)})
 
 
 class _FakeCompiledModel:
+    def __init__(self, output=None):
+        self.output = output
+
     def input(self, index):
         return _FakeInput()
 
     def create_infer_request(self):
-        return _FakeInferRequest()
+        return _FakeInferRequest(self.output)
 
 
 @unittest.skipUnless(HAS_CV_DEPS, "numpy and Pillow are required for the inference payload test")
@@ -549,6 +557,119 @@ class TestPredictPayload(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["flood_assessment"], sentinel)
         spy.assert_called_once()
+
+    def _post_predict_multipart(self, frame_bytes: bytes, meta_dict: dict):
+        boundary = "----WebKitFormBoundaryTestDirectional1234"
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="frame"; filename="frame.jpg"\r\n'
+            f"Content-Type: image/jpeg\r\n\r\n"
+        ).encode("latin1") + frame_bytes + (
+            f"\r\n--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="meta"\r\n'
+            f"Content-Type: application/json\r\n\r\n"
+            f"{json.dumps(meta_dict)}\r\n"
+            f"--{boundary}--\r\n"
+        ).encode("utf-8")
+
+        request = urllib.request.Request(
+            f"{self.base_url}/predict",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5.0) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+
+    def test_predict_multipart_with_regions_emits_per_direction_payload(self):
+        buffer = BytesIO()
+        Image.new("RGB", (32, 32), (90, 90, 90)).save(buffer, format="JPEG")
+        meta = {
+            "regions": [
+                {
+                    "region_id": "test_cam_dir_a",
+                    "direction": "a",
+                    "polygon": [[0.0, 0.0], [0.5, 0.0], [0.5, 1.0], [0.0, 1.0]],
+                    "capacity_share": 0.5,
+                },
+                {
+                    "region_id": "test_cam_dir_b",
+                    "direction": "b",
+                    "polygon": [[0.5, 0.0], [1.0, 0.0], [1.0, 1.0], [0.5, 1.0]],
+                    "capacity_share": 0.5,
+                },
+            ]
+        }
+        status, payload = self._post_predict_multipart(buffer.getvalue(), meta)
+        self.assertEqual(status, 200)
+        self.assertIn("regions", payload)
+        self.assertEqual(len(payload["regions"]), 2)
+        r0 = payload["regions"][0]
+        self.assertEqual(r0["region_id"], "test_cam_dir_a")
+        self.assertEqual(r0["direction"], "a")
+        self.assertEqual(r0["vehicles_detected"], 0)
+        self.assertEqual(r0["water_ratio"], 0.0)
+
+    def test_predict_directional_vehicle_assignment(self):
+        # Set up mock detection output with 2 vehicles:
+        # Vehicle 1: Car in direction A (left half: cx=100, cy=300, w=40, h=40)
+        # Vehicle 2: Truck in direction B (right half: cx=300, cy=300, w=40, h=40)
+        mock_output = np.zeros((1, 42, 8400), dtype=np.float32)
+        # Det 0: Car (class idx 7)
+        mock_output[0, 0, 0] = 100.0  # cx
+        mock_output[0, 1, 0] = 300.0  # cy
+        mock_output[0, 2, 0] = 40.0   # w
+        mock_output[0, 3, 0] = 40.0   # h
+        mock_output[0, 7, 0] = 0.95   # car score > CONF_THRESH
+
+        # Det 1: Truck (class idx 9)
+        mock_output[0, 0, 1] = 300.0  # cx
+        mock_output[0, 1, 1] = 300.0  # cy
+        mock_output[0, 2, 1] = 40.0   # w
+        mock_output[0, 3, 1] = 40.0   # h
+        mock_output[0, 9, 1] = 0.92   # truck score > CONF_THRESH
+
+        server.compiled_model = _FakeCompiledModel(output={0: mock_output})
+
+        buffer = BytesIO()
+        Image.new("RGB", (32, 32), (90, 90, 90)).save(buffer, format="JPEG")
+        meta = {
+            "regions": [
+                {
+                    "region_id": "cam_dir_a",
+                    "direction": "a",
+                    "polygon": [[0.0, 0.0], [0.5, 0.0], [0.5, 1.0], [0.0, 1.0]],
+                    "capacity_share": 0.5,
+                },
+                {
+                    "region_id": "cam_dir_b",
+                    "direction": "b",
+                    "polygon": [[0.5, 0.0], [1.0, 0.0], [1.0, 1.0], [0.5, 1.0]],
+                    "capacity_share": 0.5,
+                },
+            ]
+        }
+        status, payload = self._post_predict_multipart(buffer.getvalue(), meta)
+        self.assertEqual(status, 200)
+        self.assertIn("regions", payload)
+        self.assertEqual(len(payload["regions"]), 2)
+
+        dir_a = payload["regions"][0]
+        self.assertEqual(dir_a["direction"], "a")
+        self.assertEqual(dir_a["vehicle_counts"]["car"], 1)
+        self.assertEqual(dir_a["vehicle_counts"]["truck"], 0)
+        self.assertEqual(dir_a["vehicles_detected"], 1)
+
+        dir_b = payload["regions"][1]
+        self.assertEqual(dir_b["direction"], "b")
+        self.assertEqual(dir_b["vehicle_counts"]["car"], 0)
+        self.assertEqual(dir_b["vehicle_counts"]["truck"], 1)
+        self.assertEqual(dir_b["vehicles_detected"], 1)
+
+        # Global counts reflect both
+        self.assertEqual(payload["vehicle_counts"]["car"], 1)
+        self.assertEqual(payload["vehicle_counts"]["truck"], 1)
+        self.assertEqual(payload["vehicles_detected"], 2)
 
 
 if __name__ == "__main__":

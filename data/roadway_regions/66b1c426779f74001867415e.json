@@ -1,0 +1,58 @@
+{
+  "camera_id": "66b1c426779f74001867415e",
+  "corridor_name": "Điện Biên Phủ - Nguyễn Gia Trí",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "66b1c426779f74001867415e_dir_a",
+      "direction": "a",
+      "description": "Approaching carriageway (towards Saigon Bridge)",
+      "polygon": [
+        [
+          0.08,
+          0.92
+        ],
+        [
+          0.47,
+          0.92
+        ],
+        [
+          0.42,
+          0.45
+        ],
+        [
+          0.15,
+          0.45
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "66b1c426779f74001867415e_dir_b",
+      "direction": "b",
+      "description": "Receding carriageway (towards Hang Xanh)",
+      "polygon": [
+        [
+          0.53,
+          0.92
+        ],
+        [
+          0.92,
+          0.92
+        ],
+        [
+          0.84,
+          0.45
+        ],
+        [
+          0.56,
+          0.45
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "pilot_dbp_ngt_202611"
+  ]
+}

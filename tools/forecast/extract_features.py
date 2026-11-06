@@ -403,11 +403,20 @@ def load_sqlite_observations(
             )
             return observations, stats
 
+        # Direction column compatibility (Migration 0008 / ADR-012 D1):
+        # Extract frame-wide series (direction = '') to avoid duplicate timestamp rows.
+        columns = {
+            col[1]
+            for col in connection.execute("PRAGMA table_info(hotset_verdict_history)").fetchall()
+        }
+        where_clause = "WHERE direction = ''" if "direction" in columns else ""
+
         cursor = connection.execute(
-            """
+            f"""
             SELECT camera_id, pcu_total, saturation_index, severity, confidence,
                    source, observed_at
             FROM hotset_verdict_history
+            {where_clause}
             ORDER BY camera_id, observed_at
             """
         )

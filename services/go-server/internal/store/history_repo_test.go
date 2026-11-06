@@ -366,3 +366,95 @@ func TestVerdictHistoryRepo_GetRecentByCamera(t *testing.T) {
 		}
 	})
 }
+
+func TestVerdictHistoryRepo_DirectionalObservations(t *testing.T) {
+	repo, _ := openTestHistoryDB(t)
+	ctx := context.Background()
+
+	camID := "cam-dir-test"
+	t0 := time.Now().UTC().Truncate(time.Second)
+
+	// Insert frame-wide observation at t0
+	frameWide := store.VerdictHistory{
+		CameraID:        camID,
+		Direction:       "",
+		RegionID:        "",
+		PCUTotal:        45.0,
+		SaturationIndex: 0.90,
+		Severity:        "CONGESTED",
+		Confidence:      0.95,
+		Source:          "onnx",
+		ObservedAt:      t0,
+	}
+	if err := repo.Record(ctx, frameWide); err != nil {
+		t.Fatalf("failed to record frame-wide: %v", err)
+	}
+
+	// Insert Direction A observation at t0
+	dirA := store.VerdictHistory{
+		CameraID:        camID,
+		Direction:       "a",
+		RegionID:        "cam-dir-test_dir_a",
+		PCUTotal:        40.0,
+		SaturationIndex: 1.60,
+		Severity:        "CONGESTED",
+		Confidence:      0.95,
+		Source:          "onnx",
+		ObservedAt:      t0,
+	}
+	if err := repo.Record(ctx, dirA); err != nil {
+		t.Fatalf("failed to record dir A: %v", err)
+	}
+
+	// Insert Direction B observation at t0
+	dirB := store.VerdictHistory{
+		CameraID:        camID,
+		Direction:       "b",
+		RegionID:        "cam-dir-test_dir_b",
+		PCUTotal:        5.0,
+		SaturationIndex: 0.20,
+		Severity:        "CLEAR",
+		Confidence:      0.95,
+		Source:          "onnx",
+		ObservedAt:      t0,
+	}
+	if err := repo.Record(ctx, dirB); err != nil {
+		t.Fatalf("failed to record dir B: %v", err)
+	}
+
+	// 1. Frame-wide query must return ONLY the frame-wide row
+	fwObs, err := repo.GetRecentByCameraBefore(ctx, camID, t0.Add(time.Second), time.Hour, 10)
+	if err != nil {
+		t.Fatalf("GetRecentByCameraBefore failed: %v", err)
+	}
+	if len(fwObs) != 1 {
+		t.Fatalf("expected 1 frame-wide observation, got %d", len(fwObs))
+	}
+	if fwObs[0].Direction != "" || fwObs[0].SaturationIndex != 0.90 {
+		t.Errorf("unexpected frame-wide observation: %+v", fwObs[0])
+	}
+
+	// 2. Query Direction A
+	obsA, err := repo.GetRecentByCameraAndDirection(ctx, camID, "a", t0.Add(time.Second), time.Hour, 10)
+	if err != nil {
+		t.Fatalf("GetRecentByCameraAndDirection('a') failed: %v", err)
+	}
+	if len(obsA) != 1 {
+		t.Fatalf("expected 1 observation for dir A, got %d", len(obsA))
+	}
+	if obsA[0].Direction != "a" || obsA[0].SaturationIndex != 1.60 || obsA[0].Severity != "CONGESTED" {
+		t.Errorf("unexpected dir A observation: %+v", obsA[0])
+	}
+
+	// 3. Query Direction B
+	obsB, err := repo.GetRecentByCameraAndDirection(ctx, camID, "b", t0.Add(time.Second), time.Hour, 10)
+	if err != nil {
+		t.Fatalf("GetRecentByCameraAndDirection('b') failed: %v", err)
+	}
+	if len(obsB) != 1 {
+		t.Fatalf("expected 1 observation for dir B, got %d", len(obsB))
+	}
+	if obsB[0].Direction != "b" || obsB[0].SaturationIndex != 0.20 || obsB[0].Severity != "CLEAR" {
+		t.Errorf("unexpected dir B observation: %+v", obsB[0])
+	}
+}
