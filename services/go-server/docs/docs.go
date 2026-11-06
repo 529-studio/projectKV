@@ -485,113 +485,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/forecast": {
-            "get": {
-                "description": "Returns short-horizon congestion forecasts (10, 20, 30 min) for a camera segment using Ridge delta regression or baseline models.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Forecast",
-                    "Traffic"
-                ],
-                "summary": "Short-horizon congestion forecast",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Camera ID (or segment_id, node_id, edge_id)",
-                        "name": "camera_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Alias for camera_id",
-                        "name": "segment_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Topology node alias",
-                        "name": "node_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Topology edge alias",
-                        "name": "edge_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Forecast horizon minutes (10, 20, 30; default 10)",
-                        "name": "horizon",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Alias for horizon",
-                        "name": "horizon_minutes",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Base timestamp in RFC3339 format (default current UTC)",
-                        "name": "timestamp",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Model selector (ridge_delta, persistence, historical_median; default ridge_delta)",
-                        "name": "model",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/forecast.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Unprocessable Entity",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "503": {
-                        "description": "Service Unavailable",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/live/stream": {
             "get": {
                 "description": "Server-Sent Events (SSE) stream delivering real-time Hot Set verdict updates and H3 hex cell aggregations. Emits 'camera_update' and 'hex_update' events with JSON payloads and periodic heartbeat comments (: heartbeat).",
@@ -1038,6 +931,72 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/cameras/{id}/forecast": {
+            "get": {
+                "description": "Returns short-horizon congestion forecasts (10, 20, 30 min) for a camera segment using Ridge delta regression or baseline models.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Forecast",
+                    "Traffic"
+                ],
+                "summary": "Short-horizon congestion forecast",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Camera ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Base timestamp in RFC3339 format (default current UTC)",
+                        "name": "timestamp",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Model selector (ridge_delta, persistence, historical_median; default ridge_delta)",
+                        "name": "model",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/forecast.MultiHorizonResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/forecast.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/forecast.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/forecast.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/forecast.ErrorResponse"
                         }
                     }
                 }
@@ -1788,6 +1747,29 @@ const docTemplate = `{
                 }
             }
         },
+        "forecast.AvailabilityStatus": {
+            "type": "string",
+            "enum": [
+                "ok",
+                "insufficient_history",
+                "model_unvalidated",
+                "stale",
+                "ok",
+                "insufficient_history",
+                "model_unvalidated",
+                "stale"
+            ],
+            "x-enum-varnames": [
+                "StatusOk",
+                "StatusInsufficientHistory",
+                "StatusModelUnvalidated",
+                "StatusStale",
+                "AvailabilityOK",
+                "AvailabilityInsufficientHistory",
+                "AvailabilityModelUnvalidated",
+                "AvailabilityStale"
+            ]
+        },
         "forecast.ConfidenceIntervals": {
             "type": "object",
             "properties": {
@@ -1796,6 +1778,117 @@ const docTemplate = `{
                 },
                 "speed_kmh": {
                     "$ref": "#/definitions/forecast.Interval"
+                }
+            }
+        },
+        "forecast.CurrentCondition": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "type": "number"
+                },
+                "observed_at": {
+                    "type": "string"
+                },
+                "saturation_index": {
+                    "type": "number"
+                },
+                "severity": {
+                    "type": "string"
+                },
+                "speed_kmh": {
+                    "type": "number"
+                }
+            }
+        },
+        "forecast.ErrorKind": {
+            "type": "string",
+            "enum": [
+                "invalid_parameter",
+                "not_found",
+                "insufficient_history",
+                "model_unvalidated",
+                "service_unavailable"
+            ],
+            "x-enum-varnames": [
+                "KindInvalidParameter",
+                "KindNotFound",
+                "KindInsufficientHistory",
+                "KindModelUnvalidated",
+                "KindServiceUnavailable"
+            ]
+        },
+        "forecast.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "availability": {
+                    "$ref": "#/definitions/forecast.AvailabilityStatus"
+                },
+                "error": {
+                    "$ref": "#/definitions/forecast.ErrorKind"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "model": {
+                    "$ref": "#/definitions/forecast.ModelMetadata"
+                },
+                "requirements": {
+                    "$ref": "#/definitions/forecast.Requirements"
+                }
+            }
+        },
+        "forecast.FitWindow": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "type": "string"
+                },
+                "start": {
+                    "type": "string"
+                }
+            }
+        },
+        "forecast.HorizonMetric": {
+            "type": "object",
+            "properties": {
+                "horizon_minutes": {
+                    "type": "integer"
+                },
+                "mae": {
+                    "type": "number"
+                },
+                "rmse": {
+                    "type": "number"
+                },
+                "sample_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "forecast.HorizonPrediction": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "type": "number"
+                },
+                "confidence_intervals": {
+                    "$ref": "#/definitions/forecast.ConfidenceIntervals"
+                },
+                "horizon_minutes": {
+                    "type": "integer"
+                },
+                "predicted_saturation_index": {
+                    "type": "number"
+                },
+                "predicted_severity": {
+                    "type": "string"
+                },
+                "predicted_speed_kmh": {
+                    "type": "number"
+                },
+                "target_time": {
+                    "type": "string"
                 }
             }
         },
@@ -1813,70 +1906,111 @@ const docTemplate = `{
         "forecast.ModelMetadata": {
             "type": "object",
             "properties": {
+                "artifact_sha256": {
+                    "type": "string"
+                },
+                "experimental": {
+                    "type": "boolean"
+                },
+                "fit_cameras": {
+                    "type": "integer"
+                },
+                "fit_data_sha256": {
+                    "type": "string"
+                },
+                "fit_rows": {
+                    "type": "integer"
+                },
+                "fit_source": {
+                    "type": "string"
+                },
+                "fit_window": {
+                    "$ref": "#/definitions/forecast.FitWindow"
+                },
                 "mae": {
                     "type": "number"
+                },
+                "metrics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/forecast.HorizonMetric"
+                    }
                 },
                 "name": {
                     "type": "string"
                 },
+                "sha256": {
+                    "type": "string"
+                },
                 "target_mode": {
                     "type": "string"
+                },
+                "validated": {
+                    "type": "boolean"
                 },
                 "version": {
                     "type": "string"
                 }
             }
         },
-        "forecast.Response": {
+        "forecast.MultiHorizonResponse": {
             "type": "object",
             "properties": {
+                "availability": {
+                    "$ref": "#/definitions/forecast.AvailabilityStatus"
+                },
                 "base_time": {
                     "type": "string"
                 },
                 "camera_id": {
                     "type": "string"
                 },
-                "confidence": {
-                    "type": "number"
+                "current": {
+                    "$ref": "#/definitions/forecast.CurrentCondition"
                 },
-                "confidence_intervals": {
-                    "$ref": "#/definitions/forecast.ConfidenceIntervals"
+                "experimental": {
+                    "type": "boolean"
                 },
-                "current_saturation_index": {
-                    "type": "number"
+                "generated_at": {
+                    "type": "string"
                 },
-                "horizon_minutes": {
-                    "type": "integer"
+                "horizons": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/forecast.HorizonPrediction"
+                    }
                 },
                 "model": {
                     "$ref": "#/definitions/forecast.ModelMetadata"
                 },
-                "predicted_saturation_index": {
-                    "type": "number"
-                },
-                "predicted_severity": {
-                    "type": "string"
-                },
-                "predicted_speed_kmh": {
-                    "type": "number"
-                },
                 "road_key": {
-                    "type": "string"
-                },
-                "segment_id": {
                     "type": "string"
                 },
                 "source_data": {
                     "$ref": "#/definitions/forecast.SourceData"
+                }
+            }
+        },
+        "forecast.Requirements": {
+            "type": "object",
+            "properties": {
+                "min_observations": {
+                    "type": "integer"
                 },
-                "target_time": {
-                    "type": "string"
+                "observed_samples": {
+                    "type": "integer"
+                },
+                "required_window_minutes": {
+                    "type": "integer"
                 }
             }
         },
         "forecast.SourceData": {
             "type": "object",
             "properties": {
+                "age_minutes": {
+                    "type": "number"
+                },
                 "last_observed_at": {
                     "type": "string"
                 },
@@ -1885,6 +2019,9 @@ const docTemplate = `{
                 },
                 "stale": {
                     "type": "boolean"
+                },
+                "window_minutes": {
+                    "type": "integer"
                 }
             }
         },

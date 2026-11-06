@@ -71,13 +71,12 @@ func (a *advHistoryAdapter) GetRecentByCameraBefore(ctx context.Context, cameraI
 
 func setupAdversarialRouter(repo *store.VerdictHistoryRepo, cat forecast.CameraCatalog) *gin.Engine {
 	adapter := &advHistoryAdapter{repo: repo}
-	svc := forecast.NewService(adapter, cat)
+	svc := forecast.NewService(adapter, cat, forecast.WithAllowSynthetic(true))
 	h := forecast.NewHandler(svc)
 
 	r := gin.New()
 	api := r.Group("/api")
 	h.RegisterRoutes(api)
-	h.RegisterRootRoutes(r)
 	return r
 }
 
@@ -139,18 +138,21 @@ func TestAdversarial_ExtremeSaturationValues(t *testing.T) {
 			camID := fmt.Sprintf("cam-stress-%s", tc.camSuffix)
 			cat.cameras[camID] = forecast.CameraInfo{ID: camID, RoadKey: "stress-way"}
 
-			_, err := db.Exec(`INSERT INTO hotset_verdict_history
-				(camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at, recorded_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-				camID, 20.0, tc.siVal, "HEAVY", 0.90, "test",
-				now.Add(-1*time.Minute).Format(time.RFC3339Nano),
-				now.Format(time.RFC3339Nano),
-			)
-			if err != nil {
-				t.Fatalf("insert failed: %v", err)
+			// Seed 4 observations to satisfy MinServingSamples = 4
+			for lag := 1; lag <= 4; lag++ {
+				_, err := db.Exec(`INSERT INTO hotset_verdict_history
+					(camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at, recorded_at)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+					camID, 20.0, tc.siVal, "HEAVY", 0.90, "test",
+					now.Add(-time.Duration(lag*5)*time.Minute).Format(time.RFC3339Nano),
+					now.Format(time.RFC3339Nano),
+				)
+				if err != nil {
+					t.Fatalf("insert failed: %v", err)
+				}
 			}
 
-			path := fmt.Sprintf("/api/forecast?camera_id=%s", url.QueryEscape(camID))
+			path := fmt.Sprintf("/api/v1/cameras/%s/forecast", url.PathEscape(camID))
 			req, _ := http.NewRequest(http.MethodGet, path, nil)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
@@ -163,15 +165,17 @@ func TestAdversarial_ExtremeSaturationValues(t *testing.T) {
 				if len(w.Body.Bytes()) == 0 {
 					t.Fatalf("FAIL: server returned status 200 with an EMPTY body")
 				}
-				var resp forecast.Response
+				var resp forecast.MultiHorizonResponse
 				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 					t.Fatalf("failed to parse JSON response: %v, raw body: %q", err, w.Body.String())
 				}
-				if resp.PredictedSaturationIndex < 0.0 {
-					t.Errorf("predicted SI must be >= 0.0, got %v", resp.PredictedSaturationIndex)
-				}
-				if resp.PredictedSpeedKmh < forecast.MinSpeedKmh || resp.PredictedSpeedKmh > forecast.MaxSpeedKmh {
-					t.Errorf("predicted speed out of bounds: %v", resp.PredictedSpeedKmh)
+				for _, h := range resp.Horizons {
+					if h.PredictedSaturationIndex < 0.0 {
+						t.Errorf("predicted SI must be >= 0.0, got %v", h.PredictedSaturationIndex)
+					}
+					if h.PredictedSpeedKmh < forecast.MinSpeedKmh || h.PredictedSpeedKmh > forecast.MaxSpeedKmh {
+						t.Errorf("predicted speed out of bounds: %v", h.PredictedSpeedKmh)
+					}
 				}
 			}
 		})
@@ -179,7 +183,6 @@ func TestAdversarial_ExtremeSaturationValues(t *testing.T) {
 }
 
 // 3. Stress Test: Non-Finite Values (Inf and NaN) Guard
-// Demonstrates Bug 2: If +Inf is returned or present, json.Marshal fails in c.JSON.
 func TestAdversarial_NonFiniteValueHandling(t *testing.T) {
 	baseTime := time.Date(2026, time.November, 5, 12, 0, 0, 0, time.UTC)
 
@@ -195,13 +198,10 @@ func TestAdversarial_NonFiniteValueHandling(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			obs := []forecast.Observation{
-				{
-					CameraID:        "cam-nonfinite",
-					SaturationIndex: tc.si,
-					Severity:        "HEAVY",
-					Confidence:      0.90,
-					ObservedAt:      baseTime.Add(-1 * time.Minute),
-				},
+				{CameraID: "cam-nonfinite", SaturationIndex: tc.si, Severity: "HEAVY", Confidence: 0.90, ObservedAt: baseTime.Add(-1 * time.Minute)},
+				{CameraID: "cam-nonfinite", SaturationIndex: tc.si, Severity: "HEAVY", Confidence: 0.90, ObservedAt: baseTime.Add(-5 * time.Minute)},
+				{CameraID: "cam-nonfinite", SaturationIndex: tc.si, Severity: "HEAVY", Confidence: 0.90, ObservedAt: baseTime.Add(-10 * time.Minute)},
+				{CameraID: "cam-nonfinite", SaturationIndex: tc.si, Severity: "HEAVY", Confidence: 0.90, ObservedAt: baseTime.Add(-15 * time.Minute)},
 			}
 			hist := &mockHistoryReader{
 				observations: map[string][]forecast.Observation{
@@ -213,20 +213,23 @@ func TestAdversarial_NonFiniteValueHandling(t *testing.T) {
 					"cam-nonfinite": {ID: "cam-nonfinite", RoadKey: "test-road"},
 				},
 			}
-			router := setupTestRouter(hist, cat)
+			router := setupTestRouter(hist, cat, forecast.WithAllowSynthetic(true))
 
-			req, _ := http.NewRequest(http.MethodGet, "/api/forecast?camera_id=cam-nonfinite&timestamp=2026-11-05T12:00:00Z", nil)
+			req, _ := http.NewRequest(http.MethodGet, "/api/v1/cameras/cam-nonfinite/forecast?timestamp=2026-11-05T12:00:00Z", nil)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
 			if len(w.Body.Bytes()) == 0 {
 				t.Errorf("CRITICAL DEFECT: Endpoint returned empty body on %s input (json.Marshal failed on non-finite float)", tc.name)
 			}
+			if w.Code != http.StatusOK {
+				t.Errorf("expected 200 OK on sanitized non-finite input, got %d: %s", w.Code, w.Body.String())
+			}
 		})
 	}
 }
 
-// 4. Stress Test: History Gaps and All-NULL History Rows
+// 4. Stress Test: History Gaps and Sample Floor Requirements
 func TestAdversarial_HistoryGapsAndAllNullRows(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo, db := openAdversarialDB(t)
@@ -257,21 +260,21 @@ func TestAdversarial_HistoryGapsAndAllNullRows(t *testing.T) {
 	}
 
 	t.Run("all rows NULL saturation index returns 422 insufficient_history", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/api/forecast?camera_id=cam-all-null", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/cameras/cam-all-null/forecast", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
 		if w.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("expected 422 Unprocessable Entity, got %d: %s", w.Code, w.Body.String())
 		}
-		var body map[string]string
-		_ = json.Unmarshal(w.Body.Bytes(), &body)
-		if body["error"] != "insufficient_history" {
-			t.Errorf("expected insufficient_history error, got %q", body["error"])
+		var errResp forecast.ErrorResponse
+		_ = json.Unmarshal(w.Body.Bytes(), &errResp)
+		if errResp.Error != forecast.KindInsufficientHistory {
+			t.Errorf("expected insufficient_history error, got %q", errResp.Error)
 		}
 	})
 
-	// Camera with exactly 1 row (fresh, 1m ago)
+	// Camera with exactly 1 row (fresh, 1m ago) -> fails MinServingSamples=4 floor
 	_, _ = db.Exec(`INSERT INTO hotset_verdict_history
 		(camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at, recorded_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -280,52 +283,47 @@ func TestAdversarial_HistoryGapsAndAllNullRows(t *testing.T) {
 		now.Format(time.RFC3339Nano),
 	)
 
-	t.Run("single observation succeeds with fallback lag interpolation", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/api/forecast?camera_id=cam-single", nil)
+	t.Run("single observation fails serving floor with 422 insufficient_history", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/cameras/cam-single/forecast", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200 OK, got %d: %s", w.Code, w.Body.String())
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected 422 Unprocessable Entity, got %d: %s", w.Code, w.Body.String())
 		}
-		var resp forecast.Response
-		_ = json.Unmarshal(w.Body.Bytes(), &resp)
-		if resp.PredictedSaturationIndex <= 0.0 {
-			t.Errorf("expected valid positive predicted SI, got %v", resp.PredictedSaturationIndex)
+		var errResp forecast.ErrorResponse
+		_ = json.Unmarshal(w.Body.Bytes(), &errResp)
+		if errResp.Error != forecast.KindInsufficientHistory {
+			t.Errorf("expected insufficient_history error, got %q", errResp.Error)
 		}
-		if resp.SourceData.SampleCount != 1 {
-			t.Errorf("expected sample count 1, got %d", resp.SourceData.SampleCount)
+		if errResp.Requirements == nil || errResp.Requirements.ObservedSamples != 1 {
+			t.Errorf("expected requirements.observed_samples = 1")
 		}
 	})
 
-	// Camera with large gaps (observations at -1m and -40m)
-	_, _ = db.Exec(`INSERT INTO hotset_verdict_history
-		(camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at, recorded_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		"cam-gaps", 20.0, 0.50, "MODERATE", 0.85, "test",
-		now.Add(-1*time.Minute).Format(time.RFC3339Nano),
-		now.Format(time.RFC3339Nano),
-	)
-	_, _ = db.Exec(`INSERT INTO hotset_verdict_history
-		(camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at, recorded_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		"cam-gaps", 10.0, 0.20, "CLEAR", 0.85, "test",
-		now.Add(-40*time.Minute).Format(time.RFC3339Nano),
-		now.Format(time.RFC3339Nano),
-	)
+	// Camera with 4 observations across 45m with large gap (-1m, -2m, -38m, -40m)
+	for _, minAgo := range []int{1, 2, 38, 40} {
+		_, _ = db.Exec(`INSERT INTO hotset_verdict_history
+			(camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at, recorded_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"cam-gaps", 20.0, 0.50, "MODERATE", 0.85, "test",
+			now.Add(-time.Duration(minAgo)*time.Minute).Format(time.RFC3339Nano),
+			now.Format(time.RFC3339Nano),
+		)
+	}
 
-	t.Run("history with large gap survives without crash", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/api/forecast?camera_id=cam-gaps", nil)
+	t.Run("history with 4 observations and gap survives without crash", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/cameras/cam-gaps/forecast", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 OK, got %d: %s", w.Code, w.Body.String())
 		}
-		var resp forecast.Response
+		var resp forecast.MultiHorizonResponse
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
-		if resp.SourceData.SampleCount != 2 {
-			t.Errorf("expected sample count 2, got %d", resp.SourceData.SampleCount)
+		if resp.SourceData.SampleCount != 4 {
+			t.Errorf("expected sample count 4, got %d", resp.SourceData.SampleCount)
 		}
 	})
 
@@ -341,7 +339,7 @@ func TestAdversarial_HistoryGapsAndAllNullRows(t *testing.T) {
 	}
 
 	t.Run("dense history is handled efficiently", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/api/forecast?camera_id=cam-dense", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/cameras/cam-dense/forecast", nil)
 		w := httptest.NewRecorder()
 		start := time.Now()
 		router.ServeHTTP(w, req)
@@ -356,7 +354,7 @@ func TestAdversarial_HistoryGapsAndAllNullRows(t *testing.T) {
 	})
 }
 
-// 5. Stress Test: Invalid Horizons and Parameter Fuzzing
+// 5. Stress Test: Parameter Fuzzing and Rejected Query Params
 func TestAdversarial_InvalidHorizonsAndFuzzing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo, db := openAdversarialDB(t)
@@ -368,13 +366,15 @@ func TestAdversarial_InvalidHorizonsAndFuzzing(t *testing.T) {
 	router := setupAdversarialRouter(repo, cat)
 
 	now := time.Now().UTC()
-	_, _ = db.Exec(`INSERT INTO hotset_verdict_history
-		(camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at, recorded_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		"cam-fuzz", 20.0, 0.50, "MODERATE", 0.85, "test",
-		now.Add(-1*time.Minute).Format(time.RFC3339Nano),
-		now.Format(time.RFC3339Nano),
-	)
+	for i := 1; i <= 4; i++ {
+		_, _ = db.Exec(`INSERT INTO hotset_verdict_history
+			(camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at, recorded_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"cam-fuzz", 20.0, 0.50, "MODERATE", 0.85, "test",
+			now.Add(-time.Duration(i*2)*time.Minute).Format(time.RFC3339Nano),
+			now.Format(time.RFC3339Nano),
+		)
+	}
 
 	fuzzCases := []struct {
 		name       string
@@ -382,29 +382,29 @@ func TestAdversarial_InvalidHorizonsAndFuzzing(t *testing.T) {
 		wantStatus int
 		wantError  string
 	}{
+		// Any horizon query param is rejected with 400 per D6
 		{"horizon=0", "horizon=0", http.StatusBadRequest, "invalid_parameter"},
 		{"horizon=-1", "horizon=-1", http.StatusBadRequest, "invalid_parameter"},
-		{"horizon=-99999", "horizon=-99999", http.StatusBadRequest, "invalid_parameter"},
-		{"horizon=5", "horizon=5", http.StatusBadRequest, "invalid_parameter"},
-		{"horizon=15", "horizon=15", http.StatusBadRequest, "invalid_parameter"},
-		{"horizon=25", "horizon=25", http.StatusBadRequest, "invalid_parameter"},
-		{"horizon=45", "horizon=45", http.StatusBadRequest, "invalid_parameter"},
-		{"horizon=60", "horizon=60", http.StatusBadRequest, "invalid_parameter"},
-		{"horizon=99999999999999999999", "horizon=99999999999999999999", http.StatusBadRequest, "invalid_parameter"},
-		{"horizon=abc", "horizon=abc", http.StatusBadRequest, "invalid_parameter"},
-		{"horizon=10 (valid)", "horizon=10", http.StatusOK, ""},
-		{"horizon=20 (valid)", "horizon=20", http.StatusOK, ""},
-		{"horizon=30 (valid)", "horizon=30", http.StatusOK, ""},
+		{"horizon=10", "horizon=10", http.StatusBadRequest, "invalid_parameter"},
+		{"horizon=20", "horizon=20", http.StatusBadRequest, "invalid_parameter"},
+		{"horizon=30", "horizon=30", http.StatusBadRequest, "invalid_parameter"},
+		{"horizon_minutes=10", "horizon_minutes=10", http.StatusBadRequest, "invalid_parameter"},
 		{"model=invalid_name", "model=super_model", http.StatusBadRequest, "invalid_parameter"},
 		{"model=sql_inject'--", "model=ridge_delta'--", http.StatusBadRequest, "invalid_parameter"},
 		{"timestamp=bad_date", "timestamp=bad_date", http.StatusBadRequest, "invalid_parameter"},
-		{"timestamp=future_1year", fmt.Sprintf("timestamp=%s", now.Add(365*24*time.Hour).Format(time.RFC3339)), http.StatusUnprocessableEntity, "insufficient_history"},
+		{"timestamp=future_1year", fmt.Sprintf("timestamp=%s", now.Add(365*24*time.Hour).Format(time.RFC3339)), http.StatusBadRequest, "invalid_parameter"},
 		{"timestamp=epoch_zero", "timestamp=1970-01-01T00:00:00Z", http.StatusUnprocessableEntity, "insufficient_history"},
+		{"valid default query", "", http.StatusOK, ""},
+		{"valid persistence query", "model=persistence", http.StatusOK, ""},
+		{"valid historical_median query", "model=historical_median", http.StatusOK, ""},
 	}
 
 	for _, tc := range fuzzCases {
 		t.Run(tc.name, func(t *testing.T) {
-			path := fmt.Sprintf("/api/forecast?camera_id=cam-fuzz&%s", tc.query)
+			path := "/api/v1/cameras/cam-fuzz/forecast"
+			if tc.query != "" {
+				path += "?" + tc.query
+			}
 			req, _ := http.NewRequest(http.MethodGet, path, nil)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
@@ -413,10 +413,10 @@ func TestAdversarial_InvalidHorizonsAndFuzzing(t *testing.T) {
 				t.Fatalf("for %s: expected status %d, got %d: %s", tc.name, tc.wantStatus, w.Code, w.Body.String())
 			}
 			if tc.wantError != "" {
-				var body map[string]string
+				var body forecast.ErrorResponse
 				_ = json.Unmarshal(w.Body.Bytes(), &body)
-				if body["error"] != tc.wantError {
-					t.Errorf("for %s: expected error %q, got %q", tc.name, tc.wantError, body["error"])
+				if string(body.Error) != tc.wantError {
+					t.Errorf("for %s: expected error %q, got %q", tc.name, tc.wantError, body.Error)
 				}
 			}
 		})
@@ -456,7 +456,7 @@ func TestAdversarial_ConcurrencyStress(t *testing.T) {
 			defer wg.Done()
 			for it := 0; it < iterationsPerWorker; it++ {
 				if workerID%2 == 0 {
-					req, _ := http.NewRequest(http.MethodGet, "/api/forecast?camera_id=cam-concurrent&horizon=10", nil)
+					req, _ := http.NewRequest(http.MethodGet, "/api/v1/cameras/cam-concurrent/forecast", nil)
 					rec := httptest.NewRecorder()
 					router.ServeHTTP(rec, req)
 					if rec.Code != http.StatusOK {

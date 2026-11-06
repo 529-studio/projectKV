@@ -675,12 +675,30 @@ func main() {
 		corridorHandler = corridor.NewHandler(corridorService)
 	}
 
-	// 5d. Initialize short-horizon congestion forecast service (Issue #302 / S9-T6).
+	// 5d. Initialize short-horizon congestion forecast service (Issue #302 / S9-T6 / Issue #372).
 	var forecastHandler *forecast.Handler
-	if verdictHistoryRepo != nil && camCatalog != nil {
-		forecastHistAdapter := &forecastHistoryAdapter{repo: verdictHistoryRepo}
+	if camCatalog != nil {
+		var forecastHistAdapter forecast.HistoryReader
+		if verdictHistoryRepo != nil {
+			forecastHistAdapter = &forecastHistoryAdapter{repo: verdictHistoryRepo}
+		}
 		forecastCamAdapter := &forecastCameraAdapter{catalog: camCatalog}
-		forecastService := forecast.NewService(forecastHistAdapter, forecastCamAdapter)
+
+		// Boot guard: FORECAST_ALLOW_SYNTHETIC is strictly prohibited in staging and production
+		envAllowSynth := strings.EqualFold(os.Getenv("FORECAST_ALLOW_SYNTHETIC"), "true") || os.Getenv("FORECAST_ALLOW_SYNTHETIC") == "1"
+		if envAllowSynth {
+			if cfg.AppEnv == "staging" || cfg.AppEnv == "production" {
+				log.Fatalf("FATAL: FORECAST_ALLOW_SYNTHETIC is prohibited in %s environment", cfg.AppEnv)
+			}
+			slog.Warn("FORECAST_ALLOW_SYNTHETIC is enabled (dev escape hatch); predictions are marked experimental")
+		}
+
+		var forecastOpts []forecast.Option
+		if modelPath := strings.TrimSpace(os.Getenv("FORECAST_MODEL_PATH")); modelPath != "" {
+			forecastOpts = append(forecastOpts, forecast.WithModelPath(modelPath))
+		}
+
+		forecastService := forecast.NewService(forecastHistAdapter, forecastCamAdapter, forecastOpts...)
 		forecastHandler = forecast.NewHandler(forecastService)
 	}
 
@@ -1143,11 +1161,6 @@ func main() {
 
 	// SSE Live Stream (ADR-003 Decision 1: GET /api/live/stream).
 	liveHub.RegisterRoutes(router)
-
-	// Short-horizon congestion forecast root alias (Issue #302 / S9-T6: GET /forecast).
-	if forecastHandler != nil {
-		forecastHandler.RegisterRootRoutes(router)
-	}
 
 	// Swagger documentation UI
 	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
