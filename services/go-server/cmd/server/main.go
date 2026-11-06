@@ -338,12 +338,26 @@ func cameraToHotSet(c camera.Camera) hotset.Camera {
 	if name == "" {
 		name = strings.TrimSpace(c.Title)
 	}
+	var hotsetRegions []hotset.RoadwayRegion
+	if len(c.Regions) > 0 {
+		hotsetRegions = make([]hotset.RoadwayRegion, len(c.Regions))
+		for i, r := range c.Regions {
+			hotsetRegions[i] = hotset.RoadwayRegion{
+				RegionID:      r.RegionID,
+				Direction:     r.Direction,
+				Polygon:       r.Polygon,
+				CapacityShare: r.CapacityShare,
+			}
+		}
+	}
 	return hotset.Camera{
-		ID:           c.ID,
-		Name:         name,
-		Zone:         c.Zone,
-		SnapshotURL:  c.SnapshotURL,
-		BaseCapacity: c.BaseCapacity,
+		ID:                c.ID,
+		Name:              name,
+		Zone:              c.Zone,
+		SnapshotURL:       c.SnapshotURL,
+		BaseCapacity:      c.BaseCapacity,
+		Regions:           hotsetRegions,
+		DirectionCoverage: c.DirectionCoverage,
 	}
 }
 
@@ -1113,20 +1127,42 @@ func main() {
 			hasPCUSeries := v.Severity != hotset.SeverityUnknown &&
 				(v.Source == "onnx" || v.PCUTotal > 0 || v.SaturationIndex > 0)
 			if verdictHistoryRepo != nil && !v.Stale && hasPCUSeries {
+				observedAt := v.ObservedAt
+				if observedAt.IsZero() {
+					observedAt = v.Timestamp
+				}
+				// 1. Frame-wide observation (direction = '')
 				hv := store.VerdictHistory{
 					CameraID:        v.CameraID,
+					Direction:       "",
+					RegionID:        "",
 					PCUTotal:        v.PCUTotal,
 					SaturationIndex: v.SaturationIndex,
 					Severity:        v.Severity,
 					Confidence:      v.Confidence,
 					Source:          v.Source,
-					ObservedAt:      v.ObservedAt,
-				}
-				if hv.ObservedAt.IsZero() {
-					hv.ObservedAt = v.Timestamp
+					ObservedAt:      observedAt,
 				}
 				if err := verdictHistoryRepo.Record(context.Background(), hv); err != nil {
 					log.Printf("[WARN] Failed to record verdict history for %s: %v", v.CameraID, err)
+				}
+
+				// 2. Directional observations (ADR-012 D1)
+				for _, dir := range v.Directions {
+					dirHV := store.VerdictHistory{
+						CameraID:        v.CameraID,
+						Direction:       dir.Direction,
+						RegionID:        dir.RegionID,
+						PCUTotal:        dir.PCUTotal,
+						SaturationIndex: dir.SaturationIndex,
+						Severity:        dir.Severity,
+						Confidence:      v.Confidence,
+						Source:          v.Source,
+						ObservedAt:      observedAt,
+					}
+					if err := verdictHistoryRepo.Record(context.Background(), dirHV); err != nil {
+						log.Printf("[WARN] Failed to record directional verdict history for %s (dir %s): %v", v.CameraID, dir.Direction, err)
+					}
 				}
 			}
 

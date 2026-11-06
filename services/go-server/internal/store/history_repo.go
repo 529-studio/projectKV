@@ -14,6 +14,8 @@ import (
 // dependency direction (internal/store is a leaf package).
 type VerdictHistory struct {
 	CameraID        string
+	Direction       string // "a", "b", or "" for frame-wide (ADR-012 D1)
+	RegionID        string // runtime geometry polygon ID
 	PCUTotal        float64
 	SaturationIndex float64
 	Severity        string
@@ -60,12 +62,14 @@ func (r *VerdictHistoryRepo) Record(ctx context.Context, h VerdictHistory) error
 	}
 
 	query := fmt.Sprintf(`INSERT INTO %s
-		(camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at, recorded_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(camera_id, observed_at) DO NOTHING`, TableHotsetVerdictHistory)
+		(camera_id, direction, region_id, pcu_total, saturation_index, severity, confidence, source, observed_at, recorded_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(camera_id, direction, observed_at) DO NOTHING`, TableHotsetVerdictHistory)
 
 	_, err := r.db.ExecContext(ctx, query,
 		h.CameraID,
+		h.Direction,
+		h.RegionID,
 		h.PCUTotal,
 		h.SaturationIndex,
 		h.Severity,
@@ -80,18 +84,22 @@ func (r *VerdictHistoryRepo) Record(ctx context.Context, h VerdictHistory) error
 	return nil
 }
 
-// GetRecentByCamera retrieves recent observations for cameraID within window prior to now,
+// GetRecentByCamera retrieves recent frame-wide observations for cameraID within window prior to now,
 // ordered descending by observed_at (newest first). If window <= 0, no lower time cutoff is applied.
 // If limit <= 0, limit defaults to 2000. If limit > 10000, limit is capped at 10000.
 func (r *VerdictHistoryRepo) GetRecentByCamera(ctx context.Context, cameraID string, window time.Duration, limit int) ([]VerdictHistory, error) {
 	return r.GetRecentByCameraBefore(ctx, cameraID, time.Now().UTC(), window, limit)
 }
 
-// GetRecentByCameraBefore retrieves recent observations for cameraID observed at or before the given
-// timestamp, within window prior to before. If window <= 0, no lower time cutoff is applied.
-// If before is zero, time.Now().UTC() is used.
-// Results are returned in reverse chronological order (newest first).
+// GetRecentByCameraBefore retrieves recent frame-wide observations (direction = ”) for cameraID
+// observed at or before before. Preserves 100% backward compatibility for downstream time-series consumers.
 func (r *VerdictHistoryRepo) GetRecentByCameraBefore(ctx context.Context, cameraID string, before time.Time, window time.Duration, limit int) ([]VerdictHistory, error) {
+	return r.GetRecentByCameraAndDirection(ctx, cameraID, "", before, window, limit)
+}
+
+// GetRecentByCameraAndDirection retrieves observations for cameraID and direction observed at or before
+// before, within window prior to before. If direction is empty, frame-wide observations are returned.
+func (r *VerdictHistoryRepo) GetRecentByCameraAndDirection(ctx context.Context, cameraID string, direction string, before time.Time, window time.Duration, limit int) ([]VerdictHistory, error) {
 	if r == nil || r.db == nil {
 		return nil, fmt.Errorf("verdict history repo db is nil")
 	}
@@ -112,25 +120,27 @@ func (r *VerdictHistoryRepo) GetRecentByCameraBefore(ctx context.Context, camera
 
 	if window > 0 {
 		since := before.Add(-window)
-		query = fmt.Sprintf(`SELECT camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at
+		query = fmt.Sprintf(`SELECT camera_id, direction, region_id, pcu_total, saturation_index, severity, confidence, source, observed_at
 			FROM %s
-			WHERE camera_id = ? AND observed_at <= ? AND observed_at >= ? AND saturation_index IS NOT NULL
+			WHERE camera_id = ? AND direction = ? AND observed_at <= ? AND observed_at >= ? AND saturation_index IS NOT NULL
 			ORDER BY observed_at DESC
 			LIMIT ?`, TableHotsetVerdictHistory)
 		args = []any{
 			cameraID,
+			direction,
 			before.UTC().Format(TimestampFixedLayout),
 			since.UTC().Format(TimestampFixedLayout),
 			limit,
 		}
 	} else {
-		query = fmt.Sprintf(`SELECT camera_id, pcu_total, saturation_index, severity, confidence, source, observed_at
+		query = fmt.Sprintf(`SELECT camera_id, direction, region_id, pcu_total, saturation_index, severity, confidence, source, observed_at
 			FROM %s
-			WHERE camera_id = ? AND observed_at <= ? AND saturation_index IS NOT NULL
+			WHERE camera_id = ? AND direction = ? AND observed_at <= ? AND saturation_index IS NOT NULL
 			ORDER BY observed_at DESC
 			LIMIT ?`, TableHotsetVerdictHistory)
 		args = []any{
 			cameraID,
+			direction,
 			before.UTC().Format(TimestampFixedLayout),
 			limit,
 		}
@@ -138,7 +148,7 @@ func (r *VerdictHistoryRepo) GetRecentByCameraBefore(ctx context.Context, camera
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("query verdict history for %s: %w", cameraID, err)
+		return nil, fmt.Errorf("query verdict history for %s (dir %q): %w", cameraID, direction, err)
 	}
 	defer rows.Close()
 
@@ -146,6 +156,8 @@ func (r *VerdictHistoryRepo) GetRecentByCameraBefore(ctx context.Context, camera
 	for rows.Next() {
 		var (
 			camID  string
+			dir    string
+			regID  string
 			pcu    sql.NullFloat64
 			si     sql.NullFloat64
 			sev    string
@@ -153,7 +165,7 @@ func (r *VerdictHistoryRepo) GetRecentByCameraBefore(ctx context.Context, camera
 			src    string
 			obsStr string
 		)
-		if err := rows.Scan(&camID, &pcu, &si, &sev, &conf, &src, &obsStr); err != nil {
+		if err := rows.Scan(&camID, &dir, &regID, &pcu, &si, &sev, &conf, &src, &obsStr); err != nil {
 			return nil, fmt.Errorf("scan verdict history row: %w", err)
 		}
 
@@ -172,6 +184,8 @@ func (r *VerdictHistoryRepo) GetRecentByCameraBefore(ctx context.Context, camera
 
 		results = append(results, VerdictHistory{
 			CameraID:        camID,
+			Direction:       dir,
+			RegionID:        regID,
 			PCUTotal:        pcu.Float64,
 			SaturationIndex: si.Float64,
 			Severity:        sev,

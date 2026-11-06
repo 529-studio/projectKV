@@ -1,0 +1,58 @@
+{
+  "camera_id": "56de42f611f398ec0c48128b",
+  "corridor_name": "Võ Văn Kiệt - Nguyễn Văn Cừ 1",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "56de42f611f398ec0c48128b_dir_a",
+      "direction": "a",
+      "description": "Inbound carriageway (towards District 1)",
+      "polygon": [
+        [
+          0.05,
+          0.95
+        ],
+        [
+          0.48,
+          0.95
+        ],
+        [
+          0.44,
+          0.42
+        ],
+        [
+          0.12,
+          0.42
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "56de42f611f398ec0c48128b_dir_b",
+      "direction": "b",
+      "description": "Outbound carriageway (towards Binh Chanh)",
+      "polygon": [
+        [
+          0.52,
+          0.95
+        ],
+        [
+          0.95,
+          0.95
+        ],
+        [
+          0.86,
+          0.42
+        ],
+        [
+          0.54,
+          0.42
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "pilot_vvk_nvc1_202611"
+  ]
+}
