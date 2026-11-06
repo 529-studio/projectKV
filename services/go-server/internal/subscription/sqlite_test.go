@@ -73,7 +73,7 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 		ChannelName: "telegram",
 		ChatID:      "chat-zone-03",
 		TargetType:  TargetZone,
-		TargetID:    "Quận 1",
+		TargetID:    "Quận 7 - Nhà Bè",
 	}
 	if err := store.Subscribe(ctx, subZone); err != nil {
 		t.Fatalf("Subscribe(zone) failed: %v", err)
@@ -90,12 +90,12 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 		t.Fatalf("Subscribe(ward) failed: %v", err)
 	}
 
-	// Test Query 1: Alert for cam-vvk-01 in Quận 1, Phường Cầu Kho
-	recipients1, err := store.GetSubscribersForChokepoint(ctx, "telegram", "cam-vvk-01", "Quận 1", "Phường Cầu Kho")
+	// Test Query 1: Alert for cam-vvk-01 in Quận 7 - Nhà Bè, Phường Cầu Kho
+	recipients1, err := store.GetSubscribersForChokepoint(ctx, "telegram", "cam-vvk-01", "Quận 7 - Nhà Bè", "Phường Cầu Kho")
 	if err != nil {
 		t.Fatalf("GetSubscribersForChokepoint failed: %v", err)
 	}
-	// Expected: chat-all-01 (all), chat-cp-02 (cam-vvk-01), chat-zone-03 (Quận 1)
+	// Expected: chat-all-01 (all), chat-cp-02 (cam-vvk-01), chat-zone-03 (Quận 7 - Nhà Bè)
 	expected1 := map[string]bool{"chat-all-01": true, "chat-cp-02": true, "chat-zone-03": true}
 	if len(recipients1) != 3 {
 		t.Fatalf("expected 3 recipients, got %d: %v", len(recipients1), recipients1)
@@ -106,8 +106,8 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 		}
 	}
 
-	// Test Query 2: Alert for cam-other in Bình Thạnh, Phường 25
-	recipients2, err := store.GetSubscribersForChokepoint(ctx, "telegram", "cam-other", "Bình Thạnh", "Phường 25")
+	// Test Query 2: Alert for cam-other in Khu vực Nội thành TP.HCM (unrelated zone), Phường 25
+	recipients2, err := store.GetSubscribersForChokepoint(ctx, "telegram", "cam-other", "Khu vực Nội thành TP.HCM", "Phường 25")
 	if err != nil {
 		t.Fatalf("GetSubscribersForChokepoint failed: %v", err)
 	}
@@ -116,12 +116,12 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 		t.Fatalf("expected [chat-all-01], got %v", recipients2)
 	}
 
-	// Test Query 3: Alert in Phường Bến Nghé
-	recipients3, err := store.GetSubscribersForChokepoint(ctx, "telegram", "cam-bn-01", "Quận 1", "Phường Bến Nghé")
+	// Test Query 3: Alert in Quận 7 - Nhà Bè and Phường Bến Nghé
+	recipients3, err := store.GetSubscribersForChokepoint(ctx, "telegram", "cam-bn-01", "Quận 7 - Nhà Bè", "Phường Bến Nghé")
 	if err != nil {
 		t.Fatalf("GetSubscribersForChokepoint failed: %v", err)
 	}
-	// Expected: chat-all-01, chat-zone-03 (Quận 1), chat-ward-04 (Bến Nghé)
+	// Expected: chat-all-01, chat-zone-03 (Quận 7 - Nhà Bè), chat-ward-04 (Bến Nghé)
 	expected3 := map[string]bool{"chat-all-01": true, "chat-zone-03": true, "chat-ward-04": true}
 	if len(recipients3) != 3 {
 		t.Fatalf("expected 3 recipients for Ben Nghe, got %d: %v", len(recipients3), recipients3)

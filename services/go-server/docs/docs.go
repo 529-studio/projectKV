@@ -731,9 +731,7 @@ const docTemplate = `{
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "additionalProperties": true
                         }
                     },
                     "500": {
@@ -799,9 +797,7 @@ const docTemplate = `{
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "additionalProperties": true
                         }
                     },
                     "500": {
@@ -811,6 +807,26 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/subscriptions/taxonomy": {
+            "get": {
+                "description": "Retrieves all canonical targets available for subscription (operational zones, administrative wards, camera chokepoints, and target types).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subscriptions"
+                ],
+                "summary": "Get subscription taxonomy",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.TaxonomyResponse"
                         }
                     }
                 }
@@ -2487,6 +2503,17 @@ const docTemplate = `{
                 }
             }
         },
+        "subscription.ChokepointInfo": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "subscription.SubscribeRequest": {
             "type": "object",
             "required": [
@@ -2505,11 +2532,53 @@ const docTemplate = `{
                 },
                 "target_id": {
                     "type": "string",
-                    "example": "Quận 1"
+                    "example": "Quận 7 - Nhà Bè"
                 },
                 "target_type": {
                     "type": "string",
                     "example": "zone"
+                }
+            }
+        },
+        "subscription.TaxonomyResponse": {
+            "type": "object",
+            "properties": {
+                "chokepoints": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/subscription.ChokepointInfo"
+                    }
+                },
+                "target_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "wards": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/subscription.WardInfo"
+                    }
+                },
+                "zones": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "subscription.WardInfo": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "e.g. \"Bến Nghé\", \"Thảo Điền\"",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"Phường\", \"Xã\", \"Thị trấn\"",
+                    "type": "string"
                 }
             }
         },
