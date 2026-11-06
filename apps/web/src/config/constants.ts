@@ -43,6 +43,7 @@ export const API_ENDPOINTS = Object.freeze({
   ARCHIVER_LABELS: '/api/archiver/labels',
   ARCHIVER_RAW: '/api/archiver/snapshots/raw',
   HOTSET_STATUS: '/api/v1/cameras/hotset/status',
+  FORECAST: (id: string) => `/api/v1/cameras/${encodeURIComponent(id)}/forecast`,
 });
 
 export const getApiUrl = (endpoint: string): string => {
@@ -449,5 +450,140 @@ export const HOTSET_LEGEND_I18N = Object.freeze({
   CONGESTED: {
     vi: '[Đỏ: Ùn ứ]',
     en: '[Red: Congested]',
+  },
+});
+
+export const FORECAST_I18N = Object.freeze({
+  HEADER: {
+    TITLE: {
+      vi: 'DỰ BÁO KẸT XE NGẮN HẠN',
+      en: 'SHORT-HORIZON CONGESTION FORECAST',
+    },
+    SUBTITLE: {
+      vi: 'Dự báo chỉ số bão hòa dòng xe (SI) và xu hướng ùn tắc',
+      en: 'Projected saturation index (SI) and congestion trend',
+    },
+  },
+  HORIZONS: {
+    NOW: {
+      vi: 'Hiện tại',
+      en: 'Now',
+    },
+    MINUTES: {
+      vi: (m: number) => `Sau ${m} phút`,
+      en: (m: number) => `+${m} min`,
+    },
+  },
+  METRICS: {
+    SATURATION_INDEX: {
+      vi: 'Chỉ số bão hòa (SI):',
+      en: 'Saturation Index (SI):',
+    },
+    CONFIDENCE_BAND: {
+      vi: 'Khoảng tin cậy 95%:',
+      en: '95% Confidence Band:',
+    },
+    SPEED: {
+      vi: 'Tốc độ dự kiến:',
+      en: 'Projected Speed:',
+    },
+    CONFIDENCE: {
+      vi: 'Độ tin cậy:',
+      en: 'Confidence:',
+    },
+  },
+  PROVENANCE: {
+    TITLE: {
+      vi: 'Thông tin mô hình:',
+      en: 'Model Provenance:',
+    },
+    VALIDATED: {
+      vi: 'ĐÃ KIỂM ĐỊNH THỰC ĐỊA',
+      en: 'FIELD VALIDATED',
+    },
+    UNVALIDATED: {
+      vi: 'CHƯA KIỂM ĐỊNH',
+      en: 'UNVALIDATED',
+    },
+    MAE: {
+      vi: 'Sai số MAE:',
+      en: 'MAE Error:',
+    },
+  },
+  AVAILABILITY: {
+    INSUFFICIENT_HISTORY: {
+      TITLE: {
+        vi: 'CHƯA ĐỦ DỮ LIỆU LỊCH SỬ',
+        en: 'INSUFFICIENT HISTORY DATA',
+      },
+      DESC: {
+        vi: (min: number, window: number, observed: number) =>
+          `Cần tối thiểu ${min} mẫu quan sát trong ${window} phút qua để kích hoạt mô hình dự báo (hiện có: ${observed} mẫu).`,
+        en: (min: number, window: number, observed: number) =>
+          `Requires at least ${min} observations in the last ${window} minutes to activate forecast (currently: ${observed} samples).`,
+      },
+    },
+    MODEL_UNVALIDATED: {
+      TITLE: {
+        vi: 'MÔ HÌNH ĐANG KIỂM ĐỊNH',
+        en: 'MODEL UNDER VALIDATION',
+      },
+      DESC: {
+        vi: 'Mô hình dự báo đang trong giai đoạn kiểm định thực địa, tạm thời khóa số liệu dự đoán.',
+        en: 'Forecast model is currently undergoing empirical validation; numeric predictions are held.',
+      },
+    },
+    STALE: {
+      TITLE: {
+        vi: 'DỮ LIỆU DỰ BÁO ĐÃ CŨ',
+        en: 'FORECAST DATA IS STALE',
+      },
+      DESC: {
+        vi: (age: number) =>
+          `Quan sát gần nhất cách đây ${age.toFixed(1)} phút (>15 phút). Biểu đồ được làm mờ để phản ánh độ tin cậy suy giảm.`,
+        en: (age: number) =>
+          `Latest observation was ${age.toFixed(1)} minutes ago (>15 min). Chart is dimmed to reflect reduced confidence.`,
+      },
+      BADGE: {
+        vi: '[DỮ LIỆU CŨ]',
+        en: '[STALE]',
+      },
+    },
+  },
+  SEVERITY: {
+    CLEAR: {
+      vi: 'Thông thoáng',
+      en: 'Clear',
+    },
+    MODERATE: {
+      vi: 'Đông vừa',
+      en: 'Moderate',
+    },
+    HEAVY: {
+      vi: 'Đông đúc',
+      en: 'Heavy',
+    },
+    CONGESTED: {
+      vi: 'Kẹt xe',
+      en: 'Congested',
+    },
+    UNKNOWN: {
+      vi: 'Chưa xác định',
+      en: 'Unknown',
+    },
+  },
+  STATES: {
+    LOADING: {
+      vi: 'Đang tải dữ liệu dự báo...',
+      en: 'Loading forecast data...',
+    },
+    ERROR: {
+      vi: 'Không thể tải dữ liệu dự báo',
+      en: 'Unable to load forecast data',
+    },
+    RETRY: {
+      vi: '↻ Thử lại',
+      en: '↻ Retry',
+    },
   },
 });
