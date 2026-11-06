@@ -13,6 +13,9 @@ permanent directory made readers pay for a document with a shelf life.
 | Sprint | Guide | State |
 |---|---|---|
 | 9 | [`sprint9_execution_guide.md`](sprint9_execution_guide.md) | In flight — #298, #300, #302, #309 open; #297, #299, #301 closed |
+| 10 | [`sprint10_issue_commands.md`](sprint10_issue_commands.md) | Planned — #372–#379 open |
+| 10 | [`s10_t1_forecast_contract_spec.md`](s10_t1_forecast_contract_spec.md) | Contract spec for #372 |
+| 10 | [`s10_t1_offline_verification.md`](s10_t1_offline_verification.md) | #372 evidence split while the infra node is offline |
 
 ## Lifecycle
 

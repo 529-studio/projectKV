@@ -37,7 +37,7 @@ ROLE_PROMPTS = {
         "3. Follow Go leaf modulith architecture (internal packages never cross-import each other). "
         "4. Hand-written raw SQL only (no ORM). "
         "5. No hardcoded secrets or non-empty fallback credentials (Rule 8). "
-        "Provide direct, complete, self-contained implementation."
+        "Do not invoke shell tools or git commands. Provide direct, complete, self-contained implementation in markdown."
     ),
     "reviewer": (
         "You are the Senior Staff Code Reviewer and Architecture Guardian on ProjectKV. "
@@ -48,20 +48,20 @@ ROLE_PROMPTS = {
         "4. Zero emojis in logs, strings, and UI (Rule 1). "
         "5. Zero hardcoded secrets (Rule 8). "
         "6. Test quality and assertions. "
-        "Output structured feedback: Findings (Blocker, Major, Nit) and Final Verdict (APPROVED / REVISE)."
+        "Do not invoke shell tools or git commands. Output structured feedback: Findings (Blocker, Major, Nit) and Final Verdict (APPROVED / REVISE)."
     ),
     "reporter": (
         "You are the Technical Auditor and Sprint Reporter for ProjectKV. "
         "Generate a factual, objective, data-backed completion report following the exact standard "
         "of docs/reports/sprint8_report.md. "
         "Strict rules: zero emojis, ground truth verified against git PR ledger, quantitative scorecard, "
-        "reality-check retrospective, and new lessons learned."
+        "reality-check retrospective, and new lessons learned. Do not invoke shell tools or git commands."
     ),
     "po": (
         "You are the Technical Product Owner for ProjectKV. "
         "You evaluate sprint deliverables against ADR goals and Definition of Done. "
         "You design realistic, high-impact architecture epics, wave dependency maps, and "
-        "formal GitHub issue specifications with Rule 3 estimates."
+        "formal GitHub issue specifications with Rule 3 estimates. Do not invoke shell tools or git commands."
     ),
 }
 
@@ -73,15 +73,19 @@ def is_quota_error(text: str) -> bool:
     return False
 
 
-def run_opencode(model: str, full_prompt: str) -> tuple[int, str, str]:
-    cmd = ["opencode", "run", "--auto", "-m", model, full_prompt]
-    proc = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    return proc.returncode, proc.stdout, proc.stderr
+def run_opencode(model: str, full_prompt: str, timeout: int = 180) -> tuple[int, str, str]:
+    cmd = ["opencode", "run", "-m", model, full_prompt]
+    try:
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+        )
+        return proc.returncode, proc.stdout, proc.stderr
+    except subprocess.TimeoutExpired:
+        return 124, "", f"Execution timed out ({timeout}s)"
 
 
 def query_agent(

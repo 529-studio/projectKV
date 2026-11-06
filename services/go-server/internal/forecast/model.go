@@ -78,6 +78,31 @@ var CalibratedRidgeParams = map[int]ModelParams{
 	},
 }
 
+// DefaultModelMetadata carries provenance and validation metadata for the embedded prototype model.
+var DefaultModelMetadata = ModelMetadata{
+	Name:         ModelRidgeDelta,
+	Version:      "2026.11.05-synthetic",
+	TargetMode:   "delta",
+	FitSource:    string(FitSourceSyntheticFixture),
+	Validated:    false,
+	Experimental: false,
+	FitRows:      1152,
+	FitCameras:   2,
+	FitWindow: &FitWindow{
+		Start: "2026-10-28T00:00:00Z",
+		End:   "2026-10-29T23:55:00Z",
+	},
+	FitDataSHA256:  "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
+	ArtifactSHA256: "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
+	SHA256:         "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
+	MAE:            0.0044,
+	Metrics: []HorizonMetric{
+		{HorizonMinutes: 10, MAE: 0.00440486, RMSE: 0.00508631, SampleCount: 342},
+		{HorizonMinutes: 20, MAE: 0.01016163, RMSE: 0.01172547, SampleCount: 342},
+		{HorizonMinutes: 30, MAE: 0.01724040, RMSE: 0.01989593, SampleCount: 342},
+	},
+}
+
 // Features contains the input feature vector for the Ridge regression delta model.
 type Features struct {
 	Lag5m          float64

@@ -2,9 +2,7 @@ package forecast
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,14 +18,10 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
-// RegisterRoutes registers the forecast endpoints onto the given RouterGroup (e.g. /api).
+// RegisterRoutes registers the canonical forecast endpoint onto the given RouterGroup (e.g. /api).
+// Registers GET /v1/cameras/:id/forecast, mounting to /api/v1/cameras/:id/forecast.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
-	rg.GET("/forecast", h.GetForecast)
-}
-
-// RegisterRootRoutes registers alias routes directly onto the root Gin engine (e.g. GET /forecast).
-func (h *Handler) RegisterRootRoutes(r *gin.Engine) {
-	r.GET("/forecast", h.GetForecast)
+	rg.GET("/v1/cameras/:id/forecast", h.GetForecast)
 }
 
 // GetForecast godoc
@@ -35,58 +29,34 @@ func (h *Handler) RegisterRootRoutes(r *gin.Engine) {
 // @Description Returns short-horizon congestion forecasts (10, 20, 30 min) for a camera segment using Ridge delta regression or baseline models.
 // @Tags Forecast, Traffic
 // @Produce json
-// @Param camera_id query string false "Camera ID (or segment_id, node_id, edge_id)"
-// @Param segment_id query string false "Alias for camera_id"
-// @Param node_id query string false "Topology node alias"
-// @Param edge_id query string false "Topology edge alias"
-// @Param horizon query int false "Forecast horizon minutes (10, 20, 30; default 10)"
-// @Param horizon_minutes query int false "Alias for horizon"
+// @Param id path string true "Camera ID"
 // @Param timestamp query string false "Base timestamp in RFC3339 format (default current UTC)"
 // @Param model query string false "Model selector (ridge_delta, persistence, historical_median; default ridge_delta)"
-// @Success 200 {object} forecast.Response
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Failure 422 {object} map[string]string
-// @Failure 503 {object} map[string]string
-// @Router /api/forecast [get]
+// @Success 200 {object} forecast.MultiHorizonResponse
+// @Failure 400 {object} forecast.ErrorResponse
+// @Failure 404 {object} forecast.ErrorResponse
+// @Failure 422 {object} forecast.ErrorResponse
+// @Failure 503 {object} forecast.ErrorResponse
+// @Router /api/v1/cameras/{id}/forecast [get]
 func (h *Handler) GetForecast(c *gin.Context) {
-	// Priority order: camera_id > segment_id > node_id > edge_id
-	cameraID := c.Query("camera_id")
-	if cameraID == "" {
-		cameraID = c.Query("segment_id")
-	}
-	if cameraID == "" {
-		cameraID = c.Query("node_id")
-	}
-	if cameraID == "" {
-		cameraID = c.Query("edge_id")
-	}
+	c.Header("Cache-Control", "no-store")
 
+	cameraID := c.Param("id")
 	if cameraID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid_parameter",
-			"message": "camera_id is required",
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   KindInvalidParameter,
+			Message: "camera id path parameter is required",
 		})
 		return
 	}
 
-	// Horizon parameter (with horizon_minutes alias)
-	horizonStr := c.Query("horizon")
-	if horizonStr == "" {
-		horizonStr = c.Query("horizon_minutes")
-	}
-
-	horizon := 10
-	if horizonStr != "" {
-		parsed, err := strconv.Atoi(horizonStr)
-		if err != nil || !IsSupportedHorizon(parsed) {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "invalid_parameter",
-				"message": "horizon must be 10, 20, or 30 minutes",
-			})
-			return
-		}
-		horizon = parsed
+	// Reject retired horizon query parameters per contract D6
+	if c.Query("horizon") != "" || c.Query("horizon_minutes") != "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   KindInvalidParameter,
+			Message: "horizon query parameter is retired; endpoint returns all horizons [10, 20, 30]",
+		})
+		return
 	}
 
 	// Base timestamp parameter
@@ -97,9 +67,9 @@ func (h *Handler) GetForecast(c *gin.Context) {
 		if err != nil {
 			parsedTime, err = time.Parse(time.RFC3339, tsStr)
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error":   "invalid_parameter",
-					"message": "invalid timestamp format, expected RFC3339",
+				c.JSON(http.StatusBadRequest, ErrorResponse{
+					Error:   KindInvalidParameter,
+					Message: "invalid timestamp format, expected RFC3339",
 				})
 				return
 			}
@@ -112,54 +82,66 @@ func (h *Handler) GetForecast(c *gin.Context) {
 	// Model parameter
 	model := c.DefaultQuery("model", ModelRidgeDelta)
 	if model != ModelRidgeDelta && model != ModelPersistence && model != ModelHistoricalMedian {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid_parameter",
-			"message": "model must be ridge_delta, persistence, or historical_median",
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   KindInvalidParameter,
+			Message: "model must be ridge_delta, persistence, or historical_median",
 		})
 		return
 	}
 
 	req := Request{
-		CameraID:       cameraID,
-		HorizonMinutes: horizon,
-		BaseTime:       baseTime,
-		Model:          model,
+		CameraID: cameraID,
+		BaseTime: baseTime,
+		Model:    model,
 	}
 
-	resp, err := h.service.Predict(c.Request.Context(), req)
+	resp, err := h.service.PredictMulti(c.Request.Context(), req)
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrInvalidCameraID):
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "invalid_parameter",
-				"message": "camera_id is required",
-			})
-		case errors.Is(err, ErrInvalidHorizon):
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "invalid_parameter",
-				"message": "horizon must be 10, 20, or 30 minutes",
-			})
-		case errors.Is(err, ErrInvalidModel):
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "invalid_parameter",
-				"message": "model must be ridge_delta, persistence, or historical_median",
-			})
-		case errors.Is(err, ErrCameraNotFound):
-			c.JSON(http.StatusNotFound, gin.H{
-				"error":   "not_found",
-				"message": fmt.Sprintf("camera %s not found in catalog", cameraID),
-			})
-		case errors.Is(err, ErrInsufficientHistory):
-			c.JSON(http.StatusUnprocessableEntity, gin.H{
-				"error":   "insufficient_history",
-				"message": "no observation history available for camera",
-			})
-		default:
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"error":   "service_unavailable",
-				"message": "forecast repository database is currently unreachable",
-			})
+		var fe *ForecastError
+		if errors.As(err, &fe) {
+			switch fe.Kind {
+			case KindInvalidParameter:
+				c.JSON(http.StatusBadRequest, ErrorResponse{
+					Error:   fe.Kind,
+					Message: fe.Message,
+				})
+			case KindNotFound:
+				c.JSON(http.StatusNotFound, ErrorResponse{
+					Error:   fe.Kind,
+					Message: fe.Message,
+				})
+			case KindInsufficientHistory:
+				c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
+					Error:        fe.Kind,
+					Message:      fe.Message,
+					Availability: StatusInsufficientHistory,
+					Requirements: fe.Requirements,
+				})
+			case KindModelUnvalidated:
+				c.JSON(http.StatusServiceUnavailable, ErrorResponse{
+					Error:        fe.Kind,
+					Message:      fe.Message,
+					Availability: StatusModelUnvalidated,
+					Model:        fe.Model,
+				})
+			case KindServiceUnavailable:
+				c.JSON(http.StatusServiceUnavailable, ErrorResponse{
+					Error:   fe.Kind,
+					Message: fe.Message,
+				})
+			default:
+				c.JSON(http.StatusInternalServerError, ErrorResponse{
+					Error:   "internal_error",
+					Message: fe.Message,
+				})
+			}
+			return
 		}
+
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "internal_error",
+			Message: err.Error(),
+		})
 		return
 	}
 
