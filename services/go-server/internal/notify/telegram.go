@@ -230,8 +230,8 @@ func FormatTelegramMessage(alert FloodAlert) string {
 	if alert.Ward != "" {
 		locationParts = append(locationParts, escapeHTML(alert.Ward))
 	}
-	if alert.District != "" {
-		locationParts = append(locationParts, escapeHTML(alert.District))
+	if alert.Zone != "" {
+		locationParts = append(locationParts, escapeHTML(alert.Zone))
 	}
 	locationStr := strings.Join(locationParts, ", ")
 	if locationStr == "" {

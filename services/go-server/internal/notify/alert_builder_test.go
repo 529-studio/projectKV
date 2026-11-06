@@ -23,8 +23,8 @@ func TestBuildFloodAlert_FullCamera(t *testing.T) {
 	if alert.CameraName != "Ung Van Khiem" {
 		t.Errorf("CameraName: got %q", alert.CameraName)
 	}
-	if alert.District != "Khu vực Nội thành TP.HCM" {
-		t.Errorf("District: got %q", alert.District)
+	if alert.Zone != "Khu vực Nội thành TP.HCM" {
+		t.Errorf("Zone: got %q", alert.Zone)
 	}
 	if alert.Ward != "Thạnh Mỹ Tây" {
 		t.Errorf("Ward: got %q", alert.Ward)
