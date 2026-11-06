@@ -72,6 +72,7 @@ is the only part an agent should read by default.
 | 66 | Self-Referential Tests and Silent Fallbacks | Test the code, not a copy of it: extract the decision into a function; make every fallback narrow, announced, or refused. | [L66](L66-self-referential-tests-and-silent-fallbacks-hide-the-live-path.md) |
 | 67 | Upsert-Only State Tables Cannot Feed Time-Series Models | Append-only history with idempotent keys, canonical UTC timestamps, stale exclusion, and lags anchored to the raw timeline with age bounds. | [L67](L67-upsert-only-state-tables-cannot-feed-time-series-models.md) |
 | 68 | Chronological Splits Still Leak at Horizon Boundaries | Purge training samples whose target timestamp crosses the test cutoff, and score every model on one common eligible set. | [L68](L68-chronological-split-horizon-boundary-leakage.md) |
+| 69 | Hardcoded Prototype Fixtures & Cost of Shortcuts | Dynamic artifact loader (//go:embed & path override) with dynamic SHA256; fail-closed path & size guards. | [L69](L69-hardcoded-prototype-fixtures-and-the-cost-of-shortcuts.md) |
 
 > Numbering note: Lesson 54 does not exist in the source register. Numbers are preserved as-is because
 > other documents reference lessons by number; nothing has been renumbered.

@@ -33,75 +33,23 @@ func IsSupportedHorizon(h int) bool {
 
 // ModelParams holds calibrated ridge regression parameters for a single horizon.
 type ModelParams struct {
-	HorizonMinutes int
-	Intercept      float64
-	Means          [6]float64
-	Stds           [6]float64
-	Coeffs         [6]float64 // standardized coefficients for [lag_5m, lag_10m, lag_15m, rolling_mean_15m, hour_of_day, day_of_week]
-	MAE            float64
-	RMSE           float64
-	GlobalMedian   float64
+	HorizonMinutes int        `json:"horizon_minutes"`
+	Intercept      float64    `json:"intercept"`
+	Means          [6]float64 `json:"means"`
+	Stds           [6]float64 `json:"stds"`
+	Coeffs         [6]float64 `json:"coeffs"`
+	MAE            float64    `json:"mae"`
+	RMSE           float64    `json:"rmse"`
+	GlobalMedian   float64    `json:"global_median"`
 }
 
-// CalibratedRidgeParams maps horizon minutes (10, 20, 30) to empirical parameters
-// calibrated in docs/reports/forecast_prototype_v1.json.
-var CalibratedRidgeParams = map[int]ModelParams{
-	10: {
-		HorizonMinutes: 10,
-		Intercept:      0.00107284,
-		Means:          [6]float64{0.40375368, 0.40319124, 0.40262416, 0.40318968, 11.45477387, 2.49497487},
-		Stds:           [6]float64{0.15215443, 0.15210521, 0.15206814, 0.15204149, 6.05392143, 0.49997475},
-		Coeffs:         [6]float64{0.09378699, -0.00372577, -0.09066105, -0.00018257, -0.00130246, 0.00012606},
-		MAE:            0.00440486,
-		RMSE:           0.00508631,
-		GlobalMedian:   0.439646,
-	},
-	20: {
-		HorizonMinutes: 20,
-		Intercept:      0.00205409,
-		Means:          [6]float64{0.40313019, 0.40258085, 0.40202802, 0.40257967, 11.43181818, 2.49242424},
-		Stds:           [6]float64{0.15224289, 0.15220401, 0.15217802, 0.15214032, 6.06054451, 0.49994260},
-		Coeffs:         [6]float64{0.17912274, -0.00956642, -0.17129539, -0.00055492, -0.00239800, 0.00045848},
-		MAE:            0.01016163,
-		RMSE:           0.01172547,
-		GlobalMedian:   0.4405125,
-	},
-	30: {
-		HorizonMinutes: 30,
-		Intercept:      0.00292070,
-		Means:          [6]float64{0.40253359, 0.40199928, 0.40146153, 0.40199812, 11.40862944, 2.48984772},
-		Stds:           [6]float64{0.15235608, 0.15232854, 0.15231368, 0.15226458, 6.06713930, 0.49989692},
-		Coeffs:         [6]float64{0.25109996, -0.01712766, -0.23729677, -0.00108567, -0.00349264, 0.00096634},
-		MAE:            0.01724040,
-		RMSE:           0.01989593,
-		GlobalMedian:   0.4415535,
-	},
-}
+// CalibratedRidgeParams provides backwards-compatible access to default ridge parameters,
+// dynamically populated from the embedded artifact.
+var CalibratedRidgeParams = DefaultArtifact().RidgeParams()
 
-// DefaultModelMetadata carries provenance and validation metadata for the embedded prototype model.
-var DefaultModelMetadata = ModelMetadata{
-	Name:         ModelRidgeDelta,
-	Version:      "2026.11.05-synthetic",
-	TargetMode:   "delta",
-	FitSource:    string(FitSourceSyntheticFixture),
-	Validated:    false,
-	Experimental: false,
-	FitRows:      1152,
-	FitCameras:   2,
-	FitWindow: &FitWindow{
-		Start: "2026-10-28T00:00:00Z",
-		End:   "2026-10-29T23:55:00Z",
-	},
-	FitDataSHA256:  "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
-	ArtifactSHA256: "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
-	SHA256:         "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
-	MAE:            0.0044,
-	Metrics: []HorizonMetric{
-		{HorizonMinutes: 10, MAE: 0.00440486, RMSE: 0.00508631, SampleCount: 342},
-		{HorizonMinutes: 20, MAE: 0.01016163, RMSE: 0.01172547, SampleCount: 342},
-		{HorizonMinutes: 30, MAE: 0.01724040, RMSE: 0.01989593, SampleCount: 342},
-	},
-}
+// DefaultModelMetadata carries provenance and validation metadata dynamically derived
+// from the default artifact.
+var DefaultModelMetadata = DefaultArtifact().DefaultMetadata()
 
 // Features contains the input feature vector for the Ridge regression delta model.
 type Features struct {

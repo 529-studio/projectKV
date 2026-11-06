@@ -693,7 +693,12 @@ func main() {
 			slog.Warn("FORECAST_ALLOW_SYNTHETIC is enabled (dev escape hatch); predictions are marked experimental")
 		}
 
-		forecastService := forecast.NewService(forecastHistAdapter, forecastCamAdapter)
+		var forecastOpts []forecast.Option
+		if modelPath := strings.TrimSpace(os.Getenv("FORECAST_MODEL_PATH")); modelPath != "" {
+			forecastOpts = append(forecastOpts, forecast.WithModelPath(modelPath))
+		}
+
+		forecastService := forecast.NewService(forecastHistAdapter, forecastCamAdapter, forecastOpts...)
 		forecastHandler = forecast.NewHandler(forecastService)
 	}
 

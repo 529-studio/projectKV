@@ -73,6 +73,7 @@ type Response struct {
 type Service struct {
 	history        HistoryReader
 	catalog        CameraCatalog
+	artifact       *ModelArtifact
 	model          ModelMetadata
 	allowSynthetic bool
 	staleTTL       time.Duration
@@ -95,6 +96,28 @@ func WithModelMetadata(meta ModelMetadata) Option {
 	}
 }
 
+// WithArtifact configures the model artifact to be used for inference.
+func WithArtifact(artifact *ModelArtifact) Option {
+	return func(s *Service) {
+		if artifact != nil {
+			s.artifact = artifact
+			s.model = artifact.DefaultMetadata()
+		}
+	}
+}
+
+// WithModelPath loads and configures a ModelArtifact from disk.
+func WithModelPath(path string) Option {
+	return func(s *Service) {
+		if art, err := LoadArtifact(path); err == nil && art != nil {
+			s.artifact = art
+			s.model = art.DefaultMetadata()
+		} else if err != nil {
+			slog.Error("forecast: failed to load model artifact from path", "path", path, "error", err)
+		}
+	}
+}
+
 // WithStaleTTL overrides the observation staleness threshold duration.
 func WithStaleTTL(ttl time.Duration) Option {
 	return func(s *Service) {
@@ -111,6 +134,7 @@ func NewService(history HistoryReader, catalog CameraCatalog, opts ...Option) *S
 	s := &Service{
 		history:        history,
 		catalog:        catalog,
+		artifact:       DefaultArtifact(),
 		model:          DefaultModelMetadata,
 		allowSynthetic: envAllow,
 		staleTTL:       15 * time.Minute,
@@ -275,7 +299,16 @@ func (s *Service) PredictMulti(ctx context.Context, req Request) (*MultiHorizonR
 	for _, hMinutes := range []int{10, 20, 30} {
 		var predictedSI float64
 		var rmse float64
+
+		// Resolve parameters dynamically from loaded artifact, with fallback to CalibratedRidgeParams
 		params := CalibratedRidgeParams[hMinutes]
+		if s.artifact != nil {
+			if entry, ok := s.artifact.Entry(req.Model); ok {
+				if p, ok := entry.Params(hMinutes); ok {
+					params = p
+				}
+			}
+		}
 
 		switch req.Model {
 		case ModelRidgeDelta:
@@ -283,23 +316,29 @@ func (s *Service) PredictMulti(ctx context.Context, req Request) (*MultiHorizonR
 			rmse = params.RMSE
 		case ModelPersistence:
 			predictedSI = currentSI
-			switch hMinutes {
-			case 10:
-				rmse = 0.01110912
-			case 20:
-				rmse = 0.02220334
-			case 30:
-				rmse = 0.03316360
+			rmse = params.RMSE
+			if rmse == 0 {
+				switch hMinutes {
+				case 10:
+					rmse = 0.01110912
+				case 20:
+					rmse = 0.02220334
+				case 30:
+					rmse = 0.03316360
+				}
 			}
 		case ModelHistoricalMedian:
 			predictedSI = params.GlobalMedian
-			switch hMinutes {
-			case 10:
-				rmse = 0.02766057
-			case 20:
-				rmse = 0.02774466
-			case 30:
-				rmse = 0.02757248
+			rmse = params.RMSE
+			if rmse == 0 {
+				switch hMinutes {
+				case 10:
+					rmse = 0.02766057
+				case 20:
+					rmse = 0.02774466
+				case 30:
+					rmse = 0.02757248
+				}
 			}
 		}
 
