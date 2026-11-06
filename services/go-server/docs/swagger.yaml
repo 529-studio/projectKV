@@ -712,6 +712,13 @@ definitions:
       report_count:
         type: integer
     type: object
+  subscription.ChokepointInfo:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
   subscription.SubscribeRequest:
     properties:
       channel_name:
@@ -721,7 +728,7 @@ definitions:
         example: "123456789"
         type: string
       target_id:
-        example: Quận 1
+        example: Quận 7 - Nhà Bè
         type: string
       target_type:
         example: zone
@@ -730,6 +737,34 @@ definitions:
     - channel_name
     - chat_id
     - target_type
+    type: object
+  subscription.TaxonomyResponse:
+    properties:
+      chokepoints:
+        items:
+          $ref: '#/definitions/subscription.ChokepointInfo'
+        type: array
+      target_types:
+        items:
+          type: string
+        type: array
+      wards:
+        items:
+          $ref: '#/definitions/subscription.WardInfo'
+        type: array
+      zones:
+        items:
+          type: string
+        type: array
+    type: object
+  subscription.WardInfo:
+    properties:
+      name:
+        description: e.g. "Bến Nghé", "Thảo Điền"
+        type: string
+      type:
+        description: '"Phường", "Xã", "Thị trấn"'
+        type: string
     type: object
   weather.HourlyForecast:
     properties:
@@ -1280,8 +1315,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
+            additionalProperties: true
             type: object
         "500":
           description: Internal Server Error
@@ -1351,8 +1385,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
+            additionalProperties: true
             type: object
         "500":
           description: Internal Server Error
@@ -1361,6 +1394,20 @@ paths:
               type: string
             type: object
       summary: Create flood alert subscription
+      tags:
+      - Subscriptions
+  /api/subscriptions/taxonomy:
+    get:
+      description: Retrieves all canonical targets available for subscription (operational
+        zones, administrative wards, camera chokepoints, and target types).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.TaxonomyResponse'
+      summary: Get subscription taxonomy
       tags:
       - Subscriptions
   /api/tiles/{z}/{x}/{y}:

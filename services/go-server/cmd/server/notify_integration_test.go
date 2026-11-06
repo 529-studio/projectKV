@@ -77,7 +77,7 @@ func TestNotifyIntegration_EndToEnd(t *testing.T) {
 		{"chat-cam-1002", "chokepoint", "cam-hotspot-binh-thanh"},
 		{"chat-zone-1003", "zone", "Quận Bình Thạnh"},
 		{"chat-ward-1004", "ward", "Phường 25"},
-		{"chat-unrelated-1005", "zone", "Quận 1"}, // Should not receive alert
+		{"chat-unrelated-1005", "zone", "Quận 7 - Nhà Bè"}, // Unrelated zone, should not receive alert
 	}
 
 	for _, s := range subs {
@@ -102,7 +102,7 @@ func TestNotifyIntegration_EndToEnd(t *testing.T) {
 	manager := notify.NewManager(debouncer)
 
 	subFinder := notify.SubscriberFinderFunc(func(ctx context.Context, channelName string, alert notify.FloodAlert) ([]string, error) {
-		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.District, alert.Ward)
+		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.Zone, alert.Ward)
 	})
 
 	tgChannel := notify.NewTelegramChannel(
@@ -116,7 +116,7 @@ func TestNotifyIntegration_EndToEnd(t *testing.T) {
 	alert := notify.FloodAlert{
 		CameraID:       "cam-hotspot-binh-thanh",
 		CameraName:     "Nguyễn Xí - Cầu Đỏ",
-		District:       "Quận Bình Thạnh",
+		Zone:           "Khu vực Nội thành TP.HCM",
 		Ward:           "Phường 25",
 		FloodSeverity:  "FLOODED_DEEP",
 		TypicalDepthCm: 45,
@@ -247,7 +247,7 @@ func TestNotifyIntegration_DebounceFiveMinuteWindow(t *testing.T) {
 	manager := notify.NewManager(debouncer)
 
 	subFinder := notify.SubscriberFinderFunc(func(ctx context.Context, channelName string, alert notify.FloodAlert) ([]string, error) {
-		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.District, alert.Ward)
+		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.Zone, alert.Ward)
 	})
 
 	manager.Register(notify.NewTelegramChannel(
@@ -260,7 +260,7 @@ func TestNotifyIntegration_DebounceFiveMinuteWindow(t *testing.T) {
 		CameraID:       "586e2995f9fab7001111b0b5",
 		CameraName:     "Ung Văn Khiêm - Nguyễn Gia Trí (D2)",
 		Ward:           "Thạnh Mỹ Tây",
-		District:       "Khu vực Nội thành TP.HCM", // production cam.Zone (traffic zone, not administrative district)
+		Zone:           "Khu vực Nội thành TP.HCM", // production cam.Zone (traffic zone, not administrative district)
 		FloodSeverity:  "FLOODED_DEEP",
 		TypicalDepthCm: 35,
 	}

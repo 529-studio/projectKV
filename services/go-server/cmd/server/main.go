@@ -131,6 +131,102 @@ func (a *forecastCameraAdapter) GetCamera(id string) (forecast.CameraInfo, bool)
 	}, true
 }
 
+// subscriptionTaxonomyAdapter adapts camera.Reader to subscription.TaxonomyProvider
+// (Dependency Inversion Principle: consumer package subscription defines the interface,
+// composition root adapts the catalog).
+type subscriptionTaxonomyAdapter struct {
+	catalog camera.Reader
+}
+
+func (a *subscriptionTaxonomyAdapter) Zones() []string {
+	if a == nil || a.catalog == nil {
+		return subscription.CanonicalZones
+	}
+	return a.catalog.Zones()
+}
+
+func (a *subscriptionTaxonomyAdapter) Wards() []subscription.WardInfo {
+	if a == nil || a.catalog == nil {
+		return nil
+	}
+	phuongs := a.catalog.Phuongs()
+	out := make([]subscription.WardInfo, len(phuongs))
+	for i, p := range phuongs {
+		out[i] = subscription.WardInfo{Type: p.Type, Name: p.Name}
+	}
+	return out
+}
+
+func (a *subscriptionTaxonomyAdapter) Chokepoints() []subscription.ChokepointInfo {
+	if a == nil || a.catalog == nil {
+		return nil
+	}
+	cams := a.catalog.All()
+	out := make([]subscription.ChokepointInfo, 0, len(cams))
+	for _, c := range cams {
+		name := c.DisplayName
+		if name == "" {
+			name = c.Title
+		}
+		out = append(out, subscription.ChokepointInfo{ID: c.ID, Name: name})
+	}
+	return out
+}
+
+func (a *subscriptionTaxonomyAdapter) HasZone(zone string) bool {
+	if a == nil || a.catalog == nil {
+		for _, z := range subscription.CanonicalZones {
+			if strings.EqualFold(z, zone) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, z := range a.catalog.Zones() {
+		if strings.EqualFold(z, zone) {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *subscriptionTaxonomyAdapter) HasWard(ward string) bool {
+	if a == nil || a.catalog == nil {
+		return false
+	}
+	trimmed := strings.TrimSpace(ward)
+	if trimmed == "" {
+		return false
+	}
+	for _, p := range a.catalog.Phuongs() {
+		if strings.EqualFold(p.Name, trimmed) || strings.EqualFold(p.Type+" "+p.Name, trimmed) {
+			return true
+		}
+	}
+	// Prefix-less check
+	target := trimmed
+	for _, prefix := range []string{"phường ", "xã ", "thị trấn "} {
+		if strings.HasPrefix(strings.ToLower(target), prefix) {
+			target = strings.TrimSpace(target[len(prefix):])
+			break
+		}
+	}
+	for _, p := range a.catalog.Phuongs() {
+		if strings.EqualFold(p.Name, target) {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *subscriptionTaxonomyAdapter) HasChokepoint(id string) bool {
+	if a == nil || a.catalog == nil {
+		return false
+	}
+	_, ok := a.catalog.ByID(id)
+	return ok
+}
+
 // criticalKeywords are used to prioritise well-known traffic choke points
 // (e.g. An Suong, Cat Lai port cluster, My Thuy, major corridors) when
 // seeding the Hot Set at startup. Vietnamese keywords are normalised to
@@ -511,7 +607,11 @@ func main() {
 		verdictRepo = store.NewVerdictRepo(db)
 		verdictHistoryRepo = store.NewVerdictHistoryRepo(db)
 		subStore = subscription.NewSQLiteStore(db)
-		subHandler = subscription.NewHandler(subStore)
+		var taxonomyProv subscription.TaxonomyProvider
+		if camCatalog != nil {
+			taxonomyProv = &subscriptionTaxonomyAdapter{catalog: camCatalog}
+		}
+		subHandler = subscription.NewHandler(subStore, taxonomyProv)
 		defer db.Close()
 	}
 
@@ -528,7 +628,7 @@ func main() {
 		if subStore == nil {
 			return nil, nil
 		}
-		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.District, alert.Ward)
+		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.Zone, alert.Ward)
 	})
 
 	telegramChan := notify.NewTelegramChannel(cfg.TelegramBotToken, subFinder)
@@ -558,7 +658,7 @@ func main() {
 		}
 
 		camName := v.CameraID
-		district := ""
+		zone := ""
 		ward := ""
 		snapshotURL := ""
 		if camCatalog != nil {
@@ -568,7 +668,7 @@ func main() {
 				} else if cam.Title != "" {
 					camName = cam.Title
 				}
-				district = cam.Zone
+				zone = cam.Zone
 				ward = cam.PhuongName
 				snapshotURL = cam.SnapshotURL
 			}
@@ -587,7 +687,7 @@ func main() {
 		alert := notify.BuildFloodAlert(
 			v.CameraID,
 			camName,
-			district,
+			zone,
 			ward,
 			snapshotURL,
 			typicalDepth,

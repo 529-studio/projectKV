@@ -80,7 +80,22 @@ func (s *SQLiteStore) Unsubscribe(ctx context.Context, channelName, chatID strin
 func (s *SQLiteStore) GetSubscribersForChokepoint(ctx context.Context, channelName, chokepointID, zone, ward string) ([]string, error) {
 	chokepointID = strings.TrimSpace(chokepointID)
 	zone = strings.TrimSpace(zone)
+	if canonical, ok := NormalizeZone(zone); ok {
+		zone = canonical
+	}
 	ward = strings.TrimSpace(ward)
+
+	var altWard string
+	lowerWard := strings.ToLower(ward)
+	for _, pfx := range []string{"phường ", "xã ", "thị trấn "} {
+		if strings.HasPrefix(lowerWard, pfx) {
+			altWard = strings.TrimSpace(ward[len(pfx):])
+			break
+		}
+	}
+	if altWard == "" && ward != "" {
+		altWard = "Phường " + ward
+	}
 
 	query := `
 		SELECT DISTINCT chat_id FROM flood_subscriptions
@@ -88,7 +103,7 @@ func (s *SQLiteStore) GetSubscribersForChokepoint(ctx context.Context, channelNa
 			(target_type = 'all') OR
 			(target_type = 'chokepoint' AND target_id = ?) OR
 			(target_type = 'zone' AND (? != '' AND LOWER(target_id) = LOWER(?))) OR
-			(target_type = 'ward' AND (? != '' AND LOWER(target_id) = LOWER(?)))
+			(target_type = 'ward' AND (? != '' AND (LOWER(target_id) = LOWER(?) OR LOWER(target_id) = LOWER(?))))
 		)
 		ORDER BY chat_id ASC
 	`
@@ -97,7 +112,7 @@ func (s *SQLiteStore) GetSubscribersForChokepoint(ctx context.Context, channelNa
 		channelName,
 		chokepointID,
 		zone, zone,
-		ward, ward,
+		ward, ward, altWard,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query subscribers for chokepoint (%s): %w", chokepointID, err)

@@ -33,12 +33,12 @@ go run -C services/go-server ./cmd/notify-preview -camera-id 586e2995f9fab700111
 - `-severity` (string, default `FLOODED_DEEP`): Severity level (`WET`, `FLOODED_SHALLOW`, `FLOODED_DEEP`).
 - `-observed-at` (string, optional): RFC3339 formatted observation time (defaults to `time.Now()`).
 
-### Important Semantics: Area Line (Zone vs District)
+### Important Semantics: Area Line (Ward & Canonical Zone)
 
 The Area line (`Khu vực / Area`) renders:
-`<Ward>, <District/Zone>`
+`<Ward>, <Zone>`
 
-In production, `District` is mapped to `cam.Zone` (the municipal traffic zone classification, e.g. `Khu vực Nội thành TP.HCM`), **not** the administrative district from the chokepoints fixture. `notify-preview` uses this exact logic to guarantee byte parity.
+`notify.FloodAlert.Zone` maps directly to `cam.Zone` (the canonical municipal traffic zone classification from `camera.DefaultZones`, e.g. `Khu vực Nội thành TP.HCM`). The legacy district tier is eliminated (ADR-012 D4); `notify-preview` uses this exact logic to guarantee byte parity.
 
 ## Staging Verification Script
 

@@ -40,7 +40,7 @@ func main() {
 	}
 
 	camName := *cameraID
-	district := ""
+	zone := ""
 	ward := ""
 	snapshotURL := ""
 	if cam != nil {
@@ -49,7 +49,7 @@ func main() {
 		} else if cam.Title != "" {
 			camName = cam.Title
 		}
-		district = cam.Zone
+		zone = cam.Zone
 		ward = cam.PhuongName
 		snapshotURL = cam.SnapshotURL
 	}
@@ -80,7 +80,7 @@ func main() {
 	alert := notify.BuildFloodAlert(
 		*cameraID,
 		camName,
-		district,
+		zone,
 		ward,
 		snapshotURL,
 		typicalDepth,

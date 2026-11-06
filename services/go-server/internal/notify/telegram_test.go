@@ -16,7 +16,7 @@ func TestFormatTelegramMessage_ZeroEmojiAndBilingual(t *testing.T) {
 	alert := FloodAlert{
 		CameraID:       "cam-test-01",
 		CameraName:     "Võ Văn Kiệt - Ký Con & Cầu Ông Lãnh",
-		District:       "Quận 1",
+		Zone:           "Quận 1",
 		Ward:           "Phường Cầu Ông Lãnh",
 		FloodSeverity:  "FLOODED_DEEP",
 		TypicalDepthCm: 35,
@@ -94,7 +94,7 @@ func TestTelegramChannel_Send_MockServer(t *testing.T) {
 	alert := FloodAlert{
 		CameraID:      "cam-01",
 		CameraName:    "Ung Văn Khiêm",
-		District:      "Bình Thạnh",
+		Zone:          "Bình Thạnh",
 		FloodSeverity: "FLOODED_SHALLOW",
 	}
 
@@ -159,7 +159,7 @@ func TestFormatTelegramMessage_StagingChokepointFixture(t *testing.T) {
 		CameraID:       "586e2995f9fab7001111b0b5",
 		CameraName:     "Ung Văn Khiêm - Nguyễn Gia Trí (D2)",
 		Ward:           "Thạnh Mỹ Tây",
-		District:       "Khu vực Nội thành TP.HCM", // production cam.Zone for this camera (default ZoneNoiThanh classification)
+		Zone:           "Khu vực Nội thành TP.HCM", // production cam.Zone for this camera (default ZoneNoiThanh classification)
 		FloodSeverity:  "FLOODED_DEEP",
 		TypicalDepthCm: 35,
 		ObservedAt:     time.Date(2026, 10, 24, 14, 15, 0, 0, time.UTC),
