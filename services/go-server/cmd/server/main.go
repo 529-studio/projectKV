@@ -25,6 +25,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/cvclient"
 	"github.com/529-studio/projectKV/services/go-server/internal/feedback"
 	"github.com/529-studio/projectKV/services/go-server/internal/flood"
+	"github.com/529-studio/projectKV/services/go-server/internal/forecast"
 	"github.com/529-studio/projectKV/services/go-server/internal/harvester"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
@@ -73,6 +74,61 @@ func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
 		}
 	}
 	return out
+}
+
+// forecastHistoryAdapter adapts *store.VerdictHistoryRepo to forecast.HistoryReader
+// (Dependency Inversion Principle: consumer package forecast defines the interface,
+// composition root adapts the persistent store).
+type forecastHistoryAdapter struct {
+	repo *store.VerdictHistoryRepo
+}
+
+func (a *forecastHistoryAdapter) GetRecentByCamera(ctx context.Context, cameraID string, window time.Duration, limit int) ([]forecast.Observation, error) {
+	return a.GetRecentByCameraBefore(ctx, cameraID, time.Now().UTC(), window, limit)
+}
+
+func (a *forecastHistoryAdapter) GetRecentByCameraBefore(ctx context.Context, cameraID string, before time.Time, window time.Duration, limit int) ([]forecast.Observation, error) {
+	if a == nil || a.repo == nil {
+		return nil, fmt.Errorf("verdict history repo is nil")
+	}
+	rows, err := a.repo.GetRecentByCameraBefore(ctx, cameraID, before, window, limit)
+	if err != nil {
+		return nil, err
+	}
+	obs := make([]forecast.Observation, len(rows))
+	for i, r := range rows {
+		obs[i] = forecast.Observation{
+			CameraID:        r.CameraID,
+			PCUTotal:        r.PCUTotal,
+			SaturationIndex: r.SaturationIndex,
+			Severity:        r.Severity,
+			Confidence:      r.Confidence,
+			Source:          r.Source,
+			ObservedAt:      r.ObservedAt,
+		}
+	}
+	return obs, nil
+}
+
+// forecastCameraAdapter adapts camera.Reader to forecast.CameraCatalog.
+type forecastCameraAdapter struct {
+	catalog camera.Reader
+}
+
+func (a *forecastCameraAdapter) GetCamera(id string) (forecast.CameraInfo, bool) {
+	if a == nil || a.catalog == nil {
+		return forecast.CameraInfo{}, false
+	}
+	cam, ok := a.catalog.ByID(id)
+	if !ok || cam == nil {
+		return forecast.CameraInfo{}, false
+	}
+	return forecast.CameraInfo{
+		ID:           cam.ID,
+		RoadKey:      cam.RoadKey,
+		RoadKeys:     cam.RoadKeys,
+		BaseCapacity: cam.BaseCapacity,
+	}, true
 }
 
 // criticalKeywords are used to prioritise well-known traffic choke points
@@ -432,12 +488,14 @@ func main() {
 	// 5. Initialize SQLite DB and Verdict Repository
 	db, err := store.NewDB(cfg.SQLitePath)
 	var verdictRepo *store.VerdictRepo
+	var verdictHistoryRepo *store.VerdictHistoryRepo
 	var subStore subscription.Store
 	var subHandler *subscription.Handler
 	if err != nil {
 		log.Printf("[WARN] Failed to initialize SQLite database (%s): %v", cfg.SQLitePath, err)
 	} else {
 		verdictRepo = store.NewVerdictRepo(db)
+		verdictHistoryRepo = store.NewVerdictHistoryRepo(db)
 		subStore = subscription.NewSQLiteStore(db)
 		subHandler = subscription.NewHandler(subStore)
 		defer db.Close()
@@ -615,6 +673,15 @@ func main() {
 			time.Duration(cfg.VerdictStaleTTLSeconds)*time.Second,
 		)
 		corridorHandler = corridor.NewHandler(corridorService)
+	}
+
+	// 5d. Initialize short-horizon congestion forecast service (Issue #302 / S9-T6).
+	var forecastHandler *forecast.Handler
+	if verdictHistoryRepo != nil && camCatalog != nil {
+		forecastHistAdapter := &forecastHistoryAdapter{repo: verdictHistoryRepo}
+		forecastCamAdapter := &forecastCameraAdapter{catalog: camCatalog}
+		forecastService := forecast.NewService(forecastHistAdapter, forecastCamAdapter)
+		forecastHandler = forecast.NewHandler(forecastService)
 	}
 
 	// 5c. Initialize live weather forecast and RainViewer radar metadata service (Issue #120).
@@ -917,6 +984,34 @@ func main() {
 				}
 			}
 
+			// Fan-out 2b: append to the Hot Set time series consumed by the
+			// short-horizon congestion forecast feature store (Issue #302).
+			// Stale or frozen verdicts are excluded: replaying an unchanged
+			// frame as a fresh observation would poison lag and rolling
+			// features with fabricated variation. Verdicts without a PCU/SI
+			// series are skipped for the same reason; a VLM-only label or an
+			// UNKNOWN error verdict must not be persisted as a zero-saturation
+			// observation.
+			hasPCUSeries := v.Severity != hotset.SeverityUnknown &&
+				(v.Source == "onnx" || v.PCUTotal > 0 || v.SaturationIndex > 0)
+			if verdictHistoryRepo != nil && !v.Stale && hasPCUSeries {
+				hv := store.VerdictHistory{
+					CameraID:        v.CameraID,
+					PCUTotal:        v.PCUTotal,
+					SaturationIndex: v.SaturationIndex,
+					Severity:        v.Severity,
+					Confidence:      v.Confidence,
+					Source:          v.Source,
+					ObservedAt:      v.ObservedAt,
+				}
+				if hv.ObservedAt.IsZero() {
+					hv.ObservedAt = v.Timestamp
+				}
+				if err := verdictHistoryRepo.Record(context.Background(), hv); err != nil {
+					log.Printf("[WARN] Failed to record verdict history for %s: %v", v.CameraID, err)
+				}
+			}
+
 			// Fan-out 3: event-driven snapshot archiver with retention policy (Issue #62, #182).
 			if arch != nil {
 				var frameReader io.Reader
@@ -1049,6 +1144,11 @@ func main() {
 	// SSE Live Stream (ADR-003 Decision 1: GET /api/live/stream).
 	liveHub.RegisterRoutes(router)
 
+	// Short-horizon congestion forecast root alias (Issue #302 / S9-T6: GET /forecast).
+	if forecastHandler != nil {
+		forecastHandler.RegisterRootRoutes(router)
+	}
+
 	// Swagger documentation UI
 	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
 	router.GET("/swagger", func(c *gin.Context) {
@@ -1078,6 +1178,10 @@ func main() {
 		// Traffic corridor status endpoints (ADR-004 §D1 / Issue #75)
 		if corridorHandler != nil {
 			corridorHandler.RegisterRoutes(api)
+		}
+		// Short-horizon congestion forecast endpoints (Issue #302 / S9-T6)
+		if forecastHandler != nil {
+			forecastHandler.RegisterRoutes(api)
 		}
 		// Live weather forecast & radar metadata endpoints (Issue #120)
 		weatherHandler.RegisterRoutes(api)

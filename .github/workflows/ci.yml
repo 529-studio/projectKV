@@ -117,6 +117,15 @@ jobs:
         with:
           node-version: 20
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify Forecast Toolchain
+        run: |
+          make test-forecast
+
       - name: Verify Tools Syntax
         run: |
           node --check tools/crawler/get_all_cameras.js

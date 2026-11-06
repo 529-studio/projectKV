@@ -1,0 +1,354 @@
+{
+  "command": "python3 tools/forecast/backtest.py --input tools/forecast/fixtures/synthetic_congestion_5m.csv --json-out docs/reports/forecast_prototype_v1.json --markdown-out docs/reports/forecast_prototype_v1.md --data-note 'Synthetic harness fixture; live hotset_verdict_history had 0 rows on 2026-11-05, so these numbers are not production evidence. Regenerate from data/forecast/features_5m.csv once history accumulates.' --log-level INFO",
+  "config": {
+    "direction_epsilon": 1e-12,
+    "feature_columns": [
+      "lag_5m",
+      "lag_10m",
+      "lag_15m",
+      "rolling_mean_15m",
+      "hour_of_day",
+      "day_of_week"
+    ],
+    "horizons_minutes": [
+      10,
+      20,
+      30
+    ],
+    "prediction_floor": 0.0,
+    "ridge_lambda": 1.0,
+    "target_mode": "delta",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "train_ratio": 0.7
+  },
+  "data_provenance": {
+    "input": "tools/forecast/fixtures/synthetic_congestion_5m.csv",
+    "note": "Synthetic harness fixture; live hotset_verdict_history had 0 rows on 2026-11-05, so these numbers are not production evidence. Regenerate from data/forecast/features_5m.csv once history accumulates.",
+    "sha256": "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840"
+  },
+  "generated_at_utc": "2026-11-05T16:44:57.194906Z",
+  "input_summary": {
+    "accepted_rows": 1152,
+    "bin_minutes": 5,
+    "bin_minutes_source": "column",
+    "camera_count": 2,
+    "invalid_rows": 0,
+    "path": "tools/forecast/fixtures/synthetic_congestion_5m.csv",
+    "rows_without_saturation_index": 0,
+    "sha256": "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
+    "time_range_utc": {
+      "max": "2026-10-29T23:55:00Z",
+      "min": "2026-10-28T00:00:00Z"
+    },
+    "total_rows": 1152
+  },
+  "results": {
+    "10": {
+      "evaluation": {
+        "test_cameras": 2,
+        "test_samples": 342
+      },
+      "gate": {
+        "beats_persistence": true,
+        "candidate_mae": 0.00440486,
+        "candidate_model": "ridge_delta",
+        "mae_improvement": 0.00476954,
+        "mae_improvement_percent": 51.9875,
+        "persistence_mae": 0.0091744
+      },
+      "horizon_minutes": 10,
+      "models": {
+        "historical_median": {
+          "label": "Historical median",
+          "metrics": {
+            "bias": -0.02017876,
+            "directional_accuracy": 0.61988304,
+            "directional_matches": 212,
+            "mae": 0.02354196,
+            "rmse": 0.02766057,
+            "sample_count": 342
+          },
+          "parameters": {
+            "camera_groups": 2,
+            "camera_hour_groups": 48,
+            "fallback_order": [
+              "camera_id + target_hour_of_day",
+              "camera_id",
+              "global"
+            ],
+            "global_median": 0.439646,
+            "target_hour_source": "target bin in the configured timezone"
+          }
+        },
+        "persistence": {
+          "label": "Persistence",
+          "metrics": {
+            "bias": 0.00235761,
+            "directional_accuracy": 0.0,
+            "directional_matches": 0,
+            "mae": 0.0091744,
+            "rmse": 0.01110912,
+            "sample_count": 342
+          },
+          "parameters": {
+            "rule": "y_hat(t+h) = saturation_index(t)"
+          }
+        },
+        "ridge_delta": {
+          "label": "Ridge regression (delta)",
+          "metrics": {
+            "bias": 0.00210682,
+            "directional_accuracy": 0.83625731,
+            "directional_matches": 286,
+            "mae": 0.00440486,
+            "rmse": 0.00508631,
+            "sample_count": 342
+          },
+          "parameters": {
+            "feature_columns": [
+              "lag_5m",
+              "lag_10m",
+              "lag_15m",
+              "rolling_mean_15m",
+              "hour_of_day",
+              "day_of_week"
+            ],
+            "intercept": 0.00107284,
+            "ridge_lambda": 1.0,
+            "standardized_coefficients": {
+              "day_of_week": 0.00012606,
+              "hour_of_day": -0.00130246,
+              "lag_10m": -0.00372577,
+              "lag_15m": -0.09066105,
+              "lag_5m": 0.09378699,
+              "rolling_mean_15m": -0.00018257
+            },
+            "target_mode": "delta"
+          }
+        }
+      },
+      "sample_accounting": {
+        "test_missing_features": 0,
+        "test_missing_target": 4,
+        "test_samples": 342,
+        "train_median_samples": 802,
+        "train_missing_features": 6,
+        "train_missing_target": 0,
+        "train_purged_boundary": 4,
+        "train_samples": 796
+      }
+    },
+    "20": {
+      "evaluation": {
+        "test_cameras": 2,
+        "test_samples": 338
+      },
+      "gate": {
+        "beats_persistence": true,
+        "candidate_mae": 0.01016163,
+        "candidate_model": "ridge_delta",
+        "mae_improvement": 0.00821242,
+        "mae_improvement_percent": 44.6957,
+        "persistence_mae": 0.01837405
+      },
+      "horizon_minutes": 20,
+      "models": {
+        "historical_median": {
+          "label": "Historical median",
+          "metrics": {
+            "bias": -0.02018964,
+            "directional_accuracy": 0.71005917,
+            "directional_matches": 240,
+            "mae": 0.02359264,
+            "rmse": 0.02774466,
+            "sample_count": 338
+          },
+          "parameters": {
+            "camera_groups": 2,
+            "camera_hour_groups": 48,
+            "fallback_order": [
+              "camera_id + target_hour_of_day",
+              "camera_id",
+              "global"
+            ],
+            "global_median": 0.4405125,
+            "target_hour_source": "target bin in the configured timezone"
+          }
+        },
+        "persistence": {
+          "label": "Persistence",
+          "metrics": {
+            "bias": 0.00481082,
+            "directional_accuracy": 0.0,
+            "directional_matches": 0,
+            "mae": 0.01837405,
+            "rmse": 0.02220334,
+            "sample_count": 338
+          },
+          "parameters": {
+            "rule": "y_hat(t+h) = saturation_index(t)"
+          }
+        },
+        "ridge_delta": {
+          "label": "Ridge regression (delta)",
+          "metrics": {
+            "bias": 0.00531227,
+            "directional_accuracy": 0.79881657,
+            "directional_matches": 270,
+            "mae": 0.01016163,
+            "rmse": 0.01172547,
+            "sample_count": 338
+          },
+          "parameters": {
+            "feature_columns": [
+              "lag_5m",
+              "lag_10m",
+              "lag_15m",
+              "rolling_mean_15m",
+              "hour_of_day",
+              "day_of_week"
+            ],
+            "intercept": 0.00205409,
+            "ridge_lambda": 1.0,
+            "standardized_coefficients": {
+              "day_of_week": 0.00045848,
+              "hour_of_day": -0.002398,
+              "lag_10m": -0.00956642,
+              "lag_15m": -0.17129539,
+              "lag_5m": 0.17912274,
+              "rolling_mean_15m": -0.00055492
+            },
+            "target_mode": "delta"
+          }
+        }
+      },
+      "sample_accounting": {
+        "test_missing_features": 0,
+        "test_missing_target": 8,
+        "test_samples": 338,
+        "train_median_samples": 798,
+        "train_missing_features": 6,
+        "train_missing_target": 0,
+        "train_purged_boundary": 8,
+        "train_samples": 792
+      }
+    },
+    "30": {
+      "evaluation": {
+        "test_cameras": 2,
+        "test_samples": 334
+      },
+      "gate": {
+        "beats_persistence": true,
+        "candidate_mae": 0.0172404,
+        "candidate_model": "ridge_delta",
+        "mae_improvement": 0.01023738,
+        "mae_improvement_percent": 37.2569,
+        "persistence_mae": 0.02747778
+      },
+      "horizon_minutes": 30,
+      "models": {
+        "historical_median": {
+          "label": "Historical median",
+          "metrics": {
+            "bias": -0.02001395,
+            "directional_accuracy": 0.75449102,
+            "directional_matches": 252,
+            "mae": 0.0234577,
+            "rmse": 0.02757248,
+            "sample_count": 334
+          },
+          "parameters": {
+            "camera_groups": 2,
+            "camera_hour_groups": 48,
+            "fallback_order": [
+              "camera_id + target_hour_of_day",
+              "camera_id",
+              "global"
+            ],
+            "global_median": 0.4415535,
+            "target_hour_source": "target bin in the configured timezone"
+          }
+        },
+        "persistence": {
+          "label": "Persistence",
+          "metrics": {
+            "bias": 0.00728514,
+            "directional_accuracy": 0.0,
+            "directional_matches": 0,
+            "mae": 0.02747778,
+            "rmse": 0.0331636,
+            "sample_count": 334
+          },
+          "parameters": {
+            "rule": "y_hat(t+h) = saturation_index(t)"
+          }
+        },
+        "ridge_delta": {
+          "label": "Ridge regression (delta)",
+          "metrics": {
+            "bias": 0.00951355,
+            "directional_accuracy": 0.73652695,
+            "directional_matches": 246,
+            "mae": 0.0172404,
+            "rmse": 0.01989593,
+            "sample_count": 334
+          },
+          "parameters": {
+            "feature_columns": [
+              "lag_5m",
+              "lag_10m",
+              "lag_15m",
+              "rolling_mean_15m",
+              "hour_of_day",
+              "day_of_week"
+            ],
+            "intercept": 0.0029207,
+            "ridge_lambda": 1.0,
+            "standardized_coefficients": {
+              "day_of_week": 0.00096634,
+              "hour_of_day": -0.00349264,
+              "lag_10m": -0.01712766,
+              "lag_15m": -0.23729677,
+              "lag_5m": 0.25109996,
+              "rolling_mean_15m": -0.00108567
+            },
+            "target_mode": "delta"
+          }
+        }
+      },
+      "sample_accounting": {
+        "test_missing_features": 0,
+        "test_missing_target": 12,
+        "test_samples": 334,
+        "train_median_samples": 794,
+        "train_missing_features": 6,
+        "train_missing_target": 0,
+        "train_purged_boundary": 12,
+        "train_samples": 788
+      }
+    }
+  },
+  "schema_version": 1,
+  "script_version": "1.0.0",
+  "split": {
+    "cutoff_utc": "2026-10-29T09:35:00Z",
+    "no_shuffle": true,
+    "strategy": "global_chronological_by_bin_start_utc",
+    "test_row_count": 346,
+    "test_timestamp_count": 173,
+    "train_ratio": 0.7,
+    "train_row_count": 806,
+    "train_timestamp_count": 403
+  },
+  "verification": {
+    "beats_persistence_horizons": [
+      10,
+      20,
+      30
+    ],
+    "candidate_model": "ridge_delta",
+    "criterion": "candidate MAE < persistence MAE on at least one forecast horizon",
+    "passed": true
+  }
+}

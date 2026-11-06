@@ -70,6 +70,8 @@ is the only part an agent should read by default.
 | 64 | First Segmentation Cycle: OpenVINO FP16 & mAP Gating | Strict annotation purity (ADR-011 D2); water_puddle IoU must beat null baseline before model deployment. | [L64](L64-first-segmentation-cycle-openvino-fp16-and-map-gating.md) |
 | 65 | Directional Roadway Polygons & Sidecar Architecture | Optional direction on roadway (a/b); YOLO txt unchanged; roadway_regions.json sidecar per split. | [L65](L65-directional-roadway-polygons-sidecar-and-per-direction-ground-truth.md) |
 | 66 | Self-Referential Tests and Silent Fallbacks | Test the code, not a copy of it: extract the decision into a function; make every fallback narrow, announced, or refused. | [L66](L66-self-referential-tests-and-silent-fallbacks-hide-the-live-path.md) |
+| 67 | Upsert-Only State Tables Cannot Feed Time-Series Models | Append-only history with idempotent keys, canonical UTC timestamps, stale exclusion, and lags anchored to the raw timeline with age bounds. | [L67](L67-upsert-only-state-tables-cannot-feed-time-series-models.md) |
+| 68 | Chronological Splits Still Leak at Horizon Boundaries | Purge training samples whose target timestamp crosses the test cutoff, and score every model on one common eligible set. | [L68](L68-chronological-split-horizon-boundary-leakage.md) |
 
 > Numbering note: Lesson 54 does not exist in the source register. Numbers are preserved as-is because
 > other documents reference lessons by number; nothing has been renumbered.
