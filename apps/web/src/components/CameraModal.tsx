@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
+import ForecastTimeline from './ForecastTimeline';
 import { API_ENDPOINTS, FLOOD_REPORT_I18N, FLOOD_VERIFY_I18N, FUNCTIONAL_COLORS, getApiUrl, USER_FLOOD_REPORT_I18N, VERDICT_I18N } from '../config/constants';
 import {
   FLOOD_MODAL_I18N,
@@ -729,8 +730,10 @@ export default function CameraModal({
           </button>
         </div>
 
-        {/* IMAGE WRAPPER */}
-        <div className="relative w-full aspect-video bg-black flex items-center justify-center">
+        {/* SCROLLABLE MODAL BODY (SNAPSHOT & FORECAST TIMELINE) */}
+        <div className="overflow-y-auto flex-1 min-h-0">
+          {/* IMAGE WRAPPER */}
+          <div className="relative w-full aspect-video bg-black flex items-center justify-center">
           {/* Overlay Navigation Buttons (< and >) */}
           {(hasPrevCamera || hasNextCamera) && (
             <>
@@ -828,6 +831,18 @@ export default function CameraModal({
             />
           )}
         </div>
+
+        {/* SHORT-HORIZON FORECAST TIMELINE (S10-T6 / Issue #377 / ADR-012 §D5) */}
+        {isActuallyAvailable && (
+          <div className="p-3 sm:p-4 bg-zinc-950 border-t border-zinc-850">
+            <ForecastTimeline
+              cameraId={camera.id}
+              lang={lang}
+              isVisible={true}
+            />
+          </div>
+        )}
+      </div>
 
         {/* FOOTER */}
         <div className="px-4 py-3 bg-zinc-900 border-t border-zinc-800 flex justify-between items-center text-xs">

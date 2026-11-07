@@ -77,6 +77,7 @@ is the only part an agent should read by default.
 | 71 | Directional Runtime Ingestion & Worst-Direction Pinning | Polygon assignment in cv-engine, per-direction PCU, worst-direction severity pinning, migration 0008. | [L71](L71-directional-runtime-ingestion-and-worst-direction-pinning.md) |
 | 72 | Schema Assertions & Non-Blocking Batch Retention | Assert migration readiness at boot; 10m bin coverage observability; chunked rowid retention (LIMIT 5000). | [L72](L72-fail-fast-schema-assertions-and-nonblocking-batch-retention.md) |
 | 73 | As-Of Weather Feature Store & Ablation Gating | Append-only weather observations (0009); as-of join with 30m cutoff (no forward fill); 3-way ablation gate. | [L73](L73-asof-weather-feature-store-and-ablation-gating.md) |
+| 74 | Frontend Forecast Contract Gating & Uncertainty Visualization | Fail-closed availability checks (ok/stale/insufficient/unvalidated), 95% CI band, 50% stale dimming, 4-file pattern. | [L74](L74-frontend-forecast-contract-gating-and-uncertainty-visualization.md) |
 
 > Numbering note: Lesson 54 does not exist in the source register. Numbers are preserved as-is because
 > other documents reference lessons by number; nothing has been renumbered.
