@@ -2104,8 +2104,8 @@
     "id": "5701e22bc4350a1100e26f6c",
     "title": "TTH 1a",
     "displayName": "Nguyễn Công Trứ - Calmette 1",
-    "status": "NOT_IMAGE",
-    "isOnline": false,
+    "status": "UP",
+    "isOnline": true,
     "latitude": 10.7671171078657,
     "longitude": 106.699680089951,
     "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=5701e22bc4350a1100e26f6c"
@@ -2614,8 +2614,8 @@
     "id": "56df8198c062921100c143dd",
     "title": "TTH 32.3",
     "displayName": "Nút giao Thủ Đức (Võ Văn Ngân)",
-    "status": "NOT_IMAGE",
-    "isOnline": false,
+    "status": "UP",
+    "isOnline": true,
     "latitude": 10.8492753334826,
     "longitude": 106.773784160614,
     "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56df8198c062921100c143dd"
@@ -5284,8 +5284,8 @@
     "id": "58affc6017139d0010f35cc8",
     "title": "TTH 21.14",
     "displayName": "Phạm Văn Đồng - Quốc Lộ 13 (1)",
-    "status": "NOT_IMAGE",
-    "isOnline": false,
+    "status": "UP",
+    "isOnline": true,
     "latitude": 10.8262720340397,
     "longitude": 106.714013814926,
     "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=58affc6017139d0010f35cc8"
