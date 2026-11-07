@@ -1,0 +1,36 @@
+{
+  "version": "2.0",
+  "created_at": "2026-11-06T15:12:46.769588+00:00",
+  "total_frames_harvested": 550,
+  "total_annotated_frames": 550,
+  "train_frames": 440,
+  "val_frames": 110,
+  "class_distribution": {
+    "roadway": 434,
+    "water_puddle": 339,
+    "motorcycle": 384,
+    "car": 334,
+    "bus": 52,
+    "truck": 59
+  },
+  "stratification": {
+    "by_date": {
+      "2026-10-08": 150,
+      "2026-10-13": 100,
+      "2026-10-15": 100,
+      "2026-10-16": 200
+    },
+    "weather_condition": {
+      "rain": 200,
+      "dry": 350
+    },
+    "time_of_day": {
+      "day": 400,
+      "dusk_night": 150
+    }
+  },
+  "dual_carriageway_frames": 84,
+  "directional_roadway_regions": 168,
+  "group_split_strategy": "camera_id_and_date_grouped_80_20",
+  "format": "yolo_seg_polygon_normalized"
+}

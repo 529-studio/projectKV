@@ -36,7 +36,7 @@ import random
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
     from PIL import Image
@@ -125,6 +125,97 @@ def is_roadway_sidecar(path: Path) -> bool:
     return name == ROADWAY_SIDECAR_NAME or (
         name.startswith(ROADWAY_SIDECAR_PREFIX) and name.endswith(".json")
     )
+
+
+def extract_file_group_key(label_path: Path) -> Tuple[str, str]:
+    """
+    Extracts (camera_id, capture_date) group key for group-aware train/val split.
+    Prevents burst leakage across the same camera on the same day (Lesson 68 / ADR-012 D6).
+    """
+    try:
+        with open(label_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        cam_id = data.get("camera_id") or ""
+        date = data.get("date") or ""
+
+        # If missing, try from snapshot_key (e.g. 2026-10-13/56de42f6.../1791...jpg)
+        snapshot_key = data.get("snapshot_key") or data.get("image_path") or ""
+        if (not cam_id or not date) and snapshot_key:
+            parts = snapshot_key.replace("\\", "/").split("/")
+            for p in parts:
+                if len(p) == 10 and p.count("-") == 2:
+                    if not date:
+                        date = p
+                elif len(p) >= 20 and not p.endswith((".jpg", ".png")):
+                    if not cam_id:
+                        cam_id = p
+
+        # If still missing, check frame_id (e.g. cam_56de42f611f398ec0c481283_1792045040)
+        frame_id = data.get("frame_id") or label_path.stem
+        if not cam_id and frame_id.startswith("cam_"):
+            parts = frame_id.split("_")
+            if len(parts) >= 2:
+                cam_id = parts[1]
+
+        # Fall back to parent dir if date-like (YYYY-MM-DD)
+        if not date and len(label_path.parent.name) == 10 and label_path.parent.name.count("-") == 2:
+            date = label_path.parent.name
+
+        cam_id = cam_id or label_path.stem.split("_")[0]
+        date = date or "unknown"
+        return cam_id, date
+    except Exception:
+        return label_path.stem, "unknown"
+
+
+def partition_files_by_group(
+    label_files: List[Path],
+    val_split: float = 0.2,
+    seed: int = 42,
+) -> Tuple[List[Path], List[Path], Dict[str, Any]]:
+    """
+    Partitions label_files into (train_files, val_files) using group-aware splitting
+    grouped strictly by (camera_id, capture_date).
+    Guarantees zero overlapping camera-date groups between train and validation (Lesson 68).
+    """
+    groups: Dict[Tuple[str, str], List[Path]] = {}
+    for p in label_files:
+        gk = extract_file_group_key(p)
+        groups.setdefault(gk, []).append(p)
+
+    total_files = len(label_files)
+    target_val = int(round(total_files * val_split))
+
+    rng = random.Random(seed)
+    unique_groups = sorted(groups.keys(), key=lambda g: f"{g[0]}:{g[1]}")
+    rng.shuffle(unique_groups)
+
+    train_files: List[Path] = []
+    val_files: List[Path] = []
+    train_groups: Set[Tuple[str, str]] = set()
+    val_groups: Set[Tuple[str, str]] = set()
+
+    current_val_count = 0
+    for gk in unique_groups:
+        file_list = groups[gk]
+        if current_val_count + len(file_list) <= target_val or (current_val_count == 0 and target_val > 0):
+            val_groups.add(gk)
+            val_files.extend(file_list)
+            current_val_count += len(file_list)
+        else:
+            train_groups.add(gk)
+            train_files.extend(file_list)
+
+    overlap = train_groups & val_groups
+    split_info = {
+        "total_groups": len(unique_groups),
+        "train_groups": len(train_groups),
+        "val_groups": len(val_groups),
+        "train_files": len(train_files),
+        "val_files": len(val_files),
+        "overlap_count": len(overlap),
+    }
+    return train_files, val_files, split_info
 
 
 def bbox_to_polygon_norm(
@@ -344,6 +435,7 @@ def export_dataset(
     copy_images: bool = True,
     verify: bool = False,
     allow_synthetic: bool = False,
+    group_split: bool = True,
 ) -> Dict[str, Any]:
     """
     Exports gold-standard label JSONs into YOLO segmentation format.
@@ -351,12 +443,10 @@ def export_dataset(
     counted in `skipped_no_annotations` (ADR-011 D2). Pass allow_synthetic=True
     (CLI: --allow-synthetic) to opt into metadata-derived geometry.
 
-    Only `labels_dir` itself is scanned. Subdirectories are deliberately ignored:
-    a tree that already contains train/ and val/ is an existing split, and re-reading
-    it would shuffle those frames into a different random split (val_split below is a
-    hash-free RNG draw), silently breaking reproducibility with the weights trained on
-    the original split. Roadway sidecars are also skipped: they are region ground truth
-    bound to a split, not frame labels.
+    Scans labels_dir (and any partition subdirectories like YYYY-MM-DD), but
+    strictly ignores existing split directories (train, val, labels, images) to
+    prevent inadvertent re-splitting of an existing dataset. Roadway sidecars are
+    also skipped: they are region ground truth bound to a split, not frame labels.
     """
     repo_root = Path(__file__).resolve().parent.parent.parent
     labels_dir = labels_dir.resolve()
@@ -365,15 +455,26 @@ def export_dataset(
     if not labels_dir.is_dir():
         raise FileNotFoundError(f"Labels directory not found: {labels_dir}")
 
-    discovered = sorted(labels_dir.glob("*.json"))
-    label_files = [path for path in discovered if not is_roadway_sidecar(path)]
-    ignored_sidecars = len(discovered) - len(label_files)
-    if ignored_sidecars:
-        logging.info(
-            "Ignoring %d roadway_regions sidecar file(s) in %s",
-            ignored_sidecars,
-            labels_dir,
-        )
+    discovered: List[Path] = []
+    # If subdirectories exist (e.g. partition folders like 2026-10-08/), discover their JSONs,
+    # strictly ignoring split directories (train, val, labels, images).
+    subdirs = [
+        p for p in labels_dir.iterdir()
+        if p.is_dir() and not p.name.startswith((".", "train", "val", "labels", "images"))
+    ]
+    if subdirs:
+        for s in sorted(subdirs):
+            for p in sorted(s.glob("*.json")):
+                if not is_roadway_sidecar(p):
+                    discovered.append(p)
+    # Also discover top-level JSONs in labels_dir
+    for p in sorted(labels_dir.glob("*.json")):
+        if not is_roadway_sidecar(p):
+            discovered.append(p)
+
+    discovered = sorted(list(dict.fromkeys(discovered)))
+    label_files = discovered
+
     if not label_files:
         raise ValueError(
             f"No JSON label files found in {labels_dir} (subdirectories are not "
@@ -385,13 +486,28 @@ def export_dataset(
         (output_dir / "images" / split).mkdir(parents=True, exist_ok=True)
         (output_dir / "labels" / split).mkdir(parents=True, exist_ok=True)
 
-    # Deterministic split
-    rng = random.Random(seed)
-    shuffled = list(label_files)
-    rng.shuffle(shuffled)
-
-    val_count = int(round(len(shuffled) * val_split))
-    val_files = set(shuffled[:val_count])
+    # Split train/val
+    split_info: Dict[str, Any] = {}
+    if group_split:
+        train_list, val_list, split_info = partition_files_by_group(
+            label_files, val_split=val_split, seed=seed
+        )
+        val_files = set(val_list)
+        ordered_files = train_list + val_list
+        logging.info(
+            "Group-aware split: %d train files (%d groups), %d val files (%d groups), 0 overlap",
+            split_info["train_files"],
+            split_info["train_groups"],
+            split_info["val_files"],
+            split_info["val_groups"],
+        )
+    else:
+        rng = random.Random(seed)
+        shuffled = list(label_files)
+        rng.shuffle(shuffled)
+        val_count = int(round(len(shuffled) * val_split))
+        val_files = set(shuffled[:val_count])
+        ordered_files = shuffled
 
     stats: Dict[str, Any] = {
         "total_labels": len(label_files),
@@ -403,12 +519,17 @@ def export_dataset(
         "skipped_no_annotations": 0,
         "synthesized_labels": 0,
         "allow_synthetic": allow_synthetic,
+        "group_split": group_split,
+        "total_groups": split_info.get("total_groups", len(label_files)),
+        "train_groups": split_info.get("train_groups", len(label_files) - len(val_files)),
+        "val_groups": split_info.get("val_groups", len(val_files)),
+        "group_overlap": split_info.get("overlap_count", 0),
         "errors": [],
     }
 
     directional_by_split: Dict[str, List[Dict[str, Any]]] = {"train": [], "val": []}
 
-    for lf in shuffled:
+    for lf in ordered_files:
         split = "val" if lf in val_files else "train"
         base_name = lf.stem
 
@@ -651,6 +772,18 @@ def parse_args():
             "for pipeline smoke tests, never for training datasets."
         ),
     )
+    parser.add_argument(
+        "--group-split",
+        action="store_true",
+        default=True,
+        help="Group-aware train/val split grouped strictly by (camera_id, date) to prevent burst leakage (default: True)",
+    )
+    parser.add_argument(
+        "--no-group-split",
+        dest="group_split",
+        action="store_false",
+        help="Disable group-aware train/val split and use naive random shuffle",
+    )
     return parser.parse_args()
 
 
@@ -666,6 +799,7 @@ def main():
             copy_images=not args.no_copy_images,
             verify=args.verify,
             allow_synthetic=args.allow_synthetic,
+            group_split=args.group_split,
         )
         if args.verify and not stats.get("verification_passed", True):
             sys.exit(1)

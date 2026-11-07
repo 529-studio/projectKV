@@ -21,10 +21,12 @@ from export_yolo_seg import (
     TARGET_CLASSES,
     bbox_to_polygon_norm,
     export_dataset,
+    extract_file_group_key,
     is_roadway_sidecar,
     normalize_class_name,
     normalize_direction,
     parse_label_file,
+    partition_files_by_group,
     synthesize_polygons_from_metadata,
     verify_dataset,
 )
@@ -556,6 +558,104 @@ class TestExportYoloSeg(unittest.TestCase):
         self.assertTrue(any("Missing dataset.yaml" in e for e in errs))
         self.assertTrue(any("invalid class_id" in e for e in errs))
         self.assertTrue(any("out of bounds" in e for e in errs))
+
+    def test_extract_file_group_key(self):
+        # 1. Explicit camera_id and date
+        f1 = self.tmp_path / "f1.json"
+        with open(f1, "w", encoding="utf-8") as f:
+            json.dump({"camera_id": "cam_abc", "date": "2026-10-13"}, f)
+        self.assertEqual(extract_file_group_key(f1), ("cam_abc", "2026-10-13"))
+
+        # 2. Extract from snapshot_key
+        f2 = self.tmp_path / "f2.json"
+        with open(f2, "w", encoding="utf-8") as f:
+            json.dump({"snapshot_key": "2026-10-15/56de42f611f398ec0c481283/1792045040_sample.jpg"}, f)
+        self.assertEqual(extract_file_group_key(f2), ("56de42f611f398ec0c481283", "2026-10-15"))
+
+        # 3. Extract from frame_id
+        f3 = self.tmp_path / "f3.json"
+        with open(f3, "w", encoding="utf-8") as f:
+            json.dump({"frame_id": "cam_56de42f611f398ec0c481283_1792045040"}, f)
+        self.assertEqual(extract_file_group_key(f3), ("56de42f611f398ec0c481283", "unknown"))
+
+    def test_partition_files_by_group_zero_overlap(self):
+        # Create 12 files across 4 distinct groups:
+        # Group A (cam1, 2026-10-13): 4 files
+        # Group B (cam1, 2026-10-15): 2 files
+        # Group C (cam2, 2026-10-13): 3 files
+        # Group D (cam3, 2026-10-16): 3 files
+        files = []
+        specs = [
+            ("cam1", "2026-10-13", 4),
+            ("cam1", "2026-10-15", 2),
+            ("cam2", "2026-10-13", 3),
+            ("cam3", "2026-10-16", 3),
+        ]
+        for cam, dt, count in specs:
+            for idx in range(count):
+                fp = self.tmp_path / f"{cam}_{dt}_{idx}.json"
+                with open(fp, "w", encoding="utf-8") as f:
+                    json.dump({"camera_id": cam, "date": dt}, f)
+                files.append(fp)
+
+        train_files, val_files, info = partition_files_by_group(files, val_split=0.25, seed=42)
+        self.assertEqual(len(train_files) + len(val_files), 12)
+        self.assertEqual(info["overlap_count"], 0)
+
+        # Assert no camera-date group is split across train and val (Lesson 68)
+        train_groups = {extract_file_group_key(p) for p in train_files}
+        val_groups = {extract_file_group_key(p) for p in val_files}
+        self.assertEqual(len(train_groups & val_groups), 0)
+
+    def test_directional_sidecar_consumer_path(self):
+        # Verifies sidecar export -> registry -> cv-engine format integrity (S10-T7)
+        labels_dir = self.tmp_path / "directional_labels"
+        labels_dir.mkdir()
+        out_dir = self.tmp_path / "directional_out"
+
+        f_dir = labels_dir / "dual_cam_01.json"
+        with open(f_dir, "w", encoding="utf-8") as f:
+            json.dump({
+                "camera_id": "56de42f611f398ec0c48128b",
+                "date": "2026-10-15",
+                "annotations": [
+                    {
+                        "class": "roadway",
+                        "direction": "a",
+                        "polygon": [[0.05, 0.95], [0.48, 0.95], [0.44, 0.42], [0.12, 0.42]],
+                    },
+                    {
+                        "class": "roadway",
+                        "direction": "b",
+                        "polygon": [[0.52, 0.95], [0.95, 0.95], [0.86, 0.42], [0.54, 0.42]],
+                    },
+                ]
+            }, f)
+
+        stats = export_dataset(
+            labels_dir=labels_dir,
+            output_dir=out_dir,
+            copy_images=False,
+            group_split=True,
+        )
+
+        self.assertEqual(stats["directional_roadway_regions"], 2)
+        sidecar_path = out_dir / "roadway_regions.json"
+        self.assertTrue(sidecar_path.is_file())
+
+        with open(sidecar_path, "r", encoding="utf-8") as f:
+            sidecar_data = json.load(f)
+
+        self.assertEqual(len(sidecar_data), 2)
+        directions = {item["direction"] for item in sidecar_data}
+        self.assertEqual(directions, {"a", "b"})
+
+        # Consumer compatibility check: verify shape matches cv-engine and registry input
+        for item in sidecar_data:
+            self.assertIn("direction", item)
+            self.assertIn("polygon", item)
+            self.assertIn(item["direction"], ("a", "b"))
+            self.assertGreaterEqual(len(item["polygon"]), 3)
 
 
 if __name__ == "__main__":

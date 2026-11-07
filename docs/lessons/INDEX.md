@@ -78,6 +78,7 @@ is the only part an agent should read by default.
 | 72 | Schema Assertions & Non-Blocking Batch Retention | Assert migration readiness at boot; 10m bin coverage observability; chunked rowid retention (LIMIT 5000). | [L72](L72-fail-fast-schema-assertions-and-nonblocking-batch-retention.md) |
 | 73 | As-Of Weather Feature Store & Ablation Gating | Append-only weather observations (0009); as-of join with 30m cutoff (no forward fill); 3-way ablation gate. | [L73](L73-asof-weather-feature-store-and-ablation-gating.md) |
 | 74 | Frontend Forecast Contract Gating & Uncertainty Visualization | Fail-closed availability checks (ok/stale/insufficient/unvalidated), 95% CI band, 50% stale dimming, 4-file pattern. | [L74](L74-frontend-forecast-contract-gating-and-uncertainty-visualization.md) |
+| 75 | Segmentation Dataset v2 Group Splitting & Retraining Gate | Group split by camera/date (0 leakage); 550 frames; IoU >= 0.612, mAP50-95 >= 0.496, p95 <= 25ms, rollback test. | [L75](L75-segmentation-dataset-v2-group-splitting-and-retraining-gates.md) |
 
 > Numbering note: Lesson 54 does not exist in the source register. Numbers are preserved as-is because
 > other documents reference lessons by number; nothing has been renumbered.
