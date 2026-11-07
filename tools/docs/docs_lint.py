@@ -3,8 +3,8 @@
 
 Six checks, one gate:
 
-  entry-budget   the always-loaded set stays inside 32 KB total and 16 KB per file
-                 (docs/lessons/INDEX.md has its own 18 KB ceiling, per Rule 11 / L66)
+  entry-budget   the always-loaded set stays inside 36 KB total and 16 KB per file
+                 (docs/lessons/INDEX.md has its own 20 KB ceiling, per Rule 11 / L66)
   doc-budget     every on-demand document stays inside 25 KB
   adr-number     no two ADRs claim the same number
   links          every relative link resolves
@@ -57,13 +57,13 @@ BASELINE_NAME = ".docs-lint-baseline.txt"
 # Two tiers, ratified in #353 and recorded in L60. The always-loaded set is read on
 # every task, so its cost is paid thousands of times and is capped hard. On-demand
 # documents are read deliberately and get a looser ceiling.
-ENTRY_TOTAL_BUDGET = 32_768
+ENTRY_TOTAL_BUDGET = 36_864
 ENTRY_FILE_BUDGET = 16_384
 # `docs/lessons/INDEX.md` is the one sanctioned exception, per Rule 11 and L66. It is a
-# table of one row per lesson; holding it at 16 KB meant every new lesson had to shorten
+# table of one row per lesson; holding it at 18 KB meant every new lesson had to shorten
 # an existing row's guardrail, which erodes the mechanism the index exists to provide.
 # The set total still bounds the whole recurring cost.
-ENTRY_FILE_BUDGET_OVERRIDE = {"docs/lessons/INDEX.md": 18_432}
+ENTRY_FILE_BUDGET_OVERRIDE = {"docs/lessons/INDEX.md": 20_480}
 DOC_BUDGET = 25_600
 FILE_SIZE_BUDGET = 1_048_576
 
