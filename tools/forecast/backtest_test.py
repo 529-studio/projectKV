@@ -884,5 +884,67 @@ class TestConfigValidation(unittest.TestCase):
             BacktestConfig(horizons_minutes=(10, 10)).validate()
 
 
+class TestAblationBacktest(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name)
+        self.fixture_v2 = (
+            REPO_ROOT
+            / "tools"
+            / "forecast"
+            / "fixtures"
+            / "synthetic_congestion_v2_5m.csv"
+        )
+
+    def test_ablation_backtest_runs_and_passes_gate(self):
+        self.assertTrue(self.fixture_v2.exists(), "v2 fixture must exist")
+        json_out = self.root / "ablation.json"
+        md_out = self.root / "ablation.md"
+
+        exit_code = run(
+            [
+                "--input",
+                str(self.fixture_v2),
+                "--ablation",
+                "--ablation-json-out",
+                str(json_out),
+                "--ablation-markdown-out",
+                str(md_out),
+                "--log-level",
+                "ERROR",
+            ]
+        )
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(json_out.exists())
+        self.assertTrue(md_out.exists())
+
+        payload = json.loads(json_out.read_text(encoding="utf-8"))
+        self.assertEqual(payload["report_type"], "3-way-ablation")
+        self.assertIn("variant_a", payload["variants"])
+        self.assertIn("variant_b", payload["variants"])
+        self.assertIn("variant_c", payload["variants"])
+
+        # Check gate decision
+        gate = payload["gate"]
+        self.assertTrue(gate["passed"])
+        self.assertTrue(gate["retained"])
+        self.assertTrue(gate["improves_ge_2pct"])
+        self.assertFalse(gate["degrades_gt_5pct"])
+
+        # Check Markdown sections
+        markdown = md_out.read_text(encoding="utf-8")
+        self.assertIn("# Short-Horizon Congestion Forecast Ablation Report v2", markdown)
+        self.assertIn("## 1. Data provenance", markdown)
+        self.assertIn("## 2. Method & 3-Way Ablation Protocol", markdown)
+        self.assertIn("## 3. Results across Horizons", markdown)
+        self.assertIn("## 4. Directional Roadway Breakdown", markdown)
+        self.assertIn("## 5. Verification Gate & Ablation Protocol", markdown)
+        self.assertIn("## 6. Sample Accounting", markdown)
+        self.assertIn("Variant B (+weather)", markdown)
+        self.assertIn("Variant C (+directional)", markdown)
+        self.assertIn("PASSED", markdown)
+
+
 if __name__ == "__main__":
     unittest.main()

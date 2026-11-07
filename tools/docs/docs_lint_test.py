@@ -93,7 +93,7 @@ class EntryBudgetTest(LintCase):
     def test_index_gets_the_larger_ceiling(self) -> None:
         docs_lint.ENTRY_FILES = ("AGENTS.md", "docs/lessons/INDEX.md")
         self.write_bytes("AGENTS.md", 1024)
-        # Over the shared 16 KB cap, inside the index's 18 KB one.
+        # Over the shared 16 KB cap, inside the index's 20 KB one.
         self.write_bytes("docs/lessons/INDEX.md", docs_lint.ENTRY_FILE_BUDGET + 1024)
         self.stage()
         self.assertEqual(self.checks("entry-budget"), [])
