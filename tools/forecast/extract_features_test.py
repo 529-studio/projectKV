@@ -15,16 +15,20 @@ import json
 import sqlite3
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from tools.forecast.extract_features import (
     Observation,
+    WeatherObservation,
+    asof_weather_features,
     build_feature_rows,
+    classify_weather_code,
     deduplicate_observations,
     load_label_observations,
     load_sqlite_observations,
+    load_sqlite_weather_observations,
     parse_label_notes,
     parse_label_record,
     parse_timestamp,
@@ -375,12 +379,12 @@ class TestEndToEnd(unittest.TestCase):
         self.assertAlmostEqual(float(rows[-1]["saturation_index"]), 0.60)
 
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        self.assertEqual(metadata["schema_version"], 1)
+        self.assertEqual(metadata["schema_version"], 2)
         self.assertEqual(metadata["row_count"], 3)
         self.assertEqual(metadata["camera_count"], 1)
 
     def test_load_sqlite_observations_directional_compatibility(self):
-        """Migration 0008 adds direction; extract_features must filter to direction = ''."""
+        """Migration 0008 adds direction; extract_features must filter to direction = '' by default."""
         db_path = self.root / "directional.db"
         conn = sqlite3.connect(db_path)
         tz = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -423,11 +427,147 @@ class TestEndToEnd(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        obs, stats = load_sqlite_observations(db_path, tz)
-        # Must only load the 1 frame-wide observation (direction = '')
+        # By default (include_directional=False), only loads frame-wide row
+        obs, stats = load_sqlite_observations(db_path, tz, include_directional=False)
         self.assertEqual(len(obs), 1)
         self.assertEqual(obs[0].saturation_index, 0.60)
         self.assertEqual(stats["rows"], 1)
+
+        # When include_directional=True, loads all 3 rows
+        obs_all, stats_all = load_sqlite_observations(db_path, tz, include_directional=True)
+        self.assertEqual(len(obs_all), 3)
+        self.assertEqual(stats_all["rows"], 3)
+
+
+class TestWeatherFeatures(unittest.TestCase):
+    def test_classify_weather_code(self):
+        self.assertEqual(classify_weather_code(0), 0)
+        self.assertEqual(classify_weather_code(1), 0)
+        self.assertEqual(classify_weather_code(3), 1)
+        self.assertEqual(classify_weather_code(45), 1)
+        self.assertEqual(classify_weather_code(51), 2)
+        self.assertEqual(classify_weather_code(61), 2)
+        self.assertEqual(classify_weather_code(63), 3)
+        self.assertEqual(classify_weather_code(65), 3)
+        self.assertEqual(classify_weather_code(95), 4)
+
+    def test_asof_weather_30min_boundary_and_null_case(self):
+        """Verify strict 30-minute cutoff and no forward fill (ADR-012 D3, Lesson 67)."""
+        base_time = datetime(2026, 11, 6, 10, 0, 0, tzinfo=UTC)
+        weather_obs = [
+            WeatherObservation(
+                observed_at=base_time,
+                precipitation_mm=2.5,
+                weather_code=61,
+                temperature_c=27.0,
+                humidity_pct=85.0,
+                radar_active=1,
+                radar_frame_age_s=60,
+                source="open-meteo+rainviewer",
+            )
+        ]
+        weather_timestamps = [base_time.timestamp()]
+
+        # 1. Target exactly at observation time (0 min age)
+        f0 = asof_weather_features(weather_obs, weather_timestamps, base_time)
+        self.assertEqual(f0["precip_mm_15m"], 2.5)
+        self.assertEqual(f0["rain_flag"], 1)
+        self.assertEqual(f0["radar_active"], 1)
+        self.assertEqual(f0["weather_code_class"], 2)
+        self.assertAlmostEqual(f0["hours_since_rain"], 0.0)
+
+        # 2. Target at 29 minutes past observation (within 30m window)
+        t_29m = base_time + datetime.resolution * 0 + timedelta(minutes=29)
+        f29 = asof_weather_features(weather_obs, weather_timestamps, t_29m)
+        self.assertEqual(f29["precip_mm_15m"], 2.5)
+        self.assertEqual(f29["rain_flag"], 1)
+        self.assertAlmostEqual(f29["hours_since_rain"], 29.0 / 60.0)
+
+        # 3. Target at exactly 30 minutes (boundary)
+        t_30m = base_time + timedelta(minutes=30)
+        f30 = asof_weather_features(weather_obs, weather_timestamps, t_30m)
+        self.assertEqual(f30["precip_mm_15m"], 2.5)
+        self.assertEqual(f30["rain_flag"], 1)
+
+        # 4. Target at 31 minutes (exceeds 30m cutoff) -> all fields must be None (no forward fill!)
+        t_31m = base_time + timedelta(minutes=31)
+        f31 = asof_weather_features(weather_obs, weather_timestamps, t_31m)
+        self.assertIsNone(f31["precip_mm_15m"])
+        self.assertIsNone(f31["precip_mm_60m"])
+        self.assertIsNone(f31["rain_flag"])
+        self.assertIsNone(f31["hours_since_rain"])
+        self.assertIsNone(f31["weather_code_class"])
+        self.assertIsNone(f31["radar_active"])
+
+        # 5. Target before any observation -> all fields None
+        t_before = base_time - timedelta(minutes=5)
+        f_before = asof_weather_features(weather_obs, weather_timestamps, t_before)
+        self.assertIsNone(f_before["precip_mm_15m"])
+        self.assertIsNone(f_before["rain_flag"])
+
+
+class TestDirectionalAndWeatherIntegration(unittest.TestCase):
+    def test_build_feature_rows_directional_pairing(self):
+        """Verify peer_si and si_delta_ab pairing for directional series."""
+        t1000 = datetime(2026, 11, 6, 10, 0, tzinfo=UTC)
+        observations = [
+            Observation(
+                camera_id="cam-pair",
+                observed_at=t1000,
+                pcu_total=25.0,
+                saturation_index=0.80,
+                severity="CONGESTED",
+                confidence=0.9,
+                source="onnx",
+                origin="sqlite",
+                direction="a",
+            ),
+            Observation(
+                camera_id="cam-pair",
+                observed_at=t1000,
+                pcu_total=10.0,
+                saturation_index=0.30,
+                severity="CLEAR",
+                confidence=0.9,
+                source="onnx",
+                origin="sqlite",
+                direction="b",
+            ),
+            Observation(
+                camera_id="cam-single",
+                observed_at=t1000,
+                pcu_total=15.0,
+                saturation_index=0.50,
+                severity="MODERATE",
+                confidence=0.9,
+                source="onnx",
+                origin="sqlite",
+                direction="",
+            ),
+        ]
+
+        rows, fieldnames, stats = build_feature_rows(observations, 5, ICT)
+        self.assertEqual(len(rows), 3)
+
+        by_dir = {f"{r.values['camera_id']}_{r.values['direction']}": r.values for r in rows}
+
+        # Direction 'a': peer_si is 0.30, si_delta_ab is 0.80 - 0.30 = 0.50
+        row_a = by_dir["cam-pair_a"]
+        self.assertEqual(row_a["direction"], "a")
+        self.assertAlmostEqual(row_a["peer_si"], 0.30)
+        self.assertAlmostEqual(row_a["si_delta_ab"], 0.50)
+
+        # Direction 'b': peer_si is 0.80, si_delta_ab is 0.80 - 0.30 = 0.50 (si_a - si_b)
+        row_b = by_dir["cam-pair_b"]
+        self.assertEqual(row_b["direction"], "b")
+        self.assertAlmostEqual(row_b["peer_si"], 0.80)
+        self.assertAlmostEqual(row_b["si_delta_ab"], 0.50)
+
+        # Single frame-wide: peer_si and si_delta_ab are None
+        row_single = by_dir["cam-single_"]
+        self.assertEqual(row_single["direction"], "")
+        self.assertIsNone(row_single["peer_si"])
+        self.assertIsNone(row_single["si_delta_ab"])
 
 
 if __name__ == "__main__":
