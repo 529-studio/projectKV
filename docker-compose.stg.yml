@@ -102,6 +102,24 @@ services:
     volumes:
       - warded-model-weights:/app/models
 
+  warded-harvester:
+    profiles: ["harvester"]
+    image: python:3.11-slim
+    container_name: ${HARVESTER_CONTAINER_NAME:-warded-harvester}
+    restart: unless-stopped
+    networks:
+      - core-network
+    volumes:
+      - warded-stg-data:/app/data
+      - ./:/workspace:ro
+    working_dir: /workspace
+    command: ["python3", "tools/harvester/service.py", "--daemon", "--interval", "300", "--db-path", "/app/data/camera-view.db", "--proof-dir", "/app/data/proofs", "--state-path", "/app/data/harvester_soak_state.json", "--telemetry-out", "/app/data/harvester_soak_status.json"]
+    environment:
+      - TZ=${TZ:-Asia/Ho_Chi_Minh}
+      - BACKEND_URL=${BACKEND_URL:-http://warded-backend:3000}
+      - CV_ENGINE_URL=${CV_ENGINE_URL:-http://warded-model:8000}
+      - DEV_ACCESS_TOKEN=${DEV_ACCESS_TOKEN:-}
+
 volumes:
   warded-stg-data:
     name: ${DATA_VOLUME_NAME:-warded-stg_warded-stg-data}

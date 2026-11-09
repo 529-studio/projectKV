@@ -131,6 +131,8 @@ jobs:
           pip install pillow
           make test-ci
           make evidence-lint
+          make test-eval
+          make test-harvester
 
       - name: Verify Tools Syntax
         run: |

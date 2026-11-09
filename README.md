@@ -92,11 +92,14 @@ hcm-traffic-cameras/
 │       └── api.py                     # Multi-threaded OpenVINO detection endpoint (:8000)
 │
 ├── tools/
+│   ├── harvester/                     # [HARVESTER] 24/7 autonomous soak & frame capture daemon
+│   │   └── service.py                 # 5-minute Hot Set harvester with WAL & soak telemetry (S11-T2)
 │   ├── seg/                           # [SEGMENTATION PRE-LABELING] SAM-assisted batch toolchain (S9-T2)
 │   │   ├── prelabel_sam.py            # Stream frames from R2, run MobileSAM + YOLOv8n, upload candidates
 │   │   ├── sam_runtime.py             # ONNX runtime wrappers for ViT encoder & promptable decoder
 │   │   └── contract.py                # Polygon annotation schema & validation contract
 │   ├── eval/                          # [EVALUATION] Ground-truth benchmarks & label curation
+│   │   ├── ingest_proof_archive.py    # 11,905-frame proof archive replay & SQLite populator (S11-T2)
 │   │   ├── auto_harvest.py            # Standalone automated frame harvester & Draft-07 labeler CLI
 │   │   ├── export_yolo_seg.py         # Standalone YOLO segmentation dataset exporter CLI (ADR-009)
 │   │   ├── label_curator.py           # Taxonomy curation and legacy label cleansing
@@ -236,10 +239,10 @@ Trained OpenVINO models (`.xml` / `.bin`) deploy directly to `services/cv-engine
 *   **Clean Standard OSM Basemap**: OpenStreetMap tiles, no watermark, geographically constrained to Southeastern Vietnam (`maxBounds`).
 *   **Map Clutter Hygiene & Offline Camera Filtering**: Automatically hides 135 offline or no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default, with dynamic header counter badge (`Đang hiển thị 702 / 837 camera`) and a monochromatic toggle button.
 *   **Chained Deep Filter**: Multi-tier faceted filtering — *Zone* ➔ *Road / Corridor* ➔ *Intersection / Node*.
-*   **Real-Time Arterial Marker Saturation Coloring**: Dynamically styles the 50 arterial Hot Set camera markers based on continuous 30-second autonomous ONNX PCU saturation indexes: Emerald green (`#10b981`) for Clear ($SI < 0.30$), Amber yellow (`#f59e0b`) for Moderate ($0.30 \le SI < 0.60$), and Rose red (`#ef4444`) for Congested ($SI \ge 0.60$) with subtle pulsating CSS animation, rich tooltip metrics (SI% & PCU), and monochromatic map footer legend `[Xanh: Thông thoáng] [Vàng: Đông xe] [Đỏ: Ùn ứ]`.
-*   **Calibrated Doppler Rain Radar Pipeline (S8-T1)**: RainViewer Doppler radar tiles projected at raw Zoom 8 (`0_0.png`) with true meteorological RGB reflectivity (dBZ) decoding ($18–29\text{ dBZ}$ Light, $30–39\text{ dBZ}$ Moderate, $\ge 40\text{ dBZ}$ Heavy rain), 7-point hexagon spatial contraction sampling with quorum, and surface cross-validation gate with ground cameras, preventing false inundation alarms on clear days.
+*   **Real-Time Arterial Marker Saturation Coloring**: Styles Hot Set camera markers from 30s ONNX PCU saturation: Clear (`#10b981`, $SI < 0.30$), Moderate (`#f59e0b`, $0.30 \le SI < 0.60$), and Congested (`#ef4444`, $SI \ge 0.60$) with CSS pulse, tooltip SI%/PCU metrics, and legend `[Xanh] [Vàng] [Đỏ]`.
+*   **Calibrated Doppler Rain Radar Pipeline (S8-T1)**: RainViewer Doppler radar tiles at Zoom 8 with meteorological RGB reflectivity decoding (18–29 dBZ Light, 30–39 dBZ Moderate, $\ge 40$ dBZ Heavy), 7-point hexagon spatial quorum, and surface ground-camera cross-validation.
 *   **Multi-Camera Corridor Tracking Dock**: Pin cameras into the bottom tracking dock with synchronized snapshot refresh.
-*   **Human-in-the-Loop Flood Reporting & Real-Time Map Bridge (S8-T7)**: Commuters can report real-time street flooding directly from the camera modal with sliding rate limits; reports bridge live to SSE map streams and spatial hex aggregators, highlighting cameras with high-contrast amber markers (`[Báo cáo từ người dân: Có ngập]`), 15-minute sliding TTL, and multi-reporter escalation ($\ge 2$ distinct IP hashes within 10 minutes).
+*   **Human-in-the-Loop Flood Reporting & Map Bridge (S8-T7)**: Commuter flood reports from camera modals bridge live to SSE map streams and hex aggregators, with amber markers, 15m sliding TTL, and multi-reporter escalation ($\ge 2$ distinct IPs within 10m).
 *   **Directional Multi-Lane Taxonomy & Physical Flood Markers**: Classifies traffic density independently by direction (Direction A approaching vs Direction B receding) to resolve asymmetric divided boulevards, and anchors flood severity strictly to physical tire/wheel depth markers.
 *   **Responsive Layout (100dvh)**: Desktop, tablet, and smartphone friendly with collapsible legend and mobile bottom-sheet drawer.
 *   **Go Backend**: Single static binary, no runtime dependency install, in-memory + SQLite state, goroutine-based Hot Set scheduler.
