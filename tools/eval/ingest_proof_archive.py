@@ -1770,7 +1770,9 @@ def run_ingest(args: argparse.Namespace) -> int:
         "unrecognized_file_count": len(unrecognized),
         "schema_migration": schema_report,
         "verification": verification,
-        "frame_index": frame_index,
+        "frame_index": frame_index if len(frame_index) <= 200 else frame_index[:100],
+        "frame_index_sampled": len(frame_index) > 200,
+        "frame_index_total": len(frame_index),
     }
     write_json_atomic(manifest_path, manifest)
 
