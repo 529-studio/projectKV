@@ -126,6 +126,12 @@ jobs:
         run: |
           make test-forecast
 
+      - name: Verify Evidence Integrity Gate
+        run: |
+          pip install pillow
+          make test-ci
+          make evidence-lint
+
       - name: Verify Tools Syntax
         run: |
           node --check tools/crawler/get_all_cameras.js

@@ -1,0 +1,28 @@
+# Evidence-integrity baseline: historical violations grandfathered from Sprint 10.
+#
+# This is a ratchet, not an exemption list. Fixing a violation means deleting
+# its line here in the same PR; a stale line fails the gate, so this file can only shrink.
+# Never add a line to silence a regression.
+#
+# Format: <gate>\t<path>\t<detail>
+gate1_synthetic	docs/reports/cotenancy_benchmark_v1.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
+gate1_synthetic	docs/reports/cotenancy_benchmark_v1.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
+gate1_synthetic	docs/reports/cotenancy_benchmark_v1.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
+gate1_synthetic	docs/reports/cotenancy_benchmark_v1.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
+gate1_synthetic	docs/reports/cotenancy_benchmark_v1.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
+gate1_synthetic	docs/reports/forecast_ablation_v2.json	Forecast release artifact missing required 'fit_source' declaration (must be 'live_history')
+gate1_synthetic	docs/reports/forecast_ablation_v2.json	Prohibited reference to synthetic fixture matching 'synthetic_congestion_v2_5m.csv'
+gate1_synthetic	docs/reports/forecast_prototype_v1.json	Forecast release artifact missing required 'fit_source' declaration (must be 'live_history')
+gate1_synthetic	docs/reports/forecast_prototype_v1.json	Prohibited reference to synthetic fixture matching 'synthetic_congestion_5m.csv'
+gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
+gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
+gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
+gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
+gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
+gate2_temporal	docs/proofs/sprint10/harvester_observation.json	generated_at (2026-11-06T10:23:18.434225+00:00) < window.end (2026-11-10T06:00:00+07:00): cannot observe soak before window concludes
+gate2_temporal	docs/proofs/sprint10/harvester_observation.json	window.end (2026-11-10T06:00:00+07:00) is in the future (> current_time + 300s)
+gate2_temporal	docs/reports/bench_devbox_report.json	generated_at (2026-10-09 04:11:30) has no UTC offset (naive local time prohibited)
+gate2_temporal	docs/reports/bench_solution1_report.json	generated_at (2026-10-09 09:05:40) has no UTC offset (naive local time prohibited)
+gate2_temporal	docs/reports/stress_test_results.json	generated_at (2026-10-09 04:19:23) has no UTC offset (naive local time prohibited)
+gate3_model	models/yolov8n_seg_openvino_416/yolov8n_seg.bin	Model file size (65536 B) is below 1 MB threshold (1048576 B). Placeholder stub suspected.
+gate4_proof	docs/proofs/sprint10/forecast_insufficient_history.png	Image resolution 961x211 is below minimum 320x240 threshold
