@@ -1,0 +1,236 @@
+{
+  "timestamp": "2026-11-09T06:14:16.396687+00:00",
+  "measurement_source": "reference-profile",
+  "measurement_note": "Values are the reference capacity profile adopted for the target AMD Ryzen 7 6800HS worker and are reported as planning figures. They are not a live measurement performed by this script. Run tools/eval/verify_s10_t8_manual.py to exercise the live policy and cgroup invariants on the host that executes it.",
+  "hardware": {
+    "cpu": "AMD Ryzen 7 6800HS with Radeon Graphics (8 Cores / 16 Threads, AVX2 enabled)",
+    "physical_cores": 8,
+    "logical_threads": 16,
+    "base_freq_ghz": 3.2,
+    "boost_freq_ghz": 4.7,
+    "total_ram_mb": 3840.0,
+    "hotset_cameras": 57,
+    "cycle_budget_s": 30.0,
+    "p95_sla_ceiling_ms": 25.0,
+    "degrade_cpu_threshold_pct": 85.0,
+    "recover_p95_threshold_ms": 20.0,
+    "recover_cpu_threshold_pct": 70.0
+  },
+  "cgroup_status": {
+    "verification_mode": "static-policy",
+    "cgroup_version": 2,
+    "slices_configured": [
+      "cv_engine",
+      "sam_prelabel",
+      "ci_runner"
+    ],
+    "boundaries": {
+      "cv_engine": {
+        "description": "Latency-critical real-time inference loop",
+        "parent_slice": "root",
+        "cpuset_cpus": "0-3,8-11",
+        "cpu_weight": 1000,
+        "cpu_quota_pct": null,
+        "memory_limit_mb": 2048.0
+      },
+      "sam_prelabel": {
+        "description": "MobileSAM batch pre-labeling offline toolchain",
+        "parent_slice": "root",
+        "cpuset_cpus": "4-7,12-15",
+        "cpu_weight": 200,
+        "cpu_quota_pct": 50.0,
+        "memory_limit_mb": 1536.0
+      },
+      "ci_runner": {
+        "description": "GitHub Actions runner / compilation jobs",
+        "parent_slice": "sam_prelabel",
+        "cpuset_cpus": "4-7,12-15",
+        "cpu_weight": 100,
+        "cpu_quota_pct": 30.0,
+        "memory_limit_mb": 1024.0
+      }
+    },
+    "checks": [
+      {
+        "name": "cv_engine.physical_cores",
+        "passed": true,
+        "detail": "physical cores [0, 1, 2, 3] != required [0, 1, 2, 3]"
+      },
+      {
+        "name": "cv_engine.parent_slice",
+        "passed": true,
+        "detail": "parent slice 'root' != 'root'"
+      },
+      {
+        "name": "cv_engine.cpu_quota_pct",
+        "passed": true,
+        "detail": "cpu quota None != None"
+      },
+      {
+        "name": "cv_engine.memory_limit_mb",
+        "passed": true,
+        "detail": "memory limit 2048.0 MB != 2048.0 MB"
+      },
+      {
+        "name": "sam_prelabel.physical_cores",
+        "passed": true,
+        "detail": "physical cores [4, 5, 6, 7] != required [4, 5, 6, 7]"
+      },
+      {
+        "name": "sam_prelabel.parent_slice",
+        "passed": true,
+        "detail": "parent slice 'root' != 'root'"
+      },
+      {
+        "name": "sam_prelabel.cpu_quota_pct",
+        "passed": true,
+        "detail": "cpu quota 50.0 != 50.0"
+      },
+      {
+        "name": "sam_prelabel.memory_limit_mb",
+        "passed": true,
+        "detail": "memory limit 1536.0 MB != 1536.0 MB"
+      },
+      {
+        "name": "ci_runner.physical_cores",
+        "passed": true,
+        "detail": "physical cores [4, 5, 6, 7] != required [4, 5, 6, 7]"
+      },
+      {
+        "name": "ci_runner.parent_slice",
+        "passed": true,
+        "detail": "parent slice 'sam_prelabel' != 'sam_prelabel'"
+      },
+      {
+        "name": "ci_runner.cpu_quota_pct",
+        "passed": true,
+        "detail": "cpu quota 30.0 != 30.0"
+      },
+      {
+        "name": "ci_runner.memory_limit_mb",
+        "passed": true,
+        "detail": "memory limit 1024.0 MB != 1024.0 MB"
+      },
+      {
+        "name": "priority.cv_engine_over_sam_prelabel",
+        "passed": true,
+        "detail": "cpu_weight cv_engine=1000 must exceed sam_prelabel=200"
+      },
+      {
+        "name": "priority.cv_engine_over_ci_runner",
+        "passed": true,
+        "detail": "cpu_weight cv_engine=1000 must exceed ci_runner=100"
+      },
+      {
+        "name": "sam_prelabel.within_batch_group",
+        "passed": true,
+        "detail": "physical cores [4, 5, 6, 7] escape batch group [4, 5, 6, 7]"
+      },
+      {
+        "name": "ci_runner.within_batch_group",
+        "passed": true,
+        "detail": "physical cores [4, 5, 6, 7] escape batch group [4, 5, 6, 7]"
+      },
+      {
+        "name": "memory.ci_within_sam_slice",
+        "passed": true,
+        "detail": "ci_runner 1024.0 MB exceeds parent sam_prelabel 1536.0 MB"
+      },
+      {
+        "name": "memory.root_slices_fit_ceiling",
+        "passed": true,
+        "detail": "root slice limits total 3584 MB > allocable 3840 MB"
+      }
+    ],
+    "violations": [],
+    "root_memory_total_mb": 3584.0,
+    "allocable_memory_mb": 3840.0,
+    "verified": true
+  },
+  "matrix_validation": {
+    "valid": true,
+    "errors": []
+  },
+  "scenarios": [
+    {
+      "scenario_id": "baseline",
+      "name": "Scenario 1: Baseline (Hotset Sweep Only)",
+      "description": "cv-engine running 57-camera hotset sweep at 416 px resolution, zero background contention",
+      "measurement_source": "reference-profile",
+      "resolution": 416,
+      "active_batch_workers": 0,
+      "ci_runner_active": false,
+      "p50_latency_ms": 11.9,
+      "p95_latency_ms": 14.2,
+      "p99_latency_ms": 16.8,
+      "throughput_fps": 70.4,
+      "cpu_utilization_pct": 18.2,
+      "memory_rss_mb": 124.0,
+      "sweep_duration_s": 0.81,
+      "cycle_budget_s": 30.0,
+      "headroom_pct": 97.3,
+      "sla_passed": true,
+      "sla_status": "PASSED"
+    },
+    {
+      "scenario_id": "cotenancy_sam",
+      "name": "Scenario 2: Co-Tenancy Level 1 (Hotset + SAM Batch)",
+      "description": "cv-engine running 57-camera hotset sweep (416 px) + concurrent MobileSAM batch (4 workers)",
+      "measurement_source": "reference-profile",
+      "resolution": 416,
+      "active_batch_workers": 4,
+      "ci_runner_active": false,
+      "p50_latency_ms": 16.5,
+      "p95_latency_ms": 21.8,
+      "p99_latency_ms": 24.5,
+      "throughput_fps": 45.8,
+      "cpu_utilization_pct": 62.4,
+      "memory_rss_mb": 682.0,
+      "sweep_duration_s": 1.24,
+      "cycle_budget_s": 30.0,
+      "headroom_pct": 95.9,
+      "sla_passed": true,
+      "sla_status": "PASSED"
+    },
+    {
+      "scenario_id": "cotenancy_full",
+      "name": "Scenario 3: Co-Tenancy Level 2 (Hotset + SAM + CI Build)",
+      "description": "cv-engine running 57-camera hotset sweep (416 px) + MobileSAM batch (4 workers) + CI build runner",
+      "measurement_source": "reference-profile",
+      "resolution": 416,
+      "active_batch_workers": 4,
+      "ci_runner_active": true,
+      "p50_latency_ms": 22.4,
+      "p95_latency_ms": 28.6,
+      "p99_latency_ms": 34.2,
+      "throughput_fps": 34.9,
+      "cpu_utilization_pct": 91.8,
+      "memory_rss_mb": 1150.0,
+      "sweep_duration_s": 1.63,
+      "cycle_budget_s": 30.0,
+      "headroom_pct": 94.6,
+      "sla_passed": false,
+      "sla_status": "VIOLATED"
+    },
+    {
+      "scenario_id": "loadshed_320",
+      "name": "Scenario 4: Adaptive Load-Shedding (320 px under Full Contention)",
+      "description": "Automatic degradation policy downgrades resolution from 416 px to 320 px under Level 2 contention",
+      "measurement_source": "reference-profile",
+      "resolution": 320,
+      "active_batch_workers": 4,
+      "ci_runner_active": true,
+      "p50_latency_ms": 9.4,
+      "p95_latency_ms": 12.2,
+      "p99_latency_ms": 14.6,
+      "throughput_fps": 82.0,
+      "cpu_utilization_pct": 68.1,
+      "memory_rss_mb": 652.0,
+      "sweep_duration_s": 0.7,
+      "cycle_budget_s": 30.0,
+      "headroom_pct": 97.7,
+      "sla_passed": true,
+      "sla_status": "PASSED"
+    }
+  ]
+}

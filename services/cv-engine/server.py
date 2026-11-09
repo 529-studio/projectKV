@@ -14,7 +14,7 @@ import sys
 import time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from io import BytesIO
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +31,12 @@ OPENVINO_AVAILABLE = False
 PIL_AVAILABLE = False
 core = None
 compiled_model = None
+# How the loaded model treats its spatial input, and the compiled input shape.
+# "dynamic" means the graph accepts a per-request spatial size; "static" means the
+# shape baked into the IR is the only shape it can execute; "unknown" means nothing
+# is loaded yet. The handler reads these instead of assuming every model is dynamic.
+resolution_mode = "unknown"
+compiled_input_shape = None
 
 try:
     import openvino as ov
@@ -54,6 +60,163 @@ except ImportError:
 # the service to bounding boxes.
 SEG_MODEL_XML = "yolov8n_seg.xml"
 DET_MODEL_XML = "yolov8n.xml"
+
+# Load-shedding contract (ADR-012 §1.2 F5 / Issue #379).
+#
+# The request header is reachable by any client that can talk to the port, so it is
+# held to the two sizes the serving loop is dimensioned for. Allowing 640 px from a
+# header would be a CPU-amplification vector: one caller could quadruple the pixel
+# count relative to 320 px for every request. The operator-controlled environment
+# override keeps 640 available for a deliberate, restart-scoped capacity change.
+HEADER_INPUT_RESOLUTIONS: Tuple[int, ...] = (320, 416)
+ENV_INPUT_RESOLUTIONS: Tuple[int, ...] = (320, 416, 640)
+DEFAULT_INPUT_RESOLUTION = 416
+
+
+def resolve_input_resolution(
+    header_value: Optional[str],
+    env_value: Optional[str],
+    model_shape: Optional[Sequence[int]] = None,
+) -> Tuple[int, int]:
+    """Resolve the (width, height) used for inference preprocessing.
+
+    Precedence, highest first:
+      1. ``X-Target-Resolution`` request header (per-request load shedding, 320/416).
+      2. ``CV_INPUT_RESOLUTION`` environment override (operator degradation, 320/416/640).
+      3. The loaded OpenVINO model's static NCHW input shape.
+      4. ``DEFAULT_INPUT_RESOLUTION`` (416 px).
+
+    Each source has its own whitelist: the request header cannot select 640 px, while
+    the environment override can. An out-of-contract header or environment value is
+    ignored with a warning so the effective resolution is never silently different
+    from the documented contract.
+    """
+    sources = (
+        ("X-Target-Resolution header", header_value, HEADER_INPUT_RESOLUTIONS),
+        ("CV_INPUT_RESOLUTION", env_value, ENV_INPUT_RESOLUTIONS),
+    )
+    for source, raw, allowed in sources:
+        if raw is None:
+            continue
+        candidate = raw.strip()
+        if not candidate:
+            continue
+        if candidate.isascii() and candidate.isdigit() and int(candidate) in allowed:
+            size = int(candidate)
+            return size, size
+        logger.warning(
+            "Ignoring %s=%r: allowed values are %s",
+            source,
+            raw,
+            ", ".join(str(v) for v in allowed),
+        )
+
+    if model_shape is not None and len(model_shape) == 4:
+        try:
+            height = int(model_shape[2])
+            width = int(model_shape[3])
+        except (TypeError, ValueError):
+            height = width = 0
+        if height > 0 and width > 0:
+            return width, height
+
+    return DEFAULT_INPUT_RESOLUTION, DEFAULT_INPUT_RESOLUTION
+
+
+def spatial_dims_are_dynamic(model_shape: Optional[Sequence[int]]) -> bool:
+    """Return True when a 4-D NCHW shape has no fixed spatial height/width."""
+    if model_shape is None or len(model_shape) != 4:
+        return True
+    for dim in model_shape[2:]:
+        if dim is None:
+            return True
+        try:
+            if int(dim) <= 0:
+                return True
+        except (TypeError, ValueError):
+            return True
+    return False
+
+
+def resolve_feed_resolution(
+    target_w: int,
+    target_h: int,
+    mode: str,
+    model_shape: Optional[Sequence[int]],
+) -> Tuple[int, int]:
+    """Return the ``(width, height)`` the compiled model can actually be fed.
+
+    A dynamic graph accepts the requested target size. A static graph only executes
+    the shape baked into the IR, so feeding the requested size would raise at
+    ``infer()`` time; the request is served at the model shape instead and the
+    downgrade is logged. The handler reports whichever pair this returns, so the
+    response can never claim a resolution that was not fed to the model.
+    """
+    if mode == "dynamic" or spatial_dims_are_dynamic(model_shape):
+        return target_w, target_h
+
+    try:
+        model_h = int(model_shape[2])
+        model_w = int(model_shape[3])
+    except (TypeError, ValueError, IndexError):
+        return target_w, target_h
+    if model_h <= 0 or model_w <= 0:
+        return target_w, target_h
+
+    if (model_w, model_h) != (target_w, target_h):
+        logger.warning(
+            "Loaded OpenVINO model is static (%dx%d); cannot execute at requested %dx%d. "
+            "Running at model shape.",
+            model_w,
+            model_h,
+            target_w,
+            target_h,
+        )
+    return model_w, model_h
+
+
+def model_input_metadata(
+    model: Any,
+) -> Tuple[str, Optional[Sequence[int]]]:
+    """Return the resolution mode and input shape for the loaded compiled model.
+
+    Production stores both in module globals when ``load_model()`` runs. A test
+    double may expose the same information on the model object, which takes
+    precedence so the handler can be exercised against a recording fake without
+    mutating process state.
+    """
+    mode = getattr(model, "resolution_mode", None) or resolution_mode
+    shape = getattr(model, "input_shape", None)
+    if shape is None:
+        shape = compiled_input_shape
+    if shape is None:
+        try:
+            shape = model.input(0).shape
+        except Exception as exc:
+            logger.warning("Could not read model input shape, using default resolution: %s", exc)
+    return mode, shape
+
+
+def box_polygon_anchor(
+    cx: float,
+    cy: float,
+    w: float,
+    h: float,
+    img_w: int,
+    img_h: int,
+) -> Tuple[float, float]:
+    """Bottom-center anchor of a detection box in normalized image coordinates.
+
+    Region membership is tested in the same normalized space the polygon contract
+    uses, against the resolution actually fed to the model. Clamping keeps the anchor
+    inside [0.0, 1.0] for boxes that extend past the frame edge, so an out-of-frame
+    detection cannot be assigned to a region by an arithmetic accident.
+    """
+    if img_w <= 0 or img_h <= 0:
+        return 0.0, 0.0
+    norm_cx = min(1.0, max(0.0, float(cx) / float(img_w)))
+    norm_by = min(1.0, max(0.0, (float(cy) + float(h) / 2.0) / float(img_h)))
+    return norm_cx, norm_by
 
 
 def select_model_xml(model_dir: str) -> Optional[str]:
@@ -91,9 +254,15 @@ def select_model_xml(model_dir: str) -> Optional[str]:
 
 def load_model():
     """Attempt to load and compile OpenVINO model if model files exist."""
-    global compiled_model
+    global compiled_model, resolution_mode, compiled_input_shape
     if not OPENVINO_AVAILABLE or not core:
         return
+
+    # Reset the serving contract before every load attempt so a failed reload cannot
+    # leave the handler describing a model that is no longer loaded.
+    compiled_model = None
+    compiled_input_shape = None
+    resolution_mode = "unknown"
 
     model_xml = select_model_xml(MODEL_DIR)
     if not model_xml:
@@ -103,9 +272,51 @@ def load_model():
         start_t = time.perf_counter()
         logger.info("Loading OpenVINO model from %s...", model_xml)
         model = core.read_model(model=model_xml)
+        try:
+            # A dynamic spatial reshape lets the serving loop honour load shedding.
+            # It is not supported by every IR, and promising it when the graph
+            # rejected it is what produced the squashed-resize bug: the handler must
+            # know which of the two modes it is actually running in.
+            model.reshape([-1, 3, -1, -1])
+            resolution_mode = "dynamic"
+            logger.info(
+                "Dynamic reshape succeeded on %s: model accepts per-request spatial sizes",
+                model_xml,
+            )
+        except Exception as reshape_exc:
+            resolution_mode = "static"
+            logger.warning(
+                "Dynamic reshape not supported on %s (%s); staying static",
+                model_xml,
+                reshape_exc,
+            )
         compiled_model = core.compile_model(model=model, device_name="CPU")
+        try:
+            compiled_input_shape = list(compiled_model.input(0).shape)
+        except Exception as exc:
+            compiled_input_shape = None
+            logger.warning("Could not read compiled input shape: %s", exc)
+        if compiled_input_shape is not None:
+            # The compiled graph, not the reshape request, decides what the serving
+            # loop can feed. A graph that still exposes fixed spatial dimensions
+            # ignores X-Target-Resolution and must be reported as static.
+            resolution_mode = (
+                "dynamic" if spatial_dims_are_dynamic(compiled_input_shape) else "static"
+            )
         duration = (time.perf_counter() - start_t) * 1000
         logger.info("OpenVINO model compiled successfully on CPU in %.1f ms", duration)
+        if resolution_mode == "dynamic":
+            logger.info(
+                "Input resolution mode: dynamic (compiled input shape %s); "
+                "per-request X-Target-Resolution 320/416 is honoured",
+                compiled_input_shape,
+            )
+        else:
+            logger.info(
+                "Input resolution mode: static (compiled input shape %s); "
+                "requests are served at the model's baked spatial size",
+                compiled_input_shape,
+            )
     except Exception as exc:
         logger.error("Failed to compile OpenVINO model: %s", exc)
 
@@ -425,7 +636,9 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                 "openvino_available": OPENVINO_AVAILABLE,
                 "available_devices": devices,
                 "model_dir": MODEL_DIR,
-                "model_loaded": compiled_model is not None
+                "model_loaded": compiled_model is not None,
+                "resolution_mode": resolution_mode,
+                "input_shape": compiled_input_shape,
             })
             return
 
@@ -496,17 +709,25 @@ class CVRequestHandler(BaseHTTPRequestHandler):
             if compiled_model is not None and PIL_AVAILABLE:
                 try:
                     image = Image.open(BytesIO(image_bytes)).convert("RGB")
-                    target_w, target_h = 416, 416
-                    if compiled_model is not None:
-                        try:
-                            in_shape = compiled_model.input(0).shape
-                            if len(in_shape) == 4:
-                                target_h = int(in_shape[2])
-                                target_w = int(in_shape[3])
-                        except Exception:
-                            pass
+                    # Target resolution with load-shedding support (Issue #379 / ADR-012 §1.2 F5).
+                    # The decision lives in resolve_input_resolution() so it is unit-testable.
+                    mode, model_shape = model_input_metadata(compiled_model)
+                    target_w, target_h = resolve_input_resolution(
+                        self.headers.get("X-Target-Resolution"),
+                        os.environ.get("CV_INPUT_RESOLUTION"),
+                        model_shape,
+                    )
+                    # A static graph can only execute the shape in its IR. Letterbox
+                    # straight to the size that will really be fed: an intermediate
+                    # resize to the requested size would distort the aspect ratio
+                    # without changing what the model sees.
+                    actual_w, actual_h = resolve_feed_resolution(
+                        target_w, target_h, mode, model_shape
+                    )
+                    image_letterboxed, scale, pad_x, pad_y = letterbox(
+                        image, target_size=(actual_w, actual_h)
+                    )
 
-                    image_letterboxed, scale, pad_x, pad_y = letterbox(image, target_size=(target_w, target_h))
                     input_tensor = np.expand_dims(np.array(image_letterboxed).transpose((2, 0, 1)), axis=0).astype(np.float32) / 255.0
 
                     infer_request = compiled_model.create_infer_request()
@@ -552,7 +773,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                     depth_estimated_cm = 0.0
                     submerged_mc = 0
                     puddle_count = 0
-                    model_tag = f"yolov8n_openvino_{target_w}"
+                    model_tag = f"yolov8n_openvino_{actual_w}"
                     road_mask = None
                     water_mask = None
 
@@ -571,7 +792,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                             # Fine-tuned 6-class YOLOv8n-seg model (ADR-009):
                             # Classes: 0: roadway, 1: water_puddle, 2: motorcycle, 3: car, 4: bus, 5: truck
                             # Rows: 0..3 box, 4..9 classes, 10..41 (32 mask coeffs)
-                            model_tag = f"yolov8n_seg_openvino_{target_w}"
+                            model_tag = f"yolov8n_seg_openvino_{actual_w}"
                             seg_classes = {
                                 "motorcycle": 6,
                                 "car": 7,
@@ -628,7 +849,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                                 water_ratio = calculate_water_ratio(water_mask, road_mask)
                                 if len(kept_motorcycles) > 0 and water_mask is not None:
                                     max_delta_sub, depth_estimated_cm, submerged_mc = calculate_motorcycle_submersion(
-                                        np.array(kept_motorcycles), water_mask, target_img_size=(target_w, target_h)
+                                        np.array(kept_motorcycles), water_mask, target_img_size=(actual_w, actual_h)
                                     )
 
                         elif data.ndim == 2 and num_channels >= 12:
@@ -732,9 +953,10 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                             }
                             for cls_name, box in kept_vehicles:
                                 cx, cy, w, h = box[0], box[1], box[2], box[3]
-                                norm_cx = cx / float(target_w)
-                                norm_by = (cy + h / 2.0) / float(target_h)
-                                if point_in_polygon(norm_cx, norm_by, poly) or point_in_polygon(norm_cx, cy / float(target_h), poly):
+                                norm_cx, norm_by = box_polygon_anchor(
+                                    cx, cy, w, h, actual_w, actual_h
+                                )
+                                if point_in_polygon(norm_cx, norm_by, poly):
                                     reg_counts[cls_name] = reg_counts.get(cls_name, 0) + 1
 
                             reg_water_ratio = 0.0
@@ -770,6 +992,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                         "confidence": round(float(flood_conf if flood_verdict != "CLEAR" else 0.88), 2),
                         "latency_ms": round(latency, 2),
                         "model": model_tag,
+                        "input_resolution": [actual_w, actual_h],
                         "flood_assessment": build_flood_assessment(
                             verdict=flood_verdict,
                             water_ratio=water_ratio,
