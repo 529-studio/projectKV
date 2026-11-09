@@ -1,0 +1,46 @@
+name: Evidence Integrity Gate
+
+# Enforces AGENTS.md Rule 2, Rule 6, Rule 10, and Sprint 11 Architecture (ADR-013 D1):
+# Prohibits synthetic fixtures, simulated soak logs with future timestamps, dummy
+# model stubs, and degenerate proof placeholders.
+# Runs on every pull request and push to main/dev without path filters, ensuring that
+# changes to reports, proofs, models, or workflows cannot bypass integrity gates.
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evidence-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Enforce evidence integrity & anti-spoofing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install pillow
+
+      - name: Run Evidence Gate Unit Tests
+        run: make test-ci
+
+      - name: Enforce Evidence Integrity Gate
+        run: make evidence-lint

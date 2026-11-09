@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs test-eval test-seg test-train test-forecast export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint test-ci test-eval test-seg test-train test-forecast export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam
 
 help:
 	@echo "========================================================"
@@ -30,6 +30,8 @@ help:
 	@echo "  make test-enrich     - Run unit tests for geo-enrich tool"
 	@echo "  make docs-lint       - Enforce the context budget, ADR numbers, links and prose rules"
 	@echo "  make test-docs       - Run unit tests for the docs-lint gate"
+	@echo "  make evidence-lint   - Enforce evidence integrity, temporal invariants and anti-spoofing"
+	@echo "  make test-ci         - Run unit tests for evidence integrity gate"
 	@echo "  make test-eval       - Run unit tests for eval benchmark harness"
 	@echo "  make test-seg        - Run unit tests for SAM pre-labeling toolchain (S9-T2)"
 	@echo "  make test-forecast   - Run unit tests for the congestion forecast toolchain (S9-T6)"
@@ -114,6 +116,12 @@ docs-lint:
 
 test-docs:
 	python3 -m unittest discover -s tools/docs -p "*_test.py"
+
+evidence-lint:
+	python3 tools/ci/check_evidence_integrity.py --verify-all
+
+test-ci:
+	python3 -m unittest discover -s tools/ci -p "*_test.py"
 
 test-eval:
 	python3 -m unittest discover -s tools/eval -p "*_test.py"

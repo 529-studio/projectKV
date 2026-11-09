@@ -80,3 +80,7 @@ models/
 # Local agent session artefacts
 .zcode/
 .agents/teamwork/
+
+# Local agent scratchpad
+scratch/
+
