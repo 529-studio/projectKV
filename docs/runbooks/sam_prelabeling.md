@@ -20,6 +20,7 @@ To protect production stability and enforce hardware standards (ADR-011 D3 / AGE
 1. **Host Disqualification**: The production ingress host (Intel Celeron) lacks AVX2 vector instructions and must never execute batch AI annotation workloads that could degrade the live 30-second camera polling loop.
 2. **Authorized Host**: Inference runs offline on `inference worker` (AMD Ryzen 7 6800HS with AVX2), sharing cgroups with the CV engine and GitHub Actions runner.
 3. **Host Guard**: `prelabel_sam.py` inspects host CPU flags. On Linux x86_64, missing AVX2 halts execution immediately with an exit code. On developer machines (e.g. macOS Apple Silicon), pass `--allow-unsafe-host` to bypass the x86 guard for local development.
+4. **Off-Peak Guard**: After the host guard, `prelabel_sam.py` refuses to run batch pre-labeling outside the authorized nocturnal window (01:00-05:00 ICT / 18:00-22:00 UTC) so MobileSAM never contends with the live hotset sweep (ADR-012 §3 (S10-T8) / §1.2 (F5)). `--dry-run` bypasses the window check because it performs no inference, and `--allow-daytime` overrides it for manual daytime profiling or debugging after logging an explicit override warning. If the policy module cannot be imported the guard fails closed rather than allowing the batch.
 
 ---
 

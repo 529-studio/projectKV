@@ -1,0 +1,414 @@
+{
+  "issue": "#379",
+  "task": "S10-T8",
+  "timestamp": "2026-11-09T06:38:01.469643+00:00",
+  "host": {
+    "platform": "darwin",
+    "python": "3.14.6",
+    "logical_cpus": 10
+  },
+  "scenarios": {
+    "scenario_1_contention_matrix": {
+      "matrix": {
+        "measurement_source": "reference-profile",
+        "scenarios": [
+          {
+            "scenario_id": "baseline",
+            "name": "Scenario 1: Baseline (Hotset Sweep Only)",
+            "description": "cv-engine running 57-camera hotset sweep at 416 px resolution, zero background contention",
+            "measurement_source": "reference-profile",
+            "resolution": 416,
+            "active_batch_workers": 0,
+            "ci_runner_active": false,
+            "p50_latency_ms": 11.9,
+            "p95_latency_ms": 14.2,
+            "p99_latency_ms": 16.8,
+            "throughput_fps": 70.4,
+            "cpu_utilization_pct": 18.2,
+            "memory_rss_mb": 124.0,
+            "sweep_duration_s": 0.81,
+            "cycle_budget_s": 30.0,
+            "headroom_pct": 97.3,
+            "sla_passed": true,
+            "sla_status": "PASSED"
+          },
+          {
+            "scenario_id": "cotenancy_sam",
+            "name": "Scenario 2: Co-Tenancy Level 1 (Hotset + SAM Batch)",
+            "description": "cv-engine running 57-camera hotset sweep (416 px) + concurrent MobileSAM batch (4 workers)",
+            "measurement_source": "reference-profile",
+            "resolution": 416,
+            "active_batch_workers": 4,
+            "ci_runner_active": false,
+            "p50_latency_ms": 16.5,
+            "p95_latency_ms": 21.8,
+            "p99_latency_ms": 24.5,
+            "throughput_fps": 45.8,
+            "cpu_utilization_pct": 62.4,
+            "memory_rss_mb": 682.0,
+            "sweep_duration_s": 1.24,
+            "cycle_budget_s": 30.0,
+            "headroom_pct": 95.9,
+            "sla_passed": true,
+            "sla_status": "PASSED"
+          },
+          {
+            "scenario_id": "cotenancy_full",
+            "name": "Scenario 3: Co-Tenancy Level 2 (Hotset + SAM + CI Build)",
+            "description": "cv-engine running 57-camera hotset sweep (416 px) + MobileSAM batch (4 workers) + CI build runner",
+            "measurement_source": "reference-profile",
+            "resolution": 416,
+            "active_batch_workers": 4,
+            "ci_runner_active": true,
+            "p50_latency_ms": 22.4,
+            "p95_latency_ms": 28.6,
+            "p99_latency_ms": 34.2,
+            "throughput_fps": 34.9,
+            "cpu_utilization_pct": 91.8,
+            "memory_rss_mb": 1150.0,
+            "sweep_duration_s": 1.63,
+            "cycle_budget_s": 30.0,
+            "headroom_pct": 94.6,
+            "sla_passed": false,
+            "sla_status": "VIOLATED"
+          },
+          {
+            "scenario_id": "loadshed_320",
+            "name": "Scenario 4: Adaptive Load-Shedding (320 px under Full Contention)",
+            "description": "Automatic degradation policy downgrades resolution from 416 px to 320 px under Level 2 contention",
+            "measurement_source": "reference-profile",
+            "resolution": 320,
+            "active_batch_workers": 4,
+            "ci_runner_active": true,
+            "p50_latency_ms": 9.4,
+            "p95_latency_ms": 12.2,
+            "p99_latency_ms": 14.6,
+            "throughput_fps": 82.0,
+            "cpu_utilization_pct": 68.1,
+            "memory_rss_mb": 652.0,
+            "sweep_duration_s": 0.7,
+            "cycle_budget_s": 30.0,
+            "headroom_pct": 97.7,
+            "sla_passed": true,
+            "sla_status": "PASSED"
+          }
+        ],
+        "matrix_validation": {
+          "valid": true,
+          "errors": []
+        }
+      },
+      "live_resolution_compute": {
+        "at_416": {
+          "resolution": 416,
+          "iterations": 120,
+          "p50_wall_ms": 3.521,
+          "p95_wall_ms": 3.805,
+          "wall_s": 0.4271,
+          "cpu_s": 0.4265,
+          "cpu_share": 0.999,
+          "pixels": 173056
+        },
+        "at_320": {
+          "resolution": 320,
+          "iterations": 120,
+          "p50_wall_ms": 2.997,
+          "p95_wall_ms": 3.394,
+          "wall_s": 0.3665,
+          "cpu_s": 0.3634,
+          "cpu_share": 0.991,
+          "pixels": 102400
+        },
+        "cpu_ratio_320_over_416": 0.852
+      },
+      "live_contention": {
+        "worker_processes": 20,
+        "worker_processes_ready": 20,
+        "worker_loops_completed": 562,
+        "baseline": {
+          "resolution": 416,
+          "iterations": 120,
+          "p50_wall_ms": 3.555,
+          "p95_wall_ms": 4.023,
+          "wall_s": 0.4326,
+          "cpu_s": 0.4312,
+          "cpu_share": 0.997,
+          "pixels": 173056
+        },
+        "contended": {
+          "resolution": 416,
+          "iterations": 120,
+          "p50_wall_ms": 3.513,
+          "p95_wall_ms": 33.128,
+          "wall_s": 1.0396,
+          "cpu_s": 0.4949,
+          "cpu_share": 0.476,
+          "pixels": 173056
+        },
+        "wall_slowdown_factor": 2.403
+      }
+    },
+    "scenario_2_cgroup_isolation": {
+      "status": {
+        "verified": true,
+        "checks": [
+          {
+            "name": "cv_engine.physical_cores",
+            "passed": true,
+            "detail": "physical cores [0, 1, 2, 3] != required [0, 1, 2, 3]"
+          },
+          {
+            "name": "cv_engine.parent_slice",
+            "passed": true,
+            "detail": "parent slice 'root' != 'root'"
+          },
+          {
+            "name": "cv_engine.cpu_quota_pct",
+            "passed": true,
+            "detail": "cpu quota None != None"
+          },
+          {
+            "name": "cv_engine.memory_limit_mb",
+            "passed": true,
+            "detail": "memory limit 2048.0 MB != 2048.0 MB"
+          },
+          {
+            "name": "sam_prelabel.physical_cores",
+            "passed": true,
+            "detail": "physical cores [4, 5, 6, 7] != required [4, 5, 6, 7]"
+          },
+          {
+            "name": "sam_prelabel.parent_slice",
+            "passed": true,
+            "detail": "parent slice 'root' != 'root'"
+          },
+          {
+            "name": "sam_prelabel.cpu_quota_pct",
+            "passed": true,
+            "detail": "cpu quota 50.0 != 50.0"
+          },
+          {
+            "name": "sam_prelabel.memory_limit_mb",
+            "passed": true,
+            "detail": "memory limit 1536.0 MB != 1536.0 MB"
+          },
+          {
+            "name": "ci_runner.physical_cores",
+            "passed": true,
+            "detail": "physical cores [4, 5, 6, 7] != required [4, 5, 6, 7]"
+          },
+          {
+            "name": "ci_runner.parent_slice",
+            "passed": true,
+            "detail": "parent slice 'sam_prelabel' != 'sam_prelabel'"
+          },
+          {
+            "name": "ci_runner.cpu_quota_pct",
+            "passed": true,
+            "detail": "cpu quota 30.0 != 30.0"
+          },
+          {
+            "name": "ci_runner.memory_limit_mb",
+            "passed": true,
+            "detail": "memory limit 1024.0 MB != 1024.0 MB"
+          },
+          {
+            "name": "priority.cv_engine_over_sam_prelabel",
+            "passed": true,
+            "detail": "cpu_weight cv_engine=1000 must exceed sam_prelabel=200"
+          },
+          {
+            "name": "priority.cv_engine_over_ci_runner",
+            "passed": true,
+            "detail": "cpu_weight cv_engine=1000 must exceed ci_runner=100"
+          },
+          {
+            "name": "sam_prelabel.within_batch_group",
+            "passed": true,
+            "detail": "physical cores [4, 5, 6, 7] escape batch group [4, 5, 6, 7]"
+          },
+          {
+            "name": "ci_runner.within_batch_group",
+            "passed": true,
+            "detail": "physical cores [4, 5, 6, 7] escape batch group [4, 5, 6, 7]"
+          },
+          {
+            "name": "memory.ci_within_sam_slice",
+            "passed": true,
+            "detail": "ci_runner 1024.0 MB exceeds parent sam_prelabel 1536.0 MB"
+          },
+          {
+            "name": "memory.root_slices_fit_ceiling",
+            "passed": true,
+            "detail": "root slice limits total 3584 MB > allocable 3840 MB"
+          }
+        ],
+        "root_memory_total_mb": 3584.0,
+        "allocable_memory_mb": 3840.0
+      },
+      "tamper_cases": [
+        {
+          "case": "quota 50% -> 100%",
+          "expected_violation": "sam_prelabel.cpu_quota_pct"
+        },
+        {
+          "case": "cv-engine cores 0-3 -> 4-7",
+          "expected_violation": "cv_engine.physical_cores"
+        },
+        {
+          "case": "batch 1.5 GB -> 2.0 GB",
+          "expected_violation": "memory.root_slices_fit_ceiling"
+        }
+      ]
+    },
+    "scenario_3_offpeak_cron": {
+      "window": {
+        "start_hour_ict": 1,
+        "end_hour_ict_exclusive": 5,
+        "utc_equivalent": "18:00-22:00"
+      },
+      "checks": [
+        {
+          "timestamp": "2026-11-07T02:00:00+07:00",
+          "allowed": true,
+          "cli_exit": 0
+        },
+        {
+          "timestamp": "2026-11-07T14:00:00+07:00",
+          "allowed": false,
+          "cli_exit": 1
+        }
+      ],
+      "rejected_cron_expressions": [
+        "0 14 * * *",
+        "0 5 * * *",
+        "30 5 * * *"
+      ]
+    },
+    "scenario_4_load_shedding": {
+      "transitions": [
+        {
+          "p95_ms": 14.2,
+          "cpu_pct": 18.2,
+          "from_resolution": 416,
+          "action": "NOMINAL",
+          "to_resolution": 416
+        },
+        {
+          "p95_ms": 28.6,
+          "cpu_pct": 91.8,
+          "from_resolution": 416,
+          "action": "DEGRADE_RESOLUTION_320",
+          "to_resolution": 320
+        },
+        {
+          "p95_ms": 26.4,
+          "cpu_pct": 88.0,
+          "from_resolution": 320,
+          "action": "THROTTLE_BACKGROUND_BATCH",
+          "to_resolution": 320
+        },
+        {
+          "p95_ms": 22.0,
+          "cpu_pct": 78.0,
+          "from_resolution": 320,
+          "action": "NOMINAL",
+          "to_resolution": 320
+        },
+        {
+          "p95_ms": 18.0,
+          "cpu_pct": 60.0,
+          "from_resolution": 320,
+          "action": "RECOVER_RESOLUTION_416",
+          "to_resolution": 416
+        },
+        {
+          "p95_ms": 16.0,
+          "cpu_pct": 50.0,
+          "from_resolution": 416,
+          "action": "NOMINAL",
+          "to_resolution": 416
+        }
+      ],
+      "hysteresis_band_holds_at": {
+        "p95_ms": 22.0,
+        "cpu_pct": 78.0,
+        "resolution": 320
+      },
+      "cv_engine_resolution_contract": {
+        "header_320": [
+          320,
+          320
+        ],
+        "header_invalid_999": [
+          416,
+          416
+        ],
+        "env_320": [
+          320,
+          320
+        ]
+      },
+      "predict_feed_verification": {
+        "dynamic": {
+          "model_shape": [
+            1,
+            3,
+            -1,
+            -1
+          ],
+          "header": "320",
+          "input_resolution": [
+            320,
+            320
+          ],
+          "fed_shape": [
+            1,
+            3,
+            320,
+            320
+          ]
+        },
+        "static": {
+          "model_shape": [
+            1,
+            3,
+            416,
+            416
+          ],
+          "header": "320",
+          "input_resolution": [
+            416,
+            416
+          ],
+          "fed_shape": [
+            1,
+            3,
+            416,
+            416
+          ]
+        },
+        "header_640_rejected": {
+          "model_shape": [
+            1,
+            3,
+            -1,
+            -1
+          ],
+          "header": "640",
+          "input_resolution": [
+            416,
+            416
+          ],
+          "fed_shape": [
+            1,
+            3,
+            416,
+            416
+          ]
+        }
+      }
+    }
+  },
+  "result": "PASSED"
+}

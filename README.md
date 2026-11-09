@@ -295,9 +295,11 @@ Issue #302 (S9-T6) compares persistence, a historical median, and ridge regressi
 |---|---|---|
 | **Host Worker** | `inference worker` | Dedicated multi-core host with private mesh VPN |
 | **Model Runtime** | Intel OpenVINO 2024.4 IR | Optimized FP16 vehicle detection engine (~6.3 MB) |
-| **Input Resolution** | 416x416 (with letterbox preprocessing & NMS) | Low-latency inference geometry with aspect ratio preservation and box deduplication |
+| **Input Resolution** | 416x416 default; `CV_INPUT_RESOLUTION` (320/416/640) | Restart-scoped override; per-request `X-Target-Resolution` (320/416) |
 | **Resource Caps** | 2 vCPU / 2 GB RAM | Resource limits configured via Docker Compose stack |
-| **API Endpoints** | `POST /predict`, `GET /healthz` | Prediction endpoint accepting JPEG bytes and returning vehicle counts |
+| **API Endpoints** | `POST /predict`, `GET /healthz`, `GET /info` | JPEG prediction; `/info` reports compiled geometry |
+
+Operations: [Inference Worker Capacity Runbook](docs/runbooks/inference_worker_capacity.md).
 
 #### Operational Verification: Staging Telegram Flood Alerts
 
@@ -317,10 +319,10 @@ debouncer and token redaction are enforced deterministically by
 
 ## 4. Next Evolution Steps
 
-Detailed architectural decisions are documented in:
-**[`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md)** — original caching & CV roadmap
-**[`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md)** — flood-alert feasibility, notification channels, and the Go backend migration decision (ADR-002)
-**[`docs/ADR-009-zero-vlm-flood-segmentation.md`](docs/ADR-009-zero-vlm-flood-segmentation.md)** — self-hosted flood segmentation, OpenVINO model selection benchmarks, and dual-layer physical triangulation (Zero-VLM)
+Architecture decisions:
+**[`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md)** — caching and CV roadmap
+**[`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md)** — flood-alert feasibility, channels, Go backend migration (ADR-002)
+**[`docs/ADR-009-zero-vlm-flood-segmentation.md`](docs/ADR-009-zero-vlm-flood-segmentation.md)** — self-hosted segmentation, OpenVINO benchmarks, dual-layer physical triangulation (Zero-VLM)
 
 ## License
 

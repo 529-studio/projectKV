@@ -6,6 +6,8 @@ Verifies ThreadingHTTPServer concurrency, healthchecks, and resilient disconnect
 
 from __future__ import annotations
 
+import json
+import os
 import socket
 import struct
 import sys
@@ -13,12 +15,19 @@ import tempfile
 import threading
 import time
 import unittest
-import urllib.request
-import urllib.error
-import json
 import unittest.mock
+import urllib.error
+import urllib.request
 from io import BytesIO
 from pathlib import Path
+
+# Support `python3 -m unittest services/cv-engine/test_server.py` from the repository
+# root: this module imports its sibling `server` as a top-level module, which only works
+# when the service directory is on sys.path. Discovery from inside the service directory
+# already satisfies that, so the insert is a no-op there.
+SERVICE_DIR = str(Path(__file__).resolve().parent)
+if SERVICE_DIR not in sys.path:
+    sys.path.insert(0, SERVICE_DIR)
 
 try:
     import numpy as np
@@ -35,14 +44,34 @@ from server import (
     CVRequestHandler,
     DET_MODEL_XML,
     SEG_MODEL_XML,
+    DEFAULT_INPUT_RESOLUTION,
     WHEEL_SUBMERSION_DELTA,
     letterbox,
     nms_cpu,
     decode_mask_prototypes,
     calculate_water_ratio,
     calculate_motorcycle_submersion,
+    resolve_input_resolution,
     triangulate_flood_verdict,
 )
+
+
+def isolate_input_resolution_env(testcase: unittest.TestCase) -> None:
+    """Remove ``CV_INPUT_RESOLUTION`` for one test, restoring it afterwards.
+
+    The serving handler reads this variable from the real process environment, so an
+    operator override exported in the developer's shell would silently change what the
+    requests in this module resolve to. Every test that starts or drives the server pops
+    it in ``setUp`` and restores the prior value on cleanup.
+    """
+    saved = os.environ.pop("CV_INPUT_RESOLUTION", None)
+
+    def restore() -> None:
+        os.environ.pop("CV_INPUT_RESOLUTION", None)
+        if saved is not None:
+            os.environ["CV_INPUT_RESOLUTION"] = saved
+
+    testcase.addCleanup(restore)
 
 
 class TestCVServer(unittest.TestCase):
@@ -60,6 +89,9 @@ class TestCVServer(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
 
+    def setUp(self):
+        isolate_input_resolution_env(self)
+
     def test_healthz_endpoint(self):
         req = urllib.request.Request(f"{self.base_url}/healthz")
         with urllib.request.urlopen(req, timeout=5.0) as resp:
@@ -69,11 +101,29 @@ class TestCVServer(unittest.TestCase):
             self.assertEqual(data.get("service"), "cv-engine")
 
     def test_info_endpoint(self):
+        # Operators use /info to confirm what the compiled graph can execute, so pin the
+        # reported mode and shape instead of only checking that the keys exist: a handler
+        # that swapped or dropped the values would still satisfy a presence assertion.
+        # The module globals are read per request, so patching them here exercises the
+        # real response path; whatever the process resolved at import time is restored.
+        previous_mode = server.resolution_mode
+        previous_shape = server.compiled_input_shape
+        server.resolution_mode = "dynamic"
+        server.compiled_input_shape = [1, 3, 416, 416]
+
+        def restore() -> None:
+            server.resolution_mode = previous_mode
+            server.compiled_input_shape = previous_shape
+
+        self.addCleanup(restore)
+
         req = urllib.request.Request(f"{self.base_url}/info")
         with urllib.request.urlopen(req, timeout=5.0) as resp:
             self.assertEqual(resp.status, 200)
             data = json.loads(resp.read().decode("utf-8"))
             self.assertEqual(data.get("service"), "projectkv-cv-engine")
+            self.assertEqual(data.get("resolution_mode"), "dynamic")
+            self.assertEqual(data.get("input_shape"), [1, 3, 416, 416])
 
     def test_head_endpoint(self):
         req = urllib.request.Request(f"{self.base_url}/healthz", method="HEAD")
@@ -477,14 +527,18 @@ class _FakeResults:
 
 
 class _FakeInput:
-    shape = (1, 3, 416, 416)
+    def __init__(self, shape=(1, 3, 416, 416)):
+        self.shape = tuple(shape)
 
 
 class _FakeInferRequest:
-    def __init__(self, output=None):
+    def __init__(self, output=None, recorded_feeds=None):
         self.output = output
+        self.recorded_feeds = recorded_feeds if recorded_feeds is not None else []
 
     def infer(self, feeds):
+        # Record what the handler actually fed the graph, not what it intended to.
+        self.recorded_feeds.append({key: np.asarray(value).shape for key, value in feeds.items()})
         if self.output is not None:
             return _FakeResults(self.output)
         # 42 rows = the 6-class segmentation head; all scores below threshold.
@@ -492,14 +546,20 @@ class _FakeInferRequest:
 
 
 class _FakeCompiledModel:
-    def __init__(self, output=None):
+    def __init__(self, output=None, shape=(1, 3, 416, 416)):
         self.output = output
+        self.input_shape = tuple(shape)
+        self.recorded_feeds = []
+
+    @property
+    def resolution_mode(self):
+        return "dynamic" if server.spatial_dims_are_dynamic(self.input_shape) else "static"
 
     def input(self, index):
-        return _FakeInput()
+        return _FakeInput(self.input_shape)
 
     def create_infer_request(self):
-        return _FakeInferRequest(self.output)
+        return _FakeInferRequest(self.output, self.recorded_feeds)
 
 
 @unittest.skipUnless(HAS_CV_DEPS, "numpy and Pillow are required for the inference payload test")
@@ -520,21 +580,81 @@ class TestPredictPayload(unittest.TestCase):
         cls.httpd.server_close()
 
     def setUp(self):
+        # The handler reads CV_INPUT_RESOLUTION from the process environment; isolate it
+        # so a host-shell override cannot change what these payload assertions see.
+        isolate_input_resolution_env(self)
         saved = server.compiled_model
-        server.compiled_model = _FakeCompiledModel()
+        self.model = _FakeCompiledModel()
+        server.compiled_model = self.model
         self.addCleanup(setattr, server, "compiled_model", saved)
 
-    def _post_predict(self):
+    def _use_model(self, shape, output=None):
+        self.model = _FakeCompiledModel(output=output, shape=shape)
+        server.compiled_model = self.model
+        return self.model
+
+    def _post_predict(self, extra_headers=None):
         buffer = BytesIO()
         Image.new("RGB", (32, 32), (90, 90, 90)).save(buffer, format="JPEG")
+        headers = {"Content-Type": "image/jpeg"}
+        if extra_headers:
+            headers.update(extra_headers)
         request = urllib.request.Request(
             f"{self.base_url}/predict",
             data=buffer.getvalue(),
-            headers={"Content-Type": "image/jpeg"},
+            headers=headers,
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=5.0) as response:
             return response.status, json.loads(response.read().decode("utf-8"))
+
+    def test_predict_reports_default_resolution_416(self):
+        status, payload = self._post_predict()
+        self.assertEqual(status, 200)
+        self.assertIn("input_resolution", payload)
+        self.assertEqual(payload["input_resolution"], [416, 416])
+
+    def test_predict_honors_target_resolution_header_320_when_dynamic(self):
+        self._use_model(shape=(1, 3, -1, -1))
+        status, payload = self._post_predict(extra_headers={"X-Target-Resolution": "320"})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["input_resolution"], [320, 320])
+        self.assertEqual(self.model.recorded_feeds, [{0: (1, 3, 320, 320)}])
+
+    def test_predict_static_model_serves_baked_shape_and_reports_it(self):
+        # A static IR cannot execute 320 px. The handler must feed the shape in the
+        # graph and report that shape, never the requested one.
+        self._use_model(shape=(1, 3, 416, 416))
+        with self.assertLogs("cv-engine", level="WARNING") as logs:
+            status, payload = self._post_predict(extra_headers={"X-Target-Resolution": "320"})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["input_resolution"], [416, 416])
+        self.assertEqual(self.model.recorded_feeds, [{0: (1, 3, 416, 416)}])
+        self.assertIn("static", "\n".join(logs.output))
+
+    def test_predict_ignores_640_header_and_falls_back_to_416(self):
+        # 640 px is an operator environment override only. A request header must not
+        # be able to quadruple the pixel count relative to 320 px.
+        self._use_model(shape=(1, 3, -1, -1))
+        status, payload = self._post_predict(extra_headers={"X-Target-Resolution": "640"})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["input_resolution"], [416, 416])
+        self.assertEqual(self.model.recorded_feeds, [{0: (1, 3, 416, 416)}])
+
+    def test_predict_reports_the_shape_actually_fed_to_the_model(self):
+        # Guards the wire contract directly: payload resolution must equal the tensor
+        # received by infer(), so a squashed resize can never be reported as served.
+        self._use_model(shape=(1, 3, -1, -1))
+        status, payload = self._post_predict(extra_headers={"X-Target-Resolution": "416"})
+        self.assertEqual(status, 200)
+        fed_shape = self.model.recorded_feeds[-1][0]
+        self.assertEqual(list(fed_shape[2:]), payload["input_resolution"])
+
+    def test_predict_rejects_out_of_contract_resolution_header(self):
+        self._use_model(shape=(1, 3, -1, -1))
+        status, payload = self._post_predict(extra_headers={"X-Target-Resolution": "999"})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["input_resolution"], [416, 416])
 
     def test_response_carries_the_contract_block(self):
         status, payload = self._post_predict()
@@ -670,6 +790,75 @@ class TestPredictPayload(unittest.TestCase):
         self.assertEqual(payload["vehicle_counts"]["car"], 1)
         self.assertEqual(payload["vehicle_counts"]["truck"], 1)
         self.assertEqual(payload["vehicles_detected"], 2)
+
+
+class TestBoxPolygonAnchor(unittest.TestCase):
+    """Coordinate normalization for directional polygon assignment (ADR-012 D1)."""
+
+    def test_normal_box_produces_normalized_bottom_center(self):
+        nx, ny = server.box_polygon_anchor(100.0, 200.0, 40.0, 20.0, 400, 400)
+        self.assertAlmostEqual(nx, 0.25)
+        self.assertAlmostEqual(ny, 210.0 / 400.0)
+
+    def test_anchor_always_stays_inside_the_unit_square(self):
+        # Boxes may extend past the frame in any direction after letterbox decoding.
+        cases = [
+            (-500.0, -500.0, 40.0, 40.0),
+            (-500.0, 5000.0, 40.0, 40.0),
+            (5000.0, -5000.0, 40.0, 40.0),
+            (5000.0, 5000.0, 40.0, 40.0),
+            (208.0, 208.0, 900.0, 900.0),
+        ]
+        for cx, cy, w, h in cases:
+            nx, ny = server.box_polygon_anchor(cx, cy, w, h, 416, 416)
+            self.assertGreaterEqual(nx, 0.0, (cx, cy, w, h))
+            self.assertLessEqual(nx, 1.0, (cx, cy, w, h))
+            self.assertGreaterEqual(ny, 0.0, (cx, cy, w, h))
+            self.assertLessEqual(ny, 1.0, (cx, cy, w, h))
+
+    def test_degenerate_image_dimensions_return_origin(self):
+        self.assertEqual(server.box_polygon_anchor(10.0, 10.0, 2.0, 2.0, 0, 416), (0.0, 0.0))
+        self.assertEqual(server.box_polygon_anchor(10.0, 10.0, 2.0, 2.0, 416, -1), (0.0, 0.0))
+
+
+class TestLoadSheddingResolution(unittest.TestCase):
+    """The load-shedding decision must come from production code, not a test copy (L66)."""
+
+    def test_header_degrades_to_320_and_recovers_to_416(self):
+        self.assertEqual(resolve_input_resolution("320", None, [1, 3, 416, 416]), (320, 320))
+        self.assertEqual(resolve_input_resolution("416", "320", [1, 3, 416, 416]), (416, 416))
+
+    def test_header_takes_precedence_over_environment(self):
+        self.assertEqual(resolve_input_resolution("320", "640", [1, 3, 416, 416]), (320, 320))
+
+    def test_environment_override_when_no_header(self):
+        self.assertEqual(resolve_input_resolution(None, "320", [1, 3, 416, 416]), (320, 320))
+
+    def test_model_shape_is_used_when_no_overrides(self):
+        self.assertEqual(resolve_input_resolution(None, None, [1, 3, 640, 640]), (640, 640))
+
+    def test_default_when_nothing_available(self):
+        self.assertEqual(
+            resolve_input_resolution(None, None, None),
+            (DEFAULT_INPUT_RESOLUTION, DEFAULT_INPUT_RESOLUTION),
+        )
+        self.assertEqual(
+            resolve_input_resolution("", "", [1, 3, 0, 0]),
+            (DEFAULT_INPUT_RESOLUTION, DEFAULT_INPUT_RESOLUTION),
+        )
+
+    def test_out_of_contract_values_are_rejected_not_adopted(self):
+        # An arbitrary resolution must never silently resize the model.
+        self.assertEqual(resolve_input_resolution("999", None, [1, 3, 416, 416]), (416, 416))
+        self.assertEqual(resolve_input_resolution("abc", None, [1, 3, 416, 416]), (416, 416))
+        self.assertEqual(resolve_input_resolution(None, "512", [1, 3, 416, 416]), (416, 416))
+        self.assertEqual(resolve_input_resolution("-320", None, [1, 3, 416, 416]), (416, 416))
+
+    def test_contract_constants_match_policy(self):
+        # Each control carries its own whitelist: the client-reachable header cannot
+        # request 640 px, while the operator-scoped environment override can.
+        self.assertEqual(server.HEADER_INPUT_RESOLUTIONS, (320, 416))
+        self.assertEqual(server.ENV_INPUT_RESOLUTIONS, (320, 416, 640))
 
 
 if __name__ == "__main__":

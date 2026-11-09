@@ -224,6 +224,42 @@ def enforce_host_guard(allow_unsafe: bool) -> bool:
     return False
 
 
+def enforce_offpeak_guard(allow_daytime: bool = False, dry_run: bool = False) -> bool:
+    """
+    Enforces nocturnal off-peak cron window (01:00-05:00 ICT) for batch pre-labeling (ADR-012 §1.2 (F5)).
+    Dry-run mode and explicit --allow-daytime bypass the guard; the explicit
+    override is still logged so an out-of-window run leaves an audit trail.
+    Returns True when execution may proceed.
+    """
+    if dry_run:
+        return True
+    if allow_daytime:
+        logger.warning(
+            "OFF-PEAK GUARD OVERRIDE: --allow-daytime was passed explicitly; batch "
+            "pre-labeling may contend with the live hotset sweep (ADR-012 §1.2 (F5))."
+        )
+        return True
+    try:
+        from tools.eval.benchmark_cotenancy import is_within_offpeak_window
+    except ImportError:
+        # Fail closed: a guard that silently disappears when its policy module
+        # cannot be imported is not a guard (ADR-012 §1.2 (F5)).
+        logger.error(
+            "OFF-PEAK GUARD: cannot import tools.eval.benchmark_cotenancy to evaluate "
+            "the nocturnal window; refusing to run. Verify the repository root is on "
+            "PYTHONPATH or pass --allow-daytime to override deliberately."
+        )
+        return False
+    if not is_within_offpeak_window():
+        logger.error(
+            "OFF-PEAK GUARD: Refusing to run batch pre-labeling outside authorized "
+            "nocturnal window (01:00-05:00 ICT / 18:00-22:00 UTC) to protect inference "
+            "worker hotset SLA (ADR-012 §1.2 (F5)). Pass --allow-daytime to override."
+        )
+        return False
+    return True
+
+
 def get_r2_client() -> Optional[Any]:
     """Initializes and returns boto3 S3 client for Cloudflare R2."""
     try:
@@ -694,6 +730,8 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
                         help="Maximum vehicle polygons per frame (default 12)")
     parser.add_argument("--allow-unsafe-host", action="store_true",
                         help="Override the AVX2 host guard on capable non-x86 dev machines")
+    parser.add_argument("--allow-daytime", action="store_true",
+                        help="Override nocturnal off-peak guard (01:00-05:00 ICT) for manual daytime profiling/debugging (ADR-012 §1.2 F5)")
     parser.add_argument("--encoder-path", type=str, default=None,
                         help="SAM image encoder ONNX path (default: $%s)" % sam_runtime.ENV_ENCODER)
     parser.add_argument("--decoder-path", type=str, default=None,
@@ -719,6 +757,8 @@ def run_pipeline(args: argparse.Namespace) -> int:
     print("=" * 80)
 
     if not enforce_host_guard(args.allow_unsafe_host):
+        return 1
+    if not enforce_offpeak_guard(allow_daytime=args.allow_daytime, dry_run=args.dry_run):
         return 1
 
     encoder_path = sam_runtime.resolve_weight_path(sam_runtime.ENV_ENCODER, args.encoder_path)

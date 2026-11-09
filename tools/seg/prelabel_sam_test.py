@@ -186,6 +186,62 @@ class TestHostGuard(unittest.TestCase):
         self.assertTrue(desc)
 
 
+class TestOffpeakGuard(unittest.TestCase):
+    """Guards batch pre-labeling to the authorized 01:00-05:00 ICT window."""
+
+    def test_dry_run_bypasses_offpeak_guard(self):
+        # Dry runs perform no inference; probing the real clock here would make
+        # the test flaky, so the bypass must happen before the window check.
+        with mock.patch(
+            "tools.eval.benchmark_cotenancy.is_within_offpeak_window",
+            side_effect=AssertionError("window check must not run on a dry run"),
+        ):
+            self.assertTrue(prelabel_sam.enforce_offpeak_guard(dry_run=True))
+
+    def test_allow_daytime_bypasses_offpeak_guard(self):
+        with mock.patch(
+            "tools.eval.benchmark_cotenancy.is_within_offpeak_window",
+            side_effect=AssertionError("window check must not run with --allow-daytime"),
+        ):
+            self.assertTrue(prelabel_sam.enforce_offpeak_guard(allow_daytime=True))
+
+    def test_outside_window_refuses_execution(self):
+        with mock.patch(
+            "tools.eval.benchmark_cotenancy.is_within_offpeak_window",
+            return_value=False,
+        ) as window:
+            with self.assertLogs("prelabel_sam", level="ERROR") as logs:
+                self.assertFalse(
+                    prelabel_sam.enforce_offpeak_guard(allow_daytime=False, dry_run=False)
+                )
+            window.assert_called_once_with()
+        message = "\n".join(logs.output)
+        self.assertIn(
+            "Refusing to run batch pre-labeling outside authorized nocturnal window "
+            "(01:00-05:00 ICT / 18:00-22:00 UTC)",
+            message,
+        )
+        self.assertIn("Pass --allow-daytime to override.", message)
+
+    def test_inside_window_allows_execution(self):
+        with mock.patch(
+            "tools.eval.benchmark_cotenancy.is_within_offpeak_window",
+            return_value=True,
+        ) as window:
+            self.assertTrue(
+                prelabel_sam.enforce_offpeak_guard(allow_daytime=False, dry_run=False)
+            )
+            window.assert_called_once_with()
+
+    def test_missing_policy_module_fails_closed(self):
+        # A guard that silently disappears when its policy module cannot be
+        # imported is not a guard: refuse rather than allow daytime execution.
+        with mock.patch.dict(sys.modules, {"tools.eval.benchmark_cotenancy": None}):
+            self.assertFalse(
+                prelabel_sam.enforce_offpeak_guard(allow_daytime=False, dry_run=False)
+            )
+
+
 class TestRateLimiterAndRetry(unittest.TestCase):
     def test_limiter_paces_calls(self):
         limiter = prelabel_sam.TokenBucketRateLimiter(rps=50.0, burst=2.0)
@@ -349,6 +405,7 @@ class TestParseArgs(unittest.TestCase):
         self.assertFalse(args.dry_run)
         self.assertFalse(args.upload_r2)
         self.assertFalse(args.allow_unsafe_host)
+        self.assertFalse(args.allow_daytime)
 
     def test_explicit_args(self):
         args = prelabel_sam.parse_args([
@@ -360,6 +417,11 @@ class TestParseArgs(unittest.TestCase):
         self.assertTrue(args.dry_run)
         self.assertTrue(args.upload_r2)
         self.assertTrue(args.allow_unsafe_host)
+        self.assertFalse(args.allow_daytime)
+
+    def test_allow_daytime_flag_enables_override(self):
+        args = prelabel_sam.parse_args(["--allow-daytime"])
+        self.assertTrue(args.allow_daytime)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ services:
       - PORT=8000
       - MODEL_DIR=/app/models/yolov8n_openvino_320
       - PYTHONUNBUFFERED=1
+      - CV_INPUT_RESOLUTION=${CV_INPUT_RESOLUTION:-}
     volumes:
       - /home/ubuntu/cv-engine/models:/app/models:ro
     deploy:

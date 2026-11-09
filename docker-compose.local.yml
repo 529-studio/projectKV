@@ -17,6 +17,7 @@ services:
     environment:
       - PORT=8000
       - MODEL_DIR=/app/models/yolov8n_openvino_320
+      - CV_INPUT_RESOLUTION=${CV_INPUT_RESOLUTION:-}
     volumes:
       - ./yolov8n_openvino_model:/app/models/yolov8n_openvino_320:ro
       - ./services/cv-engine/server.py:/app/server.py:ro
