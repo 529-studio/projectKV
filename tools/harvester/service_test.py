@@ -25,6 +25,7 @@ import sys
 import tempfile
 import time
 import unittest
+import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
@@ -188,8 +189,12 @@ class TestSnapshotFetchingAndTimeout(unittest.TestCase):
         # With proxy base: proxy URL should precede upstream URL
         urls_proxy = harvester_mod.build_snapshot_urls(cam, "http://localhost:8080")
         self.assertEqual(len(urls_proxy), 2)
-        self.assertTrue(urls_proxy[0].startswith("http://localhost:8080/cam_test_01"))
-        self.assertTrue(urls_proxy[1].startswith("https://traffic.example.com/snapshot"))
+        parsed_proxy = urllib.parse.urlsplit(urls_proxy[0])
+        self.assertEqual(parsed_proxy.netloc, "localhost:8080")
+        self.assertEqual(parsed_proxy.path, "/cam_test_01")
+        parsed_up = urllib.parse.urlsplit(urls_proxy[1])
+        self.assertEqual(parsed_up.netloc, "traffic.example.com")
+        self.assertEqual(parsed_up.path, "/snapshot")
 
     @patch("urllib.request.urlopen")
     def test_fetch_snapshot_rejects_placeholder_resolution(self, mock_urlopen: MagicMock) -> None:
@@ -231,7 +236,7 @@ class TestSnapshotFetchingAndTimeout(unittest.TestCase):
         upstream_request = mock_urlopen.call_args_list[1].args[0]
         self.assertEqual(proxy_request.get_header("X-dev-token"), "staging-token")
         self.assertIsNone(upstream_request.get_header("X-dev-token"))
-        self.assertTrue(source.startswith("https://traffic.example.com"))
+        self.assertEqual(source, "https://traffic.example.com/snap.jpg")
 
     @patch.dict("os.environ", {"DEV_ACCESS_TOKEN": "staging-token"}, clear=False)
     @patch("urllib.request.urlopen")
@@ -264,7 +269,7 @@ class TestSnapshotFetchingAndTimeout(unittest.TestCase):
         self.assertIsNotNone(payload)
         self.assertEqual(payload, VALID_JPEG_BYTES)
         self.assertEqual(err, "")
-        self.assertTrue(source.startswith("https://traffic.example.com"))
+        self.assertEqual(source, "https://traffic.example.com/snap.jpg")
 
     @patch("urllib.request.urlopen")
     def test_fetch_snapshot_timeout_handling(self, mock_urlopen: MagicMock) -> None:
