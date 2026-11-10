@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close
 
 help:
 	@echo "========================================================"
@@ -44,6 +44,7 @@ help:
 	@echo "  make r2-setup        - Configure ~/.config/rclone/rclone.conf from .env"
 	@echo "  make r2-ls           - List Cloudflare R2 bucket partitions via rclone"
 	@echo "  make r2-size         - Measure total object count and size on Cloudflare R2"
+	@echo "  make sprint-close    - Validate the sprint handoff and print the next-conversation prompt"
 
 install:
 	cd services/go-server && go mod download
@@ -192,3 +193,6 @@ r2-size:
 	rclone size R2:warded-proofs/
 
 
+
+sprint-close:
+	@tools/sprint/close.sh $(if $(S),--sprint $(S),) $(if $(LAUNCH),--launch,)

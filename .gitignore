@@ -84,3 +84,5 @@ models/
 # Local agent scratchpad
 scratch/
 
+
+.agents/.state/

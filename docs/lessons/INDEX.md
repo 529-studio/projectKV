@@ -84,8 +84,7 @@ is the only part an agent should read by default.
 | 78 | Unattended Staging Soak & Proof Archive Ingestion | 24/7 autonomous harvester daemon, WAL concurrency, 11,905 real frames replay, process-anchored soak telemetry. | [L78](L78-unattended-soak-and-proof-archive-ingestion.md) |
 | 79 | Directional Roadway Registry Scale-Out & Geometry Invariants | 100% Hot Set dual coverage (59 cameras); IoU < 0.05 non-overlap; capacity sum 1.0+-0.01; Go backend integration. | [L79](L79-directional-roadway-registry-scaleout.md) |
 | 80 | Automated Forecast Refit & Live History Deployment | Standard-library Ridge pipeline; chronological persistence gate; atomic artifact promotion; unlocks 200 ok natively. | [L80](L80-automated-forecast-refit-and-live-deployment.md) |
-| 81 | Temporal Baseline Ratchet Expiry & Manual Approval Gate Concurrency | Prohibit clock-dependent baseline entries; support SUPERSEDED artifact lifecycle; scope concurrency to deployment jobs. | [L79](L79-temporal-baseline-ratchet-and-approval-gate-concurrency.md) |
-| 82 | Directional Roadway Registry Scale-Out & Geometry Invariants | 100% Hot Set dual coverage (59 cameras); IoU < 0.05 non-overlap; capacity sum 1.0+-0.01; Go backend integration. | [L80](L80-directional-roadway-registry-scaleout.md) |
+| 81 | Temporal Baseline Ratchet Expiry & Manual Approval Gate Concurrency | Prohibit clock-dependent baseline entries; support SUPERSEDED artifact lifecycle; scope concurrency to deployment jobs. | [L81](L81-temporal-baseline-ratchet-and-approval-gate-concurrency.md) |
 
 > Numbering note: Lesson 54 does not exist in the source register. Numbers are preserved as-is because
 > other documents reference lessons by number; nothing has been renumbered.
