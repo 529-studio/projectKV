@@ -1,0 +1,58 @@
+{
+  "camera_id": "5a10c79f02eb490011a0b0dd",
+  "corridor_name": "Mai Chí Thọ - Tố Hữu (C6)",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "5a10c79f02eb490011a0b0dd_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1847,
+          0.95
+        ],
+        [
+          0.4642,
+          0.95
+        ],
+        [
+          0.4692,
+          0.4781
+        ],
+        [
+          0.2895,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "5a10c79f02eb490011a0b0dd_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5042,
+          0.95
+        ],
+        [
+          0.8589,
+          0.95
+        ],
+        [
+          0.7278,
+          0.4781
+        ],
+        [
+          0.4992,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:5a10c79f02eb490011a0b0dd:snapshot_1793945231_sample"
+  ]
+}

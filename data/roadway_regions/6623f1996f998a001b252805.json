@@ -1,0 +1,58 @@
+{
+  "camera_id": "6623f1996f998a001b252805",
+  "corridor_name": "Mai Chí Thọ - Xa Lộ Hà Nội (3)",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "6623f1996f998a001b252805_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1616,
+          0.95
+        ],
+        [
+          0.453,
+          0.95
+        ],
+        [
+          0.458,
+          0.4753
+        ],
+        [
+          0.2706,
+          0.4753
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "6623f1996f998a001b252805_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.493,
+          0.95
+        ],
+        [
+          0.8021,
+          0.95
+        ],
+        [
+          0.6869,
+          0.4753
+        ],
+        [
+          0.488,
+          0.4753
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:6623f1996f998a001b252805:snapshot_1793945239_sample"
+  ]
+}

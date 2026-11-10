@@ -1,0 +1,58 @@
+{
+  "camera_id": "662b857b1afb9c00172dd106",
+  "corridor_name": "Điện Biên Phủ - Nguyễn Bỉnh Khiêm",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "662b857b1afb9c00172dd106_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1723,
+          0.95
+        ],
+        [
+          0.4812,
+          0.95
+        ],
+        [
+          0.4862,
+          0.4781
+        ],
+        [
+          0.2874,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "662b857b1afb9c00172dd106_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5212,
+          0.95
+        ],
+        [
+          0.8769,
+          0.95
+        ],
+        [
+          0.7454,
+          0.4781
+        ],
+        [
+          0.5162,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:662b857b1afb9c00172dd106:snapshot_1793945231_sample"
+  ]
+}

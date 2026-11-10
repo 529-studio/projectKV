@@ -1,0 +1,58 @@
+{
+  "camera_id": "56de42f611f398ec0c48128a",
+  "corridor_name": "Võ Văn Kiệt - Trần Đình Xu 2",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "56de42f611f398ec0c48128a_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1838,
+          0.95
+        ],
+        [
+          0.4835,
+          0.95
+        ],
+        [
+          0.4885,
+          0.4781
+        ],
+        [
+          0.2957,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "56de42f611f398ec0c48128a_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5235,
+          0.95
+        ],
+        [
+          0.9451,
+          0.95
+        ],
+        [
+          0.7905,
+          0.4781
+        ],
+        [
+          0.5185,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:56de42f611f398ec0c48128a:snapshot_1793945239_sample"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "camera_id": "586e1d4ef9fab7001111b0a2",
+  "corridor_name": "Cộng Hòa - Đường C 18",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "586e1d4ef9fab7001111b0a2_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.0658,
+          0.95
+        ],
+        [
+          0.4571,
+          0.95
+        ],
+        [
+          0.4621,
+          0.3808
+        ],
+        [
+          0.2098,
+          0.3808
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "586e1d4ef9fab7001111b0a2_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.4971,
+          0.95
+        ],
+        [
+          0.8049,
+          0.95
+        ],
+        [
+          0.6902,
+          0.3808
+        ],
+        [
+          0.4921,
+          0.3808
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:586e1d4ef9fab7001111b0a2:snapshot_1793945239_sample"
+  ]
+}

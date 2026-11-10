@@ -1,0 +1,58 @@
+{
+  "camera_id": "68ede112230ee50017d046a6",
+  "corridor_name": "Mỹ Phước Tân Vạn - Điện Biên Phủ (2)",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "68ede112230ee50017d046a6_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1267,
+          0.95
+        ],
+        [
+          0.4672,
+          0.95
+        ],
+        [
+          0.4722,
+          0.428
+        ],
+        [
+          0.2529,
+          0.428
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "68ede112230ee50017d046a6_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5072,
+          0.95
+        ],
+        [
+          0.8236,
+          0.95
+        ],
+        [
+          0.7059,
+          0.428
+        ],
+        [
+          0.5022,
+          0.428
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:68ede112230ee50017d046a6:snapshot_1793945239_sample"
+  ]
+}

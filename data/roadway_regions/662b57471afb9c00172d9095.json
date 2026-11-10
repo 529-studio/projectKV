@@ -1,0 +1,58 @@
+{
+  "camera_id": "662b57471afb9c00172d9095",
+  "corridor_name": "Cộng Hòa - Ấp Bắc",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "662b57471afb9c00172d9095_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.0888,
+          0.95
+        ],
+        [
+          0.4548,
+          0.95
+        ],
+        [
+          0.4598,
+          0.4781
+        ],
+        [
+          0.2239,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "662b57471afb9c00172d9095_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.4948,
+          0.95
+        ],
+        [
+          0.8362,
+          0.95
+        ],
+        [
+          0.7097,
+          0.4781
+        ],
+        [
+          0.4898,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:662b57471afb9c00172d9095:snapshot_1793945296_sample"
+  ]
+}

@@ -6,7 +6,7 @@
     {
       "region_id": "66b1c426779f74001867415e_dir_a",
       "direction": "a",
-      "description": "Approaching carriageway (towards Saigon Bridge)",
+      "description": "Corridor carriageway A (left lane boundary)",
       "polygon": [
         [
           0.08,
@@ -30,7 +30,7 @@
     {
       "region_id": "66b1c426779f74001867415e_dir_b",
       "direction": "b",
-      "description": "Receding carriageway (towards Hang Xanh)",
+      "description": "Corridor carriageway B (right lane boundary)",
       "polygon": [
         [
           0.53,

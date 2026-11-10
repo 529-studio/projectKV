@@ -1,0 +1,58 @@
+{
+  "camera_id": "5874769eb807da0011e33cec",
+  "corridor_name": "Cộng Hòa - Út Tịch 2",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "5874769eb807da0011e33cec_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.0817,
+          0.95
+        ],
+        [
+          0.4894,
+          0.95
+        ],
+        [
+          0.4944,
+          0.4628
+        ],
+        [
+          0.2314,
+          0.4628
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "5874769eb807da0011e33cec_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5294,
+          0.95
+        ],
+        [
+          0.8286,
+          0.95
+        ],
+        [
+          0.7169,
+          0.4628
+        ],
+        [
+          0.5244,
+          0.4628
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:5874769eb807da0011e33cec:snapshot_1793945231_sample"
+  ]
+}

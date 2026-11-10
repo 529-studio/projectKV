@@ -1,0 +1,2716 @@
+{
+  "56de42f611f398ec0c48127d": {
+    "camera_id": "56de42f611f398ec0c48127d",
+    "corridor_name": "Mai Chí Thọ - Võ Nguyên Giáp (Cát Lái cầu A)",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1901,
+          0.95
+        ],
+        [
+          0.4905,
+          0.95
+        ],
+        [
+          0.4955,
+          0.3878
+        ],
+        [
+          0.3022,
+          0.3878
+        ]
+      ],
+      "b": [
+        [
+          0.5305,
+          0.95
+        ],
+        [
+          0.7992,
+          0.95
+        ],
+        [
+          0.6982,
+          0.3878
+        ],
+        [
+          0.5255,
+          0.3878
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c48127d:snapshot_1793945239_sample"
+    ]
+  },
+  "56de42f611f398ec0c48127e": {
+    "camera_id": "56de42f611f398ec0c48127e",
+    "corridor_name": "Mai Chí Thọ - Võ Nguyên Giáp (Cát Lái cầu B)",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0791,
+          0.95
+        ],
+        [
+          0.4952,
+          0.95
+        ],
+        [
+          0.5002,
+          0.4628
+        ],
+        [
+          0.2317,
+          0.4628
+        ]
+      ],
+      "b": [
+        [
+          0.5352,
+          0.95
+        ],
+        [
+          0.9422,
+          0.95
+        ],
+        [
+          0.7928,
+          0.4628
+        ],
+        [
+          0.5302,
+          0.4628
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c48127e:snapshot_1793945242_sample"
+    ]
+  },
+  "56de42f611f398ec0c48127f": {
+    "camera_id": "56de42f611f398ec0c48127f",
+    "corridor_name": "Mai Chí Thọ - Lương Định Của 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1048,
+          0.95
+        ],
+        [
+          0.4636,
+          0.95
+        ],
+        [
+          0.4686,
+          0.4281
+        ],
+        [
+          0.2374,
+          0.4281
+        ]
+      ],
+      "b": [
+        [
+          0.5036,
+          0.95
+        ],
+        [
+          0.9223,
+          0.95
+        ],
+        [
+          0.7688,
+          0.4281
+        ],
+        [
+          0.4986,
+          0.4281
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c48127f:snapshot_1793945296_sample"
+    ]
+  },
+  "56de42f611f398ec0c481280": {
+    "camera_id": "56de42f611f398ec0c481280",
+    "corridor_name": "Mai Chí Thọ - Lương Định Của 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1954,
+          0.95
+        ],
+        [
+          0.4923,
+          0.95
+        ],
+        [
+          0.4973,
+          0.4781
+        ],
+        [
+          0.3063,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5323,
+          0.95
+        ],
+        [
+          0.8987,
+          0.95
+        ],
+        [
+          0.7635,
+          0.4781
+        ],
+        [
+          0.5273,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481280:snapshot_1793945239_sample"
+    ]
+  },
+  "56de42f611f398ec0c481282": {
+    "camera_id": "56de42f611f398ec0c481282",
+    "corridor_name": "Mai Chí Thọ - Đồng Văn Cống 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1075,
+          0.95
+        ],
+        [
+          0.4835,
+          0.95
+        ],
+        [
+          0.4885,
+          0.4183
+        ],
+        [
+          0.2461,
+          0.4183
+        ]
+      ],
+      "b": [
+        [
+          0.5235,
+          0.95
+        ],
+        [
+          0.8248,
+          0.95
+        ],
+        [
+          0.7123,
+          0.4183
+        ],
+        [
+          0.5185,
+          0.4183
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481282:snapshot_1793945242_sample"
+    ]
+  },
+  "56de42f611f398ec0c481283": {
+    "camera_id": "56de42f611f398ec0c481283",
+    "corridor_name": "Mai Chí Thọ - Trần Não 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1288,
+          0.95
+        ],
+        [
+          0.5087,
+          0.95
+        ],
+        [
+          0.5137,
+          0.4572
+        ],
+        [
+          0.2688,
+          0.4572
+        ]
+      ],
+      "b": [
+        [
+          0.5487,
+          0.95
+        ],
+        [
+          0.9479,
+          0.95
+        ],
+        [
+          0.8012,
+          0.4572
+        ],
+        [
+          0.5437,
+          0.4572
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481283:snapshot_1793945356_sample"
+    ]
+  },
+  "56de42f611f398ec0c481286": {
+    "camera_id": "56de42f611f398ec0c481286",
+    "corridor_name": "Mai Chí Thọ - Nguyễn Cơ Thạch 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1537,
+          0.95
+        ],
+        [
+          0.4782,
+          0.95
+        ],
+        [
+          0.4832,
+          0.4781
+        ],
+        [
+          0.2743,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5182,
+          0.95
+        ],
+        [
+          0.9366,
+          0.95
+        ],
+        [
+          0.7832,
+          0.4781
+        ],
+        [
+          0.5132,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481286:snapshot_1793945296_sample"
+    ]
+  },
+  "56de42f611f398ec0c481287": {
+    "camera_id": "56de42f611f398ec0c481287",
+    "corridor_name": "Võ Văn Kiệt - Ký Con",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1466,
+          0.95
+        ],
+        [
+          0.5023,
+          0.95
+        ],
+        [
+          0.5073,
+          0.4531
+        ],
+        [
+          0.2781,
+          0.4531
+        ]
+      ],
+      "b": [
+        [
+          0.5423,
+          0.95
+        ],
+        [
+          0.8485,
+          0.95
+        ],
+        [
+          0.7343,
+          0.4531
+        ],
+        [
+          0.5373,
+          0.4531
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481287:snapshot_1793945239_sample"
+    ]
+  },
+  "56de42f611f398ec0c481288": {
+    "camera_id": "56de42f611f398ec0c481288",
+    "corridor_name": "Võ Văn Kiệt - Cầu Ông Lãnh 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0613,
+          0.95
+        ],
+        [
+          0.4589,
+          0.95
+        ],
+        [
+          0.4639,
+          0.4558
+        ],
+        [
+          0.2075,
+          0.4558
+        ]
+      ],
+      "b": [
+        [
+          0.4989,
+          0.95
+        ],
+        [
+          0.9119,
+          0.95
+        ],
+        [
+          0.7604,
+          0.4558
+        ],
+        [
+          0.4939,
+          0.4558
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481288:snapshot_1793945231_sample"
+    ]
+  },
+  "56de42f611f398ec0c481289": {
+    "camera_id": "56de42f611f398ec0c481289",
+    "corridor_name": "Võ Văn Kiệt - Cầu Ông Lãnh 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0596,
+          0.95
+        ],
+        [
+          0.4911,
+          0.95
+        ],
+        [
+          0.4961,
+          0.4419
+        ],
+        [
+          0.2176,
+          0.4419
+        ]
+      ],
+      "b": [
+        [
+          0.5311,
+          0.95
+        ],
+        [
+          0.8722,
+          0.95
+        ],
+        [
+          0.7458,
+          0.4419
+        ],
+        [
+          0.5261,
+          0.4419
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481289:snapshot_1793945242_sample"
+    ]
+  },
+  "56de42f611f398ec0c48128a": {
+    "camera_id": "56de42f611f398ec0c48128a",
+    "corridor_name": "Võ Văn Kiệt - Trần Đình Xu 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1838,
+          0.95
+        ],
+        [
+          0.4835,
+          0.95
+        ],
+        [
+          0.4885,
+          0.4781
+        ],
+        [
+          0.2957,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5235,
+          0.95
+        ],
+        [
+          0.9451,
+          0.95
+        ],
+        [
+          0.7905,
+          0.4781
+        ],
+        [
+          0.5185,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c48128a:snapshot_1793945239_sample"
+    ]
+  },
+  "56de42f611f398ec0c48128b": {
+    "camera_id": "56de42f611f398ec0c48128b",
+    "corridor_name": "Võ Văn Kiệt - Nguyễn Văn Cừ 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.05,
+          0.95
+        ],
+        [
+          0.48,
+          0.95
+        ],
+        [
+          0.44,
+          0.42
+        ],
+        [
+          0.12,
+          0.42
+        ]
+      ],
+      "b": [
+        [
+          0.52,
+          0.95
+        ],
+        [
+          0.95,
+          0.95
+        ],
+        [
+          0.86,
+          0.42
+        ],
+        [
+          0.54,
+          0.42
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "pilot_vvk_nvc1_202611"
+    ]
+  },
+  "56de42f611f398ec0c48128c": {
+    "camera_id": "56de42f611f398ec0c48128c",
+    "corridor_name": "Võ Văn Kiệt - Nguyễn Văn Cừ 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1537,
+          0.95
+        ],
+        [
+          0.4987,
+          0.95
+        ],
+        [
+          0.5037,
+          0.4781
+        ],
+        [
+          0.2814,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5387,
+          0.95
+        ],
+        [
+          0.8191,
+          0.95
+        ],
+        [
+          0.714,
+          0.4781
+        ],
+        [
+          0.5337,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c48128c:snapshot_1793945231_sample"
+    ]
+  },
+  "56de42f611f398ec0c48128e": {
+    "camera_id": "56de42f611f398ec0c48128e",
+    "corridor_name": "Võ Văn Kiệt - Cầu Chữ Y 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1164,
+          0.95
+        ],
+        [
+          0.5087,
+          0.95
+        ],
+        [
+          0.5137,
+          0.4364
+        ],
+        [
+          0.2607,
+          0.4364
+        ]
+      ],
+      "b": [
+        [
+          0.5487,
+          0.95
+        ],
+        [
+          0.946,
+          0.95
+        ],
+        [
+          0.7999,
+          0.4364
+        ],
+        [
+          0.5437,
+          0.4364
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c48128e:snapshot_1793945296_sample"
+    ]
+  },
+  "56de42f611f398ec0c48128f": {
+    "camera_id": "56de42f611f398ec0c48128f",
+    "corridor_name": "Võ Văn Kiệt - Huỳnh Mẫn Đạt",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1794,
+          0.95
+        ],
+        [
+          0.5058,
+          0.95
+        ],
+        [
+          0.5108,
+          0.4781
+        ],
+        [
+          0.3006,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5458,
+          0.95
+        ],
+        [
+          0.8362,
+          0.95
+        ],
+        [
+          0.7276,
+          0.4781
+        ],
+        [
+          0.5408,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c48128f:snapshot_1793945231_sample"
+    ]
+  },
+  "56de42f611f398ec0c481290": {
+    "camera_id": "56de42f611f398ec0c481290",
+    "corridor_name": "Võ Văn Kiệt - An Bình",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1377,
+          0.95
+        ],
+        [
+          0.4999,
+          0.95
+        ],
+        [
+          0.5049,
+          0.4308
+        ],
+        [
+          0.2715,
+          0.4308
+        ]
+      ],
+      "b": [
+        [
+          0.5399,
+          0.95
+        ],
+        [
+          0.8371,
+          0.95
+        ],
+        [
+          0.7261,
+          0.4308
+        ],
+        [
+          0.5349,
+          0.4308
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481290:snapshot_1793945242_sample"
+    ]
+  },
+  "56de42f611f398ec0c481291": {
+    "camera_id": "56de42f611f398ec0c481291",
+    "corridor_name": "Võ Văn Kiệt - Nguyễn Tri Phương 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1989,
+          0.95
+        ],
+        [
+          0.4525,
+          0.95
+        ],
+        [
+          0.4575,
+          0.4558
+        ],
+        [
+          0.2947,
+          0.4558
+        ]
+      ],
+      "b": [
+        [
+          0.4925,
+          0.95
+        ],
+        [
+          0.8248,
+          0.95
+        ],
+        [
+          0.7015,
+          0.4558
+        ],
+        [
+          0.4875,
+          0.4558
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481291:snapshot_1793945296_sample"
+    ]
+  },
+  "56de42f611f398ec0c481292": {
+    "camera_id": "56de42f611f398ec0c481292",
+    "corridor_name": "Võ Văn Kiệt - Phạm Phú Thứ",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1421,
+          0.95
+        ],
+        [
+          0.453,
+          0.95
+        ],
+        [
+          0.458,
+          0.4697
+        ],
+        [
+          0.2579,
+          0.4697
+        ]
+      ],
+      "b": [
+        [
+          0.493,
+          0.95
+        ],
+        [
+          0.9119,
+          0.95
+        ],
+        [
+          0.7583,
+          0.4697
+        ],
+        [
+          0.488,
+          0.4697
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481292:snapshot_1793945242_sample"
+    ]
+  },
+  "56de42f611f398ec0c481293": {
+    "camera_id": "56de42f611f398ec0c481293",
+    "corridor_name": "Võ Văn Kiệt - Hải Thượng Lãn Ông 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1918,
+          0.95
+        ],
+        [
+          0.453,
+          0.95
+        ],
+        [
+          0.458,
+          0.4697
+        ],
+        [
+          0.2902,
+          0.4697
+        ]
+      ],
+      "b": [
+        [
+          0.493,
+          0.95
+        ],
+        [
+          0.892,
+          0.95
+        ],
+        [
+          0.7453,
+          0.4697
+        ],
+        [
+          0.488,
+          0.4697
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481293:snapshot_1793945231_sample"
+    ]
+  },
+  "56de42f611f398ec0c481295": {
+    "camera_id": "56de42f611f398ec0c481295",
+    "corridor_name": "Võ Văn Kiệt - Cầu Chà Và 1 (dạ cầu)",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0587,
+          0.95
+        ],
+        [
+          0.4777,
+          0.95
+        ],
+        [
+          0.4827,
+          0.4447
+        ],
+        [
+          0.2123,
+          0.4447
+        ]
+      ],
+      "b": [
+        [
+          0.5177,
+          0.95
+        ],
+        [
+          0.9564,
+          0.95
+        ],
+        [
+          0.7959,
+          0.4447
+        ],
+        [
+          0.5127,
+          0.4447
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481295:snapshot_1793945239_sample"
+    ]
+  },
+  "56de42f611f398ec0c481296": {
+    "camera_id": "56de42f611f398ec0c481296",
+    "corridor_name": "Võ Văn Kiệt - Cao Văn Lầu",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0995,
+          0.95
+        ],
+        [
+          0.5058,
+          0.95
+        ],
+        [
+          0.5108,
+          0.4169
+        ],
+        [
+          0.2487,
+          0.4169
+        ]
+      ],
+      "b": [
+        [
+          0.5458,
+          0.95
+        ],
+        [
+          0.8485,
+          0.95
+        ],
+        [
+          0.7356,
+          0.4169
+        ],
+        [
+          0.5408,
+          0.4169
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481296:snapshot_1793945239_sample"
+    ]
+  },
+  "56de42f611f398ec0c481297": {
+    "camera_id": "56de42f611f398ec0c481297",
+    "corridor_name": "Võ Văn Kiệt - Nguyễn Tri Phương 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1315,
+          0.95
+        ],
+        [
+          0.4706,
+          0.95
+        ],
+        [
+          0.4756,
+          0.3836
+        ],
+        [
+          0.2572,
+          0.3836
+        ]
+      ],
+      "b": [
+        [
+          0.5106,
+          0.95
+        ],
+        [
+          0.9299,
+          0.95
+        ],
+        [
+          0.7761,
+          0.3836
+        ],
+        [
+          0.5056,
+          0.3836
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481297:snapshot_1793945231_sample"
+    ]
+  },
+  "56de42f611f398ec0c481298": {
+    "camera_id": "56de42f611f398ec0c481298",
+    "corridor_name": "Võ Văn Kiệt - An Dương Vương 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1679,
+          0.95
+        ],
+        [
+          0.4788,
+          0.95
+        ],
+        [
+          0.4838,
+          0.4628
+        ],
+        [
+          0.2837,
+          0.4628
+        ]
+      ],
+      "b": [
+        [
+          0.5188,
+          0.95
+        ],
+        [
+          0.8864,
+          0.95
+        ],
+        [
+          0.7507,
+          0.4628
+        ],
+        [
+          0.5138,
+          0.4628
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481298:snapshot_1793945242_sample"
+    ]
+  },
+  "56de42f611f398ec0c481299": {
+    "camera_id": "56de42f611f398ec0c481299",
+    "corridor_name": "Võ Văn Kiệt - An Dương Vương 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1652,
+          0.95
+        ],
+        [
+          0.4859,
+          0.95
+        ],
+        [
+          0.4909,
+          0.4781
+        ],
+        [
+          0.2844,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5259,
+          0.95
+        ],
+        [
+          0.8646,
+          0.95
+        ],
+        [
+          0.7391,
+          0.4781
+        ],
+        [
+          0.5209,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c481299:snapshot_1793945231_sample"
+    ]
+  },
+  "56de42f611f398ec0c48129a": {
+    "camera_id": "56de42f611f398ec0c48129a",
+    "corridor_name": "Võ Văn Kiệt - Hồ Học Lãm 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1483,
+          0.95
+        ],
+        [
+          0.4841,
+          0.95
+        ],
+        [
+          0.4891,
+          0.4433
+        ],
+        [
+          0.2728,
+          0.4433
+        ]
+      ],
+      "b": [
+        [
+          0.5241,
+          0.95
+        ],
+        [
+          0.8475,
+          0.95
+        ],
+        [
+          0.7273,
+          0.4433
+        ],
+        [
+          0.5191,
+          0.4433
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c48129a:snapshot_1793945296_sample"
+    ]
+  },
+  "56de42f611f398ec0c48129b": {
+    "camera_id": "56de42f611f398ec0c48129b",
+    "corridor_name": "Võ Văn Kiệt - Hồ Học Lãm 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0924,
+          0.95
+        ],
+        [
+          0.4853,
+          0.95
+        ],
+        [
+          0.4903,
+          0.4628
+        ],
+        [
+          0.2369,
+          0.4628
+        ]
+      ],
+      "b": [
+        [
+          0.5253,
+          0.95
+        ],
+        [
+          0.9583,
+          0.95
+        ],
+        [
+          0.7997,
+          0.4628
+        ],
+        [
+          0.5203,
+          0.4628
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c48129b:snapshot_1793945296_sample"
+    ]
+  },
+  "56de42f611f398ec0c48129c": {
+    "camera_id": "56de42f611f398ec0c48129c",
+    "corridor_name": "Võ Văn Kiệt - Quốc Lộ 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1403,
+          0.95
+        ],
+        [
+          0.4583,
+          0.95
+        ],
+        [
+          0.4633,
+          0.4781
+        ],
+        [
+          0.2586,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.4983,
+          0.95
+        ],
+        [
+          0.8674,
+          0.95
+        ],
+        [
+          0.7312,
+          0.4781
+        ],
+        [
+          0.4933,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:56de42f611f398ec0c48129c:snapshot_1793945242_sample"
+    ]
+  },
+  "58175c81edeb6c0012a2d5c2": {
+    "camera_id": "58175c81edeb6c0012a2d5c2",
+    "corridor_name": "Mai Chí Thọ - Trần Não 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.111,
+          0.95
+        ],
+        [
+          0.4929,
+          0.95
+        ],
+        [
+          0.4979,
+          0.4586
+        ],
+        [
+          0.2517,
+          0.4586
+        ]
+      ],
+      "b": [
+        [
+          0.5329,
+          0.95
+        ],
+        [
+          0.9366,
+          0.95
+        ],
+        [
+          0.7883,
+          0.4586
+        ],
+        [
+          0.5279,
+          0.4586
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:58175c81edeb6c0012a2d5c2:snapshot_1793945239_sample"
+    ]
+  },
+  "5822adbbedeb6c0012a2d65f": {
+    "camera_id": "5822adbbedeb6c0012a2d65f",
+    "corridor_name": "Võ Văn Kiệt - Cầu Chữ Y 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0498,
+          0.95
+        ],
+        [
+          0.4736,
+          0.95
+        ],
+        [
+          0.4786,
+          0.3933
+        ],
+        [
+          0.2051,
+          0.3933
+        ]
+      ],
+      "b": [
+        [
+          0.5136,
+          0.95
+        ],
+        [
+          0.9422,
+          0.95
+        ],
+        [
+          0.7852,
+          0.3933
+        ],
+        [
+          0.5086,
+          0.3933
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5822adbbedeb6c0012a2d65f:snapshot_1793945420_sample"
+    ]
+  },
+  "5822b5ededeb6c0012a2d66a": {
+    "camera_id": "5822b5ededeb6c0012a2d66a",
+    "corridor_name": "Mai Chí Thọ - Nguyễn Cơ Thạch 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.05,
+          0.95
+        ],
+        [
+          0.49,
+          0.95
+        ],
+        [
+          0.45,
+          0.4
+        ],
+        [
+          0.1,
+          0.4
+        ]
+      ],
+      "b": [
+        [
+          0.51,
+          0.95
+        ],
+        [
+          0.95,
+          0.95
+        ],
+        [
+          0.88,
+          0.4
+        ],
+        [
+          0.53,
+          0.4
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "pilot_mct_nct1_202611"
+    ]
+  },
+  "586e1d4ef9fab7001111b0a2": {
+    "camera_id": "586e1d4ef9fab7001111b0a2",
+    "corridor_name": "Cộng Hòa - Đường C 18",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0658,
+          0.95
+        ],
+        [
+          0.4571,
+          0.95
+        ],
+        [
+          0.4621,
+          0.3808
+        ],
+        [
+          0.2098,
+          0.3808
+        ]
+      ],
+      "b": [
+        [
+          0.4971,
+          0.95
+        ],
+        [
+          0.8049,
+          0.95
+        ],
+        [
+          0.6902,
+          0.3808
+        ],
+        [
+          0.4921,
+          0.3808
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:586e1d4ef9fab7001111b0a2:snapshot_1793945239_sample"
+    ]
+  },
+  "586e1f18f9fab7001111b0a5": {
+    "camera_id": "586e1f18f9fab7001111b0a5",
+    "corridor_name": "Cộng Hòa - Trường Chinh",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1146,
+          0.95
+        ],
+        [
+          0.453,
+          0.95
+        ],
+        [
+          0.458,
+          0.4669
+        ],
+        [
+          0.24,
+          0.4669
+        ]
+      ],
+      "b": [
+        [
+          0.493,
+          0.95
+        ],
+        [
+          0.804,
+          0.95
+        ],
+        [
+          0.6882,
+          0.4669
+        ],
+        [
+          0.488,
+          0.4669
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:586e1f18f9fab7001111b0a5:snapshot_1793945239_sample"
+    ]
+  },
+  "5874769eb807da0011e33cec": {
+    "camera_id": "5874769eb807da0011e33cec",
+    "corridor_name": "Cộng Hòa - Út Tịch 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0817,
+          0.95
+        ],
+        [
+          0.4894,
+          0.95
+        ],
+        [
+          0.4944,
+          0.4628
+        ],
+        [
+          0.2314,
+          0.4628
+        ]
+      ],
+      "b": [
+        [
+          0.5294,
+          0.95
+        ],
+        [
+          0.8286,
+          0.95
+        ],
+        [
+          0.7169,
+          0.4628
+        ],
+        [
+          0.5244,
+          0.4628
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5874769eb807da0011e33cec:snapshot_1793945231_sample"
+    ]
+  },
+  "587476e3b807da0011e33cee": {
+    "camera_id": "587476e3b807da0011e33cee",
+    "corridor_name": "Cộng Hòa - Út Tịch 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1519,
+          0.95
+        ],
+        [
+          0.4929,
+          0.95
+        ],
+        [
+          0.4979,
+          0.41
+        ],
+        [
+          0.2782,
+          0.41
+        ]
+      ],
+      "b": [
+        [
+          0.5329,
+          0.95
+        ],
+        [
+          0.9536,
+          0.95
+        ],
+        [
+          0.7994,
+          0.41
+        ],
+        [
+          0.5279,
+          0.41
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:587476e3b807da0011e33cee:snapshot_1793945359_sample"
+    ]
+  },
+  "587c79e9b807da0011e33d3d": {
+    "camera_id": "587c79e9b807da0011e33d3d",
+    "corridor_name": "Điện Biên Phủ - Nguyễn Văn Thương 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1252,
+          0.95
+        ],
+        [
+          0.456,
+          0.95
+        ],
+        [
+          0.461,
+          0.4781
+        ],
+        [
+          0.248,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.496,
+          0.95
+        ],
+        [
+          0.9006,
+          0.95
+        ],
+        [
+          0.752,
+          0.4781
+        ],
+        [
+          0.491,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:587c79e9b807da0011e33d3d:snapshot_1793945420_sample"
+    ]
+  },
+  "58ad6214bd82540010390be2": {
+    "camera_id": "58ad6214bd82540010390be2",
+    "corridor_name": "Cộng Hòa - Hoàng Hoa Thám",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.167,
+          0.95
+        ],
+        [
+          0.4982,
+          0.95
+        ],
+        [
+          0.5032,
+          0.3864
+        ],
+        [
+          0.2899,
+          0.3864
+        ]
+      ],
+      "b": [
+        [
+          0.5382,
+          0.95
+        ],
+        [
+          0.8021,
+          0.95
+        ],
+        [
+          0.7027,
+          0.3864
+        ],
+        [
+          0.5332,
+          0.3864
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:58ad6214bd82540010390be2:snapshot_1793945296_sample"
+    ]
+  },
+  "58af8b69bd82540010390c28": {
+    "camera_id": "58af8b69bd82540010390c28",
+    "corridor_name": "Nam Kỳ Khởi Nghĩa - Điện Biên Phủ 1",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1519,
+          0.95
+        ],
+        [
+          0.4501,
+          0.95
+        ],
+        [
+          0.4551,
+          0.4725
+        ],
+        [
+          0.2633,
+          0.4725
+        ]
+      ],
+      "b": [
+        [
+          0.4901,
+          0.95
+        ],
+        [
+          0.8722,
+          0.95
+        ],
+        [
+          0.7315,
+          0.4725
+        ],
+        [
+          0.4851,
+          0.4725
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:58af8b69bd82540010390c28:snapshot_1793945296_sample"
+    ]
+  },
+  "58af8d68bd82540010390c2e": {
+    "camera_id": "58af8d68bd82540010390c2e",
+    "corridor_name": "Nam Kỳ Khởi Nghĩa - Điện Biên Phủ 2",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1528,
+          0.95
+        ],
+        [
+          0.4747,
+          0.95
+        ],
+        [
+          0.4797,
+          0.4781
+        ],
+        [
+          0.2725,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5147,
+          0.95
+        ],
+        [
+          0.9384,
+          0.95
+        ],
+        [
+          0.7831,
+          0.4781
+        ],
+        [
+          0.5097,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:58af8d68bd82540010390c2e:snapshot_1793945242_sample"
+    ]
+  },
+  "59414c883dcfc400106f260b": {
+    "camera_id": "59414c883dcfc400106f260b",
+    "corridor_name": "Cộng Hòa - Bình Giã",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1013,
+          0.95
+        ],
+        [
+          0.453,
+          0.95
+        ],
+        [
+          0.458,
+          0.4642
+        ],
+        [
+          0.2314,
+          0.4642
+        ]
+      ],
+      "b": [
+        [
+          0.493,
+          0.95
+        ],
+        [
+          0.8494,
+          0.95
+        ],
+        [
+          0.7177,
+          0.4642
+        ],
+        [
+          0.488,
+          0.4642
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:59414c883dcfc400106f260b:snapshot_1793945239_sample"
+    ]
+  },
+  "5a10c79f02eb490011a0b0dd": {
+    "camera_id": "5a10c79f02eb490011a0b0dd",
+    "corridor_name": "Mai Chí Thọ - Tố Hữu (C6)",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1847,
+          0.95
+        ],
+        [
+          0.4642,
+          0.95
+        ],
+        [
+          0.4692,
+          0.4781
+        ],
+        [
+          0.2895,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5042,
+          0.95
+        ],
+        [
+          0.8589,
+          0.95
+        ],
+        [
+          0.7278,
+          0.4781
+        ],
+        [
+          0.4992,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5a10c79f02eb490011a0b0dd:snapshot_1793945231_sample"
+    ]
+  },
+  "5a606dbc8576340017d0662b": {
+    "camera_id": "5a606dbc8576340017d0662b",
+    "corridor_name": "Điện Biên Phủ - Nguyễn Hữu Cảnh",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1297,
+          0.95
+        ],
+        [
+          0.4577,
+          0.95
+        ],
+        [
+          0.4627,
+          0.4753
+        ],
+        [
+          0.2515,
+          0.4753
+        ]
+      ],
+      "b": [
+        [
+          0.4977,
+          0.95
+        ],
+        [
+          0.8722,
+          0.95
+        ],
+        [
+          0.7341,
+          0.4753
+        ],
+        [
+          0.4927,
+          0.4753
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5a606dbc8576340017d0662b:snapshot_1793945231_sample"
+    ]
+  },
+  "5b5995a3fd4edb0019c7d9ab": {
+    "camera_id": "5b5995a3fd4edb0019c7d9ab",
+    "corridor_name": "Võ Văn Kiệt - Cầu Chà Và 2 (trên cầu)",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1883,
+          0.95
+        ],
+        [
+          0.4835,
+          0.95
+        ],
+        [
+          0.4885,
+          0.4336
+        ],
+        [
+          0.2986,
+          0.4336
+        ]
+      ],
+      "b": [
+        [
+          0.5235,
+          0.95
+        ],
+        [
+          0.9167,
+          0.95
+        ],
+        [
+          0.7721,
+          0.4336
+        ],
+        [
+          0.5185,
+          0.4336
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5b5995a3fd4edb0019c7d9ab:snapshot_1793945231_sample"
+    ]
+  },
+  "5d8cdbdc766c88001718896a": {
+    "camera_id": "5d8cdbdc766c88001718896a",
+    "corridor_name": "Hoàng Văn Thụ - Cộng Hòa",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1821,
+          0.95
+        ],
+        [
+          0.4747,
+          0.95
+        ],
+        [
+          0.4797,
+          0.4781
+        ],
+        [
+          0.2915,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5147,
+          0.95
+        ],
+        [
+          0.8059,
+          0.95
+        ],
+        [
+          0.697,
+          0.4781
+        ],
+        [
+          0.5097,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5d8cdbdc766c88001718896a:snapshot_1793945296_sample"
+    ]
+  },
+  "5deb576d1dc17d7c5515acf2": {
+    "camera_id": "5deb576d1dc17d7c5515acf2",
+    "corridor_name": "Điện Biên Phủ - Cách Mạng Tháng Tám",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0888,
+          0.95
+        ],
+        [
+          0.4519,
+          0.95
+        ],
+        [
+          0.4569,
+          0.4614
+        ],
+        [
+          0.2229,
+          0.4614
+        ]
+      ],
+      "b": [
+        [
+          0.4919,
+          0.95
+        ],
+        [
+          0.8087,
+          0.95
+        ],
+        [
+          0.6908,
+          0.4614
+        ],
+        [
+          0.4869,
+          0.4614
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5deb576d1dc17d7c5515acf2:snapshot_1793945296_sample"
+    ]
+  },
+  "5deb576d1dc17d7c5515acfc": {
+    "camera_id": "5deb576d1dc17d7c5515acfc",
+    "corridor_name": "Điện Biên Phủ - Trương Định",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1776,
+          0.95
+        ],
+        [
+          0.4841,
+          0.95
+        ],
+        [
+          0.4891,
+          0.4614
+        ],
+        [
+          0.2919,
+          0.4614
+        ]
+      ],
+      "b": [
+        [
+          0.5241,
+          0.95
+        ],
+        [
+          0.821,
+          0.95
+        ],
+        [
+          0.7101,
+          0.4614
+        ],
+        [
+          0.5191,
+          0.4614
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5deb576d1dc17d7c5515acfc:snapshot_1793945239_sample"
+    ]
+  },
+  "5deb576d1dc17d7c5515ad02": {
+    "camera_id": "5deb576d1dc17d7c5515ad02",
+    "corridor_name": "Điện Biên Phủ - Pasteur",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1989,
+          0.95
+        ],
+        [
+          0.4577,
+          0.95
+        ],
+        [
+          0.4627,
+          0.4392
+        ],
+        [
+          0.2965,
+          0.4392
+        ]
+      ],
+      "b": [
+        [
+          0.4977,
+          0.95
+        ],
+        [
+          0.8883,
+          0.95
+        ],
+        [
+          0.7446,
+          0.4392
+        ],
+        [
+          0.4927,
+          0.4392
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5deb576d1dc17d7c5515ad02:snapshot_1793945231_sample"
+    ]
+  },
+  "5deb576d1dc17d7c5515ad05": {
+    "camera_id": "5deb576d1dc17d7c5515ad05",
+    "corridor_name": "Điện Biên Phủ - Đinh Tiên Hoàng",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1563,
+          0.95
+        ],
+        [
+          0.4864,
+          0.95
+        ],
+        [
+          0.4914,
+          0.3822
+        ],
+        [
+          0.2788,
+          0.3822
+        ]
+      ],
+      "b": [
+        [
+          0.5264,
+          0.95
+        ],
+        [
+          0.9271,
+          0.95
+        ],
+        [
+          0.7799,
+          0.3822
+        ],
+        [
+          0.5214,
+          0.3822
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5deb576d1dc17d7c5515ad05:snapshot_1793945239_sample"
+    ]
+  },
+  "5deb576d1dc17d7c5515ad08": {
+    "camera_id": "5deb576d1dc17d7c5515ad08",
+    "corridor_name": "Cộng Hòa - Tân Kỳ Tân Quý",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1341,
+          0.95
+        ],
+        [
+          0.4618,
+          0.95
+        ],
+        [
+          0.4668,
+          0.4669
+        ],
+        [
+          0.2558,
+          0.4669
+        ]
+      ],
+      "b": [
+        [
+          0.5018,
+          0.95
+        ],
+        [
+          0.8352,
+          0.95
+        ],
+        [
+          0.7115,
+          0.4669
+        ],
+        [
+          0.4968,
+          0.4669
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:5deb576d1dc17d7c5515ad08:snapshot_1793945231_sample"
+    ]
+  },
+  "63ae7a9cbfd3d90017e8f303": {
+    "camera_id": "63ae7a9cbfd3d90017e8f303",
+    "corridor_name": "Điện Biên Phủ – Cao Thắng",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0569,
+          0.95
+        ],
+        [
+          0.4548,
+          0.95
+        ],
+        [
+          0.4598,
+          0.4753
+        ],
+        [
+          0.2032,
+          0.4753
+        ]
+      ],
+      "b": [
+        [
+          0.4948,
+          0.95
+        ],
+        [
+          0.9271,
+          0.95
+        ],
+        [
+          0.7688,
+          0.4753
+        ],
+        [
+          0.4898,
+          0.4753
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:63ae7a9cbfd3d90017e8f303:snapshot_1793945296_sample"
+    ]
+  },
+  "649da495a6068200171a6cb6": {
+    "camera_id": "649da495a6068200171a6cb6",
+    "corridor_name": "Mai Chí Thọ - Trần Quý Kiên (3)",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1395,
+          0.95
+        ],
+        [
+          0.5064,
+          0.95
+        ],
+        [
+          0.5114,
+          0.4753
+        ],
+        [
+          0.2749,
+          0.4753
+        ]
+      ],
+      "b": [
+        [
+          0.5464,
+          0.95
+        ],
+        [
+          0.8002,
+          0.95
+        ],
+        [
+          0.7044,
+          0.4753
+        ],
+        [
+          0.5414,
+          0.4753
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:649da495a6068200171a6cb6:snapshot_1793945239_sample"
+    ]
+  },
+  "6623f1996f998a001b252805": {
+    "camera_id": "6623f1996f998a001b252805",
+    "corridor_name": "Mai Chí Thọ - Xa Lộ Hà Nội (3)",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1616,
+          0.95
+        ],
+        [
+          0.453,
+          0.95
+        ],
+        [
+          0.458,
+          0.4753
+        ],
+        [
+          0.2706,
+          0.4753
+        ]
+      ],
+      "b": [
+        [
+          0.493,
+          0.95
+        ],
+        [
+          0.8021,
+          0.95
+        ],
+        [
+          0.6869,
+          0.4753
+        ],
+        [
+          0.488,
+          0.4753
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:6623f1996f998a001b252805:snapshot_1793945239_sample"
+    ]
+  },
+  "662b57471afb9c00172d9095": {
+    "camera_id": "662b57471afb9c00172d9095",
+    "corridor_name": "Cộng Hòa - Ấp Bắc",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0888,
+          0.95
+        ],
+        [
+          0.4548,
+          0.95
+        ],
+        [
+          0.4598,
+          0.4781
+        ],
+        [
+          0.2239,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.4948,
+          0.95
+        ],
+        [
+          0.8362,
+          0.95
+        ],
+        [
+          0.7097,
+          0.4781
+        ],
+        [
+          0.4898,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:662b57471afb9c00172d9095:snapshot_1793945296_sample"
+    ]
+  },
+  "662b57711afb9c00172d90a7": {
+    "camera_id": "662b57711afb9c00172d90a7",
+    "corridor_name": "Cộng Hòa - Đường A4",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0968,
+          0.95
+        ],
+        [
+          0.5046,
+          0.95
+        ],
+        [
+          0.5096,
+          0.4781
+        ],
+        [
+          0.2465,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5446,
+          0.95
+        ],
+        [
+          0.8153,
+          0.95
+        ],
+        [
+          0.7136,
+          0.4781
+        ],
+        [
+          0.5396,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:662b57711afb9c00172d90a7:snapshot_1793945296_sample"
+    ]
+  },
+  "662b85481afb9c00172dd0f1": {
+    "camera_id": "662b85481afb9c00172dd0f1",
+    "corridor_name": "Võ Văn Kiệt - Pasteur",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.0888,
+          0.95
+        ],
+        [
+          0.4853,
+          0.95
+        ],
+        [
+          0.4903,
+          0.4725
+        ],
+        [
+          0.2346,
+          0.4725
+        ]
+      ],
+      "b": [
+        [
+          0.5253,
+          0.95
+        ],
+        [
+          0.8731,
+          0.95
+        ],
+        [
+          0.7444,
+          0.4725
+        ],
+        [
+          0.5203,
+          0.4725
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:662b85481afb9c00172dd0f1:snapshot_1793945296_sample"
+    ]
+  },
+  "662b857b1afb9c00172dd106": {
+    "camera_id": "662b857b1afb9c00172dd106",
+    "corridor_name": "Điện Biên Phủ - Nguyễn Bỉnh Khiêm",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1723,
+          0.95
+        ],
+        [
+          0.4812,
+          0.95
+        ],
+        [
+          0.4862,
+          0.4781
+        ],
+        [
+          0.2874,
+          0.4781
+        ]
+      ],
+      "b": [
+        [
+          0.5212,
+          0.95
+        ],
+        [
+          0.8769,
+          0.95
+        ],
+        [
+          0.7454,
+          0.4781
+        ],
+        [
+          0.5162,
+          0.4781
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:662b857b1afb9c00172dd106:snapshot_1793945231_sample"
+    ]
+  },
+  "66b1c426779f74001867415e": {
+    "camera_id": "66b1c426779f74001867415e",
+    "corridor_name": "Điện Biên Phủ - Nguyễn Gia Trí",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.08,
+          0.92
+        ],
+        [
+          0.47,
+          0.92
+        ],
+        [
+          0.42,
+          0.45
+        ],
+        [
+          0.15,
+          0.45
+        ]
+      ],
+      "b": [
+        [
+          0.53,
+          0.92
+        ],
+        [
+          0.92,
+          0.92
+        ],
+        [
+          0.84,
+          0.45
+        ],
+        [
+          0.56,
+          0.45
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "pilot_dbp_ngt_202611"
+    ]
+  },
+  "6878bab06145d3001ba517f7": {
+    "camera_id": "6878bab06145d3001ba517f7",
+    "corridor_name": "Mai Chí Thọ - Trần Quý Kiên (1)",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1261,
+          0.95
+        ],
+        [
+          0.4695,
+          0.95
+        ],
+        [
+          0.4745,
+          0.3975
+        ],
+        [
+          0.2533,
+          0.3975
+        ]
+      ],
+      "b": [
+        [
+          0.5095,
+          0.95
+        ],
+        [
+          0.8059,
+          0.95
+        ],
+        [
+          0.6952,
+          0.3975
+        ],
+        [
+          0.5045,
+          0.3975
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:6878bab06145d3001ba517f7:snapshot_1793945356_sample"
+    ]
+  },
+  "68ede0cf230ee50017d04657": {
+    "camera_id": "68ede0cf230ee50017d04657",
+    "corridor_name": "Mỹ Phước Tân Vạn - Điện Biên Phủ (1)",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1716,
+          0.95
+        ],
+        [
+          0.456,
+          0.95
+        ],
+        [
+          0.461,
+          0.4751
+        ],
+        [
+          0.2781,
+          0.4751
+        ]
+      ],
+      "b": [
+        [
+          0.496,
+          0.95
+        ],
+        [
+          0.9388,
+          0.95
+        ],
+        [
+          0.7768,
+          0.4751
+        ],
+        [
+          0.491,
+          0.4751
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:68ede0cf230ee50017d04657:snapshot_1793945296_sample"
+    ]
+  },
+  "68ede112230ee50017d046a6": {
+    "camera_id": "68ede112230ee50017d046a6",
+    "corridor_name": "Mỹ Phước Tân Vạn - Điện Biên Phủ (2)",
+    "direction_coverage": "dual",
+    "polygons": {
+      "a": [
+        [
+          0.1267,
+          0.95
+        ],
+        [
+          0.4672,
+          0.95
+        ],
+        [
+          0.4722,
+          0.428
+        ],
+        [
+          0.2529,
+          0.428
+        ]
+      ],
+      "b": [
+        [
+          0.5072,
+          0.95
+        ],
+        [
+          0.8236,
+          0.95
+        ],
+        [
+          0.7059,
+          0.428
+        ],
+        [
+          0.5022,
+          0.428
+        ]
+      ]
+    },
+    "source_label_ids": [
+      "calibration:camera_view:68ede112230ee50017d046a6:snapshot_1793945239_sample"
+    ]
+  }
+}

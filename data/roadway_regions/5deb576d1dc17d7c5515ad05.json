@@ -1,0 +1,58 @@
+{
+  "camera_id": "5deb576d1dc17d7c5515ad05",
+  "corridor_name": "Điện Biên Phủ - Đinh Tiên Hoàng",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "5deb576d1dc17d7c5515ad05_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1563,
+          0.95
+        ],
+        [
+          0.4864,
+          0.95
+        ],
+        [
+          0.4914,
+          0.3822
+        ],
+        [
+          0.2788,
+          0.3822
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "5deb576d1dc17d7c5515ad05_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5264,
+          0.95
+        ],
+        [
+          0.9271,
+          0.95
+        ],
+        [
+          0.7799,
+          0.3822
+        ],
+        [
+          0.5214,
+          0.3822
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:5deb576d1dc17d7c5515ad05:snapshot_1793945239_sample"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "camera_id": "5deb576d1dc17d7c5515ad02",
+  "corridor_name": "Điện Biên Phủ - Pasteur",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "5deb576d1dc17d7c5515ad02_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1989,
+          0.95
+        ],
+        [
+          0.4577,
+          0.95
+        ],
+        [
+          0.4627,
+          0.4392
+        ],
+        [
+          0.2965,
+          0.4392
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "5deb576d1dc17d7c5515ad02_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.4977,
+          0.95
+        ],
+        [
+          0.8883,
+          0.95
+        ],
+        [
+          0.7446,
+          0.4392
+        ],
+        [
+          0.4927,
+          0.4392
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:5deb576d1dc17d7c5515ad02:snapshot_1793945231_sample"
+  ]
+}

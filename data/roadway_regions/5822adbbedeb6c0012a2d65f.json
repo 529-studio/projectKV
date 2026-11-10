@@ -1,0 +1,58 @@
+{
+  "camera_id": "5822adbbedeb6c0012a2d65f",
+  "corridor_name": "Võ Văn Kiệt - Cầu Chữ Y 1",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "5822adbbedeb6c0012a2d65f_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.0498,
+          0.95
+        ],
+        [
+          0.4736,
+          0.95
+        ],
+        [
+          0.4786,
+          0.3933
+        ],
+        [
+          0.2051,
+          0.3933
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "5822adbbedeb6c0012a2d65f_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5136,
+          0.95
+        ],
+        [
+          0.9422,
+          0.95
+        ],
+        [
+          0.7852,
+          0.3933
+        ],
+        [
+          0.5086,
+          0.3933
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:5822adbbedeb6c0012a2d65f:snapshot_1793945420_sample"
+  ]
+}

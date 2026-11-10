@@ -1,0 +1,58 @@
+{
+  "camera_id": "662b57711afb9c00172d90a7",
+  "corridor_name": "Cộng Hòa - Đường A4",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "662b57711afb9c00172d90a7_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.0968,
+          0.95
+        ],
+        [
+          0.5046,
+          0.95
+        ],
+        [
+          0.5096,
+          0.4781
+        ],
+        [
+          0.2465,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "662b57711afb9c00172d90a7_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5446,
+          0.95
+        ],
+        [
+          0.8153,
+          0.95
+        ],
+        [
+          0.7136,
+          0.4781
+        ],
+        [
+          0.5396,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:662b57711afb9c00172d90a7:snapshot_1793945296_sample"
+  ]
+}

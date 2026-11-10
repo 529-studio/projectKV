@@ -1,0 +1,58 @@
+{
+  "camera_id": "56de42f611f398ec0c48128c",
+  "corridor_name": "Võ Văn Kiệt - Nguyễn Văn Cừ 2",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "56de42f611f398ec0c48128c_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1537,
+          0.95
+        ],
+        [
+          0.4987,
+          0.95
+        ],
+        [
+          0.5037,
+          0.4781
+        ],
+        [
+          0.2814,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "56de42f611f398ec0c48128c_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5387,
+          0.95
+        ],
+        [
+          0.8191,
+          0.95
+        ],
+        [
+          0.714,
+          0.4781
+        ],
+        [
+          0.5337,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:56de42f611f398ec0c48128c:snapshot_1793945231_sample"
+  ]
+}

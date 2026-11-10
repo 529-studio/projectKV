@@ -1,0 +1,58 @@
+{
+  "camera_id": "587c79e9b807da0011e33d3d",
+  "corridor_name": "Điện Biên Phủ - Nguyễn Văn Thương 2",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "587c79e9b807da0011e33d3d_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1252,
+          0.95
+        ],
+        [
+          0.456,
+          0.95
+        ],
+        [
+          0.461,
+          0.4781
+        ],
+        [
+          0.248,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "587c79e9b807da0011e33d3d_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.496,
+          0.95
+        ],
+        [
+          0.9006,
+          0.95
+        ],
+        [
+          0.752,
+          0.4781
+        ],
+        [
+          0.491,
+          0.4781
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:587c79e9b807da0011e33d3d:snapshot_1793945420_sample"
+  ]
+}
