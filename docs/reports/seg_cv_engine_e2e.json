@@ -1,0 +1,128 @@
+{
+  "generated_at": "2026-11-10T17:15:05+0700",
+  "artifact": {
+    "xml": "models/yolov8n_seg_openvino_416/yolov8n_seg.xml",
+    "xml_bytes": 409568,
+    "bin": "models/yolov8n_seg_openvino_416/yolov8n_seg.bin",
+    "bin_bytes": 6518038,
+    "bin_sha256": "bbc1fc66798e5e99e322336ea35fcb25440dd109baaada61133eda62fe475120"
+  },
+  "service": "services/cv-engine/server.py",
+  "model_dir_env": "models/yolov8n_seg_openvino_416",
+  "sample_frame": "data/proofs/proofs/2026-11-06/56de42f611f398ec0c48127d/1793945234_sample.jpg",
+  "frame_bytes": 50981,
+  "healthz": {
+    "status": "healthy",
+    "service": "cv-engine",
+    "openvino_available": true,
+    "model_loaded": true,
+    "timestamp": 1794305705
+  },
+  "requests": [
+    {
+      "requested_resolution": 416,
+      "http_status": 200,
+      "response": {
+        "service": "projectkv-cv-engine",
+        "vehicles_detected": 0,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 0,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "traffic_severity": "CLEAR",
+        "flood_severity": "CLEAR",
+        "water_ratio": 0.0,
+        "depth_estimated_cm": 0.0,
+        "confidence": 0.88,
+        "latency_ms": 41.43,
+        "model": "yolov8n_seg_openvino_416",
+        "input_resolution": [
+          416,
+          416
+        ],
+        "flood_assessment": {
+          "status": "CLEAR",
+          "water_surface_ratio": 0.0,
+          "wheel_submersion_detected": false,
+          "max_submersion_depth_cm": 0.0,
+          "motorcycles_observed": 0,
+          "motorcycles_submerged": 0,
+          "puddle_polygon_count": 0
+        }
+      }
+    },
+    {
+      "requested_resolution": 320,
+      "http_status": 200,
+      "response": {
+        "service": "projectkv-cv-engine",
+        "vehicles_detected": 0,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 0,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "traffic_severity": "CLEAR",
+        "flood_severity": "CLEAR",
+        "water_ratio": 0.0,
+        "depth_estimated_cm": 0.0,
+        "confidence": 0.88,
+        "latency_ms": 19.48,
+        "model": "yolov8n_seg_openvino_320",
+        "input_resolution": [
+          320,
+          320
+        ],
+        "flood_assessment": {
+          "status": "CLEAR",
+          "water_surface_ratio": 0.0,
+          "wheel_submersion_detected": false,
+          "max_submersion_depth_cm": 0.0,
+          "motorcycles_observed": 0,
+          "motorcycles_submerged": 0,
+          "puddle_polygon_count": 0
+        }
+      }
+    },
+    {
+      "requested_resolution": 416,
+      "http_status": 200,
+      "response": {
+        "service": "projectkv-cv-engine",
+        "vehicles_detected": 0,
+        "vehicle_counts": {
+          "motorcycle": 0,
+          "car": 0,
+          "bus": 0,
+          "truck": 0,
+          "container": 0
+        },
+        "traffic_severity": "CLEAR",
+        "flood_severity": "CLEAR",
+        "water_ratio": 0.0,
+        "depth_estimated_cm": 0.0,
+        "confidence": 0.88,
+        "latency_ms": 21.95,
+        "model": "yolov8n_seg_openvino_416",
+        "input_resolution": [
+          416,
+          416
+        ],
+        "flood_assessment": {
+          "status": "CLEAR",
+          "water_surface_ratio": 0.0,
+          "wheel_submersion_detected": false,
+          "max_submersion_depth_cm": 0.0,
+          "motorcycles_observed": 0,
+          "motorcycles_submerged": 0,
+          "puddle_polygon_count": 0
+        }
+      }
+    }
+  ]
+}

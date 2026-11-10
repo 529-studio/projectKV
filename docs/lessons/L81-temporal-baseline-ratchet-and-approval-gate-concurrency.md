@@ -1,4 +1,4 @@
-# Lesson 79: Temporal Baseline Ratchet Expiry & Manual Approval Gate Concurrency
+# Lesson 81: Temporal Baseline Ratchet Expiry & Manual Approval Gate Concurrency
 
 ## Navigation Aid & Quick Reference
 - **Domain**: CI/CD Pipelines, Evidence Integrity Ratchet, GitHub Actions Workflow Concurrency, Environment Approval Gates, Artifact Lifecycle Invalidation

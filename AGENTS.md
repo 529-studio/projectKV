@@ -33,3 +33,5 @@ This document defines the core principles, design standards, and mandatory techn
     - Never duplicate content across the two tiers. The entry file states the rule, the on-demand file holds the detail, the entry file links to it. Duplication is how the 143 KB lesson register and the 41 KB bilingual README were built.
     - `make docs-lint` enforces these numbers once it lands; until then review does.
 
+12. **Sprint Handoff & Conversation Boundary**: One conversation covers one sprint. When a sprint's tasks are merged and `docs/reports/sprint<N>_report.md` is committed, the agent MUST close the span before the session ends — run the `sprint-close` skill: write `docs/HANDOFF-s<N>.md` (template in `.agents/skills/sprint-close/templates/handoff.md`, 12 KB ceiling), commit it with the sprint close, then start a NEW conversation bootstrapped from that handoff (`tools/sprint/close.sh --launch`). Never begin a new sprint inside a conversation that already crossed a sprint boundary; 1,500+ steps means the boundary is overdue. An old conversation may be resumed to answer a historical question only, never to do new work.
+

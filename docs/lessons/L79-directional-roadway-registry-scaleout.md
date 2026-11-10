@@ -1,4 +1,4 @@
-# Lesson 80: Directional Roadway Registry Scale-Out & Geometry Invariants
+# Lesson 79: Directional Roadway Registry Scale-Out & Geometry Invariants
 
 ## Navigation Aid & Quick Reference
 - **Domain**: Directional Geometry, Computer Vision Registry, ADR-012 D1, Roadway Segmentation, Leaf Modulith Backend
