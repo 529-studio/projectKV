@@ -117,15 +117,18 @@ def on_pre_invocation(payload: dict) -> None:
         if record.get("closed_notified"):
             return
         message = (
-            f"Sprint {sprint} is already closed: `{handoff.relative_to(REPO_ROOT)}` exists."
-            f" This conversation is at ~{steps} steps and is now a historical reference."
-            " Do not start new work here; answer questions and point the user to the"
-            " handoff and the new conversation."
+            f"Sprint {sprint} already has a handoff at `{handoff.relative_to(REPO_ROOT)}`,"
+            f" and this conversation is at ~{steps} steps."
+            f" If sprint {sprint} is finished, do not start new work here: the next"
+            " conversation begins from that handoff."
+            f" If sprint {sprint} is still in flight, continue, but treat the handoff as"
+            " stale and rewrite it at the boundary."
         )
         record["closed_notified"] = True
         banner = (
-            f"**Sprint {sprint} is closed** — handoff: `{handoff.relative_to(REPO_ROOT)}`\n\n"
-            "Start the next conversation: `tools/sprint/close.sh --launch`"
+            f"**Sprint {sprint} has a handoff** — `{handoff.relative_to(REPO_ROOT)}`\n\n"
+            "Finished? Start the next conversation: `tools/sprint/close.sh --launch`\n\n"
+            "Still in flight? Keep going, then rewrite the handoff and launch."
         )
     else:
         if last and steps - last < REPEAT_EVERY:
