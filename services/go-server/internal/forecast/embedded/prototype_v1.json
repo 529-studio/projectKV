@@ -1,150 +1,227 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-11-05T16:44:57.194906Z",
+  "generated_at_utc": "2026-11-10T08:48:04.090162Z",
+  "fit_source": "live_history",
   "models": [
     {
       "name": "ridge_delta",
-      "version": "2026.11.05-synthetic",
+      "version": "2026.11.10-live",
       "target_mode": "delta",
-      "fit_source": "synthetic_fixture",
-      "fit_rows": 1152,
-      "fit_cameras": 2,
+      "fit_source": "live_history",
+      "fit_rows": 1623,
+      "fit_cameras": 58,
       "fit_window": {
-        "start": "2026-10-28T00:00:00Z",
-        "end": "2026-10-29T23:55:00Z"
+        "start": "2026-11-03T04:55:00Z",
+        "end": "2026-11-03T08:00:00Z"
       },
-      "fit_data_sha256": "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
-      "mae": 0.0044,
+      "fit_data_sha256": "7cc4c4f6fe301d50814b4e66687bccaba0188b87fbb7ba16baf016af0d3fc06a",
+      "source_counts": {
+        "harvester_daemon": 57,
+        "proof_archive": 11905
+      },
+      "mae": 0.04690819,
       "horizons": [
         {
           "horizon_minutes": 10,
-          "mae": 0.00440486,
-          "rmse": 0.00508631,
-          "sample_count": 342,
+          "mae": 0.04690819,
+          "rmse": 0.06314935,
+          "sample_count": 285,
           "params": {
             "horizon_minutes": 10,
-            "intercept": 0.00107284,
-            "means": [0.40375368, 0.40319124, 0.40262416, 0.40318968, 11.45477387, 2.49497487],
-            "stds": [0.15215443, 0.15210521, 0.15206814, 0.15204149, 6.05392143, 0.49997475],
-            "coeffs": [0.09378699, -0.00372577, -0.09066105, -0.00018257, -0.00130246, 0.00012606],
-            "mae": 0.00440486,
-            "rmse": 0.00508631,
-            "global_median": 0.439646
+            "intercept": -0.00299854,
+            "means": [
+              0.21142314,
+              0.21197509,
+              0.21065998,
+              0.20964859,
+              12.87859425,
+              1.0
+            ],
+            "stds": [
+              0.16803719,
+              0.16658935,
+              0.16719128,
+              0.1168711,
+              0.91383855,
+              1.0
+            ],
+            "coeffs": [
+              -0.00848345,
+              -0.00262797,
+              0.00431438,
+              0.00083124,
+              -0.00101599,
+              0.0
+            ],
+            "mae": 0.04690819,
+            "rmse": 0.06314935,
+            "global_median": 0.182857
           }
         },
         {
           "horizon_minutes": 20,
-          "mae": 0.01016163,
-          "rmse": 0.01172547,
-          "sample_count": 338,
+          "mae": 0.05152231,
+          "rmse": 0.07371094,
+          "sample_count": 171,
           "params": {
             "horizon_minutes": 20,
-            "intercept": 0.00205409,
-            "means": [0.40313019, 0.40258085, 0.40202802, 0.40257967, 11.43181818, 2.49242424],
-            "stds": [0.15224289, 0.15220401, 0.15217802, 0.15214032, 6.06054451, 0.4999426],
-            "coeffs": [0.17912274, -0.00956642, -0.17129539, -0.00055492, -0.002398, 0.00045848],
-            "mae": 0.01016163,
-            "rmse": 0.01172547,
-            "global_median": 0.4405125
+            "intercept": -0.00905617,
+            "means": [
+              0.21441467,
+              0.21135982,
+              0.20935036,
+              0.21407308,
+              12.67932489,
+              1.0
+            ],
+            "stds": [
+              0.16902141,
+              0.16592796,
+              0.16497854,
+              0.11828007,
+              0.92692653,
+              1.0
+            ],
+            "coeffs": [
+              -0.00605112,
+              -0.00669827,
+              -0.00546906,
+              -0.00042184,
+              -0.0063018,
+              0.0
+            ],
+            "mae": 0.05152231,
+            "rmse": 0.07371094,
+            "global_median": 0.178929
           }
         },
         {
           "horizon_minutes": 30,
-          "mae": 0.0172404,
-          "rmse": 0.01989593,
-          "sample_count": 334,
+          "mae": 0.05428774,
+          "rmse": 0.08142465,
+          "sample_count": 57,
           "params": {
             "horizon_minutes": 30,
-            "intercept": 0.0029207,
-            "means": [0.40253359, 0.40199928, 0.40146153, 0.40199812, 11.40862944, 2.48984772],
-            "stds": [0.15235608, 0.15232854, 0.15231368, 0.15226458, 6.0671393, 0.49989692],
-            "coeffs": [0.25109996, -0.01712766, -0.23729677, -0.00108567, -0.00349264, 0.00096634],
-            "mae": 0.0172404,
-            "rmse": 0.01989593,
-            "global_median": 0.4415535
+            "intercept": -0.01067411,
+            "means": [
+              0.21255737,
+              0.21400716,
+              0.21439197,
+              0.21843812,
+              12.46625767,
+              1.0
+            ],
+            "stds": [
+              0.16656258,
+              0.16784365,
+              0.16877382,
+              0.1195907,
+              0.84564716,
+              1.0
+            ],
+            "coeffs": [
+              -0.01166699,
+              0.00040615,
+              0.007595,
+              -0.01248285,
+              -0.0055817,
+              0.0
+            ],
+            "mae": 0.05428774,
+            "rmse": 0.08142465,
+            "global_median": 0.1775
           }
         }
       ]
     },
     {
       "name": "persistence",
-      "version": "2026.11.05-synthetic",
+      "version": "2026.11.10-live",
       "target_mode": "persistence",
-      "fit_source": "synthetic_fixture",
-      "fit_rows": 1152,
-      "fit_cameras": 2,
+      "fit_source": "live_history",
+      "fit_rows": 1623,
+      "fit_cameras": 58,
       "fit_window": {
-        "start": "2026-10-28T00:00:00Z",
-        "end": "2026-10-29T23:55:00Z"
+        "start": "2026-11-03T04:55:00Z",
+        "end": "2026-11-03T08:00:00Z"
       },
-      "fit_data_sha256": "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
-      "mae": 0.0044,
+      "fit_data_sha256": "7cc4c4f6fe301d50814b4e66687bccaba0188b87fbb7ba16baf016af0d3fc06a",
+      "source_counts": {
+        "harvester_daemon": 57,
+        "proof_archive": 11905
+      },
+      "mae": 0.04693062,
       "horizons": [
         {
           "horizon_minutes": 10,
-          "mae": 0.0091744,
-          "rmse": 0.01110912,
-          "sample_count": 342
+          "mae": 0.04693062,
+          "rmse": 0.06343285,
+          "sample_count": 285
         },
         {
           "horizon_minutes": 20,
-          "mae": 0.01837405,
-          "rmse": 0.02220334,
-          "sample_count": 338
+          "mae": 0.05173185,
+          "rmse": 0.07260226,
+          "sample_count": 171
         },
         {
           "horizon_minutes": 30,
-          "mae": 0.02747778,
-          "rmse": 0.0331636,
-          "sample_count": 334
+          "mae": 0.05029311,
+          "rmse": 0.07872156,
+          "sample_count": 57
         }
       ]
     },
     {
       "name": "historical_median",
-      "version": "2026.11.05-synthetic",
+      "version": "2026.11.10-live",
       "target_mode": "historical_median",
-      "fit_source": "synthetic_fixture",
-      "fit_rows": 1152,
-      "fit_cameras": 2,
+      "fit_source": "live_history",
+      "fit_rows": 1623,
+      "fit_cameras": 58,
       "fit_window": {
-        "start": "2026-10-28T00:00:00Z",
-        "end": "2026-10-29T23:55:00Z"
+        "start": "2026-11-03T04:55:00Z",
+        "end": "2026-11-03T08:00:00Z"
       },
-      "fit_data_sha256": "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
-      "mae": 0.0044,
+      "fit_data_sha256": "7cc4c4f6fe301d50814b4e66687bccaba0188b87fbb7ba16baf016af0d3fc06a",
+      "source_counts": {
+        "harvester_daemon": 57,
+        "proof_archive": 11905
+      },
+      "mae": 0.05094709,
       "horizons": [
         {
           "horizon_minutes": 10,
-          "mae": 0.02354196,
-          "rmse": 0.02766057,
-          "sample_count": 342,
+          "mae": 0.05094709,
+          "rmse": 0.06775886,
+          "sample_count": 285,
           "params": {
             "horizon_minutes": 10,
-            "global_median": 0.439646
+            "global_median": 0.182857
           }
         },
         {
           "horizon_minutes": 20,
-          "mae": 0.02359264,
-          "rmse": 0.02774466,
-          "sample_count": 338,
+          "mae": 0.05335883,
+          "rmse": 0.07122646,
+          "sample_count": 171,
           "params": {
             "horizon_minutes": 20,
-            "global_median": 0.4405125
+            "global_median": 0.178929
           }
         },
         {
           "horizon_minutes": 30,
-          "mae": 0.0234577,
-          "rmse": 0.02757248,
-          "sample_count": 334,
+          "mae": 0.05454586,
+          "rmse": 0.07463124,
+          "sample_count": 57,
           "params": {
             "horizon_minutes": 30,
-            "global_median": 0.4415535
+            "global_median": 0.1775
           }
         }
       ]
     }
-  ]
+  ],
+  "db_sha256": "7fb9a64264027e5d5efd568d5dd63d48208ba2662c9e533f6fa3ba3d9ffc4fda"
 }

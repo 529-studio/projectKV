@@ -25,7 +25,7 @@ command and response body recorded in the PR description.
 |---|---|---|---|
 | V1 | Route surface | `GET /api/v1/cameras/<id>/forecast` reaches the handler; `/forecast`, `/api/forecast`, `/api/cameras/<id>/forecast` all 404 | curl + route-tree test |
 | V2 | Route tree intact | `/api/cameras/hotset/status`, `/api/cameras/<id>` and `/api/cameras/snapshot/<id>` still resolve after registration | route-tree test asserts all four paths |
-| V3 | Default boot, embedded artifact | 503 `model_unvalidated`, `model.fit_source=synthetic_fixture`, no `current`/`horizons` keys present | curl |
+| V3 | Default boot (S10 baseline; superseded in S11-T4 by live 200 ok) | 503 `model_unvalidated` if unvalidated artifact loaded (200 `availability: ok` with live history) | curl |
 | V4 | Zero DB work on the failing path | History reader called 0 times | stub reader with a call counter |
 | V5 | Override boot | `FORECAST_ALLOW_SYNTHETIC=true` returns 200, `experimental=true`, `availability=ok` (or `stale`), `model.validated=false`, three horizons ordered | curl |
 | V6 | Boot guard | `APP_ENV=staging FORECAST_ALLOW_SYNTHETIC=true` exits non-zero before listening | process exit assertion |

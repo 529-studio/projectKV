@@ -32,6 +32,7 @@ const (
 type ModelArtifact struct {
 	SchemaVersion  int          `json:"schema_version"`
 	GeneratedAtUTC string       `json:"generated_at_utc,omitempty"`
+	FitSource      string       `json:"fit_source,omitempty"`
 	Models         []ModelEntry `json:"models"`
 
 	// SHA256 holds the computed cryptographic digest of the raw artifact data.
@@ -70,7 +71,7 @@ var (
 	defaultArtifactErr  error
 )
 
-// DefaultArtifact returns the parsed embedded synthetic prototype artifact.
+// DefaultArtifact returns the parsed embedded model artifact.
 func DefaultArtifact() *ModelArtifact {
 	defaultArtifactOnce.Do(func() {
 		defaultArtifact, defaultArtifactErr = LoadArtifactFromBytes(defaultArtifactBytes)
@@ -82,7 +83,7 @@ func DefaultArtifact() *ModelArtifact {
 }
 
 // LoadArtifact loads and validates a ModelArtifact from a path on disk.
-// If path is empty, it returns the embedded default synthetic prototype artifact.
+// If path is empty, it returns the embedded default model artifact.
 func LoadArtifact(path string) (*ModelArtifact, error) {
 	cleanPath := strings.TrimSpace(path)
 	if cleanPath == "" {
@@ -165,17 +166,48 @@ func (a *ModelArtifact) Validate() error {
 	if a.SchemaVersion <= 0 {
 		return fmt.Errorf("%w: schema_version must be positive", ErrArtifactInvalid)
 	}
+	if a.FitSource != "" {
+		if a.FitSource != string(FitSourceLiveHistory) && a.FitSource != string(FitSourceSyntheticFixture) {
+			return fmt.Errorf("%w: invalid top-level fit_source %q", ErrArtifactInvalid, a.FitSource)
+		}
+	}
 	if len(a.Models) == 0 {
 		return fmt.Errorf("%w: artifact must contain at least one model", ErrArtifactInvalid)
 	}
 
 	foundRidge := false
 	for _, m := range a.Models {
+		if a.FitSource != "" && string(m.FitSource) != a.FitSource {
+			return fmt.Errorf("%w: model %q fit_source %q conflicts with top-level fit_source %q",
+				ErrArtifactInvalid, m.Name, m.FitSource, a.FitSource)
+		}
 		if m.Name == ModelRidgeDelta {
 			foundRidge = true
+			covered := make(map[int]bool, len(m.Horizons))
+			for _, h := range m.Horizons {
+				if h.Params == nil {
+					return fmt.Errorf("%w: candidate model %q missing parameters for horizon %d",
+						ErrArtifactInvalid, ModelRidgeDelta, h.HorizonMinutes)
+				}
+				covered[h.HorizonMinutes] = true
+			}
+			for _, reqH := range SupportedHorizons {
+				if !covered[reqH] {
+					return fmt.Errorf("%w: candidate model %q missing required horizon %d (must cover all %v)",
+						ErrArtifactInvalid, ModelRidgeDelta, reqH, SupportedHorizons)
+				}
+			}
 		}
 		if m.FitSource != FitSourceLiveHistory && m.FitSource != FitSourceSyntheticFixture {
 			return fmt.Errorf("%w: invalid fit_source %q for model %q", ErrArtifactInvalid, m.FitSource, m.Name)
+		}
+		if m.FitSource == FitSourceLiveHistory {
+			if m.FitRows <= 0 {
+				return fmt.Errorf("%w: model %q with fit_source live_history must have positive fit_rows", ErrArtifactInvalid, m.Name)
+			}
+			if m.FitWindow == nil || m.FitWindow.Start == "" || m.FitWindow.End == "" {
+				return fmt.Errorf("%w: model %q with fit_source live_history must specify fit_window", ErrArtifactInvalid, m.Name)
+			}
 		}
 		if len(m.Horizons) == 0 {
 			return fmt.Errorf("%w: model %q has no horizons defined", ErrArtifactInvalid, m.Name)

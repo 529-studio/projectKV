@@ -1,5 +1,5 @@
 {
-  "command": "python3 tools/forecast/backtest.py --input tools/forecast/fixtures/synthetic_congestion_5m.csv --json-out docs/reports/forecast_prototype_v1.json --markdown-out docs/reports/forecast_prototype_v1.md --data-note 'Synthetic harness fixture; live hotset_verdict_history had 0 rows on 2026-11-05, so these numbers are not production evidence. Regenerate from data/forecast/features_5m.csv once history accumulates.' --log-level INFO",
+  "command": "python3 tools/forecast/train_live_model.py --db services/go-server/data/camera-view.db --train-ratio 0.8 --horizons 10,20,30 --target-mode delta",
   "config": {
     "direction_epsilon": 1e-12,
     "feature_columns": [
@@ -19,76 +19,81 @@
     "ridge_lambda": 1.0,
     "target_mode": "delta",
     "timezone": "Asia/Ho_Chi_Minh",
-    "train_ratio": 0.7
+    "train_ratio": 0.8
   },
   "data_provenance": {
-    "input": "tools/forecast/fixtures/synthetic_congestion_5m.csv",
-    "note": "Synthetic harness fixture; live hotset_verdict_history had 0 rows on 2026-11-05, so these numbers are not production evidence. Regenerate from data/forecast/features_5m.csv once history accumulates.",
-    "sha256": "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840"
+    "db_sha256": "7fb9a64264027e5d5efd568d5dd63d48208ba2662c9e533f6fa3ba3d9ffc4fda",
+    "fit_source": "live_history",
+    "input": "data/forecast/features_live_5m.csv",
+    "note": "Authentic live traffic history from SQLite hotset_verdict_history.",
+    "sha256": "7cc4c4f6fe301d50814b4e66687bccaba0188b87fbb7ba16baf016af0d3fc06a"
   },
-  "generated_at_utc": "2026-11-05T16:44:57.194906Z",
+  "fit_source": "live_history",
+  "generated_at_utc": "2026-11-10T08:48:04.090162Z",
+  "generator": "`tools/forecast/train_live_model.py` (via backtest core `2.0.0`)",
   "input_summary": {
-    "accepted_rows": 1152,
+    "accepted_rows": 2079,
     "bin_minutes": 5,
     "bin_minutes_source": "column",
-    "camera_count": 2,
+    "camera_count": 88,
     "invalid_rows": 0,
-    "path": "tools/forecast/fixtures/synthetic_congestion_5m.csv",
+    "path": "data/forecast/features_live_5m.csv",
     "rows_without_saturation_index": 0,
-    "sha256": "1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840",
+    "sha256": "7cc4c4f6fe301d50814b4e66687bccaba0188b87fbb7ba16baf016af0d3fc06a",
     "time_range_utc": {
-      "max": "2026-10-29T23:55:00Z",
-      "min": "2026-10-28T00:00:00Z"
+      "max": "2026-11-09T11:55:00Z",
+      "min": "2026-11-03T04:55:00Z"
     },
-    "total_rows": 1152
+    "total_rows": 2079
   },
   "results": {
     "10": {
+      "directional_metrics": {},
       "evaluation": {
-        "test_cameras": 2,
-        "test_samples": 342
+        "test_cameras": 57,
+        "test_samples": 285
       },
       "gate": {
         "beats_persistence": true,
-        "candidate_mae": 0.00440486,
+        "candidate_mae": 0.04690819,
         "candidate_model": "ridge_delta",
-        "mae_improvement": 0.00476954,
-        "mae_improvement_percent": 51.9875,
-        "persistence_mae": 0.0091744
+        "mae_improvement": 2.243e-05,
+        "mae_improvement_percent": 0.0478,
+        "persistence_mae": 0.04693062
       },
       "horizon_minutes": 10,
       "models": {
         "historical_median": {
           "label": "Historical median",
           "metrics": {
-            "bias": -0.02017876,
-            "directional_accuracy": 0.61988304,
-            "directional_matches": 212,
-            "mae": 0.02354196,
-            "rmse": 0.02766057,
-            "sample_count": 342
+            "bias": 0.01220368,
+            "directional_accuracy": 0.63157895,
+            "directional_matches": 180,
+            "mae": 0.05094709,
+            "rmse": 0.06775886,
+            "sample_count": 285
           },
           "parameters": {
-            "camera_groups": 2,
-            "camera_hour_groups": 48,
+            "camera_groups": 58,
+            "camera_hour_groups": 228,
             "fallback_order": [
               "camera_id + target_hour_of_day",
               "camera_id",
               "global"
             ],
-            "global_median": 0.439646,
+            "global_median": 0.182857,
             "target_hour_source": "target bin in the configured timezone"
           }
         },
         "persistence": {
           "label": "Persistence",
           "metrics": {
-            "bias": 0.00235761,
+            "bias": 0.00637325,
             "directional_accuracy": 0.0,
             "directional_matches": 0,
-            "mae": 0.0091744,
-            "rmse": 0.01110912,
-            "sample_count": 342
+            "mae": 0.04693062,
+            "rmse": 0.06343285,
+            "sample_count": 285
           },
           "parameters": {
             "rule": "y_hat(t+h) = saturation_index(t)"
@@ -97,14 +102,22 @@
         "ridge_delta": {
           "label": "Ridge regression (delta)",
           "metrics": {
-            "bias": 0.00210682,
-            "directional_accuracy": 0.83625731,
-            "directional_matches": 286,
-            "mae": 0.00440486,
-            "rmse": 0.00508631,
-            "sample_count": 342
+            "bias": 0.0019634,
+            "directional_accuracy": 0.47719298,
+            "directional_matches": 136,
+            "mae": 0.04690819,
+            "rmse": 0.06314935,
+            "sample_count": 285
           },
           "parameters": {
+            "coeffs": [
+              -0.00848345,
+              -0.00262797,
+              0.00431438,
+              0.00083124,
+              -0.00101599,
+              0.0
+            ],
             "feature_columns": [
               "lag_5m",
               "lag_10m",
@@ -113,77 +126,94 @@
               "hour_of_day",
               "day_of_week"
             ],
-            "intercept": 0.00107284,
+            "intercept": -0.00299854,
+            "means": [
+              0.21142314,
+              0.21197509,
+              0.21065998,
+              0.20964859,
+              12.87859425,
+              1.0
+            ],
             "ridge_lambda": 1.0,
             "standardized_coefficients": {
-              "day_of_week": 0.00012606,
-              "hour_of_day": -0.00130246,
-              "lag_10m": -0.00372577,
-              "lag_15m": -0.09066105,
-              "lag_5m": 0.09378699,
-              "rolling_mean_15m": -0.00018257
+              "day_of_week": 0.0,
+              "hour_of_day": -0.00101599,
+              "lag_10m": -0.00262797,
+              "lag_15m": 0.00431438,
+              "lag_5m": -0.00848345,
+              "rolling_mean_15m": 0.00083124
             },
+            "stds": [
+              0.16803719,
+              0.16658935,
+              0.16719128,
+              0.1168711,
+              0.91383855,
+              1.0
+            ],
             "target_mode": "delta"
           }
         }
       },
       "sample_accounting": {
         "test_missing_features": 0,
-        "test_missing_target": 4,
-        "test_samples": 342,
-        "train_median_samples": 802,
-        "train_missing_features": 6,
-        "train_missing_target": 0,
-        "train_purged_boundary": 4,
-        "train_samples": 796
+        "test_missing_target": 171,
+        "test_samples": 285,
+        "train_median_samples": 1395,
+        "train_missing_features": 456,
+        "train_missing_target": 114,
+        "train_purged_boundary": 114,
+        "train_samples": 939
       }
     },
     "20": {
+      "directional_metrics": {},
       "evaluation": {
-        "test_cameras": 2,
-        "test_samples": 338
+        "test_cameras": 57,
+        "test_samples": 171
       },
       "gate": {
         "beats_persistence": true,
-        "candidate_mae": 0.01016163,
+        "candidate_mae": 0.05152231,
         "candidate_model": "ridge_delta",
-        "mae_improvement": 0.00821242,
-        "mae_improvement_percent": 44.6957,
-        "persistence_mae": 0.01837405
+        "mae_improvement": 0.00020954,
+        "mae_improvement_percent": 0.405,
+        "persistence_mae": 0.05173185
       },
       "horizon_minutes": 20,
       "models": {
         "historical_median": {
           "label": "Historical median",
           "metrics": {
-            "bias": -0.02018964,
-            "directional_accuracy": 0.71005917,
-            "directional_matches": 240,
-            "mae": 0.02359264,
-            "rmse": 0.02774466,
-            "sample_count": 338
+            "bias": 0.01082674,
+            "directional_accuracy": 0.61988304,
+            "directional_matches": 106,
+            "mae": 0.05335883,
+            "rmse": 0.07122646,
+            "sample_count": 171
           },
           "parameters": {
-            "camera_groups": 2,
-            "camera_hour_groups": 48,
+            "camera_groups": 58,
+            "camera_hour_groups": 225,
             "fallback_order": [
               "camera_id + target_hour_of_day",
               "camera_id",
               "global"
             ],
-            "global_median": 0.4405125,
+            "global_median": 0.178929,
             "target_hour_source": "target bin in the configured timezone"
           }
         },
         "persistence": {
           "label": "Persistence",
           "metrics": {
-            "bias": 0.00481082,
-            "directional_accuracy": 0.0,
-            "directional_matches": 0,
-            "mae": 0.01837405,
-            "rmse": 0.02220334,
-            "sample_count": 338
+            "bias": 0.00885253,
+            "directional_accuracy": 0.00584795,
+            "directional_matches": 1,
+            "mae": 0.05173185,
+            "rmse": 0.07260226,
+            "sample_count": 171
           },
           "parameters": {
             "rule": "y_hat(t+h) = saturation_index(t)"
@@ -192,14 +222,22 @@
         "ridge_delta": {
           "label": "Ridge regression (delta)",
           "metrics": {
-            "bias": 0.00531227,
-            "directional_accuracy": 0.79881657,
-            "directional_matches": 270,
-            "mae": 0.01016163,
-            "rmse": 0.01172547,
-            "sample_count": 338
+            "bias": -0.01137427,
+            "directional_accuracy": 0.59649123,
+            "directional_matches": 102,
+            "mae": 0.05152231,
+            "rmse": 0.07371094,
+            "sample_count": 171
           },
           "parameters": {
+            "coeffs": [
+              -0.00605112,
+              -0.00669827,
+              -0.00546906,
+              -0.00042184,
+              -0.0063018,
+              0.0
+            ],
             "feature_columns": [
               "lag_5m",
               "lag_10m",
@@ -208,77 +246,94 @@
               "hour_of_day",
               "day_of_week"
             ],
-            "intercept": 0.00205409,
+            "intercept": -0.00905617,
+            "means": [
+              0.21441467,
+              0.21135982,
+              0.20935036,
+              0.21407308,
+              12.67932489,
+              1.0
+            ],
             "ridge_lambda": 1.0,
             "standardized_coefficients": {
-              "day_of_week": 0.00045848,
-              "hour_of_day": -0.002398,
-              "lag_10m": -0.00956642,
-              "lag_15m": -0.17129539,
-              "lag_5m": 0.17912274,
-              "rolling_mean_15m": -0.00055492
+              "day_of_week": 0.0,
+              "hour_of_day": -0.0063018,
+              "lag_10m": -0.00669827,
+              "lag_15m": -0.00546906,
+              "lag_5m": -0.00605112,
+              "rolling_mean_15m": -0.00042184
             },
+            "stds": [
+              0.16902141,
+              0.16592796,
+              0.16497854,
+              0.11828007,
+              0.92692653,
+              1.0
+            ],
             "target_mode": "delta"
           }
         }
       },
       "sample_accounting": {
         "test_missing_features": 0,
-        "test_missing_target": 8,
-        "test_samples": 338,
-        "train_median_samples": 798,
-        "train_missing_features": 6,
-        "train_missing_target": 0,
-        "train_purged_boundary": 8,
-        "train_samples": 792
+        "test_missing_target": 285,
+        "test_samples": 171,
+        "train_median_samples": 1167,
+        "train_missing_features": 456,
+        "train_missing_target": 228,
+        "train_purged_boundary": 228,
+        "train_samples": 711
       }
     },
     "30": {
+      "directional_metrics": {},
       "evaluation": {
-        "test_cameras": 2,
-        "test_samples": 334
+        "test_cameras": 57,
+        "test_samples": 57
       },
       "gate": {
-        "beats_persistence": true,
-        "candidate_mae": 0.0172404,
+        "beats_persistence": false,
+        "candidate_mae": 0.05428774,
         "candidate_model": "ridge_delta",
-        "mae_improvement": 0.01023738,
-        "mae_improvement_percent": 37.2569,
-        "persistence_mae": 0.02747778
+        "mae_improvement": -0.00399463,
+        "mae_improvement_percent": -7.9427,
+        "persistence_mae": 0.05029311
       },
       "horizon_minutes": 30,
       "models": {
         "historical_median": {
           "label": "Historical median",
           "metrics": {
-            "bias": -0.02001395,
-            "directional_accuracy": 0.75449102,
-            "directional_matches": 252,
-            "mae": 0.0234577,
-            "rmse": 0.02757248,
-            "sample_count": 334
+            "bias": 0.01396884,
+            "directional_accuracy": 0.54385965,
+            "directional_matches": 31,
+            "mae": 0.05454586,
+            "rmse": 0.07463124,
+            "sample_count": 57
           },
           "parameters": {
-            "camera_groups": 2,
-            "camera_hour_groups": 48,
+            "camera_groups": 58,
+            "camera_hour_groups": 222,
             "fallback_order": [
               "camera_id + target_hour_of_day",
               "camera_id",
               "global"
             ],
-            "global_median": 0.4415535,
+            "global_median": 0.1775,
             "target_hour_source": "target bin in the configured timezone"
           }
         },
         "persistence": {
           "label": "Persistence",
           "metrics": {
-            "bias": 0.00728514,
+            "bias": 0.013469,
             "directional_accuracy": 0.0,
             "directional_matches": 0,
-            "mae": 0.02747778,
-            "rmse": 0.0331636,
-            "sample_count": 334
+            "mae": 0.05029311,
+            "rmse": 0.07872156,
+            "sample_count": 57
           },
           "parameters": {
             "rule": "y_hat(t+h) = saturation_index(t)"
@@ -287,14 +342,22 @@
         "ridge_delta": {
           "label": "Ridge regression (delta)",
           "metrics": {
-            "bias": 0.00951355,
-            "directional_accuracy": 0.73652695,
-            "directional_matches": 246,
-            "mae": 0.0172404,
-            "rmse": 0.01989593,
-            "sample_count": 334
+            "bias": -0.0094203,
+            "directional_accuracy": 0.56140351,
+            "directional_matches": 32,
+            "mae": 0.05428774,
+            "rmse": 0.08142465,
+            "sample_count": 57
           },
           "parameters": {
+            "coeffs": [
+              -0.01166699,
+              0.00040615,
+              0.007595,
+              -0.01248285,
+              -0.0055817,
+              0.0
+            ],
             "feature_columns": [
               "lag_5m",
               "lag_10m",
@@ -303,49 +366,64 @@
               "hour_of_day",
               "day_of_week"
             ],
-            "intercept": 0.0029207,
+            "intercept": -0.01067411,
+            "means": [
+              0.21255737,
+              0.21400716,
+              0.21439197,
+              0.21843812,
+              12.46625767,
+              1.0
+            ],
             "ridge_lambda": 1.0,
             "standardized_coefficients": {
-              "day_of_week": 0.00096634,
-              "hour_of_day": -0.00349264,
-              "lag_10m": -0.01712766,
-              "lag_15m": -0.23729677,
-              "lag_5m": 0.25109996,
-              "rolling_mean_15m": -0.00108567
+              "day_of_week": 0.0,
+              "hour_of_day": -0.0055817,
+              "lag_10m": 0.00040615,
+              "lag_15m": 0.007595,
+              "lag_5m": -0.01166699,
+              "rolling_mean_15m": -0.01248285
             },
+            "stds": [
+              0.16656258,
+              0.16784365,
+              0.16877382,
+              0.1195907,
+              0.84564716,
+              1.0
+            ],
             "target_mode": "delta"
           }
         }
       },
       "sample_accounting": {
         "test_missing_features": 0,
-        "test_missing_target": 12,
-        "test_samples": 334,
-        "train_median_samples": 794,
-        "train_missing_features": 6,
-        "train_missing_target": 0,
-        "train_purged_boundary": 12,
-        "train_samples": 788
+        "test_missing_target": 399,
+        "test_samples": 57,
+        "train_median_samples": 939,
+        "train_missing_features": 450,
+        "train_missing_target": 342,
+        "train_purged_boundary": 342,
+        "train_samples": 489
       }
     }
   },
   "schema_version": 1,
-  "script_version": "1.0.0",
+  "script_version": "2.0.0",
   "split": {
-    "cutoff_utc": "2026-10-29T09:35:00Z",
+    "cutoff_utc": "2026-11-03T08:05:00Z",
     "no_shuffle": true,
     "strategy": "global_chronological_by_bin_start_utc",
-    "test_row_count": 346,
-    "test_timestamp_count": 173,
-    "train_ratio": 0.7,
-    "train_row_count": 806,
-    "train_timestamp_count": 403
+    "test_row_count": 456,
+    "test_timestamp_count": 8,
+    "train_ratio": 0.8,
+    "train_row_count": 1623,
+    "train_timestamp_count": 30
   },
   "verification": {
     "beats_persistence_horizons": [
       10,
-      20,
-      30
+      20
     ],
     "candidate_model": "ridge_delta",
     "criterion": "candidate MAE < persistence MAE on at least one forecast horizon",
