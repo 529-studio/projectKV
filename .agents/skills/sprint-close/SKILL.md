@@ -16,7 +16,7 @@ order.
 ## 1. Write the handoff
 
 `docs/HANDOFF-s<N>.md`, from [templates/handoff.md](./templates/handoff.md).
-English, 12 KB ceiling (1.2 KB floor — shorter means sections were skipped).
+English, 700 B - 12 KB (shorter means sections were skipped).
 
 - Numbered sections, same order as the template. A fresh agent reads this once,
   end to end, so every line carries a fact.

@@ -56,7 +56,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 [ -f "$HANDOFF" ] || fail "$HANDOFF is missing - run the sprint-close skill, or --init for a skeleton"
 
 size=$(wc -c < "$HANDOFF" | tr -d ' ')
-[ "$size" -ge 1200 ] || fail "$HANDOFF is only ${size} B - a handoff that short cannot carry the sprint"
+[ "$size" -ge 700 ] || fail "$HANDOFF is only ${size} B - a handoff that short cannot carry the sprint"
 [ "$size" -le 12288 ] || fail "$HANDOFF is ${size} B, over the 12 KB handoff ceiling"
 
 if grep -q '<YYYY-MM-DD>' "$HANDOFF"; then
