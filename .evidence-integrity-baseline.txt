@@ -19,7 +19,6 @@ gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_sour
 gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
 gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
 gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
-gate2_temporal	docs/proofs/sprint10/harvester_observation.json	generated_at (2026-11-06T10:23:18.434225+00:00) < window.end (2026-11-10T06:00:00+07:00): cannot observe soak before window concludes
 gate2_temporal	docs/reports/bench_devbox_report.json	generated_at (2026-10-09 04:11:30) has no UTC offset (naive local time prohibited)
 gate2_temporal	docs/reports/bench_solution1_report.json	generated_at (2026-10-09 09:05:40) has no UTC offset (naive local time prohibited)
 gate2_temporal	docs/reports/stress_test_results.json	generated_at (2026-10-09 04:19:23) has no UTC offset (naive local time prohibited)

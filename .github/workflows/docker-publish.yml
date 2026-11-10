@@ -21,10 +21,6 @@ on:
         required: false
         default: ""
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
   packages: write
@@ -231,6 +227,9 @@ jobs:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     environment: staging
+    concurrency:
+      group: staging-deployment
+      cancel-in-progress: false
     needs: [detect-changes, build-backend, build-frontend, build-model]
     if: |
       always() &&
