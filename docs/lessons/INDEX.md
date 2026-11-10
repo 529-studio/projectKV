@@ -81,6 +81,7 @@ is the only part an agent should read by default.
 | 75 | Segmentation Dataset v2 Group Splitting & Retraining Gate | Group split by camera/date (0 leakage); 550 frames; IoU >= 0.612, mAP50-95 >= 0.496, p95 <= 25ms, rollback test. | [L75](L75-segmentation-dataset-v2-group-splitting-and-retraining-gates.md) |
 | 76 | Inference Worker Co-Tenancy & Adaptive Load-Shedding | Recompute cgroup invariants; tag reference profiles vs live runs; cron gate exits 1; extract the resolution decision; assert the tensor actually fed and clamp polygon anchors. | [L76](L76-inference-worker-cotenancy-and-adaptive-loadshedding.md) |
 | 77 | Evidence Integrity CI Gate & Synthetic Prohibition | Reject synthetic fixtures, assert non-future soak timestamps (generated_at >= window.end), model weight entropy >= 3.0, and baseline ratchet. | [L77](L77-evidence-integrity-gate-and-synthetic-prohibition.md) |
+| 78 | Unattended Staging Soak & Proof Archive Ingestion | 24/7 autonomous harvester daemon, WAL concurrency, 11,905 real frames replay, process-anchored soak telemetry. | [L78](L78-unattended-soak-and-proof-archive-ingestion.md) |
 
 > Numbering note: Lesson 54 does not exist in the source register. Numbers are preserved as-is because
 > other documents reference lessons by number; nothing has been renumbered.

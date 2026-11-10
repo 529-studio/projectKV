@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "service": "projectkv-hot-set-harvester",
+  "source": "harvester_daemon",
+  "provenance": "live",
+  "generated_at": "2026-11-09T11:58:58.098482000Z",
+  "process_started_at": "2026-11-09T11:58:49.120831000Z",
+  "process_uptime_seconds": 8.978,
+  "interval_seconds": 300,
+  "cameras_configured": 57,
+  "daemon_started_at": "2026-11-09T11:58:49.155531000Z",
+  "unbroken_soak_seconds": 8.943,
+  "longest_unbroken_soak_seconds": 8.914,
+  "completed_cycles": 1,
+  "failed_cycles": 0,
+  "total_frames_harvested": 57,
+  "consecutive_successful_cycles": 1,
+  "last_cycle_timestamp": "2026-11-09T11:58:58.069205000Z",
+  "last_error": "",
+  "coverage_ratio": 0.0048,
+  "coverage_window_hours": 336,
+  "coverage_72h": 0.0023,
+  "coverage_14d": 0.0048,
+  "coverage_detail": {
+    "bin_minutes": 10,
+    "requested_window_hours": 336,
+    "windows": {
+      "72h": {
+        "coverage_ratio": 0.0023,
+        "observed_bins": 57,
+        "expected_bins": 24624,
+        "cameras_with_observations": 57,
+        "longest_gap_seconds": 0
+      },
+      "336h": {
+        "coverage_ratio": 0.0048,
+        "observed_bins": 546,
+        "expected_bins": 114912,
+        "cameras_with_observations": 57,
+        "longest_gap_seconds": 538769
+      }
+    },
+    "db_records_total": 13242
+  },
+  "last_cycle": {
+    "started_at": "2026-11-09T11:58:49.155827000Z",
+    "completed_at": "2026-11-09T11:58:58.069205000Z",
+    "duration_seconds": 8.913,
+    "cameras_total": 57,
+    "cameras_harvested": 57,
+    "cameras_failed": 0,
+    "frames_analyzed": 57,
+    "harvested_frames": 57,
+    "records_attempted": 63,
+    "records_inserted": 63,
+    "methods": {
+      "cv_engine": 57
+    },
+    "success": true,
+    "error": ""
+  },
+  "cycle_history": [
+    {
+      "started_at": "2026-11-09T11:58:49.155827000Z",
+      "completed_at": "2026-11-09T11:58:58.069205000Z",
+      "duration_seconds": 8.913,
+      "cameras_total": 57,
+      "cameras_harvested": 57,
+      "cameras_failed": 0,
+      "frames_analyzed": 57,
+      "harvested_frames": 57,
+      "records_attempted": 63,
+      "records_inserted": 63,
+      "methods": {
+        "cv_engine": 57
+      },
+      "success": true,
+      "error": ""
+    }
+  ],
+  "last_run_mode": "once",
+  "clean_shutdown": true,
+  "crash_count": 0
+}

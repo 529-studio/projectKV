@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint test-ci test-eval test-seg test-train test-forecast export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint test-ci test-eval test-harvester test-seg test-train test-forecast export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs
 
 help:
 	@echo "========================================================"
@@ -125,6 +125,12 @@ test-ci:
 
 test-eval:
 	python3 -m unittest discover -s tools/eval -p "*_test.py"
+
+test-harvester:
+	python3 -m unittest discover -s tools/harvester -p "*_test.py"
+
+ingest-proofs:
+	python3 tools/eval/ingest_proof_archive.py --archive-dir services/go-server/data/proofs/2026-11-03 --manifest-out docs/proofs/sprint11/proof_archive_manifest.json
 
 test-seg:
 	python3 -m unittest discover -s tools/seg -p "*_test.py"
