@@ -131,6 +131,20 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+CANONICAL_V2_METRICS: Dict[str, Any] = {
+    "mask_map50": 0.742,
+    "mask_map50_95": 0.528,
+    "class_iou": {
+        "roadway": 0.762,
+        "water_puddle": 0.624,
+        "motorcycle": 0.638,
+        "car": 0.702,
+        "bus": 0.718,
+        "truck": 0.669,
+    },
+}
+
+
 def evaluate_retraining_gate(
     metrics: Optional[Dict[str, Any]] = None,
     p95_latency_ms: float = 14.2,
@@ -149,22 +163,16 @@ def evaluate_retraining_gate(
     the IoU figures were measured (`--export-only` re-measures latency and size
     empirically but cannot invent IoU) or are the documented held-out split.
 
+    When `metrics is None`, the gate evaluates canonical reference numbers from v2,
+    labels the verdict as UNVERIFIED, and appends an unmeasured metric failure reason
+    so bootstrap / export artifacts cannot falsely claim PASSED 100%.
+
     Returns (passed, evaluation_results, failure_reasons).
     """
-    if metrics is None:
-        # Canonical evaluation results for retrained v2 on held-out validation split
-        metrics = {
-            "mask_map50": 0.742,
-            "mask_map50_95": 0.528,
-            "class_iou": {
-                "roadway": 0.762,
-                "water_puddle": 0.624,
-                "motorcycle": 0.638,
-                "car": 0.702,
-                "bus": 0.718,
-                "truck": 0.669,
-            },
-        }
+    is_measured = metrics is not None
+    if not is_measured:
+        metrics = dict(CANONICAL_V2_METRICS)
+        metrics_provenance = f"{metrics_provenance} (reference baseline, unmeasured on this export)"
 
     failures: List[str] = []
     eval_summary: Dict[str, Any] = {
@@ -219,7 +227,14 @@ def evaluate_retraining_gate(
         )
 
     passed = len(failures) == 0
-    eval_summary["verdict"] = "PASSED" if passed else "FAILED"
+    if not is_measured:
+        eval_summary["verdict"] = "UNVERIFIED"
+        failures.append("No measured held-out validation metrics supplied (unmeasured bootstrap artifact)")
+        passed = False
+    elif passed:
+        eval_summary["verdict"] = "PASSED"
+    else:
+        eval_summary["verdict"] = "FAILED"
     eval_summary["failures"] = failures
 
     return passed, eval_summary, failures
@@ -887,11 +902,11 @@ def train_yolov8_seg(
         logging.warning("Host compute warning: %s", headroom["warning"])
 
     if not dry_run and headroom.get("is_constrained"):
-        logging.info(
-            "Host has constrained compute resources. Switching to dry-run verification mode. "
-            "To train fully, deploy this script to Google Colab or external GPU."
+        raise RuntimeError(
+            "Host has constrained compute resources and cannot train. "
+            "Pass --dry-run explicitly if dry-run verification is intended, "
+            "or train on a GPU worker per docs/reports/seg_eval_v3.md §7."
         )
-        dry_run = True
 
     result_stats: Dict[str, Any] = {
         "data_yaml": str(data_yaml),
@@ -914,13 +929,14 @@ def train_yolov8_seg(
         logging.info("Base model:     %s", model_name)
         logging.info("Hyperparameters: epochs=%d, imgsz=%d, batch=%d, nc=%d", epochs, imgsz, batch, nc)
         time.sleep(0.05)  # Simulate execution
-        result_stats["train_completed"] = True
+        result_stats["train_completed"] = False
+        result_stats["dry_run"] = True
 
         if export_openvino_dir:
             export_to_openvino_fp16(
                 Path(model_name), export_dir=export_openvino_dir, imgsz=imgsz, nc=nc, dry_run=True
             )
-        logging.info("--- DRY-RUN PIPELINE COMPLETED SUCCESSFULLY ---")
+        logging.info("--- DRY-RUN PIPELINE COMPLETED (train_completed=False) ---")
         return result_stats
 
     # Real training path (Off-box workstation / Colab with PyTorch & Ultralytics)
@@ -968,20 +984,10 @@ def train_yolov8_seg(
 
     except ImportError as ie:
         logging.error("Ultralytics/PyTorch not installed in environment: %s", ie)
-        logging.info("Falling back to dry-run export verification.")
-        return train_yolov8_seg(
-            data_yaml=data_yaml,
-            model_name=model_name,
-            epochs=epochs,
-            imgsz=imgsz,
-            batch=batch,
-            device=device,
-            workers=workers,
-            output_dir=output_dir,
-            export_openvino_dir=export_openvino_dir,
-            dry_run=True,
-            nc=nc,
-        )
+        raise RuntimeError(
+            f"Cannot train YOLOv8 segmentation model: required ML dependencies missing ({ie}). "
+            "Run under an environment with ultralytics/torch installed or pass --dry-run explicitly."
+        ) from ie
 
     return result_stats
 
@@ -1195,11 +1201,18 @@ def main():
             logging.info("  Model Size:           %.2f MiB (Threshold <= %.2f MiB)", summary["model_size_mb"], V2_GATE_THRESHOLDS["model_size_mb_max"])
             report["gate"] = summary
             if not passed:
-                logging.error("Benchmark gate failed with %d violation(s):", len(failures))
-                for f in failures:
-                    logging.error("  - %s", f)
-                sys.exit(1)
-            logging.info("Quantitative benchmark gate PASSED 100%%!")
+                if getattr(args, "allow_untrained_head", False) and summary["verdict"] == "UNVERIFIED":
+                    logging.warning(
+                        "Quantitative benchmark gate is UNVERIFIED (held-out metrics unmeasured for bootstrap IR). "
+                        "Permitted on staging artifact under --allow-untrained-head."
+                    )
+                else:
+                    logging.error("Benchmark gate failed with %d violation(s):", len(failures))
+                    for f in failures:
+                        logging.error("  - %s", f)
+                    sys.exit(1)
+            else:
+                logging.info("Quantitative benchmark gate PASSED 100%% (%s)!", summary["verdict"])
 
         if args.export_only:
             if args.report:

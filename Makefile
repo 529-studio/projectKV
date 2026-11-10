@@ -8,6 +8,7 @@ export
 EPOCHS ?= 50
 SEG_CHECKPOINT ?= yolov8n-seg.pt
 DATA ?= data/yolo_seg/dataset.yaml
+SEG_PYTHON ?= $(shell if [ -f .venv-seg/bin/python3 ]; then echo .venv-seg/bin/python3; else echo python3; fi)
 
 help:
 	@echo "========================================================"
@@ -161,10 +162,10 @@ export-seg:
 	python3 tools/eval/export_yolo_seg.py --labels-dir tools/eval/labels_gold_standard --output-dir data/yolo_seg --verify
 
 train-seg:
-	python3 tools/train/train_yolov8_seg.py --data $(DATA) --epochs $(EPOCHS) --export-openvino models/yolov8n_seg_openvino_416
+	$(SEG_PYTHON) tools/train/train_yolov8_seg.py --data $(DATA) --epochs $(EPOCHS) --export-openvino models/yolov8n_seg_openvino_416
 
 export-seg-openvino:
-	python3 tools/train/train_yolov8_seg.py --export-only --model $(SEG_CHECKPOINT) --export-openvino models/yolov8n_seg_openvino_416 --verify-gate $(EXTRA)
+	$(SEG_PYTHON) tools/train/train_yolov8_seg.py --export-only --model $(SEG_CHECKPOINT) --export-openvino models/yolov8n_seg_openvino_416 --verify-gate $(EXTRA)
 
 benchmark-mock:
 	python3 tools/eval/benchmark.py --analyzer mock

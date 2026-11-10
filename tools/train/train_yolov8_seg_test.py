@@ -10,6 +10,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 TRAIN_DIR = Path(__file__).resolve().parent
@@ -210,20 +211,51 @@ names:
             dry_run=True,
         )
 
-        self.assertTrue(stats["train_completed"])
+        self.assertFalse(stats["train_completed"], "dry run must not report train_completed=True")
         self.assertFalse(stats["exported_openvino"], "dry run must not export fabricated IR")
         self.assertIsNone(stats["xml_path"])
         self.assertIsNone(stats["bin_path"])
         self.assertEqual(stats["model_size_mb"], 0.0)
         self.assertFalse((export_dir / "yolov8n_seg.bin").exists())
 
+    @patch("train_yolov8_seg.check_host_compute_headroom", return_value={"is_constrained": True, "warning": "low disk"})
+    def test_train_without_dry_run_fails_closed_when_constrained(self, _mock):
+        dataset_yaml = self.tmp_path / "dataset_test.yaml"
+        dataset_yaml.write_text("train: a\nval: b\nnames:\n  0: roadway\n", encoding="utf-8")
+        with self.assertRaises(RuntimeError) as ctx:
+            train_yolov8_seg(
+                data_yaml=dataset_yaml,
+                model_name="yolov8n-seg.pt",
+                epochs=1,
+                dry_run=False,
+            )
+        self.assertIn("constrained compute resources", str(ctx.exception))
+
     def test_evaluate_retraining_gate_passes_canonical(self):
-        passed, summary, failures = evaluate_retraining_gate()
+        canonical_metrics = {
+            "mask_map50": 0.742,
+            "mask_map50_95": 0.528,
+            "class_iou": {
+                "roadway": 0.762,
+                "water_puddle": 0.624,
+                "motorcycle": 0.638,
+                "car": 0.702,
+                "bus": 0.718,
+                "truck": 0.669,
+            },
+        }
+        passed, summary, failures = evaluate_retraining_gate(metrics=canonical_metrics)
         self.assertTrue(passed)
         self.assertEqual(summary["verdict"], "PASSED")
         self.assertEqual(len(failures), 0)
         self.assertGreaterEqual(summary["puddle_iou"], V2_GATE_THRESHOLDS["water_puddle_iou_min"])
         self.assertGreaterEqual(summary["mask_map50_95"], V2_GATE_THRESHOLDS["mask_map50_95_min"])
+
+    def test_evaluate_retraining_gate_unverified_when_unmeasured(self):
+        passed, summary, failures = evaluate_retraining_gate(metrics=None)
+        self.assertFalse(passed)
+        self.assertEqual(summary["verdict"], "UNVERIFIED")
+        self.assertTrue(any("unmeasured" in f.lower() for f in failures))
 
     def test_evaluate_retraining_gate_rejects_degradations(self):
         # 1. Puddle IoU drop below threshold

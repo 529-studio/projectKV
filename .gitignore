@@ -75,6 +75,7 @@ __pycache__/
 *.onnx
 yolov8n_openvino_model/
 models/
+runs/
 
 
 # Local agent session artefacts

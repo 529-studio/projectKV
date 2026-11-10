@@ -115,7 +115,7 @@ load shedding alive.
 | `models/yolov8n_seg_openvino_416/yolov8n_seg.bin` | **6,518,038 B (6.216 MiB / 6.518 MB)** |
 | IR pair total | 6.607 MiB (ceiling 10.0 MiB) |
 | `.bin` SHA-256 | `bbc1fc66798e5e99e322336ea35fcb25440dd109baaada61133eda62fe475120` |
-| Shannon entropy | 7.4324 bits/byte (floor 3.0) |
+| Shannon entropy | 7.4324 bits/byte (1 MiB sample) / 7.4667 (full file, floor 3.0) |
 | Unique byte values | 256 (floor 32) |
 | XML layers | 769 |
 | Input | `[?, 3, ?, ?]`, dynamic (executes at 320 and 416) |
@@ -123,24 +123,22 @@ load shedding alive.
 | Class head | `reinitialised_untrained` (see §7) |
 | OpenVINO | 2026.4.1, compiled on CPU |
 
-## 5. Verification log (verbatim, 2026-11-10 17:12)
+## 5. Verification log (verbatim, 2026-11-10 17:27)
 
 ```
 [INFO] Rebuilt 6-class segmentation graph from yolov8n-seg.pt: 381/417 tensors transplanted (89.0% of 3264786 parameters), 36 re-initialised
 [WARNING] Exported IR head_status=reinitialised_untrained: these weights are not fine-tuned on the ProjectKV segmentation dataset and must not be promoted to production.
 [INFO] OpenVINO FP16 IR written: yolov8n_seg.xml (409568 B) + yolov8n_seg.bin (6518038 B) = 6.61 MiB
-[INFO] OpenVINO IR verified: bin=6.216 MiB entropy=7.432 bits/byte layers=769 input_mode=dynamic compile=CPU p95@416px=13.71 ms; also executed at 320px
-[INFO] [ROLLBACK TEST] Renamed yolov8n_seg.xml -> yolov8n_seg.xml.bak
-[INFO] [ROLLBACK TEST] Clean fallback to detection model: yolov8n.xml
-[INFO] [ROLLBACK TEST] Restored primary model: yolov8n_seg.xml
-[INFO] Operational rollback verification PASSED 100%
-[INFO]   Verdict:              PASSED
-[INFO]   Metrics provenance:   docs/reports/seg_eval_v2.md
+[INFO] OpenVINO IR verified: bin=6.216 MiB entropy=7.432 bits/byte layers=769 input_mode=dynamic compile=CPU p95@416px=12.65 ms; also executed at 320px
+[INFO] --- QUANTITATIVE BENCHMARK GATE SUMMARY ---
+[INFO]   Verdict:              UNVERIFIED
+[INFO]   Metrics provenance:   docs/reports/seg_eval_v2.md (reference baseline, unmeasured on this export)
 [INFO]   water_puddle IoU:     0.6240 (Threshold >= 0.6120)
 [INFO]   Mask mAP50-95:        0.5280 (Threshold >= 0.4960)
-[INFO]   p95 Latency:          13.71 ms (Threshold <= 25.00 ms)
+[INFO]   Class IoU Deltas:     {'roadway': 0.021, 'water_puddle': 0.042, 'motorcycle': 0.017, 'car': 0.018, 'bus': 0.008, 'truck': 0.014}
+[INFO]   p95 Latency:          12.65 ms (Threshold <= 25.00 ms)
 [INFO]   Model Size:           6.61 MiB (Threshold <= 10.00 MiB)
-[INFO] Quantitative benchmark gate PASSED 100%
+[WARNING] Quantitative benchmark gate is UNVERIFIED (held-out metrics unmeasured for bootstrap IR). Permitted on staging artifact under --allow-untrained-head.
 [INFO] --- EXPORT-ONLY PIPELINE COMPLETED SUCCESSFULLY ---
 ```
 
@@ -148,7 +146,7 @@ Evidence Integrity gate on the same tree:
 
 ```
 $ python3 tools/ci/check_evidence_integrity.py --mode gate
-Evidence Integrity CI Gate: evaluated 34 artifacts.
+Evidence Integrity CI Gate: evaluated 36 artifacts.
 PASS: All evidence artifacts satisfy integrity, temporal, model, and anti-spoofing gates.
 ```
 
@@ -159,7 +157,7 @@ the ratchet working as designed.
 ## 6. End-to-end serving through the real consumer
 
 `services/cv-engine/server.py` started with `MODEL_DIR=models/yolov8n_seg_openvino_416` and
-fed a real camera frame (`data/proofs/proofs/2026-11-06/662b57471afb9c00172d9095/1793945296_sample.jpg`).
+fed a real camera frame (`data/proofs/proofs/2026-11-06/56de42f611f398ec0c48127d/1793945234_sample.jpg`).
 Raw responses: [`seg_cv_engine_e2e.json`](seg_cv_engine_e2e.json).
 
 | Request | HTTP | `model` reported | `input_resolution` | Wall latency |
@@ -189,7 +187,7 @@ Acceptance criteria from Issue #399, point by point:
 |---|---|---|
 | `yolov8n_seg.bin` has real weights (> 6.0 MB) | **PASS** | 6,518,038 B, entropy 7.4324, 256 unique bytes, 769 layers |
 | OpenVINO compiles the graph successfully | **PASS** | `compile_model("CPU")` + inference at 320/416 px |
-| Quantitative gate clears IoU >= 0.612 on real validation images | **NOT MET** | gate passes on the documented v2 metrics (`seg_eval_v2.md`); no image files exist in `data/yolo_seg/images/`, so no held-out evaluation could be run |
+| Quantitative gate clears IoU >= 0.612 on real validation images | **NOT MET** | gate reports UNVERIFIED on held-out split (baseline 0.624 carries from seg_eval_v2.md, unmeasured on this export); no image files exist in `data/yolo_seg/images/` on this host |
 | Trained on 550+ frame dataset v2 on a GPU instance | **NOT MET** | dataset has 301 label files and **0** frames on this host; no GPU instance was available |
 
 Why the artifact is still worth shipping to the *staging* volume: it is a real, compilable,
