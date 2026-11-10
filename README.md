@@ -230,7 +230,7 @@ Trained OpenVINO models (`.xml` / `.bin`) deploy directly to `services/cv-engine
 ### 2.4. Verification, Forecast & Evidence Integrity Gates
 
 * **Evidence Integrity Gate**: Run `make evidence-lint` (`tools/ci/check_evidence_integrity.py`) and `make test-ci` to enforce anti-spoofing, temporal invariants, and synthetic data prohibition across all release artifacts (ADR-013 D1).
-* **Forecast Backtest**: Run `make test-forecast`; `tools/forecast/backtest.py` validates chronological evaluation sets. Provenance: [`docs/reports/forecast_prototype_v1.md`](docs/reports/forecast_prototype_v1.md).
+* **Forecast Pipeline**: Run `make test-forecast` for suite and `make train-forecast` to refit models on live history and promote to Go server. Provenance: [`docs/reports/forecast_prototype_v1.md`](docs/reports/forecast_prototype_v1.md).
 
 ## 3. Key Highlights
 

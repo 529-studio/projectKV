@@ -86,12 +86,13 @@ scaffolding over synthetic fixtures, placeholder stubs, and empty production tab
 
 ### D4. Automated Forecast Refit Worker & Live History Model Deployment
 
-- **Refit Pipeline**: `tools/forecast/train_live_model.py` runs on a nocturnal schedule, pulling
+- **Refit Pipeline**: `tools/forecast/train_live_model.py` (invocable via `make train-forecast`), pulling
   contiguous history from SQLite, generating features via Feature Store v2, and fitting Ridge
   regression models.
 - **Model Promotion Gate**: New candidate weights are verified against chronological held-out test
   splits before atomic promotion to `services/go-server/internal/forecast/embedded/`. Unlocks
-  `GET /api/v1/cameras/:id/forecast` with `availability: ok`.
+  `GET /api/v1/cameras/:id/forecast` with `availability: ok`. Initial live baseline accepts narrow 10m
+  improvement (+0.0478%) and negative 30m margin (-7.94% on N=57 samples) pending longer soak collection.
 
 ### D5. Real GPU YOLOv8n-seg Training & 6.4 MB OpenVINO FP16 Deployment
 

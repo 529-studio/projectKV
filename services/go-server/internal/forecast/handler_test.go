@@ -107,7 +107,7 @@ func seedTestObservations(baseTime time.Time) []forecast.Observation {
 	}
 }
 
-// TestHandler_FailClosedGate tests that the default boot with embedded synthetic fixture
+// TestHandler_FailClosedGate tests that booting with an unvalidated synthetic fixture
 // fails closed with HTTP 503 and performs zero database reads.
 func TestHandler_FailClosedGate(t *testing.T) {
 	_ = os.Unsetenv("FORECAST_ALLOW_SYNTHETIC")
@@ -124,7 +124,15 @@ func TestHandler_FailClosedGate(t *testing.T) {
 		},
 	}
 
-	r := setupTestRouter(history, catalog, forecast.WithAllowSynthetic(false))
+	syntheticMeta := forecast.ModelMetadata{
+		Name:      forecast.ModelRidgeDelta,
+		Version:   "2026.11.05-synthetic",
+		FitSource: string(forecast.FitSourceSyntheticFixture),
+		Validated: false,
+		MAE:       0.0044,
+	}
+
+	r := setupTestRouter(history, catalog, forecast.WithModelMetadata(syntheticMeta), forecast.WithAllowSynthetic(false))
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/cameras/cam-1/forecast", nil)
 	w := httptest.NewRecorder()
@@ -185,7 +193,16 @@ func TestHandler_OverrideSyntheticHatch(t *testing.T) {
 		},
 	}
 
-	r := setupTestRouter(history, catalog, forecast.WithAllowSynthetic(true))
+	syntheticMeta := forecast.ModelMetadata{
+		Name:         forecast.ModelRidgeDelta,
+		Version:      "2026.11.05-synthetic",
+		FitSource:    string(forecast.FitSourceSyntheticFixture),
+		Validated:    false,
+		Experimental: true,
+		MAE:          0.0044,
+	}
+
+	r := setupTestRouter(history, catalog, forecast.WithModelMetadata(syntheticMeta), forecast.WithAllowSynthetic(true))
 
 	t.Run("GET /api/v1/cameras/:id/forecast returns 200 with multi-horizon payload", func(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, "/api/v1/cameras/cam-1/forecast", nil)
@@ -361,6 +378,47 @@ func TestHandler_LiveArtifactServing(t *testing.T) {
 	}
 	if !resp.Model.Validated {
 		t.Errorf("expected model.validated true for live model")
+	}
+	if resp.Model.FitSource != "live_history" {
+		t.Errorf("expected fit_source live_history, got %q", resp.Model.FitSource)
+	}
+}
+
+// TestHandler_DefaultBootLiveHistory verifies that default server boot (without options)
+// uses the embedded live history model, returns 200 OK, and validated=true.
+func TestHandler_DefaultBootLiveHistory(t *testing.T) {
+	now := time.Now().UTC()
+	history := &mockHistoryReader{
+		observations: map[string][]forecast.Observation{
+			"cam-default": seedTestObservations(now),
+		},
+	}
+	catalog := &mockCameraCatalog{
+		cameras: map[string]forecast.CameraInfo{
+			"cam-default": {ID: "cam-default", RoadKey: "vo_van_kiet"},
+		},
+	}
+
+	r := setupTestRouter(history, catalog)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/cameras/cam-default/forecast", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for default boot with embedded live model, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp forecast.MultiHorizonResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Availability != forecast.StatusOk {
+		t.Errorf("expected availability ok, got %q", resp.Availability)
+	}
+	if resp.Experimental {
+		t.Errorf("expected experimental false for default live model")
+	}
+	if !resp.Model.Validated {
+		t.Errorf("expected model.validated true for default live model")
 	}
 	if resp.Model.FitSource != "live_history" {
 		t.Errorf("expected fit_source live_history, got %q", resp.Model.FitSource)

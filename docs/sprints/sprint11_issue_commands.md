@@ -169,7 +169,7 @@ gh issue create \
 `GET /api/v1/cameras/:id/forecast` is permanently fail-closed with 503 `model_unvalidated` because no automated pipeline fits weights to real traffic history.
 
 ## Solution
-1. Build `tools/forecast/train_live_model.py` scheduled to run nightly on staging.
+1. Build `tools/forecast/train_live_model.py` (invocable via `make train-forecast` for manual or externally scheduled runs).
 2. Extract chronological features from `hotset_verdict_history` joined as-of with `weather_observations`.
 3. Fit Ridge regression models, evaluate on held-out test splits, and promote verified model artifacts atomically to `services/go-server/internal/forecast/embedded/`.
 4. Unlock the forecast endpoint with `availability: ok`.

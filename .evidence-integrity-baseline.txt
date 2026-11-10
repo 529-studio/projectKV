@@ -12,8 +12,6 @@ gate1_synthetic	docs/reports/cotenancy_benchmark_v1.json	Field 'measurement_sour
 gate1_synthetic	docs/reports/cotenancy_benchmark_v1.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
 gate1_synthetic	docs/reports/forecast_ablation_v2.json	Forecast release artifact missing required 'fit_source' declaration (must be 'live_history')
 gate1_synthetic	docs/reports/forecast_ablation_v2.json	Prohibited reference to synthetic fixture matching 'synthetic_congestion_v2_5m.csv'
-gate1_synthetic	docs/reports/forecast_prototype_v1.json	Forecast release artifact missing required 'fit_source' declaration (must be 'live_history')
-gate1_synthetic	docs/reports/forecast_prototype_v1.json	Prohibited reference to synthetic fixture matching 'synthetic_congestion_5m.csv'
 gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
 gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'
 gate1_synthetic	docs/reports/s10_t8_manual_evidence.json	Field 'measurement_source' has prohibited synthetic value 'reference-profile'

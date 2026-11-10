@@ -219,26 +219,26 @@ type HorizonModel struct {
 `ModelParams` gains JSON tags and remains the only representation of the coefficients; `service.go` stops duplicating the report's metrics. Loader contract in `artifact.go`:
 
 ```go
-func EmbeddedSyntheticArtifact() ModelArtifact  // default, fit_source=synthetic_fixture
-func LoadArtifact(path string) (ModelArtifact, error) // "" returns EmbeddedSyntheticArtifact()
-func (a ModelArtifact) Validate() error          // exactly 3 models, 3 horizons each, SHA verified
-func (a ModelArtifact) Entry(name string) (ModelEntry, bool)
+func DefaultArtifact() *ModelArtifact                 // default embedded artifact (live_history in S11)
+func LoadArtifact(path string) (*ModelArtifact, error) // "" returns DefaultArtifact()
+func (a *ModelArtifact) Validate() error              // models, horizons, fit_source and live history rules
+func (a *ModelArtifact) Entry(name string) (ModelEntry, bool)
 func (e ModelEntry) Provenance() ModelProvenance
 ```
 
 `Validate` rejects unknown model names, duplicate or out-of-range horizons, an `artifact_sha256` mismatch, a `live_history` entry with `fit_rows == 0` or a nil `fit_window`, and a synthetic entry claiming `validated`. These are boot failures, not request errors.
 
-Embedded artifact values, from [`forecast_prototype_v1.json`](../reports/forecast_prototype_v1.json): `version` `2026.11.05-synthetic`, `fit_source` `synthetic_fixture`, `fit_rows` `1152`, `fit_cameras` `2`, `fit_window` `2026-10-28T00:00:00Z` → `2026-10-29T23:55:00Z`, `fit_data_sha256` `1a54fd12319e0f936f1b67dcf61025d73ee8d88aecae131327b637674ea4d840`.
+*Superseded in S11-T4 (L80)*: Promoted live model `2026.11.10-live` (`fit_source: live_history`, 1623 rows, 58 cameras); default boot serves 200 `availability: ok`, `validated: true`. See [`forecast_prototype_v1.json`](../reports/forecast_prototype_v1.json).
 
-Per-horizon metrics for the three entries (MAE / RMSE):
+Live per-horizon metrics (MAE / RMSE, rounded to 5 decimal places from `forecast_prototype_v1.json`):
 
 | Horizon | `ridge_delta` | `persistence` | `historical_median` |
 |---:|---|---|---|
-| 10 | 0.00440486 / 0.00508631 | 0.00917440 / 0.01110912 | 0.02354196 / 0.02766057 |
-| 20 | 0.01016163 / 0.01172547 | 0.01837405 / 0.02220334 | 0.02359264 / 0.02774466 |
-| 30 | 0.01724040 / 0.01989593 | 0.02747778 / 0.03316360 | 0.02345770 / 0.02757248 |
+| 10 | 0.04691 / 0.06315 | 0.04693 / 0.06343 | 0.05095 / 0.06776 |
+| 20 | 0.05152 / 0.07371 | 0.05173 / 0.07260 | 0.05336 / 0.07123 |
+| 30 | 0.05429 / 0.08142 | 0.05029 / 0.07872 | 0.05455 / 0.07463 |
 
-All three entries carry `sample_count: 342` and `fit_source: synthetic_fixture`.
+All entries carry `fit_source: live_history`.
 ### 3.7 Service surface
 
 ```go
@@ -307,7 +307,7 @@ Configuration in `internal/config`:
 | Variable | Type | Default | Rule |
 |---|---|---|---|
 | `FORECAST_ALLOW_SYNTHETIC` | bool | `false` | `parseEnvBool`. Development escape hatch only. |
-| `FORECAST_MODEL_PATH` | string | `""` | Empty means the embedded synthetic artifact. A non-empty value that cannot be read or verified is fatal at boot. |
+| `FORECAST_MODEL_PATH` | string | `""` | Empty means embedded artifact (live_history in S11). A non-empty value that cannot be read or verified is fatal at boot. |
 | `FORECAST_STALE_TTL_SECONDS` | int | `900` | Three 5-minute feature bins. Not `VERDICT_STALE_TTL_SECONDS`, which measures 30 s verdict freshness. |
 
 Boot guard in `main.go`: `log.Fatalf` when `AppEnv` is `staging` or `production` and `ForecastAllowSynthetic` is true — the hatch is not a deployment option. In `dev` it logs one `[WARN]` naming the variable. No compose file gains it; `.env.example` gets a commented `# FORECAST_ALLOW_SYNTHETIC=false`.
@@ -349,7 +349,9 @@ These are real outputs of the current coefficients; use `1e-4` tolerance, not by
 
 Same inputs, base time +20 m: `availability: "stale"`, `source_data.stale: true`, `age_minutes: 21.0`, confidence `0.45 / 0.43 / 0.41`. Predictions and intervals are unchanged.
 
-### 6.3 `503 model_unvalidated` (default config, embedded artifact)
+### 6.3 `503 model_unvalidated` (S10 baseline; superseded in S11-T4 by live 200 ok)
+
+In S10 baseline, embedded synthetic model returned 503 by default. In S11-T4 (L80), embedded model was promoted to `2026.11.10-live` (`fit_source: live_history`), unlocking 200 `availability: ok` by default. 503 is returned if an unvalidated model artifact is injected without override:
 
 ```json
 {"error": "model_unvalidated", "message": "forecast model was not fitted on live traffic history",
@@ -358,7 +360,7 @@ Same inputs, base time +20 m: `availability: "stale"`, `source_data.stale: true`
    "validated": false, "fit_rows": 1152, "fit_cameras": 2, "mae": 0.0172404, "metrics": ["…three entries…"]}}
 ```
 
-`requirements` is absent. With `FORECAST_ALLOW_SYNTHETIC=true` the same request returns `200` with the §6.1 body, `availability: "ok"` (or `"stale"`), `experimental: true` and `model.validated: false`.
+`requirements` is absent. With `FORECAST_ALLOW_SYNTHETIC=true` the request returns `200` with the §6.1 body, `availability: "ok"` (or `"stale"`), `experimental: true` and `model.validated: false`.
 
 ### 6.4 `422 insufficient_history`
 
@@ -381,12 +383,12 @@ Same inputs, base time +20 m: `availability: "stale"`, `source_data.stale: true`
 
 - Delete `Response`, `ModelMetadata`, `Request.HorizonMinutes`, `Predict`, and the per-horizon MAE/RMSE literals in the persistence and median branches. Add the §3.2-§3.5 types, `ErrorKind` and `ForecastError`; `NewService` takes `Options` and applies the §3.7 validations.
 - `PredictMulti` order: validate model → camera lookup → synthetic gate → history query (`GetRecentByCameraBefore`, 45 m, 50 rows) → sample floor → staleness → one `HorizonModel` per horizon ascending → assemble `SourceData` and `ModelProvenance` → one log line with `camera_id`, `availability`, `fit_source`, `validated`, `experimental`, horizon SIs. A nil reader or query error becomes `KindServiceUnavailable`; it must not fall through to the 422 path.
-- Coefficients and metrics come only from `s.artifact`. `CalibratedRidgeParams` moves to `artifact.go`, unexported and reachable only through `EmbeddedSyntheticArtifact`; nothing else may rebuild it.
+- Coefficients and metrics come only from `s.artifact`. `CalibratedRidgeParams` moves to `artifact.go`, unexported and reachable through `DefaultArtifact`; nothing else may rebuild it.
 - Rounding: SI 4 dp, speed 1 dp, confidence 2 dp, MAE 6 dp, age 1 dp.
 
 ### 7.3 `internal/forecast/artifact.go` (new)
 
-- The §3.6 types plus `FitSource`, `EmbeddedSyntheticArtifact`, `LoadArtifact`, `Validate`, `Entry`, `Provenance`.
+- The §3.6 types plus `FitSource`, `DefaultArtifact`, `LoadArtifact`, `Validate`, `Entry`, `Provenance`.
 - Loader: read → `json.Unmarshal` → `Validate` → recompute each `ArtifactSHA256` from `json.Marshal(entry.Horizons)` and compare. An empty path returns the embedded artifact through the same validation path (L66).
 - The embedded metrics come from the §3.6 table, transcribed from the prototype report, not from `service.go`.
 
@@ -414,7 +416,7 @@ Same inputs, base time +20 m: `availability: "stale"`, `source_data.stale: true`
 |---|---|---|
 | G1 | Live artifact, 4 fresh observations, `?model=ridge_delta` | 200, `ok`, three horizons ordered, intervals bracket the point estimate, `validated=true` |
 | G2 | Same, base time +20 m | 200, `stale`, `source_data.stale=true`, confidence halved |
-| G3 | Embedded artifact, default config | 503, `model_unvalidated`, `model.fit_source=synthetic_fixture` |
+| G3 | Unvalidated artifact injected without override (S10 baseline behavior) | 503, `model_unvalidated`, `model.fit_source=synthetic_fixture` |
 | G4 | Embedded artifact, `AllowSynthetic=true` | 200, `experimental=true`, `availability=ok`, `model.validated=false` |
 | G5 | Two observations | 422, `requirements.observed_samples=2` |
 | G6 | Zero observations / repository error | 422 / 503 with the matching kind |
@@ -435,6 +437,4 @@ Manual verification (Rule 10) is split: V1-V12 in [`s10_t1_offline_verification.
 
 ## 10. Estimate reconciliation
 
-The issue's 8-10 h did not price D4 or the golden test. Breakdown: `artifact.go` loader and hash verification 2.5 h; `service.go` rewrite 2.5 h; `handler.go` and envelope 1.5 h; config and main 1.0 h; tests G1-G12 plus fixture 2.5 h; Swagger, docs and manual scenarios 1.5 h. **Total 11.5 h**, recommended as 10-12 h (2 working days), Nov 09-10.
-
-If the deadline is immovable, descope the loader (about 2 h) and defer `FORECAST_MODEL_PATH` plus hash verification to T4. Never descope the gate, enum, route deletion or golden contract test.
+Estimate breakdown: loader/verification 2.5 h, service rewrite 2.5 h, handler/envelope 1.5 h, config/main 1.0 h, tests G1-G12 2.5 h, Swagger/docs 1.5 h. **Total 11.5 h**, recommended as 10-12 h (Nov 09-10).
