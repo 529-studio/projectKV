@@ -1,6 +1,8 @@
 name: CI - Code Verification
 
 on:
+  schedule:
+    - cron: '0 1 * * *'
   pull_request:
     branches: [main, dev]
     paths-ignore:
@@ -12,6 +14,7 @@ on:
       - '.github/workflows/docker-publish.yml'
       - '.env.example'
       - '.env.stg.example'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

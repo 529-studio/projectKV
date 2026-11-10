@@ -1,4 +1,7 @@
 {
+  "status": "SUPERSEDED",
+  "superseded_by": "docs/proofs/sprint11/harvester_soak_status.json",
+  "invalidation_reason": "Sprint 10 prototype simulation superseded by authentic S11-T2 unattended soak (ADR-013 F2 / Lesson 78)",
   "soak_protocol": "ADR-012 D2: 72-Hour Flywheel Staging Soak",
   "window_hours": 72,
   "environment": "staging",

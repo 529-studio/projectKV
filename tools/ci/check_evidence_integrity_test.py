@@ -7,7 +7,8 @@ Tests all four integrity gates:
   Gate 2: Temporal Invariants, Window Verification & Anti-Spoofing
   Gate 3: Model Weight Integrity, Entropy & Stub Rejection
   Gate 4: Empirical Proof Artifact Integrity & Magic Byte Validation
-  Plus Baseline Ratchet Engine and CLI Arguments.
+  Plus Baseline Ratchet Engine, Clock-Dependent Baseline Rejection,
+  Superseded Artifact Handling, and CLI Arguments.
 """
 
 from __future__ import annotations
@@ -16,10 +17,15 @@ import json
 import math
 import os
 import struct
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from tools.ci.check_evidence_integrity import (
     BASELINE_FILENAME,
@@ -31,6 +37,7 @@ from tools.ci.check_evidence_integrity import (
     check_gate4_proof,
     evaluate_gate,
     find_tracked_evidence_files,
+    is_clock_dependent_violation,
     load_baseline,
     parse_duration_to_seconds,
     parse_iso_timestamp,
@@ -40,6 +47,7 @@ from tools.ci.check_evidence_integrity import (
     save_baseline,
     set_root,
     shannon_entropy,
+    validate_baseline_entry,
 )
 
 
@@ -405,6 +413,127 @@ class TestBaselineAndRatchet(unittest.TestCase):
                 reset_root()
 
 
+class TestClockDependentBaselineProhibition(unittest.TestCase):
+    """Test Task 2.1: dynamic clock-dependent baseline entries are strictly rejected."""
+
+    def test_prohibit_clock_dependent_entries_in_load_baseline(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as tf:
+            tf.write(
+                "gate2_temporal\tdocs/proofs/sprint10/harvester_observation.json\t"
+                "window.end (2026-11-10T06:00:00+07:00) is in the future (> current_time + 300s)\n"
+            )
+            tf_path = Path(tf.name)
+        try:
+            with self.assertRaises(ValueError) as ctx:
+                load_baseline(tf_path)
+            self.assertIn("Dynamic clock-dependent baseline entry prohibited", str(ctx.exception))
+        finally:
+            tf_path.unlink()
+
+    def test_prohibit_clock_dependent_entries_in_save_baseline(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as tf:
+            tf_path = Path(tf.name)
+        try:
+            v = Violation(
+                gate="gate2_temporal",
+                path="docs/test.json",
+                detail="generated_at is in the future (> current_time + 300s)",
+            )
+            with self.assertRaises(ValueError) as ctx:
+                save_baseline(tf_path, [v])
+            self.assertIn("Dynamic clock-dependent baseline entry prohibited", str(ctx.exception))
+        finally:
+            if tf_path.exists():
+                tf_path.unlink()
+
+    def test_accept_static_baseline_entries(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as tf:
+            tf.write(
+                "gate1_synthetic\tdocs/reports/test.json\tField 'source' has prohibited synthetic value 'synthetic'\n"
+            )
+            tf_path = Path(tf.name)
+        try:
+            violations = load_baseline(tf_path)
+            self.assertEqual(len(violations), 1)
+        finally:
+            tf_path.unlink()
+
+    def test_evaluate_gate_rejects_clock_dependent_baseline(self):
+        with tempfile.TemporaryDirectory() as td:
+            base_dir = Path(td)
+            baseline = base_dir / BASELINE_FILENAME
+            baseline.write_text(
+                "gate2_temporal\tdocs/proofs/test.json\tgenerated_at (2026-11-11T00:00:00Z) is in the future (> current_time + 300s)\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(ValueError) as ctx:
+                evaluate_gate([], baseline_path=baseline)
+            self.assertIn("Dynamic clock-dependent baseline entry prohibited", str(ctx.exception))
+
+
+class TestSupersededArtifactHandling(unittest.TestCase):
+    """Test Task 2.2: support artifact invalidation/superseding."""
+
+    def test_valid_superseded_artifact_bypasses_temporal_checks(self):
+        with tempfile.TemporaryDirectory() as td:
+            root_p = Path(td)
+            set_root(root_p)
+            try:
+                superseding_file = root_p / "docs/proofs/sprint11/new_soak.json"
+                superseding_file.parent.mkdir(parents=True, exist_ok=True)
+                superseding_file.write_text("{}", encoding="utf-8")
+
+                data = {
+                    "status": "SUPERSEDED",
+                    "superseded_by": "docs/proofs/sprint11/new_soak.json",
+                    "invalidation_reason": "Sprint 10 prototype simulation superseded by authentic soak",
+                    "window": {
+                        "start": "2026-11-07T06:00:00Z",
+                        "end": "2026-11-10T06:00:00Z",
+                    },
+                    "generated_at": "2026-11-06T10:00:00Z",  # normally fails generated_at < window.end
+                }
+                violations = check_gate2_temporal("docs/proofs/sprint10/old.json", data)
+                self.assertEqual(violations, [])
+            finally:
+                reset_root()
+
+    def test_superseded_artifact_missing_superseded_by(self):
+        data = {
+            "status": "SUPERSEDED",
+            "invalidation_reason": "Superseded by something",
+        }
+        violations = check_gate2_temporal("docs/proofs/old.json", data)
+        self.assertTrue(any("missing required non-empty 'superseded_by'" in v.detail for v in violations))
+
+    def test_superseded_artifact_nonexistent_superseded_by_target(self):
+        data = {
+            "status": "SUPERSEDED",
+            "superseded_by": "docs/proofs/non_existent_file.json",
+            "invalidation_reason": "Superseded by something",
+        }
+        violations = check_gate2_temporal("docs/proofs/old.json", data)
+        self.assertTrue(any("references non-existent superseded_by target" in v.detail for v in violations))
+
+    def test_superseded_artifact_missing_invalidation_reason(self):
+        with tempfile.TemporaryDirectory() as td:
+            root_p = Path(td)
+            set_root(root_p)
+            try:
+                target_file = root_p / "docs/new.json"
+                target_file.parent.mkdir(parents=True, exist_ok=True)
+                target_file.write_text("{}", encoding="utf-8")
+                data = {
+                    "status": "SUPERSEDED",
+                    "superseded_by": "docs/new.json",
+                    "invalidation_reason": "",
+                }
+                violations = check_gate2_temporal("docs/proofs/old.json", data)
+                self.assertTrue(any("missing required non-empty 'invalidation_reason'" in v.detail for v in violations))
+            finally:
+                reset_root()
+
+
 class TestCheckArtifactDispatcher(unittest.TestCase):
     """Test check_artifact routing to different file formats and error handlers."""
 
@@ -524,6 +653,17 @@ class TestCLIExecution(unittest.TestCase):
                     code = main()
                     self.assertEqual(code, 0)
 
+    def test_cli_mode_and_repo_root_flags(self):
+        import sys
+        from unittest.mock import patch
+        from io import StringIO
+        from tools.ci.check_evidence_integrity import main
+
+        with patch.object(sys, "argv", ["check_evidence_integrity.py", "--repo-root", str(REPO_ROOT), "--mode", "gate"]):
+            with patch("sys.stdout", new=StringIO()):
+                code = main()
+                self.assertEqual(code, 0)
+
 
 class TestAdversarialIntegrityVectors(unittest.TestCase):
     """
@@ -575,8 +715,11 @@ class TestAdversarialIntegrityVectors(unittest.TestCase):
 
     def test_adversarial_degenerate_solid_screenshot(self):
         # Solid white 961x579 image
-        import io
-        from PIL import Image
+        try:
+            import io
+            from PIL import Image
+        except ImportError:
+            self.skipTest("Pillow not installed in current test runner environment")
 
         im = Image.new("RGB", (961, 579), color=(255, 255, 255))
         buf = io.BytesIO()

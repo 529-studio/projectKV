@@ -16,6 +16,7 @@ Four Integrity Gates:
           - Asserts `generated_at <= current_time + 300` (rejects future timestamps, 5m skew grace).
           - Asserts `window.end <= current_time + 300` (soak window cannot end in the future).
           - Asserts `window.end - window.start` matches declared window duration (e.g. 72h, 14d).
+          - Supports SUPERSEDED artifacts (bypasses live temporal checks if validly superseded).
   Gate 3: Model Weight Integrity
           - OpenVINO `.bin`, PyTorch `.pt`, and ONNX weights must be > 1 MB (configurable).
           - Rejects repetitive byte patterns & stubs via Shannon entropy (H >= 3.0 bits/byte)
@@ -30,9 +31,11 @@ Ratchet & Strict Mode:
   `.evidence-integrity-baseline.txt`. Known legacy Sprint 10 violations can be tracked
   in the baseline, while new violations fail CI immediately. When `--strict` is enabled,
   the baseline is ignored and 100% compliance is required.
+  Clock-dependent baseline entries (e.g. future timestamp assertions) are strictly prohibited.
 
 Usage:
   python3 tools/ci/check_evidence_integrity.py --verify-all
+  python3 tools/ci/check_evidence_integrity.py --repo-root . --mode gate
   python3 tools/ci/check_evidence_integrity.py --file <path>
   python3 tools/ci/check_evidence_integrity.py --strict
   python3 tools/ci/check_evidence_integrity.py --update-baseline
@@ -118,6 +121,27 @@ FORECAST_KEYWORDS = (
     "hotset_verdict_history",
     "ablation_study",
 )
+
+PROHIBITED_BASELINE_PATTERNS = (
+    "is in the future",
+    "current_time",
+)
+
+
+def is_clock_dependent_violation(detail: str) -> bool:
+    """Return True if violation detail contains dynamic clock-dependent conditions."""
+    detail_lower = detail.lower()
+    return any(p in detail_lower for p in PROHIBITED_BASELINE_PATTERNS)
+
+
+def validate_baseline_entry(v: Violation, source: str = "baseline") -> None:
+    """Validate that a baseline violation is permissible (e.g. not dynamic clock-dependent)."""
+    if is_clock_dependent_violation(v.detail):
+        raise ValueError(
+            f"Dynamic clock-dependent baseline entry prohibited in {source}: '{v.detail}'. "
+            "Temporal conditions referencing future timestamps or current clock expire as time passes "
+            "and must not be grandfathered in baseline."
+        )
 
 
 @dataclass(frozen=True)
@@ -424,9 +448,59 @@ def check_gate2_temporal(
       - generated_at <= current_time + 300s (rejects future timestamps)
       - window.end <= current_time + 300s (rejects future soak windows)
       - window.end - window.start matches declared duration within tolerance.
+    If status == "SUPERSEDED", requires non-empty superseded_by (referencing valid file)
+    and non-empty invalidation_reason. Bypasses live temporal assertions if valid.
     """
     violations: List[Violation] = []
     if not isinstance(data, dict):
+        return violations
+
+    # Support artifact invalidation/superseding (ADR-013 F2)
+    if data.get("status") == "SUPERSEDED":
+        superseded_by = data.get("superseded_by")
+        invalidation_reason = data.get("invalidation_reason")
+        has_superseded_err = False
+
+        if not isinstance(superseded_by, str) or not superseded_by.strip():
+            violations.append(
+                Violation(
+                    gate="gate2_temporal",
+                    path=rel_path,
+                    detail="SUPERSEDED artifact missing required non-empty 'superseded_by' declaration",
+                )
+            )
+            has_superseded_err = True
+        else:
+            base_root = root()
+            target_path = base_root / superseded_by.strip()
+            if not target_path.exists():
+                local_target = (base_root / rel_path).parent / superseded_by.strip()
+                if local_target.exists():
+                    target_path = local_target
+
+            if not target_path.exists() or not target_path.is_file():
+                violations.append(
+                    Violation(
+                        gate="gate2_temporal",
+                        path=rel_path,
+                        detail=f"SUPERSEDED artifact references non-existent superseded_by target '{superseded_by}'",
+                    )
+                )
+                has_superseded_err = True
+
+        if not isinstance(invalidation_reason, str) or not invalidation_reason.strip():
+            violations.append(
+                Violation(
+                    gate="gate2_temporal",
+                    path=rel_path,
+                    detail="SUPERSEDED artifact missing required non-empty 'invalidation_reason' declaration",
+                )
+            )
+            has_superseded_err = True
+
+        if not has_superseded_err:
+            # Valid superseded artifact: bypass live temporal generation assertions
+            return []
         return violations
 
     current_utc = now.astimezone(timezone.utc) if now else datetime.now(timezone.utc)
@@ -912,6 +986,7 @@ def load_baseline(baseline_path: Path) -> Set[Violation]:
     for line in baseline_path.read_text(encoding="utf-8").splitlines():
         v = Violation.from_baseline_line(line)
         if v is not None:
+            validate_baseline_entry(v, source=baseline_path.name)
             violations.add(v)
     return violations
 
@@ -930,6 +1005,7 @@ def save_baseline(baseline_path: Path, violations: List[Violation]) -> None:
     # Sort violations deterministically
     sorted_v = sorted(violations, key=lambda x: (x.gate, x.path, x.detail))
     for v in sorted_v:
+        validate_baseline_entry(v, source="save_baseline")
         lines.append(v.to_baseline_line())
     baseline_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -1104,6 +1180,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Check all evidence artifacts under a directory.",
     )
     parser.add_argument(
+        "--repo-root",
+        type=str,
+        default=None,
+        help="Path to repository root (defaults to auto-detected repository root).",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["gate", "audit", "strict"],
+        default="gate",
+        help="Execution mode: gate (enforce baseline ratchet), audit (report only), strict (zero exemptions).",
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="Enforce strict mode: ignore baseline ratchet, require 100%% compliance.",
@@ -1159,9 +1248,13 @@ def main() -> int:
     parser = build_arg_parser()
     args = parser.parse_args()
 
+    if args.repo_root:
+        set_root(args.repo_root)
+
     base_root = root()
     now_dt = parse_iso_timestamp(args.now) if args.now else None
     baseline_path = Path(args.baseline) if args.baseline else (base_root / BASELINE_FILENAME)
+    strict_mode = args.strict or (args.mode == "strict")
 
     files_to_check: List[Path] = []
 
@@ -1178,7 +1271,7 @@ def main() -> int:
             for f in sorted(d.rglob("*")):
                 if f.is_file():
                     files_to_check.append(f)
-    elif args.verify_all or args.update_baseline:
+    elif args.verify_all or args.update_baseline or args.mode in ("gate", "audit"):
         files_to_check = find_tracked_evidence_files(base_root)
     else:
         # Default behavior: run verify-all
@@ -1197,19 +1290,27 @@ def main() -> int:
                     strict=True,
                 )
             )
-        save_baseline(baseline_path, all_violations)
+        try:
+            save_baseline(baseline_path, all_violations)
+        except ValueError as e:
+            print(f"FAIL: Cannot update baseline: {e}", file=sys.stderr)
+            return 1
         print(f"Updated baseline at {baseline_path} with {len(all_violations)} violations.")
         return 0
 
-    report = evaluate_gate(
-        files=files_to_check,
-        now=now_dt,
-        strict=args.strict,
-        baseline_path=baseline_path,
-        min_model_size=args.min_model_size,
-        min_width=args.min_width,
-        min_height=args.min_height,
-    )
+    try:
+        report = evaluate_gate(
+            files=files_to_check,
+            now=now_dt,
+            strict=strict_mode,
+            baseline_path=baseline_path,
+            min_model_size=args.min_model_size,
+            min_width=args.min_width,
+            min_height=args.min_height,
+        )
+    except ValueError as e:
+        print(f"FAIL: {e}", file=sys.stderr)
+        return 1
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
@@ -1236,6 +1337,8 @@ def main() -> int:
         for v in report.stale_baseline:
             print(f"  [{v.gate}] {v.path}: {v.detail}")
 
+    if args.mode == "audit":
+        return 0
     return 1
 
 
