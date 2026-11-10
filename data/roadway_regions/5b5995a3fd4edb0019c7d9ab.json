@@ -1,0 +1,58 @@
+{
+  "camera_id": "5b5995a3fd4edb0019c7d9ab",
+  "corridor_name": "Võ Văn Kiệt - Cầu Chà Và 2 (trên cầu)",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "5b5995a3fd4edb0019c7d9ab_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1883,
+          0.95
+        ],
+        [
+          0.4835,
+          0.95
+        ],
+        [
+          0.4885,
+          0.4336
+        ],
+        [
+          0.2986,
+          0.4336
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "5b5995a3fd4edb0019c7d9ab_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5235,
+          0.95
+        ],
+        [
+          0.9167,
+          0.95
+        ],
+        [
+          0.7721,
+          0.4336
+        ],
+        [
+          0.5185,
+          0.4336
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:5b5995a3fd4edb0019c7d9ab:snapshot_1793945231_sample"
+  ]
+}

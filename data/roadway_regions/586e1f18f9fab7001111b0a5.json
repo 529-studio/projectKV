@@ -1,0 +1,58 @@
+{
+  "camera_id": "586e1f18f9fab7001111b0a5",
+  "corridor_name": "Cộng Hòa - Trường Chinh",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "586e1f18f9fab7001111b0a5_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1146,
+          0.95
+        ],
+        [
+          0.453,
+          0.95
+        ],
+        [
+          0.458,
+          0.4669
+        ],
+        [
+          0.24,
+          0.4669
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "586e1f18f9fab7001111b0a5_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.493,
+          0.95
+        ],
+        [
+          0.804,
+          0.95
+        ],
+        [
+          0.6882,
+          0.4669
+        ],
+        [
+          0.488,
+          0.4669
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:586e1f18f9fab7001111b0a5:snapshot_1793945239_sample"
+  ]
+}

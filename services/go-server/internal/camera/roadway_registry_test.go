@@ -254,3 +254,78 @@ func TestCatalog_RoadwayRegistryIntegration(t *testing.T) {
 		t.Errorf("expected 0 regions, got %d", len(c2.Regions))
 	}
 }
+
+func TestLoadRoadwayRegistryFromDir_HotSetCameras(t *testing.T) {
+	candidates := []string{
+		"../../../../data/roadway_regions",
+		"../../../data/roadway_regions",
+		"../../data/roadway_regions",
+		"data/roadway_regions",
+	}
+	var dirPath string
+	for _, c := range candidates {
+		if info, err := os.Stat(c); err == nil && info.IsDir() {
+			dirPath = c
+			break
+		}
+	}
+	if dirPath == "" {
+		t.Fatalf("could not locate data/roadway_regions directory")
+	}
+
+	reg, err := camera.LoadRoadwayRegistryFromDir(dirPath)
+	if err != nil {
+		t.Fatalf("LoadRoadwayRegistryFromDir failed: %v", err)
+	}
+
+	all := reg.All()
+	if len(all) != 59 {
+		t.Fatalf("expected 59 hot set cameras loaded, got %d", len(all))
+	}
+
+	// Assert zero cameras fall back to direction_coverage: "none"
+	for camID, rw := range all {
+		if rw.DirectionCoverage == camera.DirectionCoverageNone || rw.DirectionCoverage == "" {
+			t.Errorf("camera %s fell back to direction_coverage none or empty", camID)
+		}
+		if rw.DirectionCoverage != camera.DirectionCoverageDual {
+			t.Errorf("camera %s expected dual coverage, got %s", camID, rw.DirectionCoverage)
+		}
+		if len(rw.Regions) != 2 {
+			t.Errorf("camera %s expected 2 regions, got %d", camID, len(rw.Regions))
+		}
+	}
+
+	// Query critical arterial corridors: cong_hoa and truong_chinh
+	criticalCams := []string{
+		"586e1f18f9fab7001111b0a5", // Cong Hoa - Truong Chinh junction
+		"5874769eb807da0011e33cec", // Cong Hoa - Ut Tich
+		"587476e3b807da0011e33cee", // Cong Hoa - Ut Tich
+	}
+	for _, camID := range criticalCams {
+		rw, ok := reg.GetCameraRoadway(camID)
+		if !ok || rw == nil {
+			t.Errorf("critical arterial camera %s not found in registry", camID)
+			continue
+		}
+		if rw.DirectionCoverage != camera.DirectionCoverageDual {
+			t.Errorf("camera %s expected dual direction coverage, got %s", camID, rw.DirectionCoverage)
+		}
+		if len(rw.Regions) != 2 {
+			t.Errorf("camera %s expected 2 regions, got %d", camID, len(rw.Regions))
+		}
+		dirMap := make(map[string]camera.RoadwayRegion)
+		for _, regItem := range rw.Regions {
+			dirMap[regItem.Direction] = regItem
+			if len(regItem.Polygon) < 3 {
+				t.Errorf("camera %s region %s has < 3 polygon points", camID, regItem.RegionID)
+			}
+		}
+		if _, hasA := dirMap["a"]; !hasA {
+			t.Errorf("camera %s missing direction 'a'", camID)
+		}
+		if _, hasB := dirMap["b"]; !hasB {
+			t.Errorf("camera %s missing direction 'b'", camID)
+		}
+	}
+}

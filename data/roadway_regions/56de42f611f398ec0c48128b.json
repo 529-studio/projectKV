@@ -6,7 +6,7 @@
     {
       "region_id": "56de42f611f398ec0c48128b_dir_a",
       "direction": "a",
-      "description": "Inbound carriageway (towards District 1)",
+      "description": "Corridor carriageway A (left lane boundary)",
       "polygon": [
         [
           0.05,
@@ -30,7 +30,7 @@
     {
       "region_id": "56de42f611f398ec0c48128b_dir_b",
       "direction": "b",
-      "description": "Outbound carriageway (towards Binh Chanh)",
+      "description": "Corridor carriageway B (right lane boundary)",
       "polygon": [
         [
           0.52,

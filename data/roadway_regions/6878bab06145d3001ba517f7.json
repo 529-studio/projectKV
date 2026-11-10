@@ -1,0 +1,58 @@
+{
+  "camera_id": "6878bab06145d3001ba517f7",
+  "corridor_name": "Mai Chí Thọ - Trần Quý Kiên (1)",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "6878bab06145d3001ba517f7_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1261,
+          0.95
+        ],
+        [
+          0.4695,
+          0.95
+        ],
+        [
+          0.4745,
+          0.3975
+        ],
+        [
+          0.2533,
+          0.3975
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "6878bab06145d3001ba517f7_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5095,
+          0.95
+        ],
+        [
+          0.8059,
+          0.95
+        ],
+        [
+          0.6952,
+          0.3975
+        ],
+        [
+          0.5045,
+          0.3975
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:6878bab06145d3001ba517f7:snapshot_1793945356_sample"
+  ]
+}

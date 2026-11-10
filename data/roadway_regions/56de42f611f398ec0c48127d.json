@@ -1,0 +1,58 @@
+{
+  "camera_id": "56de42f611f398ec0c48127d",
+  "corridor_name": "Mai Chí Thọ - Võ Nguyên Giáp (Cát Lái cầu A)",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "56de42f611f398ec0c48127d_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1901,
+          0.95
+        ],
+        [
+          0.4905,
+          0.95
+        ],
+        [
+          0.4955,
+          0.3878
+        ],
+        [
+          0.3022,
+          0.3878
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "56de42f611f398ec0c48127d_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5305,
+          0.95
+        ],
+        [
+          0.7992,
+          0.95
+        ],
+        [
+          0.6982,
+          0.3878
+        ],
+        [
+          0.5255,
+          0.3878
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:56de42f611f398ec0c48127d:snapshot_1793945239_sample"
+  ]
+}

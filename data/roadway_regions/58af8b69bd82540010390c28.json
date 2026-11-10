@@ -1,0 +1,58 @@
+{
+  "camera_id": "58af8b69bd82540010390c28",
+  "corridor_name": "Nam Kỳ Khởi Nghĩa - Điện Biên Phủ 1",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "58af8b69bd82540010390c28_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1519,
+          0.95
+        ],
+        [
+          0.4501,
+          0.95
+        ],
+        [
+          0.4551,
+          0.4725
+        ],
+        [
+          0.2633,
+          0.4725
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "58af8b69bd82540010390c28_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.4901,
+          0.95
+        ],
+        [
+          0.8722,
+          0.95
+        ],
+        [
+          0.7315,
+          0.4725
+        ],
+        [
+          0.4851,
+          0.4725
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:58af8b69bd82540010390c28:snapshot_1793945296_sample"
+  ]
+}

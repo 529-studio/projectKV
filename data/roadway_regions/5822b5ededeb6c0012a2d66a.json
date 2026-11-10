@@ -6,7 +6,7 @@
     {
       "region_id": "5822b5ededeb6c0012a2d66a_dir_a",
       "direction": "a",
-      "description": "Eastbound carriageway (towards Cat Lai)",
+      "description": "Corridor carriageway A (left lane boundary)",
       "polygon": [
         [
           0.05,
@@ -30,7 +30,7 @@
     {
       "region_id": "5822b5ededeb6c0012a2d66a_dir_b",
       "direction": "b",
-      "description": "Westbound carriageway (towards Thu Thiem Tunnel)",
+      "description": "Corridor carriageway B (right lane boundary)",
       "polygon": [
         [
           0.51,

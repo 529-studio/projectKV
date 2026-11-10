@@ -1,0 +1,58 @@
+{
+  "camera_id": "59414c883dcfc400106f260b",
+  "corridor_name": "Cộng Hòa - Bình Giã",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "59414c883dcfc400106f260b_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1013,
+          0.95
+        ],
+        [
+          0.453,
+          0.95
+        ],
+        [
+          0.458,
+          0.4642
+        ],
+        [
+          0.2314,
+          0.4642
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "59414c883dcfc400106f260b_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.493,
+          0.95
+        ],
+        [
+          0.8494,
+          0.95
+        ],
+        [
+          0.7177,
+          0.4642
+        ],
+        [
+          0.488,
+          0.4642
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:59414c883dcfc400106f260b:snapshot_1793945239_sample"
+  ]
+}

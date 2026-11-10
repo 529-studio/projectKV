@@ -1,0 +1,58 @@
+{
+  "camera_id": "56de42f611f398ec0c481283",
+  "corridor_name": "Mai Chí Thọ - Trần Não 1",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "56de42f611f398ec0c481283_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1288,
+          0.95
+        ],
+        [
+          0.5087,
+          0.95
+        ],
+        [
+          0.5137,
+          0.4572
+        ],
+        [
+          0.2688,
+          0.4572
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "56de42f611f398ec0c481283_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5487,
+          0.95
+        ],
+        [
+          0.9479,
+          0.95
+        ],
+        [
+          0.8012,
+          0.4572
+        ],
+        [
+          0.5437,
+          0.4572
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:56de42f611f398ec0c481283:snapshot_1793945356_sample"
+  ]
+}

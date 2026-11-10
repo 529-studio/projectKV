@@ -1,0 +1,58 @@
+{
+  "camera_id": "56de42f611f398ec0c481297",
+  "corridor_name": "Võ Văn Kiệt - Nguyễn Tri Phương 2",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "56de42f611f398ec0c481297_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1315,
+          0.95
+        ],
+        [
+          0.4706,
+          0.95
+        ],
+        [
+          0.4756,
+          0.3836
+        ],
+        [
+          0.2572,
+          0.3836
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "56de42f611f398ec0c481297_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5106,
+          0.95
+        ],
+        [
+          0.9299,
+          0.95
+        ],
+        [
+          0.7761,
+          0.3836
+        ],
+        [
+          0.5056,
+          0.3836
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:56de42f611f398ec0c481297:snapshot_1793945231_sample"
+  ]
+}

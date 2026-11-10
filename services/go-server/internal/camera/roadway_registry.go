@@ -241,3 +241,9 @@ func LoadRoadwayRegistry(dirPath string) (*MemoryRoadwayRegistry, error) {
 	slog.Info("camera: loaded roadway registry", "path", dirPath, "valid_cameras", validCount)
 	return registry, nil
 }
+
+// LoadRoadwayRegistryFromDir loads directional roadway geometry for all cameras from dirPath.
+// It is an alias for LoadRoadwayRegistry adhering to ADR-012 D1.
+func LoadRoadwayRegistryFromDir(dirPath string) (*MemoryRoadwayRegistry, error) {
+	return LoadRoadwayRegistry(dirPath)
+}

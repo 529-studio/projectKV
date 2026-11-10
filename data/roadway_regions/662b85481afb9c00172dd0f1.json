@@ -1,0 +1,58 @@
+{
+  "camera_id": "662b85481afb9c00172dd0f1",
+  "corridor_name": "Võ Văn Kiệt - Pasteur",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "662b85481afb9c00172dd0f1_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.0888,
+          0.95
+        ],
+        [
+          0.4853,
+          0.95
+        ],
+        [
+          0.4903,
+          0.4725
+        ],
+        [
+          0.2346,
+          0.4725
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "662b85481afb9c00172dd0f1_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5253,
+          0.95
+        ],
+        [
+          0.8731,
+          0.95
+        ],
+        [
+          0.7444,
+          0.4725
+        ],
+        [
+          0.5203,
+          0.4725
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:662b85481afb9c00172dd0f1:snapshot_1793945296_sample"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "camera_id": "63ae7a9cbfd3d90017e8f303",
+  "corridor_name": "Điện Biên Phủ – Cao Thắng",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "63ae7a9cbfd3d90017e8f303_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.0569,
+          0.95
+        ],
+        [
+          0.4548,
+          0.95
+        ],
+        [
+          0.4598,
+          0.4753
+        ],
+        [
+          0.2032,
+          0.4753
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "63ae7a9cbfd3d90017e8f303_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.4948,
+          0.95
+        ],
+        [
+          0.9271,
+          0.95
+        ],
+        [
+          0.7688,
+          0.4753
+        ],
+        [
+          0.4898,
+          0.4753
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:63ae7a9cbfd3d90017e8f303:snapshot_1793945296_sample"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "camera_id": "56de42f611f398ec0c48127f",
+  "corridor_name": "Mai Chí Thọ - Lương Định Của 1",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "56de42f611f398ec0c48127f_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.1048,
+          0.95
+        ],
+        [
+          0.4636,
+          0.95
+        ],
+        [
+          0.4686,
+          0.4281
+        ],
+        [
+          0.2374,
+          0.4281
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "56de42f611f398ec0c48127f_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.5036,
+          0.95
+        ],
+        [
+          0.9223,
+          0.95
+        ],
+        [
+          0.7688,
+          0.4281
+        ],
+        [
+          0.4986,
+          0.4281
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:56de42f611f398ec0c48127f:snapshot_1793945296_sample"
+  ]
+}

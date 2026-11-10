@@ -1,0 +1,58 @@
+{
+  "camera_id": "5deb576d1dc17d7c5515acf2",
+  "corridor_name": "Điện Biên Phủ - Cách Mạng Tháng Tám",
+  "direction_coverage": "dual",
+  "regions": [
+    {
+      "region_id": "5deb576d1dc17d7c5515acf2_dir_a",
+      "direction": "a",
+      "description": "Corridor carriageway A (left lane boundary)",
+      "polygon": [
+        [
+          0.0888,
+          0.95
+        ],
+        [
+          0.4519,
+          0.95
+        ],
+        [
+          0.4569,
+          0.4614
+        ],
+        [
+          0.2229,
+          0.4614
+        ]
+      ],
+      "capacity_share": 0.5
+    },
+    {
+      "region_id": "5deb576d1dc17d7c5515acf2_dir_b",
+      "direction": "b",
+      "description": "Corridor carriageway B (right lane boundary)",
+      "polygon": [
+        [
+          0.4919,
+          0.95
+        ],
+        [
+          0.8087,
+          0.95
+        ],
+        [
+          0.6908,
+          0.4614
+        ],
+        [
+          0.4869,
+          0.4614
+        ]
+      ],
+      "capacity_share": 0.5
+    }
+  ],
+  "source_label_ids": [
+    "calibration:camera_view:5deb576d1dc17d7c5515acf2:snapshot_1793945296_sample"
+  ]
+}

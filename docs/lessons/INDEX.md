@@ -82,6 +82,7 @@ is the only part an agent should read by default.
 | 76 | Inference Worker Co-Tenancy & Adaptive Load-Shedding | Recompute cgroup invariants; tag reference profiles vs live runs; cron gate exits 1; extract the resolution decision; assert the tensor actually fed and clamp polygon anchors. | [L76](L76-inference-worker-cotenancy-and-adaptive-loadshedding.md) |
 | 77 | Evidence Integrity CI Gate & Synthetic Prohibition | Reject synthetic fixtures, assert non-future soak timestamps (generated_at >= window.end), model weight entropy >= 3.0, and baseline ratchet. | [L77](L77-evidence-integrity-gate-and-synthetic-prohibition.md) |
 | 78 | Unattended Staging Soak & Proof Archive Ingestion | 24/7 autonomous harvester daemon, WAL concurrency, 11,905 real frames replay, process-anchored soak telemetry. | [L78](L78-unattended-soak-and-proof-archive-ingestion.md) |
+| 79 | Directional Roadway Registry Scale-Out & Geometry Invariants | 100% Hot Set dual coverage (59 cameras); IoU < 0.05 non-overlap; capacity sum 1.0+-0.01; Go backend integration. | [L79](L79-directional-roadway-registry-scaleout.md) |
 
 > Numbering note: Lesson 54 does not exist in the source register. Numbers are preserved as-is because
 > other documents reference lessons by number; nothing has been renumbered.
