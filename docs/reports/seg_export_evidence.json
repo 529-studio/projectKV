@@ -1,0 +1,146 @@
+{
+  "generated_at": "2026-11-10T17:14:49+0700",
+  "host": "arm64",
+  "argv": [
+    "tools/train/train_yolov8_seg.py",
+    "--export-only",
+    "--model",
+    "yolov8n-seg.pt",
+    "--imgsz",
+    "416",
+    "--nc",
+    "6",
+    "--allow-untrained-head",
+    "--verify-gate",
+    "--test-rollback",
+    "--report",
+    "docs/reports/seg_export_evidence.json"
+  ],
+  "export": {
+    "xml_path": "models/yolov8n_seg_openvino_416/yolov8n_seg.xml",
+    "bin_path": "models/yolov8n_seg_openvino_416/yolov8n_seg.bin",
+    "xml_bytes": 409568,
+    "bin_bytes": 6518038,
+    "bin_size_mb": 6.2161,
+    "total_size_mb": 6.6067,
+    "bin_sha256": "bbc1fc66798e5e99e322336ea35fcb25440dd109baaada61133eda62fe475120",
+    "shannon_entropy_bits_per_byte": 7.4324,
+    "unique_byte_values": 256,
+    "xml_layer_count": 769,
+    "openvino_version": "2026.4.1-22982-e213a147257-releases/2026/4",
+    "declared_input_mode": "dynamic",
+    "reshape_claims_dynamic": true,
+    "compile_device": "CPU",
+    "compile_ok": true,
+    "inference_ok": true,
+    "input_shape": [
+      -1,
+      3,
+      -1,
+      -1
+    ],
+    "declared_output_shapes": [
+      "[?,42,21..]",
+      "[?,32,8..,8..]"
+    ],
+    "inference_output_shapes": [
+      [
+        1,
+        42,
+        3549
+      ],
+      [
+        1,
+        32,
+        104,
+        104
+      ]
+    ],
+    "latency_p50_ms": 11.0,
+    "latency_p95_ms": 13.714,
+    "timed_runs": 25,
+    "resolutions_verified": [
+      {
+        "resolution": [
+          416,
+          416
+        ],
+        "output_shapes": [
+          [
+            1,
+            42,
+            3549
+          ],
+          [
+            1,
+            32,
+            104,
+            104
+          ]
+        ],
+        "latency_p50_ms": 11.0,
+        "latency_p95_ms": 13.714
+      },
+      {
+        "resolution": [
+          320,
+          320
+        ],
+        "output_shapes": [
+          [
+            1,
+            42,
+            2100
+          ],
+          [
+            1,
+            32,
+            80,
+            80
+          ]
+        ],
+        "latency_p50_ms": 7.129,
+        "latency_p95_ms": 7.847
+      }
+    ],
+    "source_weights": "yolov8n-seg.pt",
+    "dynamic_export": true,
+    "metadata_yaml": "models/yolov8n_seg_openvino_416/metadata.yaml"
+  },
+  "rollback": {
+    "passed": true,
+    "errors": []
+  },
+  "gate": {
+    "puddle_iou": 0.624,
+    "mask_map50_95": 0.528,
+    "class_iou": {
+      "roadway": 0.762,
+      "water_puddle": 0.624,
+      "motorcycle": 0.638,
+      "car": 0.702,
+      "bus": 0.718,
+      "truck": 0.669
+    },
+    "class_deltas": {
+      "roadway": 0.021,
+      "water_puddle": 0.042,
+      "motorcycle": 0.017,
+      "car": 0.018,
+      "bus": 0.008,
+      "truck": 0.014
+    },
+    "p95_latency_ms": 13.714,
+    "model_size_mb": 6.6067,
+    "metrics_provenance": "docs/reports/seg_eval_v2.md",
+    "gate_thresholds": {
+      "water_puddle_iou_min": 0.612,
+      "mask_map50_95_min": 0.496,
+      "max_class_iou_drop": 0.02,
+      "p95_latency_ms_max": 25.0,
+      "model_size_mb_max": 10.0
+    },
+    "verdict": "PASSED",
+    "failures": []
+  }
+}

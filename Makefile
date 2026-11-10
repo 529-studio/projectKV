@@ -1,7 +1,13 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast export-seg train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast export-seg export-seg-openvino train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close
+
+# Segmentation training defaults (S11-T5). Override on the command line:
+#   make train-seg EPOCHS=100 DATA=data/yolo_seg/dataset.yaml
+EPOCHS ?= 50
+SEG_CHECKPOINT ?= yolov8n-seg.pt
+DATA ?= data/yolo_seg/dataset.yaml
 
 help:
 	@echo "========================================================"
@@ -36,6 +42,8 @@ help:
 	@echo "  make test-seg        - Run unit tests for SAM pre-labeling toolchain (S9-T2)"
 	@echo "  make test-forecast   - Run unit tests for the congestion forecast toolchain (S9-T6)"
 	@echo "  make train-forecast  - Refit congestion forecast models on live traffic history (S11-T4)"
+	@echo "  make train-seg       - Fine-tune YOLOv8n-seg on data/yolo_seg and export OpenVINO FP16 (S11-T5)"
+	@echo "  make export-seg-openvino - Export+verify OpenVINO FP16 IR from an existing checkpoint (SEG_CHECKPOINT)"
 	@echo "  make benchmark-mock  - Run AI benchmark harness in mock mode"
 	@echo "  make benchmark-real  - Run AI benchmark harness against live OpenVINO cv-engine (T4)"
 	@echo "  make smoke-eval      - Run known-state smoke camera verification (mock dry-run)"
@@ -153,7 +161,10 @@ export-seg:
 	python3 tools/eval/export_yolo_seg.py --labels-dir tools/eval/labels_gold_standard --output-dir data/yolo_seg --verify
 
 train-seg:
-	python3 tools/train/train_yolov8_seg.py --data data/yolo_seg/dataset.yaml --export-openvino models/yolov8n_seg_openvino_416 --dry-run
+	python3 tools/train/train_yolov8_seg.py --data $(DATA) --epochs $(EPOCHS) --export-openvino models/yolov8n_seg_openvino_416
+
+export-seg-openvino:
+	python3 tools/train/train_yolov8_seg.py --export-only --model $(SEG_CHECKPOINT) --export-openvino models/yolov8n_seg_openvino_416 --verify-gate $(EXTRA)
 
 benchmark-mock:
 	python3 tools/eval/benchmark.py --analyzer mock

@@ -2,7 +2,8 @@
 """
 Unit tests for tools/train/train_yolov8_seg.py.
 Verifies host compute headroom checks, dataset manifest validation,
-dry-run training orchestration, and OpenVINO FP16 model export.
+dry-run training orchestration, real OpenVINO FP16 export integrity,
+and the committed model artifact (Issue #399 / ADR-013 F4).
 """
 
 import shutil
@@ -15,16 +16,29 @@ TRAIN_DIR = Path(__file__).resolve().parent
 if str(TRAIN_DIR) not in sys.path:
     sys.path.insert(0, str(TRAIN_DIR))
 
+REPO_ROOT = TRAIN_DIR.parents[1]
+COMMITTED_IR_DIR = REPO_ROOT / "models" / "yolov8n_seg_openvino_416"
+
 from train_yolov8_seg import (
+    MIN_EXPORT_BIN_MB,
+    MIN_WEIGHT_ENTROPY,
     V1_BASELINE_METRICS,
     V2_GATE_THRESHOLDS,
     check_host_compute_headroom,
     evaluate_retraining_gate,
     export_to_openvino_fp16,
+    shannon_entropy,
     train_yolov8_seg,
     validate_dataset_manifest,
+    verify_openvino_ir,
     verify_operational_rollback,
 )
+
+try:  # optional: only needed for compile-and-infer assertions
+    import openvino as ov  # noqa: F401
+    HAS_OPENVINO = True
+except ImportError:
+    HAS_OPENVINO = False
 
 
 class TestTrainYolov8Seg(unittest.TestCase):
@@ -69,7 +83,8 @@ names:
         with self.assertRaises(FileNotFoundError):
             validate_dataset_manifest(self.tmp_path / "nonexistent.yaml")
 
-    def test_export_to_openvino_fp16_dry_run(self):
+    def test_export_to_openvino_fp16_dry_run_writes_no_stub(self):
+        """A dry run must never fabricate IR weights (root cause of ADR-013 F4)."""
         export_dir = self.tmp_path / "models" / "yolov8n_seg_openvino_416"
         xml_p, bin_p = export_to_openvino_fp16(
             model_or_onnx_path=self.tmp_path / "dummy.pt",
@@ -78,19 +93,97 @@ names:
             dry_run=True,
         )
 
-        self.assertTrue(xml_p.is_file())
-        self.assertTrue(bin_p.is_file())
-        self.assertEqual(xml_p.name, "yolov8n_seg.xml")
-        self.assertEqual(bin_p.name, "yolov8n_seg.bin")
+        self.assertIsNone(xml_p)
+        self.assertIsNone(bin_p)
+        self.assertFalse(export_dir.exists(), "dry run must not create IR artifacts")
 
-        xml_content = xml_p.read_text(encoding="utf-8")
-        self.assertIn('name="yolov8n_seg_fp16"', xml_content)
-        self.assertIn('name="output0"', xml_content)
-        self.assertIn('name="output1"', xml_content)
+    def test_verify_openvino_ir_rejects_repeating_stub(self):
+        """The 64 KB repeating-byte stub must fail closed with a clear reason."""
+        export_dir = self.tmp_path / "stub_ir"
+        export_dir.mkdir()
+        xml_p = export_dir / "yolov8n_seg.xml"
+        bin_p = export_dir / "yolov8n_seg.bin"
+        xml_p.write_text(
+            "<net><layers><layer id='0' type='Parameter'/></layers></net>", encoding="utf-8"
+        )
+        bin_p.write_bytes(b"\x00\x00\x01\x00" * 16384)
 
-        # Total size must be well under 10 MB
-        total_size_mb = (xml_p.stat().st_size + bin_p.stat().st_size) / (1024 * 1024)
-        self.assertLess(total_size_mb, 10.0)
+        with self.assertRaises(RuntimeError) as ctx:
+            verify_openvino_ir(xml_p, bin_p, imgsz=416)
+        message = str(ctx.exception)
+        self.assertIn("below the", message)
+        self.assertIn("entropy", message)
+        self.assertIn("periodic repetition", message)
+        self.assertIn("layers", message)
+
+    def test_shannon_entropy_bounds(self):
+        self.assertEqual(shannon_entropy(b""), 0.0)
+        self.assertAlmostEqual(shannon_entropy(b"\x00" * 4096), 0.0, places=6)
+        self.assertGreater(shannon_entropy(bytes(range(256)) * 4), MIN_WEIGHT_ENTROPY)
+
+    @unittest.skipUnless(HAS_OPENVINO, "openvino runtime not installed")
+    def test_committed_ir_is_authentic_and_loadable(self):
+        """Regression guard for Issue #399: the shipped IR must be real FP16 weights."""
+        xml_p = COMMITTED_IR_DIR / "yolov8n_seg.xml"
+        bin_p = COMMITTED_IR_DIR / "yolov8n_seg.bin"
+        self.assertTrue(xml_p.is_file(), f"missing {xml_p}")
+        self.assertTrue(bin_p.is_file(), f"missing {bin_p}")
+
+        evidence = verify_openvino_ir(xml_p, bin_p, imgsz=416, warmup_runs=1, timed_runs=2)
+        self.assertGreater(evidence["bin_size_mb"], MIN_EXPORT_BIN_MB)
+        self.assertGreaterEqual(evidence["shannon_entropy_bits_per_byte"], MIN_WEIGHT_ENTROPY)
+        self.assertGreaterEqual(evidence["unique_byte_values"], 32)
+        self.assertEqual(evidence["input_shape"][1], 3)
+        self.assertEqual(evidence["inference_output_shapes"][0][1], 42)
+        self.assertEqual(evidence["inference_output_shapes"][1], [1, 32, 104, 104])
+        self.assertTrue(evidence["compile_ok"])
+        # The cv-engine load-shedding path (320 px) must execute, not merely reshape.
+        verified = {tuple(item["resolution"]) for item in evidence["resolutions_verified"]}
+        self.assertIn((416, 416), verified)
+        self.assertIn((320, 320), verified)
+
+    @unittest.skipUnless(HAS_OPENVINO, "openvino runtime not installed")
+    def test_committed_metadata_records_training_provenance(self):
+        """metadata.yaml must state whether the class head was actually trained."""
+        metadata_path = COMMITTED_IR_DIR / "metadata.yaml"
+        self.assertTrue(metadata_path.is_file(), f"missing {metadata_path}")
+        import yaml
+
+        metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+        self.assertIn("projectkv", metadata)
+        provenance = metadata["projectkv"]
+        self.assertEqual(provenance["class_count"], 6)
+        self.assertEqual(provenance["output_channels"], 42)
+        self.assertIn(
+            provenance["head_status"],
+            {"trained", "reinitialised_untrained", "converted_external_graph"},
+        )
+
+    @unittest.skipUnless(HAS_OPENVINO, "openvino runtime not installed")
+    def test_export_refuses_untrained_head_by_default(self):
+        """An 80-class checkpoint re-headed to 6 classes must not export silently."""
+        from train_yolov8_seg import build_segmentation_model  # noqa: PLC0415
+
+        checkpoint = REPO_ROOT / "yolov8n-seg.pt"
+        if not checkpoint.is_file():
+            self.skipTest(f"{checkpoint.name} not present in the workspace")
+
+        model, stats = build_segmentation_model(checkpoint, nc=6)
+        self.addCleanup(shutil.rmtree, stats["staging_dir"], ignore_errors=True)
+        self.assertEqual(stats["target_nc"], 6)
+        self.assertEqual(stats["source_nc"], 80)
+        self.assertGreater(stats["reinitialised_tensors"], 0)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            export_to_openvino_fp16(
+                checkpoint,
+                export_dir=self.tmp_path / "guarded_export",
+                imgsz=416,
+                nc=6,
+                dry_run=False,
+                allow_untrained_head=False,
+            )
+        self.assertIn("NOT trained", str(ctx.exception))
 
     def test_train_yolov8_seg_dry_run(self):
         dataset_yaml = self.tmp_path / "dataset.yaml"
@@ -118,12 +211,11 @@ names:
         )
 
         self.assertTrue(stats["train_completed"])
-        self.assertTrue(stats["exported_openvino"])
-        self.assertIsNotNone(stats["xml_path"])
-        self.assertIsNotNone(stats["bin_path"])
-        self.assertLess(stats["model_size_mb"], 10.0)
-        self.assertTrue(Path(stats["xml_path"]).is_file())
-        self.assertTrue(Path(stats["bin_path"]).is_file())
+        self.assertFalse(stats["exported_openvino"], "dry run must not export fabricated IR")
+        self.assertIsNone(stats["xml_path"])
+        self.assertIsNone(stats["bin_path"])
+        self.assertEqual(stats["model_size_mb"], 0.0)
+        self.assertFalse((export_dir / "yolov8n_seg.bin").exists())
 
     def test_evaluate_retraining_gate_passes_canonical(self):
         passed, summary, failures = evaluate_retraining_gate()

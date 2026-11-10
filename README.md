@@ -219,13 +219,18 @@ make export-seg
 #### Step 3: Off-Box Training & OpenVINO Deployment
 Train and export optimized inference weights:
 ```bash
-# Fine-tune YOLOv8-seg and export Intel OpenVINO FP16 IR
+# Fine-tune YOLOv8n-seg (EPOCHS=50) and export Intel OpenVINO FP16 IR
 make train-seg
+
+# Export + verify an existing fine-tuned checkpoint
+make export-seg-openvino SEG_CHECKPOINT=runs/segment/train_yolov8n_seg/weights/best.pt
 
 # Verify PCU saturation and flood segmentation accuracy against ground-truth benchmarks
 make benchmark-real
 ```
-Trained OpenVINO models (`.xml` / `.bin`) deploy directly to `services/cv-engine/models/` for low-latency live inference (< 38.5ms latency).
+The export converts the 6-class (42-channel) graph the cv-engine decodes to real FP16 IR and
+refuses a re-initialised head (`--allow-untrained-head` is bootstrap-only). Evidence:
+[`docs/reports/seg_eval_v3.md`](docs/reports/seg_eval_v3.md).
 
 ### 2.4. Verification, Forecast & Evidence Integrity Gates
 
