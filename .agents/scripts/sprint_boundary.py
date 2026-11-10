@@ -27,13 +27,11 @@ REPEAT_EVERY = 500
 SPRINT_RE = re.compile(r"(?:^|[/_-])s(\d{1,2})(?:$|[/_.-])", re.IGNORECASE)
 
 
-def emit(message: str) -> None:
-    print(
-        json.dumps(
-            {"injectSteps": [{"systemMessage": {"systemMessage": message}}]},
-            ensure_ascii=False,
-        )
-    )
+def emit(message: str, banner: str | None = None) -> None:
+    step: dict = {"systemMessage": message}
+    if banner:
+        step["metadata"] = {"user_markdown": banner}
+    print(json.dumps({"injectSteps": [{"systemMessage": step}]}, ensure_ascii=False))
 
 
 def load_state() -> dict:
@@ -113,6 +111,7 @@ def on_pre_invocation(payload: dict) -> None:
     cid = payload.get("conversationId", "unknown")
     record = state.get(cid, {})
     last = int(record.get("last", 0))
+    banner: str | None = None
 
     if handoff is not None and handoff.exists():
         if record.get("closed_notified"):
@@ -124,6 +123,10 @@ def on_pre_invocation(payload: dict) -> None:
             " handoff and the new conversation."
         )
         record["closed_notified"] = True
+        banner = (
+            f"**Sprint {sprint} is closed** — handoff: `{handoff.relative_to(REPO_ROOT)}`\n\n"
+            "Start the next conversation: `tools/sprint/close.sh --launch`"
+        )
     else:
         if last and steps - last < REPEAT_EVERY:
             return
@@ -143,7 +146,7 @@ def on_pre_invocation(payload: dict) -> None:
     record["last"] = steps
     state[cid] = record
     save_state(state)
-    emit(message)
+    emit(message, banner)
 
 
 def main(argv: list[str]) -> int:
