@@ -39,6 +39,9 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install pillow
 
+      - name: Run Public-Material Safety Guard
+        run: bash scripts/check-public-safe.sh
+
       - name: Run Evidence Gate Unit Tests
         run: make test-ci
 

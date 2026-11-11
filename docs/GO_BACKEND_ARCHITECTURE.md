@@ -217,7 +217,7 @@ Fail fast at startup (log + `os.Exit(1)`) if a required var for an enabled featu
 
 ## 7. Git Hooks & CI (extends `AGENTS.md`, does not replace it)
 
-The existing two-tier branch protection (`.githooks/pre-push` + `branch-guard.yml`) stays as-is. Add:
+The local `.githooks/pre-push` hook is a convenience; GitHub branch protection and rulesets enforce the PR policy on the server. Add:
 
 **`.githooks/pre-commit`** (new):
 ```bash

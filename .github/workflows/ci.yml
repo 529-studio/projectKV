@@ -10,7 +10,6 @@ on:
       - 'docs/**'
       - '.agents/**'
       - '.githooks/**'
-      - '.github/workflows/branch-guard.yml'
       - '.github/workflows/docker-publish.yml'
       - '.env.example'
       - '.env.stg.example'
@@ -132,8 +131,6 @@ jobs:
       - name: Verify Evidence Integrity Gate
         run: |
           pip install pillow
-          make test-ci
-          make evidence-lint
           make test-eval
           make test-harvester
 

@@ -1,9 +1,8 @@
 name: Docs Lint
 
 # Enforces the context budget, unique ADR numbers, link resolution, tracked file size
-# and English-prose rules. Runs on every pull request without path filters, for the
-# same reason as public-safety: a filter on `docs/**` would let a change to this
-# workflow bypass the gate it defines.
+# and English-prose rules. Runs on every pull request without path filters so that
+# a change to this workflow cannot bypass the gate it defines.
 
 on:
   pull_request:

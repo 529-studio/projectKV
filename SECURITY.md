@@ -38,6 +38,7 @@ Include:
 
 This repository must never contain credentials, tokens, private keys, hostnames
 of internal infrastructure, or private network addresses. Every pull request runs
-`scripts/check-public-safe.sh`, which fails on those patterns. If you find a
+`scripts/check-public-safe.sh` as part of the evidence-integrity workflow, which
+fails on those patterns. If you find a
 leaked credential in the tree or in history, report it privately so it can be
 rotated and purged.
