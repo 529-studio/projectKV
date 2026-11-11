@@ -18,6 +18,7 @@ import {
   VERDICT_I18N,
 } from '../config/constants';
 import { isHexVisibleAtZoom } from '../utils/hexUtils';
+import { NEAR_ME_RADIUS_METERS } from '../utils/geoDistance';
 import {
   isFloodVerdictStale,
   type UserFloodReport,
@@ -52,6 +53,8 @@ interface MapComponentProps {
   lang?: 'vi' | 'en';
   appEnv?: string;
   onMapReady?: (map: L.Map | null) => void;
+  /** S12-T2 / Issue #400: current GPS fix, rendered in its own surviving layer group. */
+  nearMeLocation?: { latitude: number; longitude: number; accuracy: number } | null;
   hexOverlayEnabled?: boolean;
   cameraFilterControl?: React.ReactNode;
   topRightControls?: React.ReactNode;
@@ -77,6 +80,7 @@ export default function MapComponent({
   lang = 'vi',
   appEnv = 'production',
   onMapReady,
+  nearMeLocation = null,
   hexOverlayEnabled = false,
   cameraFilterControl,
   topRightControls,
@@ -88,6 +92,8 @@ export default function MapComponent({
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const nearMeLayerRef = useRef<L.LayerGroup | null>(null);
+  const nearMeLayerMapRef = useRef<L.Map | null>(null);
   const prevFilteredRef = useRef(false);
   const hexOverlayEnabledRef = useRef(hexOverlayEnabled);
   const activeTooltipMarkerRef = useRef<L.CircleMarker | null>(null);
@@ -271,6 +277,13 @@ export default function MapComponent({
         cameraPane.style.zIndex = '600';
       }
 
+      // Dedicated non-interactive pane for the user fix, accuracy circle and ring.
+      if (!map.getPane('nearMePane')) {
+        const nearMePane = map.createPane('nearMePane');
+        nearMePane.style.zIndex = '550';
+        nearMePane.style.pointerEvents = 'none';
+      }
+
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
       onMapReady?.(map);
@@ -356,6 +369,68 @@ export default function MapComponent({
       }
     };
   }, [onMapReady]);
+
+  // S12-T2 / Issue #400: user fix, accuracy circle and 1 500 m ring live in a
+  // dedicated layer group that is never cleared by camera/verdict ticks.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+
+    // Re-bind the group if the Leaflet map instance was recreated (StrictMode
+    // double-mount, HMR): a layer group belongs to exactly one map.
+    if (!nearMeLayerRef.current || nearMeLayerMapRef.current !== map) {
+      nearMeLayerRef.current = L.layerGroup().addTo(map);
+      nearMeLayerMapRef.current = map;
+    }
+    const layer = nearMeLayerRef.current;
+    layer.clearLayers();
+
+    if (!nearMeLocation) return undefined;
+
+    const { latitude, longitude, accuracy } = nearMeLocation;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
+
+    const center: L.LatLngTuple = [latitude, longitude];
+    const safeAccuracy = Number.isFinite(accuracy) ? Math.max(accuracy, 30) : 30;
+
+    // Accuracy halo: dashed, unfilled, never intercepts pointer events.
+    L.circle(center, {
+      radius: safeAccuracy,
+      color: '#71717a',
+      weight: 1,
+      dashArray: '4 4',
+      fill: false,
+      interactive: false,
+      pane: 'nearMePane',
+    }).addTo(layer);
+
+    // Search radius boundary for the 1 500 m proximity list.
+    L.circle(center, {
+      radius: NEAR_ME_RADIUS_METERS,
+      color: '#52525b',
+      weight: 1,
+      dashArray: '2 6',
+      fill: false,
+      interactive: false,
+      pane: 'nearMePane',
+    }).addTo(layer);
+
+    // User marker drawn last so it sits above both rings.
+    L.circleMarker(center, {
+      radius: 7,
+      color: '#e4e4e7',
+      weight: 2,
+      fillColor: '#18181b',
+      fillOpacity: 1,
+      interactive: false,
+      className: 'pointer-events-none',
+      pane: 'nearMePane',
+    }).addTo(layer);
+
+    return () => {
+      layer.clearLayers();
+    };
+  }, [nearMeLocation?.latitude, nearMeLocation?.longitude, nearMeLocation?.accuracy, nearMeLocation]);
 
   // Smoothly fly to selected camera
   useEffect(() => {
@@ -773,10 +848,11 @@ export default function MapComponent({
             {legendControl}
           </div>
 
-          {/* Mobile view (<md): Legend trigger at bottom left, dynamically aligned with search FAB & bottom legend */}
+          {/* Mobile view (<md): Legend trigger at bottom left, stacked above the
+              near-me trigger (S12-T2) and aligned with the search FAB. */}
           {legendControl && (
             <div className={`md:hidden absolute left-3 z-[830] pointer-events-auto transition-all ${
-              hasPinnedCameras ? 'bottom-[4.5rem]' : 'bottom-3.5'
+              hasPinnedCameras ? 'bottom-[8rem]' : 'bottom-[4.5rem]'
             }`}>
               {legendControl}
             </div>

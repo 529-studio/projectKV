@@ -18,6 +18,7 @@ permanent directory made readers pay for a document with a shelf life.
 | 10 | [`s10_t1_offline_verification.md`](s10_t1_offline_verification.md) | #372 evidence split (closed) |
 | 11 | [`sprint11_issue_commands.md`](sprint11_issue_commands.md) | Closed — retrospective in [`docs/reports/sprint11_report.md`](../reports/sprint11_report.md) |
 | 12 | [`s12_t1_issue.md`](s12_t1_issue.md) | Implemented & Verified — Close #413, PR in review |
+| 12 | [`s12_t2_spec.md`](s12_t2_spec.md) | Implemented & Verified — Close #400 |
 
 ## Lifecycle
 

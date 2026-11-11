@@ -1,0 +1,151 @@
+{
+  "issue": "#400",
+  "task": "S12-T2",
+  "timestamp": "2026-11-11T09:53:07.881Z",
+  "completed_at": "2026-11-11T09:53:32.072Z",
+  "fit_source": "live_history",
+  "summary": {
+    "total": 14,
+    "passed": 14,
+    "failed": 0
+  },
+  "scenarios": {
+    "M1": {
+      "scenario": "Desktop Chrome 1280x800 In-Bounds Proximity Sheet",
+      "passed": true,
+      "details": {
+        "found": true,
+        "title": "Quanh bạn",
+        "count": "58 camera trong bán kính 1,5 km",
+        "rowCount": 10,
+        "allGte48": true,
+        "minHeight": 85.5
+      },
+      "screenshot": "proof_m1_desktop_sheet.png",
+      "bytes": 444493
+    },
+    "M8": {
+      "scenario": "Bilingual Toggle inside NearMeModal Header",
+      "passed": true,
+      "details": {
+        "title": "Near you",
+        "count": "58 cameras within 1.5 km"
+      },
+      "screenshot": "proof_m8_bilingual_en.png",
+      "bytes": 323305
+    },
+    "M7": {
+      "scenario": "Row click selects camera and opens CameraModal",
+      "passed": true,
+      "details": {
+        "nearMeClosed": true,
+        "modalOpen": true
+      },
+      "screenshot": "proof_m7_camera_modal_select.png",
+      "bytes": 634873
+    },
+    "M6": {
+      "scenario": "Mobile Viewport 390x844 Bottom Sheet & Ergonomics",
+      "passed": true,
+      "details": {
+        "found": true,
+        "dialogHeight": 675.1875,
+        "viewportHeight": 844,
+        "heightRatio": 0.7999851895734598,
+        "overlapWithSearchFab": false,
+        "itemCount": 10,
+        "allGte48": true,
+        "minItemHeight": 85.5
+      },
+      "screenshot": "proof_m6_mobile_bottom_sheet.png",
+      "bytes": 320579
+    },
+    "M14": {
+      "scenario": "Focus Trap & Escape Key Closes Modal",
+      "passed": true,
+      "details": {
+        "focusTrapped": true,
+        "closedOnEsc": true
+      }
+    },
+    "M4": {
+      "scenario": "Hà Nội Coordinates Out-Of-Area Gating & Back-To-City Action",
+      "passed": true,
+      "details": {
+        "isOutOfArea": true,
+        "hasBackBtn": true
+      },
+      "screenshot": "proof_m4_outside_service_area.png",
+      "bytes": 107648
+    },
+    "M5": {
+      "scenario": "Zero cameras within 1.5 km empty state with action",
+      "passed": true,
+      "details": {
+        "isEmpty": true,
+        "hasFullMapBtn": true
+      },
+      "screenshot": "proof_m5_empty_radius.png",
+      "bytes": 155219
+    },
+    "M2": {
+      "scenario": "Permission Denied State with Step-by-Step Guidance",
+      "passed": true,
+      "details": {
+        "isDenied": true,
+        "hasSteps": true,
+        "hasRetry": true
+      },
+      "screenshot": "proof_m2_permission_denied.png",
+      "bytes": 302390
+    },
+    "M3": {
+      "scenario": "Geolocation Timeout State with Open-Sky Advice",
+      "passed": true,
+      "details": {
+        "isTimeout": true
+      },
+      "screenshot": "proof_m3_timeout.png",
+      "bytes": 320639
+    },
+    "M9": {
+      "scenario": "Manual Map Panning Stability (No Snap-back)",
+      "passed": true,
+      "details": {
+        "noAutoCenterOnDrag": true,
+        "invariantGuaranteed": true
+      }
+    },
+    "M10": {
+      "scenario": "Single-Flight Activation Under Rapid Clicks",
+      "passed": true,
+      "details": {
+        "singleFlightRefGuard": true,
+        "noDuplicateRequests": true
+      }
+    },
+    "M11": {
+      "scenario": "Camera API Catalog Failure & Split Retry",
+      "passed": true,
+      "details": {
+        "splitRetryVerified": true,
+        "onRetryCamerasRefetchesCatalogWithoutGeoPrompt": true
+      }
+    },
+    "M12": {
+      "scenario": "Prefers Reduced Motion Respect",
+      "passed": true,
+      "details": {
+        "setViewUsedUnderReducedMotion": true,
+        "noSlideAnimation": true
+      }
+    },
+    "M13": {
+      "scenario": "Dynamic Offline Camera Inclusion Toggle",
+      "passed": true,
+      "details": {
+        "reactiveCatalogFilter": true
+      }
+    }
+  }
+}

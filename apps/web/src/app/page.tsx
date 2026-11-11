@@ -1,6 +1,6 @@
 'use client';
 import dynamic from 'next/dynamic';
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import type L from 'leaflet';
 import { useCameras, Camera } from '../hooks/useCameras';
 import { useTraffic } from '../hooks/useTraffic';
@@ -8,10 +8,19 @@ import { useHotsetStatus } from '../hooks/useHotsetStatus';
 import { useFlood } from '../hooks/useFlood';
 import { useWeather } from '../hooks/useWeather';
 import { useRainHexRadar } from '../hooks/useRainHexRadar';
+import { useGeolocation } from '../hooks/useGeolocation';
 import { FLOOD_I18N } from '../utils/floodUtils';
-import { MOBILE_SEARCH_I18N, PINNED_DOCK_CAP, PINNED_DOCK_I18N } from '../config/constants';
+import { buildNearMeResults, isWithinBounds, FLY_TO_ZOOM } from '../utils/geoDistance';
+import {
+  MAP_CONFIG,
+  MOBILE_SEARCH_I18N,
+  NEAR_ME_I18N,
+  PINNED_DOCK_CAP,
+  PINNED_DOCK_I18N,
+} from '../config/constants';
 import LandingOverlay from '../components/LandingOverlay';
 import CameraModal from '../components/CameraModal';
+import NearMeModal from '../components/NearMeModal';
 import PinnedDock from '../components/PinnedDock';
 import MapLegend from '../components/MapLegend';
 import MobileCameraDrawer from '../components/MobileCameraDrawer';
@@ -29,8 +38,11 @@ import { isCameraOffline, isWaterwayCamera } from '../utils/cameraFilterUtils';
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
 
+/** A fix younger than this is reused instead of starting a new GPS request (AC2). */
+const NEAR_ME_FIX_MAX_AGE_MS = 60_000;
+
 export default function Home() {
-  const { cameras, loading, error, markCameraGhost } = useCameras();
+  const { cameras, loading, error, markCameraGhost, refetch: refetchCameras } = useCameras();
   const { verdicts, hexCells, analysisEnabled, appEnv, loading: trafficLoading } = useTraffic();
   const { hotsetStatus } = useHotsetStatus();
   const {
@@ -45,6 +57,11 @@ export default function Home() {
   } = useFlood();
   const { weather, radar, loading: weatherLoading } = useWeather();
   const { rainRadarHexCells, loading: rainRadarLoading } = useRainHexRadar(radar, weather, cameras, floodVerdicts);
+
+  // S12-T2 / Issue #400: one geolocation instance for the whole page.
+  const geo = useGeolocation();
+  const [nearMeOpen, setNearMeOpen] = useState(false);
+  const hasFlownToFixRef = useRef(false);
 
   const [map, setMap] = useState<L.Map | null>(null);
   // S9 (Issue #144): Independent 1-lens switcher ('flood' | 'radar' | 'traffic' | 'off')
@@ -170,10 +187,12 @@ export default function Home() {
     setIsFloodFilterActive(false);
   }, []);
 
-  // Escape key clears open camera modal first, then active filter (Issue #65)
+  // Escape key clears open camera modal first, then active filter (Issue #65).
+  // The Near-Me sheet owns Esc while it is open (focus trap handler).
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (nearMeOpen) return;
         if (selectedCameraId) {
           handleSelectCamera(null);
         } else if (isFiltered) {
@@ -183,7 +202,7 @@ export default function Home() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCameraId, isFiltered, handleFilterClear, handleSelectCamera]);
+  }, [nearMeOpen, selectedCameraId, isFiltered, handleFilterClear, handleSelectCamera]);
 
   // Set of camera IDs matching the active filter for focus dimming (ADR-004 A3)
   const filteredCameraIds = useMemo(() => {
@@ -230,6 +249,130 @@ export default function Home() {
     }
     return displayCameras.length;
   }, [displayCameras, isFiltered, filteredCameraIds]);
+
+  // S12-T2 / Issue #400 — proximity list derived from the live fix. Coordinates
+  // never leave the browser: no fetch, no storage, no logging.
+  const nearMeOrigin = useMemo(
+    () => (geo.fix ? { latitude: geo.fix.latitude, longitude: geo.fix.longitude } : null),
+    [geo.fix]
+  );
+
+  const nearMeResults = useMemo(() => {
+    if (!nearMeOrigin) return [];
+    return buildNearMeResults({
+      origin: nearMeOrigin,
+      cameras,
+      floodVerdicts,
+      trafficVerdicts: verdicts,
+      hideOffline: hideOfflineCameras,
+    });
+  }, [nearMeOrigin, cameras, floodVerdicts, verdicts, hideOfflineCameras]);
+
+  const nearMeOfflineCount = useMemo(() => {
+    if (!nearMeOrigin) return 0;
+    const withOffline = buildNearMeResults({
+      origin: nearMeOrigin,
+      cameras,
+      floodVerdicts,
+      trafficVerdicts: verdicts,
+      hideOffline: false,
+    });
+    return Math.max(0, withOffline.length - nearMeResults.length);
+  }, [nearMeOrigin, cameras, floodVerdicts, verdicts, nearMeResults.length]);
+
+  const isNearMeOutsideServiceArea = useMemo(
+    () =>
+      geo.fix
+        ? !isWithinBounds(geo.fix, MAP_CONFIG.MAX_BOUNDS as [[number, number], [number, number]])
+        : false,
+    [geo.fix]
+  );
+
+  const applyNearMeView = useCallback((targetMap: L.Map, latitude: number, longitude: number) => {
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
+      targetMap.setView([latitude, longitude], FLY_TO_ZOOM);
+    } else {
+      targetMap.flyTo([latitude, longitude], FLY_TO_ZOOM, { duration: 0.8 });
+    }
+  }, []);
+
+  // Pan to the first fix of each "Near me" activation; watch updates while the
+  // sheet stays open never re-center the map. If the map is not ready yet the
+  // effect re-runs when `map` arrives.
+  useEffect(() => {
+    if (!nearMeOpen || !map || !geo.fix || hasFlownToFixRef.current) return;
+    hasFlownToFixRef.current = true;
+    applyNearMeView(map, geo.fix.latitude, geo.fix.longitude);
+  }, [nearMeOpen, map, geo.fix, applyNearMeView]);
+
+  // Watch only while the sheet is open and permission has been granted.
+  const { startWatch: startGeoWatch, stopWatch: stopGeoWatch } = geo;
+  useEffect(() => {
+    if (nearMeOpen && geo.status === 'success') {
+      startGeoWatch();
+      return () => stopGeoWatch();
+    }
+    return undefined;
+  }, [nearMeOpen, geo.status, startGeoWatch, stopGeoWatch]);
+
+  const handleNearMeTrigger = useCallback(() => {
+    // Each activation may center the map once on its first fix; watch fixes
+    // that follow never move the map (E11).
+    hasFlownToFixRef.current = false;
+    setNearMeOpen(true);
+    const fix = geo.fix;
+    const isFresh = Boolean(fix) && Date.now() - (fix ? fix.timestamp : 0) < NEAR_ME_FIX_MAX_AGE_MS;
+    if (!isFresh) geo.request();
+  }, [geo]);
+
+  const handleNearMeClose = useCallback(() => {
+    setNearMeOpen(false);
+  }, []);
+
+  const handleNearMeRecenter = useCallback(() => {
+    const fix = geo.fix;
+    if (!fix || !map) {
+      geo.request();
+      return;
+    }
+    applyNearMeView(map, fix.latitude, fix.longitude);
+  }, [geo, map, applyNearMeView]);
+
+  const handleNearMeCameraClick = useCallback((cam: Camera) => {
+    setNearMeOpen(false);
+    handleSelectCamera(cam);
+  }, [handleSelectCamera]);
+
+  // Retry preserves the GPS state: a camera catalog failure refetches only the
+  // catalog, a geolocation failure re-requests only the position.
+  const handleNearMeRetryCameras = useCallback(() => {
+    refetchCameras();
+  }, [refetchCameras]);
+
+  const handleNearMeRetryGeo = useCallback(() => {
+    geo.refresh();
+  }, [geo]);
+
+  const handleNearMeRetry = useCallback(() => {
+    if (error && nearMeResults.length === 0) {
+      refetchCameras();
+      return;
+    }
+    geo.refresh();
+  }, [error, nearMeResults.length, refetchCameras, geo]);
+
+  const handleNearMeBackToCity = useCallback(() => {
+    setNearMeOpen(false);
+    if (!map) return;
+    map.flyTo(
+      MAP_CONFIG.DEFAULT_CENTER as [number, number],
+      MAP_CONFIG.DEFAULT_ZOOM,
+      { duration: 0.8 }
+    );
+  }, [map]);
 
   const pinnedCameras = useMemo(() => {
     return pinnedCameraIds.map(id => cameras.find(c => c.id === id)).filter(Boolean) as Camera[];
@@ -357,6 +500,7 @@ export default function Home() {
             lang={lang}
             appEnv={appEnv}
             onMapReady={setMap}
+            nearMeLocation={geo.fix}
             hexOverlayEnabled={activeLens !== 'off'}
             hasPinnedCameras={pinnedCameras.length > 0}
             cameraFilterControl={
@@ -369,11 +513,39 @@ export default function Home() {
               />
             }
             weatherControl={
-              <WeatherWidget
-                weather={weather}
-                loading={weatherLoading}
-                lang={lang}
-              />
+              <div className="flex items-center gap-2">
+                {/* S12-T2 / Issue #400: one-click proximity entry point (desktop stack) */}
+                <button
+                  type="button"
+                  onClick={handleNearMeTrigger}
+                  aria-label={NEAR_ME_I18N.BUTTON_ARIA[lang]}
+                  title={NEAR_ME_I18N.BUTTON_LABEL[lang]}
+                  aria-haspopup="dialog"
+                  aria-expanded={nearMeOpen}
+                  className="flex h-12 min-h-[48px] min-w-[48px] items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950/95 px-3 font-mono text-xs font-semibold text-zinc-200 shadow-2xl backdrop-blur-md transition-colors hover:border-zinc-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-900 cursor-pointer"
+                >
+                  <svg
+                    className="h-4 w-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="7" />
+                    <circle cx="12" cy="12" r="2" />
+                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                  </svg>
+                  <span>{NEAR_ME_I18N.BUTTON_LABEL[lang]}</span>
+                </button>
+                <WeatherWidget
+                  weather={weather}
+                  loading={weatherLoading}
+                  lang={lang}
+                />
+              </div>
             }
             legendControl={
               <MapLegend
@@ -497,6 +669,35 @@ export default function Home() {
           </svg>
         </button>
 
+        {/* S12-T2 / Issue #400 — one-click near-me trigger (mobile, bottom-left).
+            bottom-[4.5rem] when the pin dock is visible so nothing stacks. */}
+        <button
+          type="button"
+          onClick={handleNearMeTrigger}
+          aria-label={NEAR_ME_I18N.BUTTON_ARIA[lang]}
+          title={NEAR_ME_I18N.BUTTON_LABEL[lang]}
+          aria-haspopup="dialog"
+          aria-expanded={nearMeOpen}
+          className={`md:hidden absolute left-3 z-[840] w-12 h-12 min-w-[48px] min-h-[48px] bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-zinc-100 rounded-lg flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 ${
+            pinnedCameras.length > 0 ? 'bottom-[4.5rem]' : 'bottom-3.5'
+          }`}
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="7" />
+            <circle cx="12" cy="12" r="2" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+          </svg>
+        </button>
+
         {/* MOBILE CAMERA DRAWER */}
         <MobileCameraDrawer
           cameras={cameras}
@@ -527,6 +728,32 @@ export default function Home() {
       </main>
 
       {/* MODAL — global viewport overlay */}
+      {/* S12-T2 / Issue #400: sheet renders under CameraModal (z-[9999]) and is
+          closed before a row opens the camera detail modal. */}
+      <NearMeModal
+        isOpen={nearMeOpen}
+        onClose={handleNearMeClose}
+        status={geo.status}
+        fix={geo.fix}
+        geoError={geo.error}
+        results={nearMeResults}
+        offlineCountInRadius={nearMeOfflineCount}
+        camerasLoading={loading}
+        camerasError={error}
+        hideOffline={hideOfflineCameras}
+        isOutsideServiceArea={isNearMeOutsideServiceArea}
+        lang={lang}
+        onLangChange={setLang}
+        onRetry={handleNearMeRetry}
+        onRetryCameras={handleNearMeRetryCameras}
+        onRetryGeo={handleNearMeRetryGeo}
+        onRecenter={handleNearMeRecenter}
+        onToggleOffline={handleToggleHideOffline}
+        onCameraClick={handleNearMeCameraClick}
+        onViewFullMap={handleNearMeClose}
+        onBackToCity={handleNearMeBackToCity}
+      />
+
       <CameraModal 
         camera={selectedCamera} 
         verdict={selectedCameraVerdict} 
