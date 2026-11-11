@@ -16,6 +16,11 @@ Sprint 11 Wave 2 Task 4 (Issue #398):
     artifact JSON (`services/go-server/internal/forecast/embedded/prototype_v1.json`).
   * Emits updated empirical backtest evaluation JSON and markdown reports.
 
+Sprint 12 Task 1 (Issue #413):
+  * Adds single-flight refit locking (fcntl.flock), durable scheduler state,
+    row-delta gating against hotset_verdict_history, wall-clock or fixed-interval
+    scheduling, and a supervised in-process daemon (--daemon).
+
 Adheres strictly to AGENTS.md:
   * Rule 1: Zero emojis, 100% English logs, comments, and docstrings.
   * Rule 2: Root-cause sound solution, never fear effort.
@@ -32,12 +37,24 @@ import json
 import logging
 import math
 import os
+import re
+import signal
+import sqlite3
 import sys
 import tempfile
-from datetime import datetime, timezone
+import threading
+import time
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional, Sequence
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover
+    fcntl = None  # type: ignore[assignment]
 
 # Ensure tools/forecast directory is in sys.path for direct script execution
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -62,6 +79,9 @@ EXIT_OK = 0
 EXIT_CONFIG_ERROR = 1
 EXIT_DATA_ERROR = 2
 EXIT_GATE_FAILED = 3
+EXIT_FAIL_ON_LOCKED = 4
+EXIT_INTERRUPTED = 130
+EXIT_TERMINATED = 143
 
 # Default paths
 DEFAULT_DB_PATH = REPO_ROOT / "services" / "go-server" / "data" / "camera-view.db"
@@ -86,11 +106,27 @@ DEFAULT_TARGET_MODE = "delta"
 DEFAULT_MODEL_VERSION = "2026.11.10-live"
 DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh"
 
+# Scheduler defaults (S12-T1, Issue #413)
+DEFAULT_INTERVAL_SECONDS = 21600  # 6 hours
+DEFAULT_LOCK_FILE = REPO_ROOT / "var" / "forecast" / "refit.lock"
+DEFAULT_STATE_FILE = REPO_ROOT / "var" / "forecast" / "refit_state.json"
+DAEMON_SLEEP_GRANULARITY_SECONDS = 1.0
+SCHEDULE_LOOKAHEAD_DAYS = 8
+SCHEDULER_STATUSES = (
+    "success",
+    "promoted",
+    "unchanged",
+    "skipped_locked",
+    "skipped_no_new_data",
+    "gate_failed",
+    "error",
+)
 
-def resolve_db_path(db_arg: Optional[Path]) -> Path:
+
+def resolve_db_path(db_arg: Optional[Any]) -> Path:
     """Resolve database path, falling back to repository alternative if unspecified."""
     if db_arg is not None:
-        return db_arg.resolve()
+        return Path(db_arg).resolve()
     if DEFAULT_DB_PATH.exists():
         return DEFAULT_DB_PATH.resolve()
     if FALLBACK_DB_PATH.exists():
@@ -118,7 +154,7 @@ def compute_sha256(path_or_bytes: Path | bytes) -> str:
     return hasher.hexdigest()
 
 
-def atomic_write(path: Path, content: str) -> None:
+def atomic_write(path: Path, content: str, mode: int = 0o644) -> None:
     """Atomically write text content to a destination file using os.replace."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_file = tempfile.NamedTemporaryFile(
@@ -133,6 +169,11 @@ def atomic_write(path: Path, content: str) -> None:
         temp_file.write(content)
         temp_file.flush()
         os.fsync(temp_file.fileno())
+        # Set explicit permissions before closing and replacing (M7)
+        try:
+            os.chmod(temp_file.name, mode)
+        except OSError:
+            pass
         temp_file.close()
         os.replace(temp_file.name, path)
         # Flush parent directory metadata for crash durability (N15)
@@ -588,6 +629,73 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
         help="Logging level",
     )
+    # Scheduler flags (S12-T1, Issue #413)
+    parser.add_argument(
+        "--daemon",
+        action="store_true",
+        help="Run as an in-process refit daemon (loop until SIGINT/SIGTERM or --max-runs)",
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=DEFAULT_INTERVAL_SECONDS,
+        help="Seconds between refit cycles when --schedule-hours is empty",
+    )
+    parser.add_argument(
+        "--schedule-hours",
+        type=str,
+        default=None,
+        help="Comma-separated local HH:MM slots (e.g. 03:00,15:00); overrides --interval",
+    )
+    parser.add_argument(
+        "--lock-file",
+        "--lock-path",
+        type=Path,
+        dest="lock_file",
+        default=DEFAULT_LOCK_FILE,
+        help="Advisory lock file that admits one refit at a time",
+    )
+    parser.add_argument(
+        "--state-file",
+        "--state-path",
+        type=Path,
+        dest="state_file",
+        default=DEFAULT_STATE_FILE,
+        help="JSON file recording scheduler run history and the last successful row count",
+    )
+    parser.add_argument(
+        "--telemetry-out",
+        type=Path,
+        default=None,
+        help="Path to write operator telemetry / status JSON snapshot",
+    )
+    parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Print current scheduler state JSON and exit",
+    )
+    parser.add_argument(
+        "--health",
+        action="store_true",
+        help="Check scheduler health and exit (0=healthy, 1=unhealthy)",
+    )
+    parser.add_argument(
+        "--min-new-rows",
+        type=int,
+        default=0,
+        help="Skip a cycle unless at least this many new hotset_verdict_history rows arrived (0 disables)",
+    )
+    parser.add_argument(
+        "--max-runs",
+        type=int,
+        default=0,
+        help="Stop after this many cycles (0 runs until signalled)",
+    )
+    parser.add_argument(
+        "--fail-on-locked",
+        action="store_true",
+        help="Exit with code 4 when another refit holds the lock instead of skipping the cycle",
+    )
     return parser
 
 
@@ -613,8 +721,799 @@ def parse_horizons(raw: str) -> tuple[int, ...]:
     return tuple(sorted(set(horizons)))
 
 
+# --------------------------------------------------------------------------- #
+# Scheduler support: single-flight lock, durable state, row-delta gating,
+# wall-clock scheduling, and the in-process refit daemon (S12-T1 / Issue #413).
+# --------------------------------------------------------------------------- #
+
+
+class ForecastLockError(RuntimeError):
+    """Raised when the refit lock cannot be created, inspected, or unlocked."""
+
+
+class LockHeldError(ForecastLockError):
+    """Raised when another process already holds the advisory refit lock."""
+
+    def __init__(self, lock_path: Path, holder_pid: Optional[int] = None) -> None:
+        self.lock_path = Path(lock_path)
+        self.holder_pid = holder_pid
+        holder = f" (holder pid: {holder_pid})" if holder_pid is not None else ""
+        super().__init__(f"refit lock already held: {self.lock_path}{holder}")
+
+
+class ForecastRefitLock:
+    """Advisory exclusive lock that admits one forecast refit at a time."""
+
+    def __init__(self, lock_path: Path) -> None:
+        self.lock_path = Path(lock_path)
+        self._fd: Optional[int] = None
+
+    @property
+    def is_held(self) -> bool:
+        return self._fd is not None
+
+    @property
+    def acquired(self) -> bool:
+        return self._fd is not None
+
+    def acquire(self, blocking: bool = False) -> bool:
+        if self._fd is not None:
+            raise LockHeldError(self.lock_path, os.getpid())
+        if fcntl is None:
+            raise ForecastLockError("fcntl is unavailable; requires POSIX platform")
+        try:
+            self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(str(self.lock_path), os.O_RDWR | os.O_CREAT, 0o644)
+        except OSError as exc:
+            raise ForecastLockError(f"cannot open refit lock file {self.lock_path}: {exc}") from exc
+
+        operation = fcntl.LOCK_EX if blocking else (fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            fcntl.flock(fd, operation)
+        except (BlockingIOError, OSError) as exc:
+            os.close(fd)
+            if isinstance(exc, BlockingIOError) or (hasattr(exc, "errno") and exc.errno in (11, 35)):
+                if not blocking:
+                    raise LockHeldError(self.lock_path, self.holder_pid())
+                return False
+            raise ForecastLockError(f"cannot flock refit lock file {self.lock_path}: {exc}") from exc
+
+        try:
+            payload = json.dumps({
+                "pid": os.getpid(),
+                "started_at": _utc_iso(datetime.now(timezone.utc)),
+            })
+            os.ftruncate(fd, 0)
+            os.lseek(fd, 0, os.SEEK_SET)
+            os.write(fd, payload.encode("utf-8"))
+            os.fsync(fd)
+        except OSError:
+            pass
+
+        self._fd = fd
+        return True
+
+    def release(self) -> None:
+        fd, self._fd = self._fd, None
+        if fd is None:
+            return
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        finally:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+    def holder_pid(self) -> Optional[int]:
+        try:
+            raw = self.lock_path.read_text(encoding="utf-8").strip()
+            data = json.loads(raw)
+            return data.get("pid")
+        except Exception:
+            return None
+
+    def __enter__(self) -> "ForecastRefitLock":
+        self.acquire(blocking=False)
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
+        self.release()
+        return False
+
+
+def _utc_iso(moment: datetime) -> str:
+    """Render a timestamp as ISO-8601 UTC with second precision."""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def _coerce_optional_str(value: Any) -> Optional[str]:
+    return value if isinstance(value, str) and value else None
+
+
+def _coerce_int(value: Any, default: int) -> int:
+    if value is None or isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+        return int(value.strip())
+    return default
+
+
+def _coerce_optional_int(value: Any) -> Optional[int]:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+        return int(value.strip())
+    return None
+
+
+@dataclass
+class CycleOutcome:
+    status: str
+    exit_code: int
+    rows_available: int = 0
+    rows_new: int = 0
+    artifact_sha256: str = ""
+
+
+class SchedulerState:
+    """Durable record of refit scheduling history."""
+
+    SCHEMA_VERSION = 1
+
+    def __init__(self, path: Optional[Path] = None) -> None:
+        self.path = Path(path) if path is not None else None
+        self.schema_version: int = self.SCHEMA_VERSION
+        self.mode: str = "daemon"
+        self.pid: Optional[int] = None
+        self.started_at: Optional[str] = None
+        self.cadence: dict[str, Any] = {}
+        self.last_cycle: dict[str, Any] = {}
+        self.counters: dict[str, int] = {
+            "cycles_total": 0,
+            "cycles_promoted": 0,
+            "cycles_unchanged": 0,
+            "cycles_gate_failed": 0,
+            "cycles_error": 0,
+            "cycles_skipped_locked": 0,
+            "cycles_skipped_no_new_data": 0,
+            "consecutive_failures": 0,
+            "rows_last_seen": 0,
+        }
+        self.last_promotion: Optional[dict[str, Any]] = None
+        self.last_slot_fired: Optional[str] = None
+        self.next_slot_at: Optional[str] = None
+        self.clean_shutdown: bool = True
+        self.updated_at: Optional[str] = None
+
+    @property
+    def total_runs(self) -> int:
+        return self.counters.get("cycles_total", 0)
+
+    @total_runs.setter
+    def total_runs(self, val: int) -> None:
+        self.counters["cycles_total"] = val
+
+    @property
+    def consecutive_failures(self) -> int:
+        return self.counters.get("consecutive_failures", 0)
+
+    @consecutive_failures.setter
+    def consecutive_failures(self, val: int) -> None:
+        self.counters["consecutive_failures"] = val
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "mode": self.mode,
+            "pid": self.pid,
+            "started_at": self.started_at,
+            "cadence": self.cadence,
+            "last_cycle": self.last_cycle,
+            "counters": self.counters,
+            "last_promotion": self.last_promotion,
+            "last_slot_fired": self.last_slot_fired,
+            "next_slot_at": self.next_slot_at,
+            "clean_shutdown": self.clean_shutdown,
+            "updated_at": self.updated_at,
+        }
+
+    as_dict = to_dict
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any], path: Optional[Path] = None) -> "SchedulerState":
+        instance = cls(path=path)
+        instance.schema_version = _coerce_int(raw.get("schema_version"), cls.SCHEMA_VERSION)
+        instance.mode = _coerce_optional_str(raw.get("mode")) or "daemon"
+        instance.pid = _coerce_optional_int(raw.get("pid"))
+        instance.started_at = _coerce_optional_str(raw.get("started_at"))
+        if isinstance(raw.get("cadence"), dict):
+            instance.cadence = dict(raw["cadence"])
+        if isinstance(raw.get("last_cycle"), dict):
+            instance.last_cycle = dict(raw["last_cycle"])
+        if isinstance(raw.get("counters"), dict):
+            for k, v in raw["counters"].items():
+                instance.counters[k] = _coerce_int(v, 0)
+        if isinstance(raw.get("last_promotion"), dict):
+            instance.last_promotion = dict(raw["last_promotion"])
+        instance.last_slot_fired = _coerce_optional_str(raw.get("last_slot_fired"))
+        instance.next_slot_at = _coerce_optional_str(raw.get("next_slot_at"))
+        instance.clean_shutdown = bool(raw.get("clean_shutdown", True))
+        instance.updated_at = _coerce_optional_str(raw.get("updated_at"))
+        return instance
+
+    @classmethod
+    def load(cls, path: Path) -> "SchedulerState":
+        path = Path(path)
+        if not path.exists():
+            return cls(path=path)
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            quarantine = path.with_name(f"{path.name}.corrupt-{stamp}")
+            LOG.warning("State file %s corrupt (%s); quarantining to %s", path, exc, quarantine)
+            try:
+                os.replace(path, quarantine)
+            except OSError:
+                pass
+            return cls(path=path)
+
+        if not isinstance(raw, dict) or raw.get("schema_version") != cls.SCHEMA_VERSION:
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            quarantine = path.with_name(f"{path.name}.corrupt-{stamp}")
+            LOG.warning("State file %s invalid schema; quarantining to %s", path, quarantine)
+            try:
+                os.replace(path, quarantine)
+            except OSError:
+                pass
+            return cls(path=path)
+
+        return cls.from_dict(raw, path=path)
+
+    def save(self, path: Optional[Path] = None) -> None:
+        target_path = Path(path) if path is not None else self.path
+        if target_path is None:
+            raise ValueError("No path specified for SchedulerState.save()")
+        self.updated_at = _utc_iso(datetime.now(timezone.utc))
+        atomic_write(target_path, json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n")
+
+    def record_cycle_start(self, started_at: datetime) -> None:
+        self.last_cycle = {
+            "started_at": _utc_iso(started_at),
+            "status": "running",
+        }
+        self.clean_shutdown = False
+        self.pid = os.getpid()
+
+    def record_cycle_result(
+        self,
+        status: str,
+        exit_code: int,
+        *,
+        completed_at: Optional[datetime] = None,
+        **extra: Any,
+    ) -> None:
+        if completed_at is None:
+            completed_at = datetime.now(timezone.utc)
+        self.last_cycle["status"] = status
+        self.last_cycle["exit_code"] = int(exit_code)
+        self.last_cycle["completed_at"] = _utc_iso(completed_at)
+        for k, v in extra.items():
+            self.last_cycle[k] = v
+
+        counter_key = f"cycles_{status}"
+        if counter_key in self.counters:
+            self.counters[counter_key] += 1
+        else:
+            self.counters[counter_key] = 1
+
+        if status not in ("skipped_locked", "skipped_no_new_data"):
+            self.counters["cycles_total"] += 1
+            if status in ("promoted", "unchanged", "success"):
+                self.counters["consecutive_failures"] = 0
+            elif status in ("gate_failed", "error"):
+                self.counters["consecutive_failures"] += 1
+
+
+_SCHEDULE_SLOT_RE = re.compile(r"^\s*(?P<hour>\d{1,2}):(?P<minute>\d{2})\s*$")
+
+
+def parse_schedule_hours(raw: str) -> tuple[str, ...]:
+    """Parse comma-separated HH:MM schedule slots into sorted unique tuple."""
+    if not raw or not raw.strip():
+        raise ValueError("schedule slots cannot be empty")
+    tokens = raw.split(",")
+    slots = set()
+    for token in tokens:
+        stripped = token.strip()
+        if not stripped:
+            raise ValueError("empty schedule slot token in schedule_hours")
+        m = _SCHEDULE_SLOT_RE.match(stripped)
+        if not m:
+            raise ValueError(f"Invalid schedule slot format: {stripped!r}")
+        hour = int(m.group("hour"))
+        minute = int(m.group("minute"))
+        if not (0 <= hour <= 23):
+            raise ValueError(f"Schedule hour {hour} out of range in {token!r}")
+        if not (0 <= minute <= 59):
+            raise ValueError(f"Schedule minute {minute} out of range in {token!r}")
+        slots.add(f"{hour:02d}:{minute:02d}")
+    return tuple(sorted(slots))
+
+
+def compute_next_delay(
+    *,
+    now: datetime,
+    interval_seconds: Optional[float] = None,
+    slots: Sequence[str] = (),
+    timezone: ZoneInfo = ZoneInfo(DEFAULT_TIMEZONE),
+    last_slot_fired: Optional[str] = None,
+) -> tuple[float, Optional[dict[str, str]]]:
+    """Compute delay in seconds and optional slot marker until next refit."""
+    if now.tzinfo is None:
+        raise ValueError("compute_next_delay requires timezone-aware datetime")
+    if not slots:
+        interval = float(interval_seconds) if interval_seconds is not None else float(DEFAULT_INTERVAL_SECONDS)
+        if interval <= 0:
+            raise ValueError(f"interval must be positive (got {interval})")
+        return interval, None
+
+    now_tz = now.astimezone(timezone)
+    best_delay: Optional[float] = None
+    best_marker: Optional[dict[str, str]] = None
+
+    for day_offset in range(SCHEDULE_LOOKAHEAD_DAYS):
+        day = (now_tz + timedelta(days=day_offset)).date()
+        for slot in slots:
+            hour, minute = [int(p) for p in slot.split(":")]
+            slot_dt = datetime(day.year, day.month, day.day, hour, minute, tzinfo=timezone)
+            marker_str = f"{day.isoformat()}T{slot}"
+            if last_slot_fired and marker_str == last_slot_fired:
+                continue
+            delay = (slot_dt - now_tz).total_seconds()
+            if delay <= 0:
+                continue
+            if best_delay is None or delay < best_delay:
+                best_delay = delay
+                best_marker = {"local_date": day.isoformat(), "slot": slot}
+
+    if best_delay is None:
+        raise ValueError("Could not resolve future schedule slot")
+    return best_delay, best_marker
+
+
+class HistoryCountError(RuntimeError):
+    """Raised when hotset_verdict_history row count cannot be determined."""
+
+
+def count_history_rows(db_path: Path) -> int:
+    """Count rows in hotset_verdict_history using read-only mode."""
+    path = Path(db_path)
+    if not path.exists():
+        raise HistoryCountError(f"Database file does not exist: {path}")
+    uri = f"file:{quote(path.resolve().as_posix(), safe='/:')}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True, timeout=5.0)
+    try:
+        conn.execute("PRAGMA query_only = ON")
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='hotset_verdict_history'"
+        )
+        if cur.fetchone() is None:
+            return 0
+        cur.execute("SELECT count(*) FROM hotset_verdict_history")
+        row = cur.fetchone()
+        return int(row[0]) if row else 0
+    finally:
+        conn.close()
+
+
+def save_telemetry_snapshot(
+    state: SchedulerState,
+    telemetry_path: Path,
+    healthy: bool = True,
+) -> None:
+    """Write operator telemetry snapshot JSON."""
+    data = state.as_dict()
+    data["healthy"] = healthy
+    data["telemetry_generated_at"] = _utc_iso(datetime.now(timezone.utc))
+    atomic_write(telemetry_path, json.dumps(data, indent=2))
+
+
+def run_daemon(
+    args: Optional[argparse.Namespace] = None,
+    *,
+    db_path: Optional[Path] = None,
+    artifact_out: Optional[Path] = None,
+    lock_path: Optional[Path] = None,
+    state_path: Optional[Path] = None,
+    telemetry_out: Optional[Path] = None,
+    interval_seconds: Optional[float] = None,
+    schedule_hours: Optional[Any] = None,
+    timezone: Optional[ZoneInfo] = None,
+    max_runs: Optional[int] = None,
+    dry_run: bool = False,
+    promote: bool = False,
+    fail_on_locked: bool = False,
+    min_new_rows: int = 0,
+    cycle_fn: Optional[Any] = None,
+    sleep_fn: Any = time.sleep,
+    now_fn: Optional[Any] = None,
+) -> int:
+    """Execute scheduled daemon loop."""
+    if args is None:
+        args = build_parser().parse_args([])
+        effective_db_path = resolve_db_path(db_path)
+        effective_artifact_out = Path(artifact_out) if artifact_out else DEFAULT_ARTIFACT_OUT
+        effective_lock_path = Path(lock_path) if lock_path else DEFAULT_LOCK_FILE
+        effective_state_path = Path(state_path) if state_path else DEFAULT_STATE_FILE
+        try:
+            effective_interval = float(interval_seconds) if interval_seconds is not None else float(DEFAULT_INTERVAL_SECONDS)
+            if effective_interval <= 0:
+                LOG.error("--interval must be positive, got %s", effective_interval)
+                return EXIT_CONFIG_ERROR
+        except (ValueError, TypeError) as exc:
+            LOG.error("Invalid --interval: %s", exc)
+            return EXIT_CONFIG_ERROR
+
+        try:
+            if schedule_hours is None:
+                slots = ()
+            elif isinstance(schedule_hours, (list, tuple)):
+                slots = tuple(schedule_hours)
+            elif isinstance(schedule_hours, str):
+                slots = parse_schedule_hours(schedule_hours)
+            else:
+                slots = ()
+        except ValueError as exc:
+            LOG.error("Invalid --schedule-hours: %s", exc)
+            return EXIT_CONFIG_ERROR
+
+        try:
+            effective_tz = timezone or ZoneInfo(DEFAULT_TIMEZONE)
+        except Exception as exc:
+            LOG.error("Invalid timezone: %s", exc)
+            return EXIT_CONFIG_ERROR
+
+        effective_max_runs = max_runs
+        effective_dry_run = dry_run
+        effective_promote = promote
+        effective_fail_on_locked = fail_on_locked
+        effective_min_new_rows = min_new_rows
+    else:
+        effective_db_path = resolve_db_path(args.db) if db_path is None else Path(db_path)
+        effective_artifact_out = Path(args.artifact_out) if artifact_out is None else Path(artifact_out)
+        effective_lock_path = Path(args.lock_file) if lock_path is None else Path(lock_path)
+        effective_state_path = Path(args.state_file) if state_path is None else Path(state_path)
+        try:
+            effective_interval = float(args.interval) if interval_seconds is None else float(interval_seconds)
+            if effective_interval <= 0:
+                LOG.error("--interval must be positive, got %s", effective_interval)
+                return EXIT_CONFIG_ERROR
+        except (ValueError, TypeError) as exc:
+            LOG.error("Invalid --interval: %s", exc)
+            return EXIT_CONFIG_ERROR
+
+        try:
+            if schedule_hours is not None:
+                if isinstance(schedule_hours, (list, tuple)):
+                    slots = tuple(schedule_hours)
+                else:
+                    slots = parse_schedule_hours(str(schedule_hours))
+            elif getattr(args, "schedule_hours", None) is not None:
+                slots = parse_schedule_hours(args.schedule_hours)
+            else:
+                slots = ()
+        except ValueError as exc:
+            LOG.error("Invalid --schedule-hours: %s", exc)
+            return EXIT_CONFIG_ERROR
+
+        tz_name = getattr(args, "timezone", None) or DEFAULT_TIMEZONE
+        try:
+            effective_tz = timezone if timezone is not None else ZoneInfo(tz_name)
+        except Exception as exc:
+            LOG.error("Invalid --timezone %r: %s", tz_name, exc)
+            return EXIT_CONFIG_ERROR
+
+        effective_max_runs = (args.max_runs if args.max_runs > 0 else None) if max_runs is None else max_runs
+        effective_dry_run = args.dry_run or dry_run
+        effective_promote = getattr(args, "promote", False) or promote
+        effective_fail_on_locked = args.fail_on_locked or fail_on_locked
+        effective_min_new_rows = args.min_new_rows if min_new_rows == 0 else min_new_rows
+
+    effective_telemetry_out = Path(getattr(args, "telemetry_out", None)) if getattr(args, "telemetry_out", None) else (Path(telemetry_out) if telemetry_out else None)
+
+    get_now = now_fn or (lambda: datetime.now(effective_tz))
+    stop_event = threading.Event()
+
+    if args is not None:
+        args.db = Path(effective_db_path)
+        args.artifact_out = Path(effective_artifact_out)
+        args.lock_file = Path(effective_lock_path)
+        args.state_file = Path(effective_state_path)
+        args.dry_run = effective_dry_run
+        args.promote = effective_promote
+        args.fail_on_locked = effective_fail_on_locked
+        args.min_new_rows = effective_min_new_rows
+
+    def _default_sleep(duration: float) -> None:
+        stop_event.wait(max(0.0, duration))
+
+    actual_sleep_fn = _default_sleep if sleep_fn is time.sleep else sleep_fn
+
+    signal_count = [0]
+
+    def _on_signal(signum: int, _frame: Any) -> None:
+        signal_count[0] += 1
+        if signal_count[0] > 1:
+            LOG.warning(
+                "Received second signal %d; terminating immediately with exit %d",
+                signum,
+                128 + signum,
+            )
+            # AC5 second-signal escalation: exit 143 (SIGTERM) or 130 (SIGINT)
+            sys.exit(128 + signum)
+        LOG.info("Received signal %d; shutting down refit daemon cleanly", signum)
+        stop_event.set()
+
+    orig_handlers = {}
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            orig_handlers[sig] = signal.signal(sig, _on_signal)
+        except (ValueError, OSError):
+            pass
+
+    state = SchedulerState.load(effective_state_path)
+    state.mode = "daemon"
+    state.cadence = {
+        "kind": "slots" if slots else "interval",
+        "seconds": int(effective_interval),
+        "timezone": effective_tz.key,
+        "slots": list(slots),
+    }
+
+    daemon_started_at = state.started_at
+    skipped_locked_count = 0
+    runs_completed = 0
+    terminal_code = EXIT_OK
+    owns_state = False
+    active_marker = None
+    normal_exit = False
+
+    def _save_state(st: SchedulerState, healthy: bool = True) -> None:
+        st.save(effective_state_path)
+        if effective_telemetry_out is not None:
+            try:
+                save_telemetry_snapshot(st, effective_telemetry_out, healthy=healthy)
+            except Exception as exc:
+                LOG.warning("Failed to write telemetry snapshot to %s: %s", effective_telemetry_out, exc)
+
+    # M2: In slot mode, sleep to the first scheduled slot before running any refit
+    if slots:
+        delay, next_marker = compute_next_delay(
+            now=get_now(),
+            interval_seconds=effective_interval,
+            slots=slots,
+            timezone=effective_tz,
+            last_slot_fired=state.last_slot_fired,
+        )
+        active_marker = f"{next_marker['local_date']}T{next_marker['slot']}" if next_marker else None
+        if next_marker:
+            state.next_slot_at = _utc_iso(get_now() + timedelta(seconds=delay))
+            if owns_state:
+                _save_state(state)
+        actual_sleep_fn(delay)
+
+    try:
+        while not stop_event.is_set():
+            if effective_max_runs is not None and runs_completed >= effective_max_runs:
+                normal_exit = True
+                break
+
+            cycle_start = get_now()
+            lock = ForecastRefitLock(effective_lock_path)
+            lock_acquired = False
+            try:
+                lock.acquire(blocking=False)
+                lock_acquired = True
+                owns_state = True
+                # Reload fresh state under lock to prevent lost updates (MJ-4)
+                state = SchedulerState.load(effective_state_path)
+                state.mode = "daemon"
+                state.cadence = {
+                    "kind": "slots" if slots else "interval",
+                    "seconds": int(effective_interval),
+                    "timezone": effective_tz.key,
+                    "slots": list(slots),
+                }
+                if daemon_started_at and not state.started_at:
+                    state.started_at = daemon_started_at
+                if skipped_locked_count > 0:
+                    state.counters["cycles_skipped_locked"] = (
+                        state.counters.get("cycles_skipped_locked", 0) + skipped_locked_count
+                    )
+                    skipped_locked_count = 0
+            except LockHeldError:
+                LOG.warning("Refit lock held elsewhere: %s", effective_lock_path)
+                runs_completed += 1
+                skipped_locked_count += 1
+                state.record_cycle_result("skipped_locked", EXIT_FAIL_ON_LOCKED, error="Refit lock held elsewhere")
+                if effective_fail_on_locked:
+                    return EXIT_FAIL_ON_LOCKED
+                if effective_max_runs is not None and runs_completed >= effective_max_runs:
+                    normal_exit = True
+                    return EXIT_OK
+                delay, next_marker = compute_next_delay(now=get_now(), interval_seconds=effective_interval, slots=slots, timezone=effective_tz, last_slot_fired=state.last_slot_fired)
+                active_marker = f"{next_marker['local_date']}T{next_marker['slot']}" if next_marker else None
+                actual_sleep_fn(delay)
+                continue
+            except ForecastLockError as exc:
+                LOG.error("Failed to acquire refit lock: %s", exc)
+                return EXIT_CONFIG_ERROR
+
+            try:
+                state.pid = os.getpid()
+                state.clean_shutdown = False
+                state.record_cycle_start(cycle_start)
+                _save_state(state)
+
+                rows_seen = state.counters.get("rows_last_seen", 0)
+                try:
+                    current_rows = count_history_rows(effective_db_path)
+                    prev_rows = state.counters.get("rows_last_seen", 0)
+
+                    # Reset baseline if database rows decreased (e.g. table truncated / rotated)
+                    if current_rows < prev_rows:
+                        LOG.warning(
+                            "History row count decreased (%d < %d); resetting baseline to current row count",
+                            current_rows,
+                            prev_rows,
+                        )
+                        prev_rows = current_rows
+                        state.counters["rows_last_seen"] = current_rows
+
+                    new_rows = current_rows - prev_rows
+
+                    if effective_min_new_rows > 0 and new_rows < effective_min_new_rows:
+                        LOG.info(
+                            "Skipping refit: %d new rows < min %d (total=%d, baseline=%d)",
+                            new_rows,
+                            effective_min_new_rows,
+                            current_rows,
+                            prev_rows,
+                        )
+                        state.record_cycle_result("skipped_no_new_data", EXIT_OK)
+                        _save_state(state)
+                        runs_completed += 1
+                        if effective_max_runs is not None and runs_completed >= effective_max_runs:
+                            normal_exit = True
+                            state.clean_shutdown = True
+                            state.pid = None
+                            _save_state(state)
+                            break
+                        delay, next_marker = compute_next_delay(now=get_now(), interval_seconds=effective_interval, slots=slots, timezone=effective_tz, last_slot_fired=state.last_slot_fired)
+                        active_marker = f"{next_marker['local_date']}T{next_marker['slot']}" if next_marker else None
+                        if next_marker:
+                            state.next_slot_at = _utc_iso(get_now() + timedelta(seconds=delay))
+                            _save_state(state)
+                        actual_sleep_fn(delay)
+                        continue
+
+                    if cycle_fn is not None:
+                        outcome = cycle_fn(effective_dry_run)
+                        if isinstance(outcome, CycleOutcome):
+                            c_status = outcome.status
+                            c_exit = outcome.exit_code
+                            rows_seen = outcome.rows_available or current_rows
+                        else:
+                            c_exit = int(outcome)
+                            c_status = "promoted" if c_exit == 0 else "error"
+                            rows_seen = current_rows
+                    else:
+                        old_sha = hashlib.sha256(effective_artifact_out.read_bytes()).hexdigest() if effective_artifact_out.exists() else None
+                        c_exit = run_cycle(args)
+                        new_sha = hashlib.sha256(effective_artifact_out.read_bytes()).hexdigest() if effective_artifact_out.exists() else None
+                        if c_exit == EXIT_OK:
+                            if args.promote and not effective_dry_run and new_sha != old_sha:
+                                c_status = "promoted"
+                            else:
+                                c_status = "unchanged"
+                        elif c_exit == EXIT_GATE_FAILED:
+                            c_status = "gate_failed"
+                        else:
+                            c_status = "error"
+                        rows_seen = current_rows
+
+                    state.record_cycle_result(c_status, c_exit)
+                    if c_status in ("promoted", "unchanged", "success"):
+                        state.counters["rows_last_seen"] = rows_seen
+                        if active_marker:
+                            state.last_slot_fired = active_marker
+                except Exception as exc:
+                    LOG.error("Forecast daemon cycle raised unexpected exception: %s", exc, exc_info=True)
+                    c_status = "error"
+                    c_exit = EXIT_DATA_ERROR
+                    state.record_cycle_result(c_status, c_exit, error=str(exc))
+
+                runs_completed += 1
+                if effective_max_runs is not None and runs_completed >= effective_max_runs:
+                    normal_exit = True
+                    state.clean_shutdown = True
+                    state.pid = None
+                _save_state(state, healthy=(c_exit in (EXIT_OK, EXIT_FAIL_ON_LOCKED)))
+
+                if c_exit == EXIT_CONFIG_ERROR:
+                    terminal_code = c_exit
+                    break
+            finally:
+                if lock_acquired:
+                    lock.release()
+                    owns_state = False
+
+            if effective_max_runs is not None and runs_completed >= effective_max_runs:
+                normal_exit = True
+                break
+
+            if stop_event.is_set():
+                normal_exit = True
+                break
+
+            cycle_duration = (get_now() - cycle_start).total_seconds()
+            delay, next_marker = compute_next_delay(now=get_now(), interval_seconds=effective_interval, slots=slots, timezone=effective_tz, last_slot_fired=state.last_slot_fired)
+            active_marker = f"{next_marker['local_date']}T{next_marker['slot']}" if next_marker else None
+            if not slots:
+                delay = max(0.0, effective_interval - cycle_duration)
+            if next_marker:
+                state.next_slot_at = _utc_iso(get_now() + timedelta(seconds=delay))
+                _save_state(state)
+            actual_sleep_fn(delay)
+
+        if stop_event.is_set():
+            normal_exit = True
+
+    finally:
+        if normal_exit:
+            try:
+                term_lock = ForecastRefitLock(effective_lock_path)
+                try:
+                    term_lock.acquire(blocking=False)
+                    st = SchedulerState.load(effective_state_path)
+                    st.clean_shutdown = True
+                    st.pid = None
+                    if skipped_locked_count > 0:
+                        st.counters["cycles_skipped_locked"] = (
+                            st.counters.get("cycles_skipped_locked", 0) + skipped_locked_count
+                        )
+                        skipped_locked_count = 0
+                    _save_state(st, healthy=True)
+                finally:
+                    term_lock.release()
+            except Exception:
+                pass
+        for sig, h in orig_handlers.items():
+            try:
+                signal.signal(sig, h)
+            except (ValueError, OSError):
+                pass
+
+    return terminal_code
+
+
 def run(argv: Optional[Sequence[str]] = None) -> int:
-    """Execute training pipeline CLI."""
+    """Execute training pipeline CLI: one-shot refit, verification, or daemon."""
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -623,15 +1522,135 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    if getattr(args, "status", False):
+        state_path = Path(args.state_file) if args.state_file else DEFAULT_STATE_FILE
+        if not state_path.exists():
+            LOG.error("Scheduler state file not found: %s", state_path)
+            return EXIT_CONFIG_ERROR
+        try:
+            st = SchedulerState.load(state_path)
+            print(json.dumps(st.as_dict(), indent=2))
+            return EXIT_OK
+        except Exception as exc:
+            LOG.error("Failed to load scheduler state from %s: %s", state_path, exc)
+            return EXIT_CONFIG_ERROR
+
+    if getattr(args, "health", False):
+        state_path = Path(args.state_file) if args.state_file else DEFAULT_STATE_FILE
+        if not state_path.exists():
+            LOG.error("Scheduler state file not found: %s", state_path)
+            return EXIT_CONFIG_ERROR
+        try:
+            raw = json.loads(state_path.read_text(encoding="utf-8"))
+            if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+                LOG.error("Unhealthy: invalid state schema in %s", state_path)
+                return EXIT_CONFIG_ERROR
+            st = SchedulerState.from_dict(raw, path=state_path)
+            if st.counters.get("consecutive_failures", 0) >= 5:
+                LOG.error(
+                    "Unhealthy: excessive consecutive failures (%d >= 5)",
+                    st.counters["consecutive_failures"],
+                )
+                return EXIT_CONFIG_ERROR
+            if st.pid is not None and not st.clean_shutdown:
+                try:
+                    os.kill(st.pid, 0)
+                except OSError:
+                    LOG.error("Unhealthy: daemon PID %d is not running", st.pid)
+                    return EXIT_CONFIG_ERROR
+            print("OK - scheduler state healthy")
+            return EXIT_OK
+        except Exception as exc:
+            LOG.error("Unhealthy: failed to verify state: %s", exc)
+            return EXIT_CONFIG_ERROR
+
+    if args.daemon:
+        if args.verify:
+            LOG.error("--daemon and --verify are mutually exclusive")
+            return EXIT_CONFIG_ERROR
+        return run_daemon(args)
+
     if args.verify:
         LOG.info("Verifying model artifact at %s", args.artifact_out)
         valid, msg = verify_artifact(args.artifact_out)
         if valid:
             LOG.info("Verification succeeded: %s", msg)
             return EXIT_OK
-        else:
-            LOG.error("Verification failed: %s", msg)
-            return EXIT_GATE_FAILED
+        LOG.error("Verification failed: %s", msg)
+        return EXIT_GATE_FAILED
+
+    # One-shot path under cooperative refit lock (B1 / AC4)
+    lock_path = Path(args.lock_file) if args.lock_file else None
+    if lock_path:
+        lock = ForecastRefitLock(lock_path)
+        try:
+            lock.acquire(blocking=False)
+        except LockHeldError:
+            if args.fail_on_locked:
+                LOG.error("Refit lock held elsewhere: %s (--fail-on-locked)", lock_path)
+                return EXIT_FAIL_ON_LOCKED
+            LOG.warning("Refit lock held elsewhere: %s (skipped)", lock_path)
+            return EXIT_OK
+        except ForecastLockError as exc:
+            LOG.error("Failed to acquire refit lock: %s", exc)
+            return EXIT_CONFIG_ERROR
+        try:
+            # One-shot row-delta gate (MJ-1)
+            state_path = Path(args.state_file) if getattr(args, "state_file", None) else None
+            min_rows = getattr(args, "min_new_rows", 0)
+            if min_rows > 0 and state_path and state_path.exists():
+                state = SchedulerState.load(state_path)
+                try:
+                    current_rows = count_history_rows(resolve_db_path(args.db))
+                except HistoryCountError as exc:
+                    LOG.error("History count error: %s", exc)
+                    return EXIT_DATA_ERROR
+                prev_rows = state.counters.get("rows_last_seen", 0)
+                if current_rows < prev_rows:
+                    prev_rows = current_rows
+                    state.counters["rows_last_seen"] = current_rows
+                new_rows = current_rows - prev_rows
+                if new_rows < min_rows:
+                    LOG.info(
+                        "Skipping one-shot refit: %d new rows < min %d (total=%d, baseline=%d)",
+                        new_rows, min_rows, current_rows, prev_rows
+                    )
+                    state.record_cycle_result("skipped_no_new_data", EXIT_OK)
+                    state.save(state_path)
+                    return EXIT_OK
+
+            exit_code = run_cycle(args)
+            if state_path and exit_code == EXIT_OK:
+                state = SchedulerState.load(state_path)
+                try:
+                    current_rows = count_history_rows(resolve_db_path(args.db))
+                    state.counters["rows_last_seen"] = current_rows
+                except Exception:
+                    pass
+                state.record_cycle_result("promoted" if args.promote else "unchanged", EXIT_OK)
+                state.save(state_path)
+            return exit_code
+        finally:
+            lock.release()
+
+    return run_cycle(args)
+
+
+def run_cycle(args: argparse.Namespace) -> int:
+    """Execute exactly one refit, evaluation gate, and optional promotion cycle."""
+    if args.promote and not args.dry_run:
+        artifact_out = Path(args.artifact_out)
+        try:
+            artifact_out.parent.mkdir(parents=True, exist_ok=True)
+            if not os.access(artifact_out.parent, os.W_OK):
+                LOG.error("Artifact directory is not writable: %s", artifact_out.parent)
+                return EXIT_CONFIG_ERROR
+            if artifact_out.exists() and not os.access(artifact_out, os.W_OK):
+                LOG.error("Artifact file is not writable: %s", artifact_out)
+                return EXIT_CONFIG_ERROR
+        except Exception as exc:
+            LOG.error("Cannot write artifact to %s: %s", artifact_out, exc)
+            return EXIT_CONFIG_ERROR
 
     try:
         horizons = parse_horizons(args.horizons)
@@ -841,11 +1860,30 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
 
     # Atomically promote artifact if requested
     if args.promote:
+        artifact_out = Path(args.artifact_out)
         try:
-            atomic_write(args.artifact_out, rendered_artifact_json)
+            # AC8: Fail closed if artifact path or parent is unwritable
+            artifact_out.parent.mkdir(parents=True, exist_ok=True)
+            if not os.access(artifact_out.parent, os.W_OK):
+                LOG.error("Artifact directory is not writable: %s", artifact_out.parent)
+                return EXIT_CONFIG_ERROR
+            if artifact_out.exists() and not os.access(artifact_out, os.W_OK):
+                LOG.error("Artifact file is not writable: %s", artifact_out)
+                return EXIT_CONFIG_ERROR
+
+            # Check for byte-identical artifact (M6)
+            if artifact_out.exists():
+                existing_bytes = artifact_out.read_bytes()
+                new_bytes = rendered_artifact_json.encode("utf-8")
+                if existing_bytes == new_bytes:
+                    LOG.info(
+                        "Model artifact unchanged (byte-identical SHA-256); skipping rewrite"
+                    )
+                    return EXIT_OK
+            atomic_write(artifact_out, rendered_artifact_json)
             LOG.info(
                 "Model artifact successfully promoted to %s (version: %s)",
-                args.artifact_out,
+                artifact_out,
                 args.version,
             )
         except Exception as exc:

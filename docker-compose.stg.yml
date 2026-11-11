@@ -43,6 +43,8 @@ services:
       - HARVESTER_CONCURRENCY=${HARVESTER_CONCURRENCY:-15}
       - HARVESTER_RAIN_COOLDOWN_MINUTES=${HARVESTER_RAIN_COOLDOWN_MINUTES:-60}
       - HARVESTER_CATCHUP_MINUTES=${HARVESTER_CATCHUP_MINUTES:-120}
+      - FORECAST_MODEL_PATH=${FORECAST_MODEL_PATH:-/app/data/forecast/prototype_v1.json}
+      - FORECAST_MODEL_RELOAD_INTERVAL_SEC=${FORECAST_MODEL_RELOAD_INTERVAL_SEC:-60}
     volumes:
       - warded-stg-data:/app/data
     deploy:
@@ -119,6 +121,65 @@ services:
       - BACKEND_URL=${BACKEND_URL:-http://warded-backend:3000}
       - CV_ENGINE_URL=${CV_ENGINE_URL:-http://warded-model:8000}
       - DEV_ACCESS_TOKEN=${DEV_ACCESS_TOKEN:-}
+
+  warded-forecast-cron:
+    profiles: ["forecast-refit", "forecast-cron"]
+    image: python:3.11-slim
+    container_name: ${FORECAST_CRON_CONTAINER_NAME:-warded-forecast-cron}
+    restart: unless-stopped
+    user: "10001:10001"
+    networks:
+      - core-network
+    read_only: true
+    init: true
+    stop_grace_period: 60s
+    volumes:
+      - warded-stg-data:/app/data
+      - ./:/workspace:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,mode=1777
+    working_dir: /workspace
+    healthcheck:
+      test: ["CMD", "python3", "tools/forecast/train_live_model.py", "--health", "--state-file", "/app/data/forecast/refit_state.json"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    command:
+      - python3
+      - -u
+      - tools/forecast/train_live_model.py
+      - --daemon
+      - --interval
+      - "${FORECAST_REFIT_INTERVAL:-21600}"
+      - --db
+      - /app/data/camera-view.db
+      - --features-out
+      - /app/data/forecast/features_live_5m.csv
+      - --artifact-out
+      - /app/data/forecast/prototype_v1.json
+      - --report-out
+      - /app/data/forecast/forecast_prototype_v1.md
+      - --eval-json-out
+      - /app/data/forecast/forecast_prototype_v1.json
+      - --lock-file
+      - /app/data/locks/refit.lock
+      - --state-file
+      - /app/data/forecast/refit_state.json
+      - --telemetry-out
+      - /app/data/forecast/refit_status.json
+      - --min-new-rows
+      - "${FORECAST_MIN_NEW_ROWS:-50}"
+      - --promote
+    environment:
+      - TZ=${TZ:-Asia/Ho_Chi_Minh}
+      - HOME=/tmp
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
   warded-stg-data:

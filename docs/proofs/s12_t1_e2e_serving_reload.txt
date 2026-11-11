@@ -1,0 +1,21 @@
+# Empirical Verification Proof Artifact
+# Task: S12-T1 Automated Cron & Sidecar Scheduling for Forecast Live Refit Pipeline
+# Issue: Close #413
+# Git Branch: feat/s12-t1-automated-forecast-cron-sidecar
+# Git Commit: 5b7614cbdc6a76f1dc33f6914d81913d48457abc
+# Timestamp: 2026-11-11T06:26:15.345651+00:00
+# Host: DatVTs-MacBook-Pro.local (macOS-15.8.1-arm64-arm-64bit-Mach-O)
+# Go Version: go version go1.25.6 darwin/arm64
+# Python Version: 3.14.6 (main, Jun 10 2026, 10:03:53) [Clang 17.0.0 (clang-1700.6.4.2)]
+# Provenance: live_history authentic execution
+--------------------------------------------------------------------------------
+
+=== STAGING GO SERVER DYNAMIC MODEL RELOAD EVIDENCE ===
+Server PID: 76645
+GET /api/v1/cameras/5822b5ededeb6c0012a2d66a/forecast -> HTTP 200
+Initial model version: 2026.11.11-0100-initial
+Model artifact updated on disk: var/test_m5/model.json
+GET /api/v1/cameras/5822b5ededeb6c0012a2d66a/forecast -> HTTP 200
+Reloaded model version: 2026.11.11-0200-promoted
+Server PID unchanged: 76645
+Zero-restart dynamic model reload: VERIFIED PASS

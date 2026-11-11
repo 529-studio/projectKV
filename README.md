@@ -235,7 +235,7 @@ refuses a re-initialised head (`--allow-untrained-head` is bootstrap-only). Evid
 ### 2.4. Verification, Forecast & Evidence Integrity Gates
 
 * **Evidence Integrity Gate**: Run `make evidence-lint` (`tools/ci/check_evidence_integrity.py`) and `make test-ci` to enforce anti-spoofing, temporal invariants, and synthetic data prohibition across all release artifacts (ADR-013 D1).
-* **Forecast Pipeline**: Run `make test-forecast` for suite and `make train-forecast` to refit models on live history and promote to Go server. Provenance: [`docs/reports/forecast_prototype_v1.md`](docs/reports/forecast_prototype_v1.md).
+* **Forecast Pipeline**: Run `make test-forecast` for suite, `make train-forecast` to refit, and `make train-forecast-daemon` for daemon scheduling. Provenance: [`docs/reports/forecast_prototype_v1.md`](docs/reports/forecast_prototype_v1.md).
 
 ## 3. Key Highlights
 
