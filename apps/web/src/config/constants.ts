@@ -587,3 +587,77 @@ export const FORECAST_I18N = Object.freeze({
     },
   },
 });
+
+// =======================================================
+// NEAR ME (S12-T2 / Issue #400) — COMMUTER LAST-MILE I18N
+// Coordinates stay in the browser: no endpoint, no storage.
+// =======================================================
+
+export const NEAR_ME_I18N = Object.freeze({
+  BUTTON_LABEL: { vi: 'Quanh tôi', en: 'Near me' },
+  BUTTON_ARIA: { vi: 'Tìm camera trong bán kính 1,5 km quanh vị trí của bạn', en: 'Find cameras within 1.5 km of your location' },
+  SHEET_TITLE: { vi: 'Quanh bạn', en: 'Near you' },
+  COUNT: { vi: (n: number) => `${n} camera trong bán kính 1,5 km`, en: (n: number) => `${n} ${n === 1 ? 'camera' : 'cameras'} within 1.5 km` },
+  PRIVACY_NOTE: { vi: 'Vị trí chỉ được xử lý trên thiết bị của bạn và không được lưu lại.', en: 'Your location is processed only on this device and is never stored.' },
+  SORT_NOTE: { vi: 'Sắp xếp theo khoảng cách (mỗi bước 250 m), sau đó theo mức ngập.', en: 'Sorted by distance (250 m bands), then flood severity.' },
+  LOCATING_TITLE: { vi: 'Đang xác định vị trí', en: 'Locating you' },
+  LOCATING_BODY: { vi: 'Vui lòng cho phép trình duyệt truy cập vị trí. Quá trình này thường mất vài giây.', en: 'Please allow location access in your browser. This usually takes a few seconds.' },
+  ACCURACY: { vi: (m: number) => `Sai số ±${m} m`, en: (m: number) => `Accuracy ±${m} m` },
+  LOW_ACCURACY_WARN: { vi: 'Sai số GPS lớn, kết quả có thể lệch so với vị trí thực tế.', en: 'GPS accuracy is low, results may be offset from your real position.' },
+  LOW_ACCURACY_BAD: { vi: 'Hãy thử lại ở nơi thoáng hơn hoặc bật chế độ định vị chính xác cao.', en: 'Try again in a more open area or enable high-accuracy location.' },
+  DENIED_TITLE: { vi: 'Trình duyệt đang chặn quyền vị trí', en: 'Location access is blocked' },
+  DENIED_BODY: { vi: 'Warded cần vị trí của bạn để tìm camera gần nhất. Bạn có thể bật lại quyền này bất cứ lúc nào.', en: 'Warded needs your location to find the nearest cameras. You can re-enable it at any time.' },
+  DENIED_STEPS: {
+    vi: ['Mở biểu tượng ổ khóa cạnh thanh địa chỉ.', 'Chọn Quyền vị trí, sau đó chọn Cho phép.', 'Tải lại trang và bấm Quanh tôi.'],
+    en: ['Open the lock icon next to the address bar.', 'Select Location permissions, then Allow.', 'Reload the page and press Near me.'],
+  },
+  DENIED_STEPS_IOS: { vi: 'Trên iPhone: Cài đặt > Safari > Vị trí > Cho phép.', en: 'On iPhone: Settings > Safari > Location > Allow.' },
+  TIMEOUT_TITLE: { vi: 'Hết thời gian xác định vị trí', en: 'Location request timed out' },
+  TIMEOUT_BODY: { vi: 'GPS chưa phản hồi trong 10 giây. Hãy thử lại ở nơi thoáng hơn hoặc kiểm tra dịch vụ định vị.', en: 'GPS did not respond within 10 seconds. Try again in a more open area or check location services.' },
+  UNAVAILABLE_TITLE: { vi: 'Không lấy được vị trí', en: 'Location unavailable' },
+  UNAVAILABLE_BODY: { vi: 'Thiết bị chưa có tín hiệu GPS hoặc dịch vụ định vị đang tắt. Hãy bật định vị rồi thử lại.', en: 'The device has no GPS signal or location services are off. Turn location on and try again.' },
+  INVALID_TITLE: { vi: 'Vị trí không hợp lệ', en: 'Invalid location' },
+  INVALID_BODY: { vi: 'Thiết bị trả về tọa độ không hợp lệ. Hãy thử lại hoặc dùng bản đồ để tìm camera.', en: 'The device returned invalid coordinates. Try again or use the map to find cameras.' },
+  INSECURE_TITLE: { vi: 'Cần kết nối bảo mật', en: 'Secure connection required' },
+  INSECURE_BODY: { vi: 'Trình duyệt chỉ cho phép định vị trên kết nối HTTPS. Hãy mở Warded bằng địa chỉ HTTPS.', en: 'Browsers only allow geolocation over HTTPS. Open Warded using an HTTPS address.' },
+  UNSUPPORTED_TITLE: { vi: 'Trình duyệt không hỗ trợ định vị', en: 'Geolocation is not supported' },
+  UNSUPPORTED_BODY: { vi: 'Hãy dùng Chrome, Safari hoặc Edge phiên bản mới, hoặc tìm camera trực tiếp trên bản đồ.', en: 'Use a recent version of Chrome, Safari or Edge, or find cameras directly on the map.' },
+  OUTSIDE_AREA_TITLE: { vi: 'Bạn đang ở ngoài vùng phủ bản đồ', en: 'You are outside the mapped area' },
+  OUTSIDE_AREA_BODY: { vi: 'Vị trí hiện tại nằm ngoài phạm vi TP.HCM và vùng lân cận, nên kết quả quanh bạn có thể không có.', en: 'Your position is outside Ho Chi Minh City and its surroundings, so nearby results may be empty.' },
+  EMPTY_TITLE: { vi: 'Không có camera nào trong bán kính 1,5 km', en: 'No cameras within 1.5 km' },
+  EMPTY_BODY: { vi: 'Khu vực quanh bạn chưa có camera giám sát. Bạn vẫn có thể xem toàn bộ bản đồ.', en: 'There are no monitoring cameras around you yet. You can still browse the full map.' },
+  EMPTY_OFFLINE_HINT: { vi: (n: number) => `Có ${n} camera mất tín hiệu trong khu vực này.`, en: (n: number) => `${n} ${n === 1 ? 'camera is' : 'cameras are'} offline in this area.` },
+  SHOW_OFFLINE: { vi: 'Hiện camera mất tín hiệu', en: 'Show offline cameras' },
+  HIDE_OFFLINE: { vi: 'Ẩn camera mất tín hiệu', en: 'Hide offline cameras' },
+  DATA_ERROR_TITLE: { vi: 'Không tải được danh sách camera', en: 'Could not load cameras' },
+  DATA_ERROR_BODY: { vi: 'Kết nối tới máy chủ đang gián đoạn. Vị trí của bạn vẫn được giữ nguyên.', en: 'The server connection is interrupted. Your location is preserved.' },
+  RETRY: { vi: 'Thử lại', en: 'Retry' },
+  RECENTER: { vi: 'Về vị trí của tôi', en: 'Recenter on me' },
+  CLOSE: { vi: 'Đóng', en: 'Close' },
+  VIEW_FULL_MAP: { vi: 'Xem toàn bộ bản đồ', en: 'View full map' },
+  BACK_TO_CITY: { vi: 'Về trung tâm TP.HCM', en: 'Back to Ho Chi Minh City center' },
+  SHOW_MORE: { vi: (n: number) => `Xem thêm ${n} camera`, en: (n: number) => `Show ${n} more ${n === 1 ? 'camera' : 'cameras'}` },
+  ROW_ARIA: {
+    vi: (name: string, distance: string, flood: string) => `${name}, cách ${distance}, ${flood}. Mở chi tiết camera.`,
+    en: (name: string, distance: string, flood: string) => `${name}, ${distance} away, ${flood}. Open camera details.`,
+  },
+  SEVERITY: {
+    DEEP: { vi: 'Ngập sâu', en: 'Deep flood' },
+    SHALLOW: { vi: 'Ngập nông', en: 'Shallow flood' },
+    WET: { vi: 'Đường ướt', en: 'Wet road' },
+    DRY: { vi: 'Khô ráo', en: 'Dry' },
+    UNKNOWN: { vi: 'Chưa có dữ liệu', en: 'No data' },
+  },
+  TRAFFIC: {
+    CLEAR: { vi: 'Thông thoáng', en: 'Clear' },
+    MODERATE: { vi: 'Đông xe', en: 'Moderate' },
+    HEAVY: { vi: 'Ùn tắc', en: 'Heavy' },
+    CONGESTED: { vi: 'Tắc nghẽn', en: 'Congested' },
+    UNKNOWN: { vi: 'Chưa xác định', en: 'Unknown' },
+  },
+  BADGE: {
+    OFFLINE: { vi: 'Mất tín hiệu', en: 'Offline' },
+    STALE: { vi: 'Dữ liệu cũ', en: 'Stale data' },
+    NO_DATA: { vi: 'Chưa có dữ liệu', en: 'No data' },
+  },
+});

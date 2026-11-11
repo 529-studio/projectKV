@@ -29,42 +29,45 @@ export function useCameras() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    async function fetchCameras() {
-      try {
-        const res = await fetch(getApiUrl(API_ENDPOINTS.CAMERAS));
-        if (!res.ok) throw new Error('Failed to fetch cameras');
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (data.cameras || []);
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const parsed = list.map((c: any) => {
-          const isWaterway = Boolean(c.isWaterway || c.status === 'WATERWAY_MONITOR');
-          return {
-            ...c,
-            id: c.id || c._id,
-            duplicateOf: c.duplicateOf,
-            isGhost: Boolean(c.isGhost),
-            isWaterway,
-            isOnline: (c.status === 'UP' || c.isOnline === true) && !c.isGhost && !isWaterway,
-            phuong_id: c.phuong_id ?? null,
-            phuong_type: c.phuong_type ?? null,
-            phuong_name: c.phuong_name ?? null,
-            road_type: c.road_type ?? null,
-            road_name: c.road_name ?? null,
-            road_key: c.road_key ?? null,
-            road_keys: Array.isArray(c.road_keys) ? c.road_keys : [],
-          };
-        });
-        setCameras(parsed);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)));
-      } finally {
-        setLoading(false);
-      }
+  const fetchCameras = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(getApiUrl(API_ENDPOINTS.CAMERAS));
+      if (!res.ok) throw new Error('Failed to fetch cameras');
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.cameras || []);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const parsed = list.map((c: any) => {
+        const isWaterway = Boolean(c.isWaterway || c.status === 'WATERWAY_MONITOR');
+        return {
+          ...c,
+          id: c.id || c._id,
+          duplicateOf: c.duplicateOf,
+          isGhost: Boolean(c.isGhost),
+          isWaterway,
+          isOnline: (c.status === 'UP' || c.isOnline === true) && !c.isGhost && !isWaterway,
+          phuong_id: c.phuong_id ?? null,
+          phuong_type: c.phuong_type ?? null,
+          phuong_name: c.phuong_name ?? null,
+          road_type: c.road_type ?? null,
+          road_name: c.road_name ?? null,
+          road_key: c.road_key ?? null,
+          road_keys: Array.isArray(c.road_keys) ? c.road_keys : [],
+        };
+      });
+      setCameras(parsed);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setLoading(false);
     }
-    fetchCameras();
   }, []);
+
+  useEffect(() => {
+    fetchCameras();
+  }, [fetchCameras]);
 
   // markCameraGhost flips a camera to the runtime "no field signal" state after
   // the snapshot proxy reports a GHOST_CAMERA (503) response. This keeps the
@@ -75,5 +78,5 @@ export function useCameras() {
     );
   }, []);
 
-  return { cameras, loading, error, markCameraGhost };
+  return { cameras, loading, error, markCameraGhost, refetch: fetchCameras };
 }
