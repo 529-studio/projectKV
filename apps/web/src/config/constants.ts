@@ -97,6 +97,7 @@ export const FUNCTIONAL_COLORS = Object.freeze({
 });
 
 export const MAP_CONFIG = Object.freeze({
+  PREFER_CANVAS: true,
   DEFAULT_CENTER: [10.7769, 106.7009],
   DEFAULT_ZOOM: 11,
   MIN_ZOOM: 10,

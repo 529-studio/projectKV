@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_ENDPOINTS, getApiUrl } from '../config/constants';
 import {
   type TrafficVerdict,
@@ -9,6 +9,11 @@ import {
   getSeverityLabel,
 } from '../utils/trafficUtils';
 import { type HexCell, normalizeHexCell } from '../utils/hexUtils';
+import {
+  useLiveStream,
+  useCameraUpdate,
+  useHexUpdate,
+} from '../contexts/LiveStreamContext.ts';
 
 // Re-export pure utilities so existing imports of isVerdictValid from this module still work.
 export type { TrafficVerdict, HexCell };
@@ -20,24 +25,33 @@ export function useTraffic() {
   const [analysisEnabled, setAnalysisEnabled] = useState(false);
   const [appEnv, setAppEnv] = useState<string>('production');
   const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
+  const { connected } = useLiveStream();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateVerdict = useCallback((raw: any) => {
-    if (!raw || (!raw.camera_id && !raw.cameraId)) return;
+  const appEnvRef = useRef<string>('production');
+
+  const updateVerdict = useCallback((raw: unknown) => {
+    if (!raw || typeof raw !== 'object') return;
     const v = normalizeVerdict(raw);
     const id = v.camera_id;
-    if (!isVerdictValid(v)) return;
-    if (isMockHidden(v.source, appEnv)) return;
+    if (!id || !isVerdictValid(v)) return;
+    if (isMockHidden(v.source, appEnvRef.current)) return;
     setVerdicts((prev) => {
+      const existing = prev.get(id);
+      if (
+        existing &&
+        existing.observed_at !== undefined &&
+        v.observed_at !== undefined &&
+        existing.observed_at >= v.observed_at
+      ) {
+        return prev;
+      }
       const next = new Map(prev);
       next.set(id, v);
       return next;
     });
-  }, [appEnv]);
+  }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateHexCell = useCallback((raw: any) => {
+  const updateHexCell = useCallback((raw: unknown) => {
     const cell = normalizeHexCell(raw);
     if (!cell) return;
     setHexCells((prev) => {
@@ -47,8 +61,41 @@ export function useTraffic() {
     });
   }, []);
 
+  useCameraUpdate(
+    useCallback(
+      (payload: unknown) => {
+        if (Array.isArray(payload)) {
+          payload.forEach(updateVerdict);
+        } else if (payload && typeof payload === 'object' && 'data' in payload) {
+          const innerData = payload.data;
+          if (Array.isArray(innerData)) innerData.forEach(updateVerdict);
+          else updateVerdict(innerData);
+        } else if (payload) {
+          updateVerdict(payload);
+        }
+      },
+      [updateVerdict]
+    )
+  );
+
+  useHexUpdate(
+    useCallback(
+      (payload: unknown) => {
+        if (Array.isArray(payload)) {
+          payload.forEach(updateHexCell);
+        } else if (payload && typeof payload === 'object' && 'data' in payload) {
+          const innerData = payload.data;
+          if (Array.isArray(innerData)) innerData.forEach(updateHexCell);
+          else updateHexCell(innerData);
+        } else if (payload) {
+          updateHexCell(payload);
+        }
+      },
+      [updateHexCell]
+    )
+  );
+
   useEffect(() => {
-    let es: EventSource | null = null;
     let isCancelled = false;
 
     async function fetchInitial() {
@@ -65,14 +112,14 @@ export function useTraffic() {
           }
           if ('app_env' in data && typeof data.app_env === 'string') {
             currentEnv = data.app_env;
+            appEnvRef.current = data.app_env;
             setAppEnv(data.app_env);
           }
         }
 
         const list = Array.isArray(data) ? data : (data.verdicts || []);
         const initialMap = new Map<string, TrafficVerdict>();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        list.forEach((raw: any) => {
+        list.forEach((raw: unknown) => {
           const v = normalizeVerdict(raw);
           const id = v.camera_id;
           if (id && isVerdictValid(v) && !isMockHidden(v.source, currentEnv)) {
@@ -89,69 +136,7 @@ export function useTraffic() {
       }
     }
 
-    function initSSE() {
-      if (typeof window === 'undefined' || typeof EventSource === 'undefined') {
-        return;
-      }
-
-      try {
-        es = new EventSource(getApiUrl(API_ENDPOINTS.SSE_LIVE));
-
-        es.onopen = () => {
-          setConnected(true);
-        };
-
-        es.addEventListener('camera_update', (event: MessageEvent) => {
-          setConnected(true);
-          try {
-            const payload = JSON.parse(event.data);
-            if (Array.isArray(payload)) {
-              payload.forEach(updateVerdict);
-            } else if (payload.data) {
-              if (Array.isArray(payload.data)) payload.data.forEach(updateVerdict);
-              else updateVerdict(payload.data);
-            } else {
-              updateVerdict(payload);
-            }
-          } catch (err) {
-            console.warn('Failed to parse SSE camera_update message:', err);
-          }
-        });
-
-        es.addEventListener('hex_update', (event: MessageEvent) => {
-          setConnected(true);
-          try {
-            const payload = JSON.parse(event.data);
-            if (Array.isArray(payload)) {
-              payload.forEach(updateHexCell);
-            } else if (payload.data) {
-              if (Array.isArray(payload.data)) payload.data.forEach(updateHexCell);
-              else updateHexCell(payload.data);
-            } else {
-              updateHexCell(payload);
-            }
-          } catch (err) {
-            console.warn('Failed to parse SSE hex_update message:', err);
-          }
-        });
-
-        es.onerror = (err) => {
-          setConnected(false);
-          // EventSource automatically attempts to reconnect on transient errors per the SSE spec.
-          if (es?.readyState === EventSource.CLOSED) {
-            console.warn('SSE connection closed:', err);
-          }
-        };
-      } catch (err) {
-        console.warn('Failed to initialize EventSource:', err);
-      }
-    }
-
-    fetchInitial().then(() => {
-      if (!isCancelled) {
-        initSSE();
-      }
-    });
+    fetchInitial();
 
     // Periodically update staleness and prune expired verdicts
     const pruneInterval = setInterval(() => {
@@ -160,7 +145,7 @@ export function useTraffic() {
         let changed = false;
         const next = new Map<string, TrafficVerdict>();
         for (const [id, v] of prev.entries()) {
-          if (!isVerdictValid(v) || isMockHidden(v.source, appEnv)) {
+          if (!isVerdictValid(v) || isMockHidden(v.source, appEnvRef.current)) {
             changed = true;
             continue;
           }
@@ -179,11 +164,8 @@ export function useTraffic() {
     return () => {
       isCancelled = true;
       clearInterval(pruneInterval);
-      if (es) {
-        es.close();
-      }
     };
-  }, [updateVerdict, updateHexCell, appEnv]);
+  }, []);
 
   return { verdicts, hexCells, analysisEnabled, appEnv, loading, connected };
 }

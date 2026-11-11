@@ -253,6 +253,7 @@ export default function MapComponent({
     
     if (!mapRef.current) {
       const map = L.map(containerRef.current, {
+        preferCanvas: MAP_CONFIG.PREFER_CANVAS ?? true,
         center: MAP_CONFIG.DEFAULT_CENTER as L.LatLngTuple,
         zoom: MAP_CONFIG.DEFAULT_ZOOM,
         minZoom: MAP_CONFIG.MIN_ZOOM,

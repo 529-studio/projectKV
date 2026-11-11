@@ -35,6 +35,7 @@ export function useHotsetStatus(options: UseHotsetStatusOptions = {}): UseHotset
   const [error, setError] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastFetchedRef = useRef<number>(0);
 
   const executeFetch = useCallback(async () => {
     if (abortControllerRef.current) {
@@ -43,6 +44,7 @@ export function useHotsetStatus(options: UseHotsetStatusOptions = {}): UseHotset
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
+    lastFetchedRef.current = Date.now();
     const endpointUrl = getApiUrl(API_ENDPOINTS.HOTSET_STATUS);
     const result = await fetchHotsetStatus(endpointUrl, fetch, controller.signal);
 
@@ -66,25 +68,71 @@ export function useHotsetStatus(options: UseHotsetStatusOptions = {}): UseHotset
     }
 
     let isCancelled = false;
+    let intervalId: NodeJS.Timeout | null = null;
 
-    executeFetch();
+    const startPolling = () => {
+      if (intervalId) return;
+      intervalId = setInterval(() => {
+        if (!isCancelled && (typeof document === 'undefined' || document.visibilityState !== 'hidden')) {
+          executeFetch();
+        }
+      }, pollIntervalMs);
+    };
 
-    const intervalId = setInterval(() => {
-      if (!isCancelled) {
-        executeFetch();
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
       }
-    }, pollIntervalMs);
+    };
+
+    const handleVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState === 'visible') {
+        executeFetch();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+
+    const handleFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        // Debounce if visibilitychange just triggered a fetch
+        if (Date.now() - lastFetchedRef.current > 2000) {
+          executeFetch();
+        }
+      }
+    };
+
+    // Initial fetch and start polling if visible
+    if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+      executeFetch();
+      startPolling();
+    }
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleFocus);
+    }
 
     return () => {
       isCancelled = true;
-      clearInterval(intervalId);
+      stopPolling();
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleFocus);
+      }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
     };
   }, [enabled, pollIntervalMs, executeFetch]);
-
   return {
     hotsetStatus,
     total,
