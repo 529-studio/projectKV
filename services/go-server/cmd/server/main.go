@@ -52,6 +52,28 @@ type verdictStoreAdapter struct {
 	repo *store.VerdictRepo
 }
 
+// hotsetVerdictFromStore converts a persisted verdict into the in-memory/API shape.
+//
+// It is the single mapping used both by the GET endpoints (verdictStoreAdapter) and by
+// the boot-time hydration of the in-memory store. Duplicating that mapping is how a new
+// column silently reaches SQLite and never reaches the wire (Issue #401 AC11).
+func hotsetVerdictFromStore(v store.Verdict) hotset.Verdict {
+	return hotset.Verdict{
+		CameraID:             v.CameraID,
+		Severity:             v.Severity,
+		FloodSeverity:        v.FloodSeverity,
+		Confidence:           v.Confidence,
+		Source:               v.Source,
+		ObservedAt:           v.ObservedAt,
+		Timestamp:            v.Timestamp,
+		FloodDepthCm:         v.FloodDepthCm,
+		FloodHazardLevel:     v.FloodHazardLevel,
+		FloodHazardBasis:     v.FloodHazardBasis,
+		FloodDepthConfidence: v.FloodDepthConfidence,
+		FloodCalibrationRef:  v.FloodCalibrationRef,
+	}
+}
+
 func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
 	if a.repo == nil {
 		return []hotset.Verdict{}
@@ -63,15 +85,7 @@ func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
 	}
 	out := make([]hotset.Verdict, len(verdicts))
 	for i, v := range verdicts {
-		out[i] = hotset.Verdict{
-			CameraID:      v.CameraID,
-			Severity:      v.Severity,
-			FloodSeverity: v.FloodSeverity,
-			Confidence:    v.Confidence,
-			Source:        v.Source,
-			ObservedAt:    v.ObservedAt,
-			Timestamp:     v.Timestamp,
-		}
+		out[i] = hotsetVerdictFromStore(v)
 	}
 	return out
 }
@@ -996,16 +1010,9 @@ func main() {
 				if !obs.IsZero() && now.Sub(obs) > staleThreshold {
 					isStale = true
 				}
-				hv := hotset.Verdict{
-					CameraID:      sv.CameraID,
-					Severity:      sv.Severity,
-					FloodSeverity: sv.FloodSeverity,
-					Confidence:    sv.Confidence,
-					Source:        sv.Source,
-					ObservedAt:    obs,
-					Timestamp:     sv.Timestamp,
-					Stale:         isStale,
-				}
+				hv := hotsetVerdictFromStore(sv)
+				hv.ObservedAt = obs
+				hv.Stale = isStale
 				hotsetStore.Set(hv)
 				hexAggregator.OnVerdict(hv)
 				floodHexAggregator.OnVerdict(hv)
@@ -1036,13 +1043,18 @@ func main() {
 		onFloodVerdict := func(v hotset.Verdict) {
 			if verdictRepo != nil {
 				sv := store.Verdict{
-					CameraID:      v.CameraID,
-					Severity:      v.Severity,
-					FloodSeverity: v.FloodSeverity,
-					Confidence:    v.Confidence,
-					Source:        v.Source,
-					ObservedAt:    v.ObservedAt,
-					Timestamp:     v.Timestamp,
+					CameraID:             v.CameraID,
+					Severity:             v.Severity,
+					FloodSeverity:        v.FloodSeverity,
+					Confidence:           v.Confidence,
+					Source:               v.Source,
+					ObservedAt:           v.ObservedAt,
+					Timestamp:            v.Timestamp,
+					FloodDepthCm:         v.FloodDepthCm,
+					FloodHazardLevel:     v.FloodHazardLevel,
+					FloodHazardBasis:     v.FloodHazardBasis,
+					FloodDepthConfidence: v.FloodDepthConfidence,
+					FloodCalibrationRef:  v.FloodCalibrationRef,
 				}
 				if err := verdictRepo.Save(context.Background(), sv); err != nil {
 					log.Printf("[WARN] Failed to persist flood verdict for %s: %v", v.CameraID, err)
@@ -1208,13 +1220,18 @@ func main() {
 			// Fan-out 2: persist to SQLite for GET /api/traffic-status hydration.
 			if verdictRepo != nil {
 				sv := store.Verdict{
-					CameraID:      v.CameraID,
-					Severity:      v.Severity,
-					Confidence:    v.Confidence,
-					Source:        v.Source,
-					ObservedAt:    v.ObservedAt,
-					Timestamp:     v.Timestamp,
-					FloodSeverity: v.FloodSeverity,
+					CameraID:             v.CameraID,
+					Severity:             v.Severity,
+					Confidence:           v.Confidence,
+					Source:               v.Source,
+					ObservedAt:           v.ObservedAt,
+					Timestamp:            v.Timestamp,
+					FloodSeverity:        v.FloodSeverity,
+					FloodDepthCm:         v.FloodDepthCm,
+					FloodHazardLevel:     v.FloodHazardLevel,
+					FloodHazardBasis:     v.FloodHazardBasis,
+					FloodDepthConfidence: v.FloodDepthConfidence,
+					FloodCalibrationRef:  v.FloodCalibrationRef,
 				}
 				if err := verdictRepo.Save(context.Background(), sv); err != nil {
 					log.Printf("[WARN] Failed to persist verdict for %s: %v", v.CameraID, err)

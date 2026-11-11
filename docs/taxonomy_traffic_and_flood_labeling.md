@@ -103,6 +103,40 @@ Flood severity is strictly determined by **physical immersion anchors** observed
   - **Car Anchor**: Water reaches the wheel center caps or laps against car lower rocker panels/bumpers.
   - **Behavioral Anchor**: Motorcyclists turn around, ride onto elevated sidewalks, or push stalled motorbikes through the water. Vehicles produce large bow waves.
 
+### 3.2. Physical Centimetre Hazard Layer (additive, Issue #401)
+
+The `NONE` / `SHALLOW` / `DEEP` enum above remains the training and alert label. The
+API additionally publishes a rider-facing physical layer derived from the same
+segmentation, because a rider on a Honda Vision cannot act on an area ratio:
+
+| Reference | Height above road | Role |
+|:---|:---:|:---|
+| Curb top edge (`lề đường`) | 15 cm | primary anchor when no vehicle is in water |
+| Exhaust outlet (`miệng ống xả`) | 20 cm | stall threshold between Level 2 and Level 3 |
+| Wheel rim (`vành xe`) | 35–40 cm | deep-water confirmation, confidence only |
+| Motorcycle grip-to-ground | 110 cm | scale source when a box exists |
+
+Bands (classified on the **unrounded** depth, 20.0 inclusive into Level 3):
+`0 ≤ d < 10` Level 1 `Bấp bênh / Bắn nước`; `10 ≤ d < 20` Level 2
+`Cảnh báo xe ga gầm thấp`; `d ≥ 20` Level 3 `Nguy cơ chết máy cao`.
+
+Three rules make the layer honest and are normative for annotators as well:
+
+1. **Depth is measured, never inferred.** No reference object in the frame means
+   `flood_depth_cm: null` with `flood_depth_confidence: UNMEASURED` — never `0.0`,
+   which would read as "dry, verified".
+2. **Absence of traffic in a large pool is evidence of hazard.** A pool covering
+   ≥ 30 % of the lane with a credible area (≥ 400 px), that no rider is crossing,
+   is `FLOODED_DEEP` with `flood_hazard_basis: AVOIDANCE_INFERRED`, whether the lane
+   is empty or traffic is queued upstream. It publishes a level and no centimetre
+   figure. Through-traffic at rim depth (`delta_sub ≥ 0.09`) suppresses escalation.
+3. **No default level.** With neither a measured depth nor avoidance evidence the
+   level is `null`; the UI keeps the legacy severity badge instead of inventing a
+   safety claim.
+
+Field names and vocabularies are specified in
+[`sprints/s12_t3_spec.md`](sprints/s12_t3_spec.md) §5.
+
 ---
 
 ## 4. Image Quality & Environmental Artifact Flags

@@ -21,6 +21,13 @@ services:
     volumes:
       - ./yolov8n_openvino_model:/app/models/yolov8n_openvino_320:ro
       - ./services/cv-engine/server.py:/app/server.py:ro
+      # `server.py` imports this sibling module at load time; without the mount the
+      # container starts from the image copy and silently ignores local edits.
+      - ./services/cv-engine/hazard_classifier.py:/app/hazard_classifier.py:ro
+      # Operator calibration (§2.2). The repository ships an empty template
+      # (`{"version": 1, "cameras": {}}`), so the bind mount always resolves to a file:
+      # a missing path here would be auto-created as a directory and fail the loader.
+      - ./services/cv-engine/calibration.json:/app/calibration.json:ro
     deploy:
       resources:
         limits:

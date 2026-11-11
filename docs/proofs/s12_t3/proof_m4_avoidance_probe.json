@@ -1,0 +1,69 @@
+{
+  "captured_from": "http://localhost:8000/predict (live DOT frames)",
+  "probes": [
+    {
+      "camera_id": "662b86c41afb9c00172dd31c",
+      "water_ratio": 0,
+      "flood_hazard_level": null,
+      "flood_hazard_basis": "NONE",
+      "flood_depth_cm": null,
+      "flood_severity": "CLEAR"
+    },
+    {
+      "camera_id": "5a6065c58576340017d06615",
+      "water_ratio": 0,
+      "flood_hazard_level": null,
+      "flood_hazard_basis": "NONE",
+      "flood_depth_cm": null,
+      "flood_severity": "CLEAR"
+    },
+    {
+      "camera_id": "6623f4df6f998a001b2528eb",
+      "water_ratio": 0,
+      "flood_hazard_level": null,
+      "flood_hazard_basis": "NONE",
+      "flood_depth_cm": null,
+      "flood_severity": "CLEAR"
+    },
+    {
+      "camera_id": "662b7ce71afb9c00172dc676",
+      "water_ratio": 0,
+      "flood_hazard_level": null,
+      "flood_hazard_basis": "NONE",
+      "flood_depth_cm": null,
+      "flood_severity": "CLEAR"
+    },
+    {
+      "camera_id": "583f969161cfea0012cf68f7",
+      "water_ratio": 0,
+      "flood_hazard_level": null,
+      "flood_hazard_basis": "NONE",
+      "flood_depth_cm": null,
+      "flood_severity": "CLEAR"
+    },
+    {
+      "camera_id": "59ca317602eb490011a0a408",
+      "water_ratio": 0,
+      "flood_hazard_level": null,
+      "flood_hazard_basis": "NONE",
+      "flood_depth_cm": null,
+      "flood_severity": "CLEAR"
+    },
+    {
+      "camera_id": "6623e8da6f998a001b2524a6",
+      "water_ratio": 0,
+      "flood_hazard_level": null,
+      "flood_hazard_basis": "NONE",
+      "flood_depth_cm": null,
+      "flood_severity": "CLEAR"
+    },
+    {
+      "camera_id": "56de42f611f398ec0c481299",
+      "water_ratio": 0,
+      "flood_hazard_level": null,
+      "flood_hazard_basis": "NONE",
+      "flood_depth_cm": null,
+      "flood_severity": "CLEAR"
+    }
+  ]
+}

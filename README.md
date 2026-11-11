@@ -242,16 +242,17 @@ refuses a re-initialised head (`--allow-untrained-head` is bootstrap-only). Evid
 *   **Monochromatic & Intuitive Interface**: Minimalist high-contrast design using black, dark gray, and white tones.
 *   **Bilingual i18n Support**: Instant switching between Vietnamese (`vi`, default) and English (`en`), persisted across sessions.
 *   **Clean Standard OSM Basemap**: OpenStreetMap tiles, no watermark, geographically constrained to Southeastern Vietnam (`maxBounds`).
-*   **Map Clutter Hygiene & Offline Camera Filtering**: Automatically hides 135 offline or no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default, with dynamic header counter badge (`Đang hiển thị 702 / 837 camera`) and a monochromatic toggle button.
+*   **Map Clutter Hygiene & Offline Camera Filtering**: Hides 135 offline or no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default, with a header counter and monochromatic toggle.
 *   **Chained Deep Filter**: Multi-tier faceted filtering — *Zone* ➔ *Road / Corridor* ➔ *Intersection / Node*.
-*   **Real-Time Arterial Marker Saturation Coloring**: Styles Hot Set camera markers from 30s ONNX PCU saturation: Clear (`#10b981`, $SI < 0.30$), Moderate (`#f59e0b`, $0.30 \le SI < 0.60$), and Congested (`#ef4444`, $SI \ge 0.60$) with CSS pulse, tooltip SI%/PCU metrics, and legend `[Xanh] [Vàng] [Đỏ]`.
-*   **Calibrated Doppler Rain Radar Pipeline (S8-T1)**: RainViewer Doppler radar tiles at Zoom 8 with meteorological RGB reflectivity decoding (18–29 dBZ Light, 30–39 dBZ Moderate, $\ge 40$ dBZ Heavy), 7-point hexagon spatial quorum, and surface ground-camera cross-validation.
+*   **Real-Time Arterial Marker Saturation Coloring**: Styles Hot Set markers from 30s ONNX PCU saturation: Clear (`#10b981`, $SI < 0.30$), Moderate (`#f59e0b`, $0.30 \le SI < 0.60$), Congested (`#ef4444`, $SI \ge 0.60$), with CSS pulse, tooltip metrics, and legend.
+*   **Calibrated Doppler Rain Radar (S8-T1)**: RainViewer tiles at Zoom 8 with meteorological RGB reflectivity decoding (18–29 dBZ light, 30–39 moderate, $\ge 40$ heavy), hexagon quorum, and ground-camera cross-validation.
 *   **Multi-Camera Corridor Tracking Dock**: Pin cameras into the bottom tracking dock with synchronized snapshot refresh.
-*   **Human-in-the-Loop Flood Reporting & Map Bridge (S8-T7)**: Commuter flood reports from camera modals bridge live to SSE map streams and hex aggregators, with amber markers, 15m sliding TTL, and multi-reporter escalation ($\ge 2$ distinct IPs within 10m).
-*   **Directional Multi-Lane Taxonomy & Physical Flood Markers**: Classifies traffic density independently by direction (Direction A approaching vs Direction B receding) to resolve asymmetric divided boulevards, and anchors flood severity strictly to physical tire/wheel depth markers.
+*   **Human-in-the-Loop Flood Reporting (S8-T7)**: Commuter flood reports bridge live to SSE map streams and hex aggregators, with amber markers, 15m sliding TTL, and multi-reporter escalation.
+*   **Directional Multi-Lane Taxonomy & Physical Flood Markers**: Classifies traffic density independently by direction (Direction A approaching vs Direction B receding) to resolve asymmetric divided boulevards, and anchors flood severity to physical wheel-depth markers.
+*   **Physical Flood Hazard Levels (cm)**: Depth anchored to the in-frame 110 cm motorcycle reference (per-camera overrides ±25%); the 15 cm curb reference is deferred until a curb segmenter lands. Three stall-risk bands plus an avoidance-inferred Level 3 for upstream-stopped traffic — never a fabricated depth.
 *   **Responsive Layout (100dvh)**: Desktop, tablet, and smartphone friendly with collapsible legend and mobile bottom-sheet drawer.
 *   **Go Backend**: Single static binary, no runtime dependency install, in-memory + SQLite state, goroutine-based Hot Set scheduler.
-*   **Cloudflare R2 Object Storage**: S3-compatible cloud storage (`warded-proofs`) for snapshot proofs, distributed via edge CDN (`https://file.529studio.site`) for centralized team labeling workflows.
+*   **Cloudflare R2 Object Storage**: S3-compatible storage (`warded-proofs`) for snapshot proofs, distributed via edge CDN for team labeling workflows.
 
 ### Microservice Architecture & Host Topology
 

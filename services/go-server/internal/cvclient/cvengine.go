@@ -47,6 +47,98 @@ type cvPredictResponse struct {
 	Source  string            `json:"source"`
 	Mode    string            `json:"mode"`
 	Regions []cvPredictRegion `json:"regions,omitempty"`
+
+	// Physical hazard layer (Issue #401, spec §5.1/§5.3). Every field is optional:
+	// an image from before #401 omits them, and `DepthEstimatedCm` is the only
+	// legacy key the rolling-deploy fallback may read. Pointers keep "absent"
+	// distinguishable from a measured 0.0 (AC13).
+	DepthEstimatedCm     *float64 `json:"depth_estimated_cm"`
+	FloodDepthCm         *float64 `json:"flood_depth_cm"`
+	FloodHazardLevel     *int     `json:"flood_hazard_level"`
+	FloodHazardBasis     string   `json:"flood_hazard_basis"`
+	FloodDepthConfidence string   `json:"flood_depth_confidence"`
+	// cv-engine publishes `calibration_ref`; the API key is `flood_calibration_ref`
+	// (§5.2), so this decode tag and the hotset field deliberately differ.
+	CalibrationRef string `json:"calibration_ref"`
+}
+
+// Hazard basis and confidence vocabularies published by cv-engine (spec §5.1).
+// The Go layer never invents a value outside these literals.
+const (
+	hazardBasisDepthMeasured = "DEPTH_MEASURED"
+
+	hazardDepthConfidenceInferred = "INFERRED"
+)
+
+// Hazard bands in centimetres (spec §2.3). 20.0 is inclusive into level 3 because
+// the exhaust outlet sits at the waterline; the values are classified unrounded.
+const (
+	hazardLevelTwoMinCm   = 10.0
+	hazardLevelThreeMinCm = 20.0
+)
+
+// hazardLevelFromDepthCm derives a level from a centimetre depth. It exists only
+// for the rolling-deploy fallback described in spec §5.3: when cv-engine reports
+// `depth_estimated_cm` but not the hazard block.
+func hazardLevelFromDepthCm(depthCm float64) int {
+	switch {
+	case depthCm < hazardLevelTwoMinCm:
+		return 1
+	case depthCm < hazardLevelThreeMinCm:
+		return 2
+	default:
+		return 3
+	}
+}
+
+// resolveHazardFields applies the §5.3 pass-through contract.
+//
+//   - A published level is carried verbatim, with every companion field exactly
+//     as the engine sent it (no clamping, no re-classification).
+//   - Level absent, the whole hazard block absent, and `depth_estimated_cm` present
+//     (older cv-engine image during a rolling deploy) derives the level from that
+//     measured depth, labelled DEPTH_MEASURED/INFERRED so the UI can tell it from a
+//     measured level.
+//   - Both absent (VLM, mock, unknownVerdict) yields nil pointers and empty
+//     strings, keeping the legacy flood badge rendering (AC14).
+//   - A current cv-engine image that explicitly declines to measure (level null with
+//     basis `NONE` and confidence `UNMEASURED`) is carried verbatim: nil stays nil.
+//
+// `water_ratio` is never an input: without a calibrated scale it is an area
+// ratio, not a depth, and deriving a level from it is the defect being fixed.
+func resolveHazardFields(
+	resp *cvPredictResponse,
+) (depthCm *float64, level *int, basis, confidence, calibrationRef string) {
+	level = resp.FloodHazardLevel
+	depthCm = resp.FloodDepthCm
+	basis = resp.FloodHazardBasis
+	confidence = resp.FloodDepthConfidence
+	calibrationRef = resp.CalibrationRef
+
+	if level == nil && resp.DepthEstimatedCm != nil && hazardBlockAbsent(resp) {
+		derived := hazardLevelFromDepthCm(*resp.DepthEstimatedCm)
+		level = &derived
+		verbatimDepth := *resp.DepthEstimatedCm
+		depthCm = &verbatimDepth
+		basis = hazardBasisDepthMeasured
+		confidence = hazardDepthConfidenceInferred
+	}
+	return depthCm, level, basis, confidence, calibrationRef
+}
+
+// hazardBlockAbsent reports whether resp carries no §5.1 hazard block at all.
+//
+// The rolling-deploy fallback exists for one situation only: a cv-engine image that
+// predates the hazard contract and therefore sends `depth_estimated_cm` without any
+// of the companion keys. A current image always publishes the block, so a level of
+// null together with a published basis, confidence and calibration reference is an
+// explicit "not measured" verdict (an avoidance frame or a frame with no reference
+// object) and must be preserved as nil. Deriving a level there would turn the
+// engine's deliberate silence into a fabricated 0 cm reading (AC10/AC13).
+func hazardBlockAbsent(resp *cvPredictResponse) bool {
+	return resp.FloodHazardBasis == "" &&
+		resp.FloodDepthConfidence == "" &&
+		resp.CalibrationRef == ""
 }
 
 // CVEngineOption configures an optional parameter for CVEngineAnalyzer.
@@ -199,9 +291,9 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 		if err != nil {
 			return unknownVerdict(cam.ID), err
 		}
-		predResp, err = a.postPredict(ctx, predictURL, mpBody, contentType)
+		predResp, err = a.postPredict(ctx, predictURL, mpBody, contentType, cam.ID)
 	} else {
-		predResp, err = a.postPredict(ctx, predictURL, jpegBytes, "application/octet-stream")
+		predResp, err = a.postPredict(ctx, predictURL, jpegBytes, "application/octet-stream", cam.ID)
 	}
 	if err != nil {
 		return unknownVerdict(cam.ID), err
@@ -278,25 +370,34 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 		floodSev = hotset.SeverityUnknown
 	}
 
+	hazardDepthCm, hazardLevel, hazardBasis, hazardConfidence, hazardCalibrationRef := resolveHazardFields(&resp)
+
 	now := time.Now()
 	return hotset.Verdict{
-		CameraID:        cam.ID,
-		Severity:        severity,
-		FloodSeverity:   floodSev,
-		Confidence:      resp.Confidence,
-		Source:          "onnx",
-		Timestamp:       now,
-		ObservedAt:      now,
-		RawFrame:        jpegBytes,
-		SaturationIndex: saturationIndex,
-		PCUTotal:        pcuTotal,
-		Directions:      directions,
+		CameraID:             cam.ID,
+		Severity:             severity,
+		FloodSeverity:        floodSev,
+		Confidence:           resp.Confidence,
+		Source:               "onnx",
+		Timestamp:            now,
+		ObservedAt:           now,
+		RawFrame:             jpegBytes,
+		SaturationIndex:      saturationIndex,
+		PCUTotal:             pcuTotal,
+		Directions:           directions,
+		FloodDepthCm:         hazardDepthCm,
+		FloodHazardLevel:     hazardLevel,
+		FloodHazardBasis:     hazardBasis,
+		FloodDepthConfidence: hazardConfidence,
+		FloodCalibrationRef:  hazardCalibrationRef,
 	}, nil
 }
 
 // postPredict sends body to the predict endpoint with contentType, retrying
-// only transport-level failures with linear backoff.
-func (a *CVEngineAnalyzer) postPredict(ctx context.Context, url string, body []byte, contentType string) (*http.Response, error) {
+// only transport-level failures with linear backoff. `cameraID` travels as
+// X-Camera-ID so cv-engine can apply that camera's operator calibration
+// (spec §2.2); an empty id simply falls back to the raw scale.
+func (a *CVEngineAnalyzer) postPredict(ctx context.Context, url string, body []byte, contentType, cameraID string) (*http.Response, error) {
 	attempts := a.attempts
 	if attempts < 1 {
 		attempts = 1
@@ -312,6 +413,9 @@ func (a *CVEngineAnalyzer) postPredict(ctx context.Context, url string, body []b
 			return nil, fmt.Errorf("cv-engine: build predict request: %w", err)
 		}
 		req.Header.Set("Content-Type", contentType)
+		if cameraID != "" {
+			req.Header.Set("X-Camera-ID", cameraID)
+		}
 
 		resp, err := a.client.Do(req)
 		if err == nil {

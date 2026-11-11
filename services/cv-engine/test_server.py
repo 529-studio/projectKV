@@ -54,6 +54,7 @@ from server import (
     resolve_input_resolution,
     triangulate_flood_verdict,
 )
+from hazard_classifier import AVOIDANCE_CONFIDENCE_CAP
 
 
 def isolate_input_resolution_env(testcase: unittest.TestCase) -> None:
@@ -354,11 +355,22 @@ class TestSegmentationAndTriangulation(unittest.TestCase):
         )
         self.assertEqual(verdict_s, "FLOODED_SHALLOW")
 
-        # 3. Static fallback: no motorcycles observed but water_ratio >= 0.35
+        # 3. Rewritten for Issue #401 (spec §2.4, AC7/AC8). The old static fallback
+        #    returned FLOODED_SHALLOW whenever no motorcycle was observed and the water
+        #    ratio passed 0.35 — turning evidence of hazard into a clearance. A pool
+        #    that blocks the lane with no through-traffic is now FLOODED_DEEP.
         verdict_f, conf_f = triangulate_flood_verdict(
-            water_ratio=0.40, max_delta_sub=0.0, depth_estimated_cm=0.0, motorcycles_observed=0
+            water_ratio=0.40,
+            max_delta_sub=0.0,
+            depth_estimated_cm=0.0,
+            motorcycles_observed=0,
+            pool_area_px=5200.0,
+            observations=(),
+            pool_top_y=None,
         )
-        self.assertEqual(verdict_f, "FLOODED_SHALLOW")
+        self.assertEqual(verdict_f, "FLOODED_DEEP")
+        self.assertNotEqual(verdict_f, "FLOODED_SHALLOW")
+        self.assertLessEqual(conf_f, AVOIDANCE_CONFIDENCE_CAP)
 
         # 4. WET (puddle): water_ratio >= 0.05
         verdict_w, _ = triangulate_flood_verdict(
@@ -448,6 +460,12 @@ class TestFloodAssessmentContract(unittest.TestCase):
         "motorcycles_observed",
         "motorcycles_submerged",
         "puddle_polygon_count",
+        # Added by Issue #401 (spec §5.1). The block always carries them so a client
+        # never has to guess whether a missing key means "unmeasured" or "old build".
+        "hazard_level",
+        "hazard_basis",
+        "depth_confidence",
+        "calibration_ref",
     })
 
     def _build(self, **overrides):
@@ -665,6 +683,51 @@ class TestPredictPayload(unittest.TestCase):
         self.assertFalse(assessment["wheel_submersion_detected"])
         self.assertEqual(assessment["motorcycles_observed"], 0)
         self.assertEqual(assessment["puddle_polygon_count"], 0)
+
+    def test_response_carries_the_hazard_fields_unmeasured_never_zero(self):
+        # AC13/E1: the fake model reports no reference object, no motorcycle and no
+        # pool, so the depth is unmeasured. It must serialise as null — a 0.0 here
+        # would read as "dry, verified" and reproduce the defect #401 removes.
+        status, payload = self._post_predict()
+        self.assertEqual(status, 200)
+        for key in (
+            "flood_depth_cm",
+            "flood_hazard_level",
+            "flood_hazard_basis",
+            "flood_depth_confidence",
+            "calibration_ref",
+        ):
+            self.assertIn(key, payload)
+        self.assertIsNone(payload["flood_depth_cm"])
+        self.assertIsNone(payload["flood_hazard_level"])
+        self.assertEqual(payload["flood_hazard_basis"], "NONE")
+        self.assertEqual(payload["flood_depth_confidence"], "UNMEASURED")
+        self.assertEqual(payload["calibration_ref"], "NONE")
+
+    def test_detection_only_model_with_motorcycle_never_claims_a_measured_depth(self):
+        # B2/AC10: a COCO detection head has no mask prototypes, so `water_mask` is
+        # None and a detected motorcycle cannot serve as a ruler. The payload must
+        # report calibration_ref NONE and a null depth, never a fabricated
+        # "0.0 cm / MOTORCYCLE_110CM" measurement of a scene nobody measured.
+        # COCO layout is (1, 4 + 80 classes, anchors): no mask prototypes, so the
+        # handler leaves `water_mask` as None.
+        data = np.zeros((1, 84, 100), dtype=np.float32)
+        data[0, 0, 0] = 208.0  # cx of the single anchor
+        data[0, 1, 0] = 300.0  # cy
+        data[0, 2, 0] = 40.0  # w
+        data[0, 3, 0] = 80.0  # h
+        data[0, 7, 0] = 0.9  # COCO class 3 = motorcycle score
+        self._use_model(shape=(1, 3, -1, -1), output={0: data})
+
+        status, payload = self._post_predict()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["vehicle_counts"]["motorcycle"], 1)
+        self.assertEqual(payload["calibration_ref"], "NONE")
+        self.assertIsNone(payload["flood_depth_cm"])
+        self.assertIsNone(payload["flood_hazard_level"])
+        self.assertEqual(payload["flood_hazard_basis"], "NONE")
+        self.assertEqual(payload["flood_depth_confidence"], "UNMEASURED")
 
     def test_handler_delegates_to_build_flood_assessment(self):
         # If the handler ever re-inlines the dict, the contract tests stop covering the

@@ -166,7 +166,7 @@ var CriticalTables = []TableSchemaSpec{
 	},
 	{
 		TableName: "camera_verdicts",
-		Columns:   []string{"camera_id", "observed_at", "severity", "flood_severity"},
+		Columns:   []string{"camera_id", "observed_at", "severity", "flood_severity", "flood_depth_cm", "flood_hazard_level", "flood_hazard_basis", "flood_depth_confidence", "flood_calibration_ref"},
 	},
 	{
 		TableName: "camera_capacities",

@@ -1,0 +1,491 @@
+{
+  "issue": "#401",
+  "task": "S12-T3",
+  "title": "Motorbike Flood Stall Hazard Level Classifier (cm Depth)",
+  "fit_source": "live_history",
+  "timestamp": "2026-11-11T17:16:57.976Z",
+  "completed_at": "2026-11-11T17:18:16.401Z",
+  "gate_status": "BLOCKED",
+  "summary": {
+    "total": 14,
+    "passed": 3,
+    "failed": 0,
+    "blocked": 11
+  },
+  "model_state": {
+    "deployed_model_dir": "yolov8n_openvino_model (docker-compose MODEL_DIR=/app/models/yolov8n_openvino_320)",
+    "deployed_task": "detect",
+    "deployed_head": "Detect",
+    "segmentation_ir": {
+      "present": true,
+      "task": "segment",
+      "headStatus": "reinitialised_untrained",
+      "bytes": 6518038
+    },
+    "segmentation_training_frames": 0
+  },
+  "segmentation_probe": {
+    "attempted": true,
+    "model_loaded": true,
+    "observations": [
+      {
+        "camera_id": "662b86c41afb9c00172dd31c",
+        "http_status": 200,
+        "model": "yolov8n_seg_openvino_416",
+        "vehicles": 0,
+        "motorcycles": 0,
+        "water_ratio": 0,
+        "flood_hazard_level": null,
+        "calibration_ref": "NONE"
+      },
+      {
+        "camera_id": "5a6065c58576340017d06615",
+        "http_status": 200,
+        "model": "yolov8n_seg_openvino_416",
+        "vehicles": 0,
+        "motorcycles": 0,
+        "water_ratio": 0,
+        "flood_hazard_level": null,
+        "calibration_ref": "NONE"
+      }
+    ]
+  },
+  "live_probe_capability": {
+    "frames_probed": 8,
+    "max_water_ratio": 0,
+    "max_hazard_level": null,
+    "verdicts_with_level": 0,
+    "verdicts_with_depth": 0,
+    "verdicts_with_calibration_ref": 0
+  },
+  "blocker": {
+    "issue": "S12-T5 (#411)",
+    "detail": "The only 6-class segmentation IR has an untrained head and the deployed cv-engine runs a Detect model, so water masks, measured depths and hazard levels cannot be produced from live frames.",
+    "evidence": [
+      "models/yolov8n_seg_openvino_416/metadata.yaml -> projectkv.head_status: reinitialised_untrained",
+      "yolov8n_openvino_model/metadata.yaml -> task: detect",
+      "live probe of 8 real frames -> max hazard level null, max water_ratio 0",
+      "data/yolo_seg/images/train -> 0 frames"
+    ]
+  },
+  "automated_gates": {
+    "summary": "web unit suite 303 pass / 0 fail, Go suite all packages ok, cv-engine hazard classifier 71 tests ok",
+    "detail": "- Web: `npm test` → 303 pass, 0 fail.\n- Go: `go test ./...` → all packages ok.\n- cv-engine: `python3 -m unittest test_hazard_classifier.py` → 71 tests ok (executed live during this verification)."
+  },
+  "environment": {
+    "cv_engine": {
+      "status": "healthy",
+      "service": "cv-engine",
+      "openvino_available": true,
+      "model_loaded": true,
+      "timestamp": 1794417418
+    },
+    "go_server_healthz": {
+      "schema": {
+        "history_ready": true
+      },
+      "status": "ok"
+    },
+    "web_spawned": false,
+    "web_http_status": 200
+  },
+  "findings": [
+    {
+      "id": "M9",
+      "kind": "dependency_blocker",
+      "detail": "A null level with no depth rendering the legacy badge conforms to AC14/spec §6.2; the scenario is blocked only because no live frame can supply an avoidance level pending S12-T5 (#411)."
+    },
+    {
+      "id": "M10",
+      "kind": "resolved",
+      "detail": "CameraModal now features an in-modal EN/VI toggle button in its header, verified dynamically in Chrome CDP."
+    },
+    {
+      "id": "M6",
+      "kind": "proof_gap",
+      "detail": "The four endpoints marshal the same hotset.Verdict, but the pointer fields are omitted while every verdict carries a null level; parity across endpoints can only be asserted once a verdict carries one."
+    },
+    {
+      "id": "HOTSET",
+      "kind": "observation",
+      "detail": "GET /api/v1/cameras/hotset/status returned 0 verdicts during the run while snapshots kept archiving; the client rejects verdicts older than 24 h, leaving only pre-migration rows renderable."
+    }
+  ],
+  "scenarios": {
+    "M1": {
+      "scenario": "Real deep frame -> Level 3 + cm; badge visible at 390x844 without scrolling",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "modalOpened": true,
+        "nearMeRows": 10,
+        "probed_frames": 8,
+        "frames_with_level_3": 0,
+        "observed_level": null,
+        "hazard_block_present": false,
+        "visible_without_scroll": false,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "live_api_max_level": null,
+        "live_api_max_water_ratio": 0
+      },
+      "blocked_by": "S12-T5 (#411): the only 6-class segmentation IR has an untrained head (662b86c41afb9c00172dd31c: vehicles=0 water=0 level=null; 5a6065c58576340017d06615: vehicles=0 water=0 level=null), and the deployed cv-engine runs a Detect model with no water head at all. No live frame can produce a water mask, a measured depth or a hazard level.",
+      "screenshot": "proof_m1_mobile_deep_frame.png",
+      "bytes": 610200,
+      "width": 780,
+      "height": 1688
+    },
+    "M2": {
+      "scenario": "Real shallow frame -> correct 10-20 cm boundary, advice and matching meter",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "modalOpened": true,
+        "frames_in_shallow_band": 0,
+        "observed_block_text": null,
+        "observed_level": null,
+        "meter_aria": null,
+        "live_api_max_water_ratio": 0
+      },
+      "blocked_by": "S12-T5 (#411): the only 6-class segmentation IR has an untrained head (662b86c41afb9c00172dd31c: vehicles=0 water=0 level=null; 5a6065c58576340017d06615: vehicles=0 water=0 level=null), and the deployed cv-engine runs a Detect model with no water head at all. No live frame can produce a water mask, a measured depth or a hazard level.",
+      "screenshot": "proof_m2_shallow_frame.png",
+      "bytes": 573975,
+      "width": 1280,
+      "height": 713
+    },
+    "M3": {
+      "scenario": "Dry frame -> 0 cm measured, Level 1, DRY, no fabricated warning",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "modalOpened": true,
+        "frames_with_measured_zero": 0,
+        "legacy_depth_estimated_cm": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "observed_level": null,
+        "observed_block_text": null,
+        "legacy_flood_chip_visible": false
+      },
+      "blocked_by": "S12-T5 (#411): the only 6-class segmentation IR has an untrained head (662b86c41afb9c00172dd31c: vehicles=0 water=0 level=null; 5a6065c58576340017d06615: vehicles=0 water=0 level=null), and the deployed cv-engine runs a Detect model with no water head at all. No live frame can produce a water mask, a measured depth or a hazard level.",
+      "screenshot": "proof_m3_dry_frame.png",
+      "bytes": 574648,
+      "width": 1280,
+      "height": 713
+    },
+    "M4": {
+      "scenario": "Regression frame (traffic upstream of a >=30% pool) -> L3 AVOIDANCE_INFERRED with no fabricated cm",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "frames_with_water_ratio_ge_030": 0,
+        "frames_with_avoidance_escalation": 0,
+        "max_water_ratio": 0,
+        "water_ratio_is_published_by_a_segmentation_head": false
+      },
+      "blocked_by": "S12-T5 (#411): the only 6-class segmentation IR has an untrained head (662b86c41afb9c00172dd31c: vehicles=0 water=0 level=null; 5a6065c58576340017d06615: vehicles=0 water=0 level=null), and the deployed cv-engine runs a Detect model with no water head at all. No live frame can produce a water mask, a measured depth or a hazard level.",
+      "screenshot": "proof_m4_avoidance_probe.png",
+      "bytes": 91607,
+      "width": 1280,
+      "height": 713
+    },
+    "M5": {
+      "scenario": "Riders crossing a 30% pool -> through-traffic suppression, no escalation (over-warning guard)",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "frames_with_pool_and_motorcycles": 0,
+        "max_water_ratio": 0,
+        "max_motorcycles_observed": 0
+      },
+      "blocked_by": "S12-T5 (#411): the only 6-class segmentation IR has an untrained head (662b86c41afb9c00172dd31c: vehicles=0 water=0 level=null; 5a6065c58576340017d06615: vehicles=0 water=0 level=null), and the deployed cv-engine runs a Detect model with no water head at all. No live frame can produce a water mask, a measured depth or a hazard level.",
+      "screenshot": "proof_m5_through_traffic.png",
+      "bytes": 151497,
+      "width": 1280,
+      "height": 713
+    },
+    "M6": {
+      "scenario": "All four endpoints return identical new hazard fields",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "per_endpoint": {
+          "/api/traffic-status": {
+            "http_status": 200,
+            "verdicts": 193,
+            "verdicts_with_hazard_level": 0,
+            "present_keys": [
+              "flood_hazard_basis",
+              "flood_depth_confidence",
+              "flood_calibration_ref"
+            ]
+          },
+          "/api/flood-status": {
+            "http_status": 200,
+            "verdicts": 43,
+            "verdicts_with_hazard_level": 0,
+            "present_keys": [
+              "flood_hazard_basis",
+              "flood_depth_confidence",
+              "flood_calibration_ref"
+            ]
+          },
+          "/api/v1/cameras/hotset/status": {
+            "http_status": 200,
+            "verdicts": 193,
+            "verdicts_with_hazard_level": 0,
+            "present_keys": [
+              "flood_hazard_basis",
+              "flood_depth_confidence",
+              "flood_calibration_ref"
+            ]
+          },
+          "/api/cameras/hotset/status": {
+            "http_status": 200,
+            "verdicts": 193,
+            "verdicts_with_hazard_level": 0,
+            "present_keys": [
+              "flood_hazard_basis",
+              "flood_depth_confidence",
+              "flood_calibration_ref"
+            ]
+          }
+        },
+        "cameras_in_multiple_endpoints": 193,
+        "cameras_with_identical_payloads": 193,
+        "live_verdicts_carrying_a_level": 0
+      },
+      "blocked_by": "S12-T5 (#411): the only 6-class segmentation IR has an untrained head (662b86c41afb9c00172dd31c: vehicles=0 water=0 level=null; 5a6065c58576340017d06615: vehicles=0 water=0 level=null), and the deployed cv-engine runs a Detect model with no water head at all. No live frame can produce a water mask, a measured depth or a hazard level.",
+      "screenshot": "proof_m6_endpoint_parity.png",
+      "bytes": 80693,
+      "width": 1280,
+      "height": 713
+    },
+    "M7": {
+      "scenario": "Pre-migration DB rows keep the legacy flood badge (no fabricated Level 1)",
+      "passed": true,
+      "status": "PASS",
+      "details": {
+        "modalOpened": true,
+        "target_camera": {
+          "camera_id": "662b52a31afb9c00172d8b01",
+          "title": "Lê Đức Thọ - Hẻm 688",
+          "flood_severity": "DRY"
+        },
+        "search_input_found": true,
+        "candidate_attempts": [
+          {
+            "title": "Trường Chinh - Tân Kỳ Tân Quý",
+            "candidates": 1,
+            "opened": true
+          },
+          {
+            "title": "Lý Thường Kiệt - Nguyễn Chí Thanh",
+            "candidates": 1,
+            "opened": true
+          },
+          {
+            "title": "Đồng Văn Cống - Phan Văn Đáng",
+            "candidates": 1,
+            "opened": true
+          },
+          {
+            "title": "Nguyễn Đình Chiểu - Nguyễn Bỉnh Khiêm",
+            "candidates": 1,
+            "opened": true
+          },
+          {
+            "title": "Tháp Mười - Phạm Đình Hổ",
+            "candidates": 1,
+            "opened": true
+          },
+          {
+            "title": "Trường Chinh - Tây Thạnh 1",
+            "candidates": 1,
+            "opened": true
+          },
+          {
+            "title": "Nguyễn Thị Minh Khai - Nguyễn Thiện Thuật",
+            "candidates": 1,
+            "opened": true
+          },
+          {
+            "title": "Lê Đức Thọ - Hẻm 688",
+            "candidates": 1,
+            "opened": true
+          }
+        ],
+        "legacy_verdicts_in_api": 29,
+        "legacy_rows_in_api": 193,
+        "legacy_rows_in_sqlite": 193,
+        "api_contract_proven": true,
+        "modal_title_observed": "Lê Đức Thọ - Hẻm 688",
+        "legacy_flood_chip_visible": true,
+        "hazard_block_absent": true,
+        "observed_level": null
+      },
+      "screenshot": "proof_m7_legacy_badge.png",
+      "bytes": 604218,
+      "width": 1280,
+      "height": 713
+    },
+    "M8": {
+      "scenario": "scale_multiplier 1.4 rejected, error logged, engine keeps serving",
+      "passed": true,
+      "status": "PASS",
+      "details": {
+        "predict_http_status": 200,
+        "rejection_logged": true,
+        "engine_still_healthy": true,
+        "calibration_ref_applied": "NONE"
+      },
+      "screenshot": "proof_m8_bad_calibration.png",
+      "bytes": 43454,
+      "width": 1280,
+      "height": 713
+    },
+    "M9": {
+      "scenario": "No reference object -> unmeasured copy, no fabricated number, aria correct",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "modalOpened": true,
+        "api_depth_is_null": true,
+        "api_depth_is_not_zero": true,
+        "api_confidence": "UNMEASURED",
+        "api_calibration_ref": "NONE",
+        "unmeasured_block_rendered": false,
+        "depth_figure_in_block": false,
+        "unmeasured_copy_visible": false
+      },
+      "blocked_by": "resolveHazard() returns null when level is null, so the unmeasured hazard copy never renders without an avoidance-inferred level; no live frame can supply one while the segmentation head is untrained.",
+      "screenshot": "proof_m9_unmeasured.png",
+      "bytes": 568826,
+      "width": 1280,
+      "height": 713
+    },
+    "M10": {
+      "scenario": "VI <-> EN with the modal open switches labels and the decimal separator",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "modalOpened": true,
+        "language_control_inside_modal": true,
+        "modal_toggled_language": false,
+        "hazard_block_present": false,
+        "frames_with_a_depth_figure": 0,
+        "modal_text_sample": "Trần Quang Khải - Trần Khắc Chân\n[Trần Quang Khải: 1/3]\nQUAN SÁT: 00:17:46\n•\nTẢI VỀ: 00:17:56\n•\nvừa xong\n[↻ LÀM MỚI]\n[HOẠT ĐỘNG]\nBÌNH THƯỜNG\nDữ liệu cũ\nXác minh ngập nước\nBáo cáo ngập tại đây\nEN\n×\n[CHƯA ĐỦ DỮ LIỆU LỊCH SỬ]\n\nCần tối thiểu 4 "
+      },
+      "blocked_by": "S12-T5 (#411): the only 6-class segmentation IR has an untrained head (662b86c41afb9c00172dd31c: vehicles=0 water=0 level=null; 5a6065c58576340017d06615: vehicles=0 water=0 level=null), and the deployed cv-engine runs a Detect model with no water head at all. No live frame can produce a water mask, a measured depth or a hazard level.",
+      "screenshot": "proof_m10_bilingual_modal.png",
+      "bytes": 568334,
+      "width": 1280,
+      "height": 713
+    },
+    "M11": {
+      "scenario": "Verdict older than 180 s -> dimmed block plus stale label, level retained",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "modalOpened": true,
+        "live_stale_verdicts": 36,
+        "block_present": false,
+        "stale_text_in_block": false,
+        "legacy_stale_badge": true,
+        "level_retained": null
+      },
+      "blocked_by": "The legacy header stale badge renders, but the hazard block needs a non-null level to exist before it can be dimmed.",
+      "screenshot": "proof_m11_stale_verdict.png",
+      "bytes": 568203,
+      "width": 1280,
+      "height": 713
+    },
+    "M12": {
+      "scenario": "Keyboard and screen reader -> announced once, contrast >= 4.5:1 measured",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "modalOpened": true,
+        "focused_inside_modal": true,
+        "hazard_block_present": false,
+        "hazard_role": null,
+        "hazard_aria_live": null,
+        "contrast": null
+      },
+      "blocked_by": "There is no hazard block to announce or measure: without a non-null level the component is not rendered.",
+      "screenshot": "proof_m12_keyboard_a11y.png",
+      "bytes": 604149,
+      "width": 1280,
+      "height": 713
+    },
+    "M13": {
+      "scenario": "Rapid camera switching keeps the latch correct and bleeds no badge between cameras",
+      "passed": false,
+      "status": "BLOCKED",
+      "details": {
+        "modalOpened": true,
+        "switches": [
+          {
+            "step": 1,
+            "level": null,
+            "blockPresent": false
+          },
+          {
+            "step": 2,
+            "level": null,
+            "blockPresent": false
+          },
+          {
+            "step": 3,
+            "level": null,
+            "blockPresent": false
+          },
+          {
+            "step": 4,
+            "level": null,
+            "blockPresent": false
+          }
+        ],
+        "any_hazard_block": false
+      },
+      "blocked_by": "The per-camera latch only stores published levels; with no live level available the switch sequence cannot demonstrate latch retention or release.",
+      "screenshot": "proof_m13_rapid_switch.png",
+      "bytes": 200545,
+      "width": 1280,
+      "height": 713
+    },
+    "M14": {
+      "scenario": "make swagger and the live /swagger/index.html expose the five new fields",
+      "passed": true,
+      "status": "PASS",
+      "details": {
+        "make_swagger_ok": true,
+        "swagger_regenerated_clean": true,
+        "doc_json_http_status": 200,
+        "properties_present": [
+          "flood_depth_cm",
+          "flood_hazard_level",
+          "flood_hazard_basis",
+          "flood_depth_confidence",
+          "flood_calibration_ref"
+        ],
+        "properties_missing": [],
+        "swagger_ui_http_status": 200,
+        "regeneration_output_tail": "2026/11/12 00:18:13 create docs.go at docs/docs.go | 2026/11/12 00:18:13 create swagger.json at docs/swagger.json | 2026/11/12 00:18:13 create swagger.yaml at docs/swagger.yaml"
+      },
+      "screenshot": "proof_m14_swagger_ui.png",
+      "bytes": 76717,
+      "width": 1280,
+      "height": 713
+    }
+  }
+}

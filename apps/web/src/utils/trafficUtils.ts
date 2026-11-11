@@ -7,6 +7,14 @@ export interface TrafficVerdict {
   observed_at?: string;
   stale?: boolean;
   timestamp: string;
+  // Physical hazard layer (Issue #401, spec §5.2). Additive and optional: a verdict
+  // from a pre-migration build simply omits them, and a pre-migration row reads back
+  // null, which keeps the legacy flood badge rendering (AC12/AC14).
+  flood_depth_cm?: number | null;
+  flood_hazard_level?: 1 | 2 | 3 | null;
+  flood_hazard_basis?: string;
+  flood_depth_confidence?: string;
+  flood_calibration_ref?: string;
 }
 
 export const DEFAULT_VERDICT_TTL_MS = 180 * 1000;
@@ -56,12 +64,21 @@ export function isMockHidden(source?: string, appEnv?: string): boolean {
 export function normalizeVerdict(raw: any, ttlMs: number = DEFAULT_VERDICT_TTL_MS): TrafficVerdict {
   const timeStr = raw.observed_at || raw.timestamp;
   const isStale = Boolean(raw.stale) || (Boolean(timeStr) && (Date.now() - new Date(timeStr).getTime() > ttlMs));
+  // An explicit snake_case null means "never measured" and must survive the alias
+  // fallback; only `undefined` defers to the camelCase spelling (AC13).
+  const pick = <T,>(snake: T | undefined, camel: T | undefined): T | undefined =>
+    snake !== undefined ? snake : camel;
   return {
     ...raw,
     camera_id: raw.camera_id || raw.cameraId,
     flood_severity: raw.flood_severity || raw.floodSeverity,
     observed_at: raw.observed_at || raw.timestamp,
     stale: isStale,
+    flood_depth_cm: pick(raw.flood_depth_cm, raw.floodDepthCm),
+    flood_hazard_level: pick(raw.flood_hazard_level, raw.floodHazardLevel),
+    flood_hazard_basis: pick(raw.flood_hazard_basis, raw.floodHazardBasis),
+    flood_depth_confidence: pick(raw.flood_depth_confidence, raw.floodDepthConfidence),
+    flood_calibration_ref: pick(raw.flood_calibration_ref, raw.floodCalibrationRef),
   };
 }
 

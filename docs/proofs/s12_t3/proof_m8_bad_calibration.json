@@ -1,0 +1,17 @@
+{
+  "calibration_attempted": {
+    "camera_id": "m8_bad_calib_cam",
+    "scale_multiplier": 1.4,
+    "tolerance": "1.0 +/- 0.25"
+  },
+  "predict_http_status": 200,
+  "predict_calibration_ref": "NONE",
+  "engine_log_rejection_line": "2026-11-12 00:17:47,373 [ERROR] cv-engine: rejected calibration for camera m8_bad_calib_cam: scale_multiplier 1.4 is outside 1.0 +/- 0.25",
+  "health_after_rejection": {
+    "status": "healthy",
+    "service": "cv-engine",
+    "openvino_available": true,
+    "model_loaded": true,
+    "timestamp": 1794417468
+  }
+}

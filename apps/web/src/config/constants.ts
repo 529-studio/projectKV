@@ -661,3 +661,49 @@ export const NEAR_ME_I18N = Object.freeze({
     NO_DATA: { vi: 'Chưa có dữ liệu', en: 'No data' },
   },
 });
+
+// =======================================================
+// PHYSICAL HAZARD LAYER (Issue #401 / Sprint 12 Task 3)
+// =======================================================
+// Riders act on centimetres, not on area ratios: 0.25 across a 12 m arterial and
+// 0.25 in a 3 m alley are different dangers, and neither says whether the water
+// reaches the exhaust outlet. Labels are keyed by hazard level (spec §2.3) and
+// every leaf ships in VI (default, full diacritics) and EN, zero emoji.
+//
+// LEVEL_1_ADVICE may say "you can pass" only because a depth exists.
+// AVOIDANCE_ADVICE deliberately contains no number: avoidance proves the lane is
+// blocked, never how deep the water is (AC10).
+export const HAZARD_I18N = Object.freeze({
+  LEVEL_1: { vi: 'Bấp bênh / Bắn nước', en: 'Splash zone — low risk' },
+  LEVEL_2: { vi: 'Cảnh báo xe ga gầm thấp', en: 'Caution — low-clearance scooters' },
+  LEVEL_3: { vi: 'Nguy cơ chết máy cao', en: 'High stall risk — do not enter' },
+  LEVEL_1_ADVICE: {
+    vi: 'Nước dưới 10 cm. Vẫn có thể đi qua nhưng nên giảm tốc độ và tránh bắn nước.',
+    en: 'Water is under 10 cm. You can pass, but slow down and avoid splashing others.',
+  },
+  LEVEL_2_ADVICE: {
+    vi: 'Nước ngập 10–20 cm, sát miệng ống xả. Xe ga gầm thấp nên tránh hoặc đi thật chậm.',
+    en: 'Water is 10–20 cm, level with the exhaust outlet. Low-clearance scooters should avoid or go very slowly.',
+  },
+  LEVEL_3_ADVICE: {
+    vi: 'Nước trên 20 cm, nguy cơ chết máy và hỏng động cơ. Không nên đi vào.',
+    en: 'Water is over 20 cm. Engine stall and damage risk. Do not enter.',
+  },
+  AVOIDANCE_ADVICE: {
+    vi: 'Nước chiếm phần lớn lòng đường và dòng xe đang dừng lại phía trước. Không nên đi vào.',
+    en: 'Water covers most of the roadway and traffic is stopping upstream. Do not enter.',
+  },
+  DEPTH_UNMEASURED: { vi: 'Chưa đo được độ sâu', en: 'Depth not measurable' },
+  REF_MOTORCYCLE: { vi: 'đo theo chiều cao xe máy 110 cm', en: 'measured against the 110 cm motorcycle height' },
+  REF_CURB: { vi: 'đo theo lề đường 15 cm', en: 'measured against the 15 cm curb' },
+  REF_OVERRIDE: { vi: 'đo theo hiệu chuẩn riêng của camera', en: 'measured with this camera’s own calibration' },
+  METER_ARIA: {
+    vi: (cm: string) => `Độ sâu nước ${cm}, thang từ 0 đến 30 cm`,
+    en: (cm: string) => `Water depth ${cm}, scale 0 to 30 cm`,
+  },
+  LEVEL_ARIA: {
+    vi: (n: number) => `Mức nguy hiểm ${n} trên 3`,
+    en: (n: number) => `Hazard level ${n} of 3`,
+  },
+  STALE: { vi: 'Dữ liệu cũ', en: 'Stale data' },
+});
