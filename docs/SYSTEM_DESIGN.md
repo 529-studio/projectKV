@@ -124,7 +124,7 @@ To prevent system crashes when user traffic spikes, computation is completely de
 3. [x] In-memory proxy snapshot cache (10s TTL).
 4. [x] Dynamic Chained Deep Filter (Zone, Corridor, Intersection, Status).
 5. [x] Multi-camera pin dock with 10s auto-refresh.
-6. [x] Two-tier branch protection (`.githooks/pre-push` + GitHub Actions `branch-guard.yml`).
+6. [x] Local pre-push convenience (`.githooks/pre-push`) plus a server-enforced PR policy via GitHub branch protection/rulesets.
 7. [x] Internationalization (`i18n`) for Web Client with bilingual support (VI/EN).
 8. [ ] Implementation of mock congestion API (`/api/traffic-status`).
 9. [ ] CV worker pipeline prototype in `services/cv-engine/`.
