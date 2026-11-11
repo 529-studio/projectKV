@@ -84,6 +84,6 @@ runs/
 
 # Local agent scratchpad
 scratch/
-
+/var/
 
 .agents/.state/

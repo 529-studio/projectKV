@@ -1,0 +1,92 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: projectkv-forecast-refit
+  namespace: projectkv
+  labels:
+    app.kubernetes.io/name: forecast-refit
+    app.kubernetes.io/part-of: projectkv
+spec:
+  timeZone: "Asia/Ho_Chi_Minh"
+  schedule: "0 2,8,14,20 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 900
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: forecast-refit
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: forecast-refit
+              image: ghcr.io/529-studio/projectkv-backend:stg-latest
+              workingDir: /app
+              securityContext:
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              env:
+                - name: PYTHONDONTWRITEBYTECODE
+                  value: "1"
+                - name: TMPDIR
+                  value: "/tmp"
+                - name: HOME
+                  value: "/tmp"
+              command:
+                - python3
+                - tools/forecast/train_live_model.py
+                - --db
+                - /var/data/camera-view.db
+                - --features-out
+                - /var/data/forecast/features_live_5m.csv
+                - --artifact-out
+                - /var/data/forecast/prototype_v1.json
+                - --report-out
+                - /var/data/forecast/forecast_prototype_v1.md
+                - --eval-json-out
+                - /var/data/forecast/forecast_prototype_v1.json
+                - --lock-file
+                - /var/data/locks/refit.lock
+                - --state-file
+                - /var/data/forecast/refit_state.json
+                - --telemetry-out
+                - /var/data/forecast/refit_status.json
+                - --min-new-rows
+                - "50"
+                - --fail-on-locked
+                - --promote
+              volumeMounts:
+                - name: data-volume
+                  mountPath: /var/data
+                - name: tmp-volume
+                  mountPath: /tmp
+          volumes:
+            - name: data-volume
+              persistentVolumeClaim:
+                claimName: projectkv-data-pvc
+            - name: tmp-volume
+              emptyDir:
+                sizeLimit: 256Mi

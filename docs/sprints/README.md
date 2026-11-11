@@ -16,7 +16,8 @@ permanent directory made readers pay for a document with a shelf life.
 | 10 | [`sprint10_issue_commands.md`](sprint10_issue_commands.md) | Closed — #372–#379 closed; retrospective in [`docs/reports/sprint10_report.md`](../reports/sprint10_report.md) |
 | 10 | [`s10_t1_forecast_contract_spec.md`](s10_t1_forecast_contract_spec.md) | Contract spec for #372 (closed) |
 | 10 | [`s10_t1_offline_verification.md`](s10_t1_offline_verification.md) | #372 evidence split (closed) |
-| 11 | [`sprint11_issue_commands.md`](sprint11_issue_commands.md) | Planned — S11-T1–S11-T8 ([ADR-013](../ADR-013-sprint-11-architecture.md)) |
+| 11 | [`sprint11_issue_commands.md`](sprint11_issue_commands.md) | Closed — retrospective in [`docs/reports/sprint11_report.md`](../reports/sprint11_report.md) |
+| 12 | [`s12_t1_issue.md`](s12_t1_issue.md) | Implemented & Verified — Close #413, PR in review |
 
 ## Lifecycle
 

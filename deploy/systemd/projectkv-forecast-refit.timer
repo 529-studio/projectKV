@@ -1,0 +1,12 @@
+[Unit]
+Description=ProjectKV Forecast Refit 6-Hour Timer
+Wants=projectkv-forecast-refit.service
+
+[Timer]
+OnCalendar=*-*-* 02,08,14,20:00:00 Asia/Ho_Chi_Minh
+Persistent=true
+AccuracySec=1min
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,25 @@
+[Unit]
+Description=ProjectKV Forecast Refit Service
+After=network.target
+
+[Service]
+Type=oneshot
+User=projectkv
+Group=projectkv
+WorkingDirectory=/opt/projectkv
+RuntimeDirectory=projectkv
+StateDirectory=projectkv
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/projectkv/data/forecast /run/projectkv
+ExecStart=/usr/bin/python3 tools/forecast/train_live_model.py --db /opt/projectkv/data/camera-view.db --artifact-out /opt/projectkv/data/forecast/prototype_v1.json --features-out /opt/projectkv/data/forecast/features_live_5m.csv --report-out /opt/projectkv/data/forecast/forecast_prototype_v1.md --eval-json-out /opt/projectkv/data/forecast/forecast_prototype_v1.json --lock-file /run/projectkv/forecast_refit.lock --state-file /opt/projectkv/data/forecast/refit_state.json --min-new-rows 50 --fail-on-locked --promote
+StandardOutput=journal
+StandardError=journal
+SuccessExitStatus=4
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

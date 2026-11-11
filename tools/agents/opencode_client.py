@@ -8,6 +8,7 @@ Provides specialized SDLC personas: coder, reviewer, reporter, po.
 """
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -73,17 +74,38 @@ def is_quota_error(text: str) -> bool:
     return False
 
 
-def run_opencode(model: str, full_prompt: str, timeout: int = 180) -> tuple[int, str, str]:
-    cmd = ["opencode", "run", "-m", model, full_prompt]
+def extract_text_from_json(raw_stdout: str) -> str:
+    text_parts = []
+    for line in raw_stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            d = json.loads(line)
+            if d.get("type") == "text":
+                part = d.get("part", {})
+                if isinstance(part, dict):
+                    text_parts.append(part.get("text", ""))
+        except Exception:
+            pass
+    if text_parts:
+        return "".join(text_parts)
+    return raw_stdout
+
+
+def run_opencode(model: str, full_prompt: str, timeout: int = 600) -> tuple[int, str, str]:
+    cmd = ["opencode", "run", "--format", "json", "--auto", "--agent", "pure-llm", "-m", model]
     try:
         proc = subprocess.run(
             cmd,
+            input=full_prompt,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             timeout=timeout,
         )
-        return proc.returncode, proc.stdout, proc.stderr
+        parsed_out = extract_text_from_json(proc.stdout)
+        return proc.returncode, parsed_out, proc.stderr
     except subprocess.TimeoutExpired:
         return 124, "", f"Execution timed out ({timeout}s)"
 
@@ -92,22 +114,24 @@ def query_agent(
     prompt: str,
     role: str = "coder",
     model_override: str | None = None,
+    timeout: int = 600,
 ) -> str:
     system_prompt = ROLE_PROMPTS.get(role, ROLE_PROMPTS["coder"])
     composed_prompt = f"[SYSTEM PERSONA: {role.upper()}]\n{system_prompt}\n\n[USER TASK]\n{prompt}"
 
     primary = model_override or PRIMARY_MODEL
     sys.stderr.write(f"[opencode_client] Invoking agent ({role}) via {primary}...\n")
-    code, stdout, stderr = run_opencode(primary, composed_prompt)
+    code, stdout, stderr = run_opencode(primary, composed_prompt, timeout=timeout)
 
-    combined_err = f"{stderr}\n{stdout}"
-    if code != 0 or is_quota_error(combined_err):
+    # Check error patterns primarily on stderr, and on combined only if code != 0
+    quota_hit = is_quota_error(stderr) or (code != 0 and is_quota_error(f"{stderr}\n{stdout}"))
+    if code != 0 or quota_hit:
         if not model_override and primary != FALLBACK_MODEL:
             sys.stderr.write(
                 f"[opencode_client] Primary model {primary} failed/hit quota limit (code={code}). "
                 f"Switching failover to {FALLBACK_MODEL}...\n"
             )
-            code_fb, stdout_fb, stderr_fb = run_opencode(FALLBACK_MODEL, composed_prompt)
+            code_fb, stdout_fb, stderr_fb = run_opencode(FALLBACK_MODEL, composed_prompt, timeout=timeout)
             if code_fb != 0:
                 sys.stderr.write(f"[opencode_client] Fallback error (code={code_fb}): {stderr_fb}\n")
                 if not stdout_fb.strip():
@@ -128,6 +152,7 @@ def main():
     parser.add_argument("--stdin", action="store_true", help="Read prompt from stdin")
     parser.add_argument("--diff", action="store_true", help="Append current git diff to prompt")
     parser.add_argument("--model", "-m", help="Explicit model override")
+    parser.add_argument("--timeout", "-t", type=int, default=600, help="Execution timeout in seconds")
 
     args = parser.parse_args()
 
@@ -143,11 +168,11 @@ def main():
         parser.error("No prompt provided. Pass a prompt, --file, or --stdin.")
 
     if args.diff:
-        diff_proc = subprocess.run(["git", "diff"], stdout=subprocess.PIPE, text=True)
+        diff_proc = subprocess.run(["git", "diff", "HEAD"], stdout=subprocess.PIPE, text=True)
         content += f"\n\n[GIT DIFF]\n```diff\n{diff_proc.stdout}\n```"
 
     try:
-        response = query_agent(content, role=args.role, model_override=args.model)
+        response = query_agent(content, role=args.role, model_override=args.model, timeout=args.timeout)
         print(response)
     except Exception as e:
         sys.stderr.write(f"[ERROR] {e}\n")

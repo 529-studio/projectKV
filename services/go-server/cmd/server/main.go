@@ -903,6 +903,12 @@ func main() {
 
 		forecastService := forecast.NewService(forecastHistAdapter, forecastCamAdapter, forecastOpts...)
 		forecastHandler = forecast.NewHandler(forecastService)
+
+		if forecastService.ReloadInterval() > 0 && forecastService.ModelPath() != "" {
+			forecastCtx, cancelForecast := context.WithCancel(context.Background())
+			defer cancelForecast()
+			forecastService.StartReloader(forecastCtx, forecastService.ReloadInterval())
+		}
 	}
 
 	// 5c. Initialize live weather forecast and RainViewer radar metadata service (Issue #120).

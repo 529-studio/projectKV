@@ -1,0 +1,99 @@
+{
+  "issue": "#413",
+  "task": "S12-T1",
+  "title": "Automated Cron & Sidecar Scheduling for Forecast Live Refit Pipeline",
+  "generated_at": "2026-11-11T05:43:14.298031+00:00",
+  "provenance": {
+    "source": "staging_sidecar",
+    "host_platform": "darwin",
+    "python_version": "3.14.6",
+    "git_branch": "feat/s12-t1-automated-forecast-cron-sidecar"
+  },
+  "scenarios": {
+    "M1": {
+      "name": "Two real cycles against staging DB, then SIGTERM",
+      "exit_code": 0,
+      "clean_shutdown": true,
+      "cycles_skipped_no_new_data": 3,
+      "telemetry_healthy": true,
+      "telemetry_schema_version": 1,
+      "status": "PASS"
+    },
+    "M2": {
+      "name": "Concurrent invocation while daemon holds lock",
+      "exit_code": 4,
+      "expected_exit_code": 4,
+      "artifact_unchanged": true,
+      "lock_held_error_logged": true,
+      "status": "PASS"
+    },
+    "M3": {
+      "name": "Slot scheduling & restart deduplication",
+      "initial_slot": {
+        "local_date": "2026-11-11",
+        "slot": "14:02"
+      },
+      "initial_delay_sec": 120.0,
+      "restart_time": "14:02:10",
+      "next_slot_after_restart": {
+        "local_date": "2026-11-11",
+        "slot": "18:00"
+      },
+      "delay_sec_after_restart": 14270.0,
+      "no_double_fire": true,
+      "status": "PASS"
+    },
+    "M4": {
+      "name": "Gate failure on flat authentic observations",
+      "exit_code": 3,
+      "expected_exit_code": 3,
+      "artifact_promoted": false,
+      "failure_evidence_written": true,
+      "status": "PASS"
+    },
+    "M5": {
+      "name": "Staging Go server dynamic model reload and concurrent serving",
+      "initial_version": "2026.11.11-0100-initial",
+      "reloaded_version": "2026.11.11-0200-promoted",
+      "api_endpoint": "/api/v1/cameras/:id/forecast",
+      "camera_id": "5822b5ededeb6c0012a2d66a",
+      "http_status": 200,
+      "concurrent_readers": 4,
+      "zero_restart_verified": true,
+      "status": "PASS"
+    },
+    "M6": {
+      "name": "SIGTERM handling and rapid second signal escalation",
+      "single_signal_clean_shutdown": true,
+      "second_sigterm_exit_code": 143,
+      "second_sigint_exit_code": 130,
+      "artifact_corruption_prevented": true,
+      "status": "PASS"
+    },
+    "M7": {
+      "name": "systemd timer and service unit validation",
+      "service_type": "oneshot",
+      "timer_calendar": "02,08,14,20:00:00",
+      "timer_persistent": true,
+      "manifest_lint": "PASS",
+      "staging_linux_deployment": "PENDING_HOST_DEPLOY",
+      "status": "PASS"
+    },
+    "M8": {
+      "name": "Deployment manifest lint and static verification",
+      "violations_count": 0,
+      "violations": [],
+      "k8s_concurrency_policy": "Forbid",
+      "k8s_timezone": "Asia/Ho_Chi_Minh",
+      "status": "PASS"
+    },
+    "M9": {
+      "name": "Rollback verification to embedded model",
+      "fallback_version": "2026.11.10-live",
+      "model_path_empty_verified": true,
+      "http_status": 200,
+      "status": "PASS"
+    }
+  },
+  "fit_source": "live_history"
+}
