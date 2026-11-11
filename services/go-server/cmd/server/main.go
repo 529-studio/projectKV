@@ -1388,7 +1388,7 @@ func main() {
 
 	// 8. Setup Gin Engine
 	router := gin.Default()
-	router.Use(middleware.CORSMiddleware())
+	router.Use(middleware.CORSMiddleware(cfg.AllowedOrigins...))
 	router.Use(middleware.SecretSanitizer())
 	router.Use(middleware.RateLimitMiddleware(cfg.RateLimitRPS, cfg.RateLimitBurst))
 
@@ -1451,7 +1451,12 @@ func main() {
 		}
 		// Shared archiver snapshots and collaborative team labeler endpoints (Issue #214)
 		// Harvester flywheel observability (Issue #299 / S9-T3)
-		devAuth := middleware.RequireDevAuth(cfg.DevAccessToken, cfg.AppEnv)
+		devAuth := middleware.RequireDevAuth(cfg.DevAccessToken, cfg.AppEnv, middleware.DevAuthConfig{
+			CFAccessAudience:     cfg.CFAccessAudience,
+			CFAccessCertsURL:     cfg.CFAccessCertsURL,
+			CFAccessClientID:     cfg.CFAccessClientID,
+			CFAccessClientSecret: cfg.CFAccessClientSecret,
+		})
 		if archiverHandler != nil {
 			archiverHandler.RegisterRoutes(api, devAuth)
 		}

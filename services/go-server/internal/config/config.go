@@ -49,6 +49,11 @@ type Config struct {
 	HarvesterRainCooldownMinutes  int
 	HarvesterConcurrency          int
 	HarvesterCatchupMinutes       int
+	AllowedOrigins                []string
+	CFAccessAudience              string
+	CFAccessCertsURL              string
+	CFAccessClientID              string
+	CFAccessClientSecret          string
 }
 
 // CleanEnv returns the environment variable value with surrounding whitespace and quotes (`"`, `'`) stripped.
@@ -218,6 +223,54 @@ func parseEnvString(key string, fallback string) string {
 	return clean
 }
 
+// DefaultAllowedOrigins defines the default whitelisted origins for CORS requests.
+var DefaultAllowedOrigins = []string{
+	"http://localhost:3000",
+	"http://localhost:3001",
+	"http://127.0.0.1:3000",
+	"http://127.0.0.1:3001",
+	"https://warded.529studio.site",
+	"https://warded-stg.529studio.site",
+}
+
+// parseEnvStringSlice reads a comma-separated string environment variable, trimming whitespace.
+func parseEnvStringSlice(key string, fallback []string) []string {
+	val := CleanEnv(key)
+	if val == "" {
+		return fallback
+	}
+	parts := strings.Split(val, ",")
+	var result []string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return fallback
+	}
+	return result
+}
+
+func resolveCFAccessCertsURL(explicitURL, teamDomain string) string {
+	explicitURL = strings.TrimSpace(explicitURL)
+	if explicitURL != "" {
+		return explicitURL
+	}
+	teamDomain = strings.TrimSpace(teamDomain)
+	if teamDomain == "" {
+		return ""
+	}
+	if !strings.Contains(teamDomain, ".") {
+		return fmt.Sprintf("https://%s.cloudflareaccess.com/cdn-cgi/access/certs", teamDomain)
+	}
+	if !strings.HasPrefix(teamDomain, "http://") && !strings.HasPrefix(teamDomain, "https://") {
+		return fmt.Sprintf("https://%s/cdn-cgi/access/certs", teamDomain)
+	}
+	return fmt.Sprintf("%s/cdn-cgi/access/certs", strings.TrimRight(teamDomain, "/"))
+}
+
 func loadDotEnv() {
 	paths := []string{".env", "../../.env", "../.env"}
 	for _, p := range paths {
@@ -305,6 +358,16 @@ func LoadFromEnv() (*Config, error) {
 		cfg.DevAccessToken = parseEnvString("LABELER_SECRET_TOKEN", "")
 	}
 
+	cfg.AllowedOrigins = parseEnvStringSlice("ALLOWED_ORIGINS", DefaultAllowedOrigins)
+	cfg.CFAccessAudience = parseEnvString("CF_ACCESS_AUDIENCE", "")
+	cfTeamDomain := parseEnvString("CF_ACCESS_TEAM_DOMAIN", "")
+	if cfTeamDomain == "" {
+		cfTeamDomain = parseEnvString("CF_ACCESS_TEAM_NAME", "")
+	}
+	cfg.CFAccessCertsURL = resolveCFAccessCertsURL(parseEnvString("CF_ACCESS_CERTS_URL", ""), cfTeamDomain)
+	cfg.CFAccessClientID = parseEnvString("CF_ACCESS_CLIENT_ID", "")
+	cfg.CFAccessClientSecret = parseEnvString("CF_ACCESS_CLIENT_SECRET", "")
+
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -367,6 +430,11 @@ type ServerConfig struct {
 	HarvesterRainCooldownMinutes  int           // default: 60 (HARVESTER_RAIN_COOLDOWN_MINUTES)
 	HarvesterConcurrency          int           // default: 15 (HARVESTER_CONCURRENCY)
 	HarvesterCatchupMinutes       int           // default: 120 (HARVESTER_CATCHUP_MINUTES; 0 disables boot-time catch-up)
+	AllowedOrigins                []string
+	CFAccessAudience              string
+	CFAccessCertsURL              string
+	CFAccessClientID              string
+	CFAccessClientSecret          string
 }
 
 // ResolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -437,6 +505,16 @@ func LoadConfig() *ServerConfig {
 	if devAccessToken == "" {
 		devAccessToken = parseEnvString("LABELER_SECRET_TOKEN", "")
 	}
+
+	allowedOrigins := parseEnvStringSlice("ALLOWED_ORIGINS", DefaultAllowedOrigins)
+	cfAccessAudience := parseEnvString("CF_ACCESS_AUDIENCE", "")
+	cfTeamDomain := parseEnvString("CF_ACCESS_TEAM_DOMAIN", "")
+	if cfTeamDomain == "" {
+		cfTeamDomain = parseEnvString("CF_ACCESS_TEAM_NAME", "")
+	}
+	cfAccessCertsURL := resolveCFAccessCertsURL(parseEnvString("CF_ACCESS_CERTS_URL", ""), cfTeamDomain)
+	cfAccessClientID := parseEnvString("CF_ACCESS_CLIENT_ID", "")
+	cfAccessClientSecret := parseEnvString("CF_ACCESS_CLIENT_SECRET", "")
 
 	telegramBotToken := parseEnvString("TELEGRAM_BOT_TOKEN", "")
 	telegramDebounceMinutes := parseEnvInt("TELEGRAM_DEBOUNCE_MINUTES", 30, 1)
@@ -566,5 +644,10 @@ func LoadConfig() *ServerConfig {
 		HarvesterRainCooldownMinutes:  harvesterRainCooldownMinutes,
 		HarvesterConcurrency:          harvesterConcurrency,
 		HarvesterCatchupMinutes:       harvesterCatchupMinutes,
+		AllowedOrigins:                allowedOrigins,
+		CFAccessAudience:              cfAccessAudience,
+		CFAccessCertsURL:              cfAccessCertsURL,
+		CFAccessClientID:              cfAccessClientID,
+		CFAccessClientSecret:          cfAccessClientSecret,
 	}
 }
