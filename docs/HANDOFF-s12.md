@@ -9,13 +9,13 @@
 
 ## 1. Branch & Commit Status
 
-- **Active branch**: `feat/s12-t1-automated-forecast-cron-sidecar`
-- **Head commit**: `4151466` (`feat(forecast): automated cron sidecar and dynamic model reload (Close #413)`)
-- **Worktree**: clean, rebased cleanly onto `origin/dev` (`1a8eb05`)
-- **Active PR**: PR #416 (targeting `dev`, 10/10 CI checks green, status `MERGEABLE`, ready for human merge per Rule 5)
-- **Merged prior to this session**:
-  - PR #412 (`docs(sprint): record sprint 11 completion report and final handoff`, commit `5b7614c`)
+- **Active branch**: `docs/s12-handoff`
+- **Head commit**: `ce76d6b` (`docs(sprint): record sprint 12 task 1 handoff`)
+- **Worktree**: clean, based on `origin/dev` (`3682af6`)
+- **Merged PRs**:
+  - PR #416 (`feat(forecast): automated cron sidecar and dynamic model reload (Close #413)`, commit `3682af6`)
   - PR #415 (`fix(ci): consolidate public-repository workflow gates`, commit `1a8eb05`)
+  - PR #412 (`docs(sprint): record sprint 11 completion report and final handoff`, commit `5b7614c`)
 
 ---
 
@@ -29,7 +29,7 @@
 
 ## 3. Open Issues & Backlog
 
-- **#413 (S12-T1)**: `[ops + forecast] Automated Cron & Sidecar Scheduling for Forecast Live Refit Pipeline` — implemented in PR #416, pending human merge into `dev`.
+- **#413 (S12-T1)**: `[ops + forecast] Automated Cron & Sidecar Scheduling for Forecast Live Refit Pipeline` — **Merged into dev in PR #416 and closed**.
 - **#400 (S12-T2)**: `[frontend] Commuter Last-Mile Geolocation (GPS 'Near-Me' Flood Proximity View)` — next task on roadmap.
 - **#401 (S12-T3)**: `[cv-engine + go-server] Motorbike Flood Stall Hazard Level Classifier (cm Depth)` — physical tire submersion geometry into Safe/Warning/Danger hazard bands.
 - **#402 (S12-T4)**: `[ops + frontend] Telegram Alert Bot Live Provisioning & Citizen Subscription Web UI` — webhook live bot integration and citizen subscription modal.
@@ -70,5 +70,4 @@
 
 ## 7. Open Questions For The Human
 
-- **Merge PR #416**: PR #416 has passed all 10 GitHub Actions checks. Please merge PR #416 into `dev` when convenient.
 - **GPS Distance Metric for S12-T2 (#400)**: In the "Near-Me" modal, should cameras within 1.5 km be sorted strictly by Haversine distance, or sorted by composite congestion/flood severity first?
