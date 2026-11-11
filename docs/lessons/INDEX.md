@@ -91,5 +91,6 @@ is the only part an agent should read by default.
 | 85 | Commuter Geolocation, Multi-Tier Banded Sorting & Kiosk Ergonomics | 250m bands; clock-free comparator; zero coordinate exfiltration; >=48px wet targets. | [L85](L85-commuter-geolocation-banded-sorting.md) |
 | 86 | RFC3339Nano 9-Digit Timestamps & Python Microsecond Pre-normalization | Fixed 9-digit layout; regex microsecond truncation; cross-runtime UTC invariants. | [L86](L86-rfc3339nano-9digit-timestamps-microsecond-truncation.md) |
 | 87 | Cryptographic JWT & CORS Whitelisting | Never trust plain headers; verify RS256 & aud via JWKS; whitelist CORS credentials. | [L87](L87-cryptographic-jwt-verification-and-cors-origin-whitelisting.md) |
+| 88 | Proxy OOM Bounds & Compression Middleware Ordering | Cap upstream reads via io.LimitReader; order gzip outer of buffering/sanitizing middleware. | [L88](L88-proxy-oom-bounds-and-compression-middleware-ordering.md) |
 
 > Numbering note: Lesson 54 does not exist; numbers are preserved as cited.

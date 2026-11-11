@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -367,5 +369,61 @@ func TestHandler_GetSnapshotOSD(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200 for OSD endpoint, got %d", w.Code)
+	}
+}
+
+func TestHandler_OversizedPayload_CappedAt5MB(t *testing.T) {
+	const oversized = proxycache.MaxSnapshotBytes + 1024
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.WriteHeader(http.StatusOK)
+		buf := make([]byte, 32*1024)
+		for written := 0; written < oversized; written += len(buf) {
+			_, _ = w.Write(buf)
+		}
+	}))
+	defer upstream.Close()
+
+	cache := proxycache.NewCache(30 * time.Second)
+	h := proxycache.NewHandler(cache, upstream.URL, nil)
+	router := newTestRouter(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/snapshot/cam-large", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if w.Body.Len() != proxycache.MaxSnapshotBytes {
+		t.Errorf("expected body to be capped at %d bytes, got %d", proxycache.MaxSnapshotBytes, w.Body.Len())
+	}
+}
+
+func TestHandler_CameraIDQueryEscaped(t *testing.T) {
+	var capturedQuery string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("JPEG_DATA"))
+	}))
+	defer upstream.Close()
+
+	cache := proxycache.NewCache(30 * time.Second)
+	h := proxycache.NewHandler(cache, upstream.URL, nil)
+	router := newTestRouter(h)
+
+	rawID := "cam 123+test&id=injection"
+	req := httptest.NewRequest(http.MethodGet, "/api/snapshot/"+url.PathEscape(rawID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	expectedEscaped := url.QueryEscape(rawID)
+	if !strings.Contains(capturedQuery, "id="+expectedEscaped) {
+		t.Errorf("expected upstream query to contain escaped ID id=%s, got %s", expectedEscaped, capturedQuery)
 	}
 }

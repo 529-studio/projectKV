@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,9 @@ import (
 
 // GhostPlaceholderSize is the byte size of the upstream "IMAGE NOT AVAILABLE" placeholder PNG.
 const GhostPlaceholderSize = 2638
+
+// MaxSnapshotBytes is the maximum allowed size for an upstream camera snapshot payload (5 MB).
+const MaxSnapshotBytes = 5 * 1024 * 1024
 
 // ErrGhostCamera indicates that the upstream portal returned a placeholder error image.
 var ErrGhostCamera = errors.New("upstream returned placeholder image: camera stream offline")
@@ -173,7 +177,7 @@ func (h *Handler) fetchUpstream(ctx context.Context, id string) ([]byte, string,
 			}
 		}
 
-		url := fmt.Sprintf("%s?id=%s&t=%d", h.upstreamURL, id, time.Now().UnixMilli())
+		url := fmt.Sprintf("%s?id=%s&t=%d", h.upstreamURL, url.QueryEscape(id), time.Now().UnixMilli())
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
@@ -198,7 +202,7 @@ func (h *Handler) fetchUpstream(ctx context.Context, id string) ([]byte, string,
 			continue
 		}
 
-		body, err := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(io.LimitReader(resp.Body, MaxSnapshotBytes))
 		resp.Body.Close() //nolint:errcheck
 		if err != nil {
 			lastErr = fmt.Errorf("read body: %w", err)
