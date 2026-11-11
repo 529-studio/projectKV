@@ -97,6 +97,12 @@ class TestUtilityHelpers(unittest.TestCase):
         self.assertEqual(dt.month, 11)
         self.assertEqual(dt.day, 6)
 
+        # 9-digit RFC3339Nano
+        dt_nano = parse_iso_timestamp("2026-11-06T10:23:18.434225000Z")
+        self.assertIsNotNone(dt_nano)
+        self.assertEqual(dt_nano.tzinfo, timezone.utc)
+        self.assertEqual(dt_nano.microsecond, 434225)
+
         # Offset +07:00
         dt7 = parse_iso_timestamp("2026-11-07T06:00:00+07:00")
         self.assertIsNotNone(dt7)

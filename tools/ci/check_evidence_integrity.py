@@ -224,6 +224,7 @@ def parse_iso_timestamp(ts: Any) -> Optional[datetime]:
     # Normalize trailing Z
     if s.endswith("Z") or s.endswith("z"):
         s = s[:-1] + "+00:00"
+    s = re.sub(r"(\.\d{6})\d+", r"\1", s)
     try:
         dt = datetime.fromisoformat(s)
         if dt.tzinfo is None:

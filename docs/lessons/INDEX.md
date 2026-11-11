@@ -89,5 +89,6 @@ is the only part an agent should read by default.
 | 83 | Native GitHub Protection & CI Gate Consolidation | Verify native controls; migrate checks before delete; public gate; no bypasses. | [L83](L83-native-github-protection-and-ci-gate-consolidation.md) |
 | 84 | Forecast Refit Daemon & Single-Flight Locking | Daemon, non-unlinked fcntl.flock, state quarantine, row-delta gating, Compose/systemd/k8s. | [L84](L84-forecast-refit-daemon-and-singleflight-locking.md) |
 | 85 | Commuter Geolocation, Multi-Tier Banded Sorting & Kiosk Ergonomics | 250m bands; clock-free comparator; zero coordinate exfiltration; >=48px wet targets. | [L85](L85-commuter-geolocation-banded-sorting.md) |
+| 86 | RFC3339Nano 9-Digit Timestamps & Python Microsecond Pre-normalization | Fixed 9-digit layout; regex microsecond truncation; cross-runtime UTC invariants. | [L86](L86-rfc3339nano-9digit-timestamps-microsecond-truncation.md) |
 
 > Numbering note: Lesson 54 does not exist; numbers are preserved as cited.

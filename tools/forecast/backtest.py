@@ -41,6 +41,7 @@ import json
 import logging
 import math
 import os
+import re
 import shlex
 import statistics
 import sys
@@ -53,6 +54,7 @@ from typing import Any, Iterable, Optional, Sequence
 from zoneinfo import ZoneInfo
 
 LOG = logging.getLogger("forecast.backtest")
+_FRACTIONAL_SECONDS = re.compile(r"(\.\d{6})\d+")
 
 SCRIPT_VERSION = "2.0.0"
 BACKTEST_SCHEMA_VERSION = 1
@@ -296,6 +298,7 @@ def parse_utc_timestamp(value: Any) -> Optional[datetime]:
         return None
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
+    text = _FRACTIONAL_SECONDS.sub(r"\1", text)
     try:
         parsed = datetime.fromisoformat(text)
     except ValueError:
