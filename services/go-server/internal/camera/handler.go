@@ -1,11 +1,51 @@
 package camera
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
+
+// CatalogCacheControl specifies the Cache-Control directive for static camera catalogs.
+const CatalogCacheControl = "public, max-age=300, stale-while-revalidate=600"
+
+// checkETagMatch checks if the client's If-None-Match header matches the given etag using weak comparison.
+func checkETagMatch(ifNoneMatch, etag string) bool {
+	if ifNoneMatch == "" {
+		return false
+	}
+	if ifNoneMatch == "*" {
+		return true
+	}
+	rawETag := strings.TrimPrefix(etag, "W/")
+	for _, tag := range strings.Split(ifNoneMatch, ",") {
+		tag = strings.TrimSpace(tag)
+		tag = strings.TrimPrefix(tag, "W/")
+		if tag == rawETag {
+			return true
+		}
+	}
+	return false
+}
+
+// serveJSONWithETag writes a JSON payload with Cache-Control and ETag headers,
+// handling conditional requests (If-None-Match -> 304 Not Modified).
+func serveJSONWithETag(c *gin.Context, data []byte) {
+	etag := fmt.Sprintf(`"%x"`, sha256.Sum256(data))
+	c.Header("Cache-Control", CatalogCacheControl)
+	c.Header("ETag", etag)
+
+	if checkETagMatch(c.GetHeader("If-None-Match"), etag) {
+		c.Status(http.StatusNotModified)
+		return
+	}
+
+	c.Data(http.StatusOK, "application/json; charset=utf-8", data)
+}
 
 // Handler handles HTTP requests for camera catalog and query operations.
 // (Single Responsibility Principle: deals strictly with HTTP transport & encoding)
@@ -76,7 +116,12 @@ func (h *Handler) GetCameras(c *gin.Context) {
 	if cameras == nil {
 		cameras = []Camera{}
 	}
-	c.JSON(http.StatusOK, cameras)
+	data, err := json.Marshal(cameras)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encode cameras"})
+		return
+	}
+	serveJSONWithETag(c, data)
 }
 
 // GetCameraByID godoc
@@ -105,7 +150,16 @@ func (h *Handler) GetCameraByID(c *gin.Context) {
 // @Success 200 {array} string
 // @Router /api/zones [get]
 func (h *Handler) GetZones(c *gin.Context) {
-	c.JSON(http.StatusOK, h.reader.Zones())
+	zones := h.reader.Zones()
+	if zones == nil {
+		zones = []string{}
+	}
+	data, err := json.Marshal(zones)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encode zones"})
+		return
+	}
+	serveJSONWithETag(c, data)
 }
 
 // GetPhuongs godoc
