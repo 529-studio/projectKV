@@ -41,6 +41,7 @@ from tools.forecast.backtest import (
     direction,
     evaluate_horizon,
     load_feature_records,
+    parse_utc_timestamp,
     render_markdown,
     run,
     run_backtest,
@@ -944,6 +945,31 @@ class TestAblationBacktest(unittest.TestCase):
         self.assertIn("Variant B (+weather)", markdown)
         self.assertIn("Variant C (+directional)", markdown)
         self.assertIn("PASSED", markdown)
+
+
+class TestParseUtcTimestamp(unittest.TestCase):
+    """Verify parse_utc_timestamp handles standard RFC3339 and 9-digit RFC3339Nano."""
+
+    def test_rfc3339_standard(self):
+        parsed = parse_utc_timestamp("2026-11-05T01:00:00Z")
+        self.assertEqual(parsed, datetime(2026, 11, 5, 1, 0, 0, tzinfo=UTC))
+
+    def test_rfc3339nano_fixed_layout_nine_digits(self):
+        parsed = parse_utc_timestamp("2026-11-06T10:00:00.000000000Z")
+        self.assertEqual(parsed, datetime(2026, 11, 6, 10, 0, 0, 0, tzinfo=UTC))
+
+    def test_rfc3339nano_fractional_truncation(self):
+        parsed = parse_utc_timestamp("2026-11-06T10:00:00.123456789Z")
+        self.assertEqual(parsed, datetime(2026, 11, 6, 10, 0, 0, 123456, tzinfo=UTC))
+
+    def test_naive_timestamp_defaults_to_utc(self):
+        parsed = parse_utc_timestamp("2026-11-06 10:00:00.123456789")
+        self.assertEqual(parsed, datetime(2026, 11, 6, 10, 0, 0, 123456, tzinfo=UTC))
+
+    def test_invalid_timestamp_returns_none(self):
+        self.assertIsNone(parse_utc_timestamp("not-a-timestamp"))
+        self.assertIsNone(parse_utc_timestamp(None))
+        self.assertIsNone(parse_utc_timestamp(""))
 
 
 if __name__ == "__main__":

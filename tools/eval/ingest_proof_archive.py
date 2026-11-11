@@ -78,6 +78,7 @@ DEFAULT_CV_ENGINE_URL = "http://127.0.0.1:8000"
 TABLE_NAME = "hotset_verdict_history"
 TIMESTAMP_FIXED_LAYOUT = "%Y-%m-%dT%H:%M:%S"
 TIMESTAMP_SUFFIX = ".%06d000Z"
+_FRACTIONAL_SECONDS = re.compile(r"(\.\d{6})\d+")
 DEFAULT_BATCH_SIZE = 500
 
 # PCU weights conforming to ADR-005 T6 / services/go-server/internal/cvclient.
@@ -190,6 +191,7 @@ def parse_timestamp(value: Any) -> Optional[datetime]:
         text = text.replace("Z", "+00:00")
         if text.endswith(" UTC"):
             text = text[: -len(" UTC")] + "+00:00"
+        text = _FRACTIONAL_SECONDS.sub(r"\1", text)
         try:
             parsed = datetime.fromisoformat(text)
         except ValueError:

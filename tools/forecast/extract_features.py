@@ -86,6 +86,7 @@ _SI_IN_NOTES = re.compile(
     re.IGNORECASE,
 )
 _DATE_ONLY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_FRACTIONAL_SECONDS = re.compile(r"(\.\d{6})\d+")
 
 # SQLite's default CURRENT_TIMESTAMP and several historical text encodings do
 # not parse with datetime.fromisoformat alone.
@@ -187,6 +188,7 @@ def parse_timestamp(value: Any, default_tz: ZoneInfo) -> Optional[datetime]:
         if zone_match:
             text = zone_match.group(1)
         text = text.replace("Z", "+00:00")
+        text = _FRACTIONAL_SECONDS.sub(r"\1", text)
 
         parsed = None
         if _NUMERIC_TEXT.match(text):

@@ -162,6 +162,12 @@ class TestTimestampParsing(unittest.TestCase):
         self.assertIsNotNone(parsed_iso)
         assert parsed_iso is not None
         self.assertEqual(int(parsed_iso.timestamp()), 1793681792)
+        parsed_nano = ingest_mod.parse_timestamp("2026-11-03T04:56:32.123456789Z")
+        self.assertIsNotNone(parsed_nano)
+        assert parsed_nano is not None
+        self.assertEqual(int(parsed_nano.timestamp()), 1793681792)
+        self.assertEqual(parsed_nano.microsecond, 123456)
+
 
         parsed_space = ingest_mod.parse_timestamp("2026-11-03 04:56:32")
         self.assertIsNotNone(parsed_space)
