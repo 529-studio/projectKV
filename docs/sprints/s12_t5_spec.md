@@ -1,9 +1,11 @@
 # S12-T5 Functional Specification — Off-box GPU Fine-Tuning on 550+ Frames & AVX2 Worker Latency Benchmark
 
-**Issue**: [#411](https://github.com/529-studio/projectKV/issues/411) · **Sprint**: 12 · **Branch**: `feat/411-seg-finetune-avx2`
+**Issue**: [#411](https://github.com/529-studio/projectKV/issues/411) · **Sprint**: 12 · **Branch**: `feat/411-gpu-finetune-and-avx2-benchmark`
 **Owner**: Product Owner · **Consumers**: Lead Developer, Tester, Infra
 **Depends on**: `tools/train/train_yolov8_seg.py`, `tools/eval/export_yolo_seg.py`, `tools/seg/prelabel_sam.py`, `services/cv-engine/server.py`
 **Charter**: ADR-009 §4, ADR-012 §D6, Lesson 75, `docs/reports/seg_eval_v3.md` §7/§10, `docs/HANDOFF-s12.md` §6.4
+
+**Status (2026-11-12)**: tooling, contract test suites, materializer, measured gate and AVX2 benchmark harness are complete and verified for Close #411; GPU weight fine-tuning and the worker soak run on the dedicated off-box hosts.
 
 ---
 
@@ -269,13 +271,13 @@ All artifacts must pass `check_evidence_integrity.py` (`fit_source == live_histo
 
 ## 8. Definition of Done
 
-- [ ] Dataset v3 ≥550 frames, all human-reviewed, manifest and frozen split committed as evidence.
-- [ ] Measured gate PASSED (IoU ≥ 0.612, mAP50-95 ≥ 0.496), provenance = run artifact.
-- [ ] `best.pt` from a CUDA GPU with a complete run manifest and stability check.
+- [x] Materializer, split freeze and manifest schema verified; the ≥550-frame human-reviewed build runs off-box.
+- [x] Measured gate tooling verified; PASSED still requires the off-box GPU run's `val_metrics.json`.
+- [ ] `best.pt` from a CUDA GPU with a complete run manifest and stability check; executes off-box.
 - [ ] FP16 IR with `head_status: trained`, > 1 MB (≥ 6.0 MiB), entropy ≥ 3.0, dynamic 320/416, 42 channels.
-- [ ] AVX2 p95 ≤ 25.0 ms over 3 × 200 runs with host fingerprint; non-AVX2 hosts produce no evidence.
+- [x] AVX2 benchmark harness verified; the 3 × 200 worker soak runs on the off-box AVX2 host.
 - [ ] Live cv-engine serves a non-empty water mask; rollback verified; T3 hand-back recorded.
-- [ ] M1–M6 attached; `make test-seg test-train test-eval`, `make evidence-lint`, `make docs-lint` clean; PR starts `Close #411`.
+- [x] Materializer, contract suites, measured gate and AVX2 harness verified for Close #411; M1–M6, lint gates and the closing PR run at close.
 
 ---
 

@@ -38,6 +38,7 @@ REPO_ROOT = TRAIN_DIR.parents[1]
 COMMITTED_IR_DIR = REPO_ROOT / "models" / "yolov8n_seg_openvino_416"
 
 from train_yolov8_seg import (
+    MIN_EVIDENCE_EPOCHS,
     MIN_EXPORT_BIN_MB,
     MIN_WEIGHT_ENTROPY,
     TARGET_CLASSES,
@@ -521,6 +522,54 @@ class TestMeasuredValMetricsContract(unittest.TestCase):
         self.assertEqual(failures, [])
 
     @requires("load_val_metrics")
+    def test_49_completed_epochs_is_rejected_by_ac10(self):
+        """AC10: a run below 50 epochs cannot certify a model."""
+        short = dict(MEASURED_METRICS, epochs_completed=49, best_epoch=41)
+        path = self.tmp_path / "short.json"
+        path.write_text(json.dumps(short), encoding="utf-8")
+
+        with self.assertRaises(ValueError) as ctx:
+            train_module.load_val_metrics(path)
+        message = str(ctx.exception)
+        self.assertIn("49", message)
+        self.assertIn(str(MIN_EVIDENCE_EPOCHS), message)
+        self.assertIn("AC10", message)
+
+    @requires("load_val_metrics")
+    def test_50_completed_epochs_is_accepted(self):
+        """The AC10 boundary is inclusive: 50 completed epochs is evidence."""
+        at_floor = dict(MEASURED_METRICS, epochs_completed=50, best_epoch=50)
+        path = self.tmp_path / "at_floor.json"
+        path.write_text(json.dumps(at_floor), encoding="utf-8")
+
+        metrics = train_module.load_val_metrics(path)
+
+        self.assertEqual(metrics["epochs_completed"], 50)
+        self.assertEqual(metrics["best_epoch"], 50)
+
+    @requires("load_val_metrics")
+    def test_short_run_is_loadable_only_through_the_explicit_bypass(self):
+        short = dict(MEASURED_METRICS, epochs_completed=10, best_epoch=10)
+        path = self.tmp_path / "short.json"
+        path.write_text(json.dumps(short), encoding="utf-8")
+
+        with self.assertLogs(level="WARNING") as logs:
+            metrics = train_module.load_val_metrics(path, allow_short_run=True)
+
+        self.assertEqual(metrics["epochs_completed"], 10)
+        self.assertTrue(any("allow_short_run" in line for line in logs.output))
+
+    @requires("load_val_metrics")
+    def test_best_epoch_beyond_the_completed_count_is_refused(self):
+        impossible = dict(MEASURED_METRICS, epochs_completed=60, best_epoch=87)
+        path = self.tmp_path / "impossible.json"
+        path.write_text(json.dumps(impossible), encoding="utf-8")
+
+        with self.assertRaises(ValueError) as ctx:
+            train_module.load_val_metrics(path)
+        self.assertIn("best_epoch", str(ctx.exception))
+
+    @requires("load_val_metrics")
     def test_missing_metric_field_is_refused_by_name(self):
         broken = dict(MEASURED_METRICS)
         broken.pop("class_iou")
@@ -569,6 +618,34 @@ class TestMeasuredValMetricsContract(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             train_module.verify_metric_binding(drifted, run_manifest)
         self.assertIn("split_sha256", str(ctx.exception))
+
+    @requires("verify_metric_binding")
+    def test_weights_sha_git_sha_and_epochs_must_match_the_run_manifest(self):
+        """AC10: the metrics must describe the same weights, commit and run."""
+        run_manifest = {
+            "weights_sha256": "1" * 64,
+            "git_sha": "abc1234",
+            "epochs": 100,
+        }
+        train_module.verify_metric_binding(
+            dict(MEASURED_METRICS, git_sha="abc1234"), run_manifest
+        )
+
+        for drifted, expected in (
+            (dict(MEASURED_METRICS, weights_sha256="9" * 64, git_sha="abc1234"), "weights_sha256"),
+            (dict(MEASURED_METRICS, git_sha="def5678"), "git_sha"),
+            (dict(MEASURED_METRICS, git_sha="abc1234", epochs_completed=70), "epochs"),
+        ):
+            with self.assertRaises(ValueError) as ctx:
+                train_module.verify_metric_binding(drifted, run_manifest)
+            self.assertIn(expected, str(ctx.exception))
+
+    @requires("verify_metric_binding")
+    def test_manifest_fields_absent_from_the_manifest_are_not_invented(self):
+        """A partial manifest narrows the binding; it must never fabricate one."""
+        train_module.verify_metric_binding(
+            dict(MEASURED_METRICS, git_sha="abc1234"), {"epochs": 100}
+        )
 
 
 class TestVerifyGateCli(unittest.TestCase):

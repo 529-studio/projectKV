@@ -145,10 +145,14 @@ class CameraOnlyPairingError(DatasetBuildError):
     def __init__(self, camera_only: Sequence[Dict[str, Any]]) -> None:
         self.camera_only = list(camera_only)
         cameras = sorted({str(item.get("camera_id")) for item in self.camera_only})
+        keys = [
+            f"{item.get('camera_id')}@{item.get('timestamp')}"
+            for item in self.camera_only[:10]
+        ]
         super().__init__(
             f"{len(self.camera_only)} label(s) match a frame camera but no frame timestamp "
-            f"(cameras: {', '.join(cameras[:10])}); camera-only pairing is forbidden - "
-            f"it would bind stale polygons to unrelated pixels"
+            f"(cameras: {', '.join(cameras[:10])}; labels: {', '.join(keys)}); camera-only "
+            f"pairing is forbidden - it would bind stale polygons to unrelated pixels"
         )
 
 
@@ -1179,6 +1183,36 @@ def _proof_roots(cli_roots: Sequence[Path]) -> List[Path]:
     return deduped
 
 
+def scan_root_keys(
+    roots: Sequence[Path], dates: Optional[Sequence[str]] = None
+) -> List[str]:
+    """Enumerate the frame keys a local proof tree actually holds.
+
+    The result is root-relative and sorted, so it is directly usable as the
+    frame side of :func:`match_pairs` and as a ``snapshot_key`` for
+    :func:`resolve_frame`. Pairing labels against the archive (rather than
+    against the labels themselves) is what makes the camera-only guard real: a
+    stray label whose camera is present but whose timestamp is absent must be
+    reported as ``camera_only`` instead of trivially matching its own key.
+    """
+    wanted = {str(date) for date in dates or () if str(date)}
+    keys: set = set()
+    for root in roots or ():
+        base = Path(root)
+        if not base.is_dir():
+            continue
+        for path in base.rglob("*"):
+            if not path.is_file() or path.suffix.lower() not in (".jpg", ".jpeg"):
+                continue
+            key = path.relative_to(base).as_posix()
+            if wanted and key.split("/", 1)[0] not in wanted:
+                continue
+            if _key_identity(key) is None:
+                continue
+            keys.add(key)
+    return sorted(keys)
+
+
 def _r2_fetcher() -> Tuple[Optional[Callable[[str], bytes]], List[str]]:
     """Return an R2 fetch callable, or the missing environment variables."""
     missing = [name for name in R2_REQUIRED_ENV if not os.environ.get(name)]
@@ -1362,20 +1396,69 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         return EXIT_BUILD_FAILED
 
-    # 3. Exact-key pairing only; a camera-only fallback is fatal.
-    frame_keys = [str(label.get("snapshot_key") or "") for label in labels]
-    if any(not key for key in frame_keys):
+    # 3. Exact-key pairing only; a camera-only fallback is fatal. The frame side
+    #    is the local proof tree, not the label list: pairing labels with their
+    #    own keys makes every label trivially match and disables the guard that
+    #    keeps an orphaned polygon from binding to a live frame.
+    roots = _proof_roots(args.proof_root)
+    local_keys = scan_root_keys(roots, dates=_split_csv(args.dates))
+    label_keys = [str(label.get("snapshot_key") or "") for label in labels]
+    if any(not key for key in label_keys):
         logging.error("Every label must declare a snapshot_key; aborting before pairing")
         return EXIT_BUILD_FAILED
-    pairs = match_pairs(frame_keys, labels)
-    try:
-        assert_pairs_buildable(pairs)
-    except DatasetBuildError as exc:
-        logging.error("%s", exc)
-        return EXIT_BUILD_FAILED
+
+    if local_keys:
+        pairs = match_pairs(local_keys, labels)
+        if pairs["camera_only"]:
+            logging.error("%s", CameraOnlyPairingError(pairs["camera_only"]))
+            return EXIT_BUILD_FAILED
+        matched = {(match["camera_id"], match["timestamp"]) for match in pairs["matches"]}
+        pending = [
+            (label, key)
+            for label, key in zip(labels, label_keys)
+            if _label_identity(label) not in matched
+        ]
+        logging.info(
+            "Local proof scan: %d frame key(s), %d paired, %d label(s) awaiting R2",
+            len(local_keys),
+            len(pairs["matches"]),
+            len(pending),
+        )
+        # A label with no local frame may still be an exact R2 key; keep it as a
+        # candidate so resolution can prove it instead of guessing by camera.
+        for label, key in pending:
+            identity = _key_identity(key) or _label_identity(label)
+            if identity is None:
+                logging.error(
+                    "Label %s has no parseable (camera_id, timestamp); cannot pair it exactly",
+                    label.get("_label_path") or key,
+                )
+                return EXIT_BUILD_FAILED
+            pairs["matches"].append(
+                {
+                    "key": key,
+                    "camera_id": identity[0],
+                    "timestamp": identity[1],
+                    "label": label,
+                }
+            )
+    else:
+        # No local proof root is populated: exact-key resolution can still run
+        # against R2, but camera-only detection has no frame universe to compare
+        # against, so that fallback is unavailable and reported as such.
+        logging.warning(
+            "No local proof frames found under %s; pairing falls back to label keys and "
+            "camera-only detection is unavailable for this build",
+            ", ".join(str(root) for root in roots) or "<none>",
+        )
+        pairs = match_pairs(label_keys, labels)
+        try:
+            assert_pairs_buildable(pairs)
+        except DatasetBuildError as exc:
+            logging.error("%s", exc)
+            return EXIT_BUILD_FAILED
 
     # 4. Resolve and validate each frame; local roots win over R2.
-    roots = _proof_roots(args.proof_root)
     r2_fetch, r2_missing = _r2_fetcher()
     try:
         entries, missing = _stage_entries(pairs["matches"], roots, r2_fetch)
@@ -1387,7 +1470,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if r2_fetch is None:
             logging.error(
                 "%d frame(s) are absent from every local proof root (%s) and cannot be "
-                "fetched from R2 because %s is not configured: %s",
+                "fetched from R2 because %s are not configured: %s",
                 len(missing),
                 ", ".join(str(root) for root in roots) or "<none>",
                 ", ".join(r2_missing),

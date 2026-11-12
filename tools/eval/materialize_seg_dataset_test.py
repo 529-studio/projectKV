@@ -397,6 +397,22 @@ class TestExactKeyResolution(unittest.TestCase):
         self.assertEqual(len(result["matches"]), 1)
         self.assertEqual(result["matches"][0]["timestamp"], 1794000000)
 
+    @requires("scan_root_keys")
+    def test_root_scan_returns_relative_frame_keys_for_the_pairing_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proofs"
+            frame = root / "2026-11-08" / CAM_A / "1794000000_sample.jpg"
+            frame.parent.mkdir(parents=True)
+            frame.write_bytes(b"\xff\xd8\xff")
+            (frame.parent / "notes.txt").write_text("not a frame", encoding="utf-8")
+            other_date = root / "2026-11-09" / CAM_B / "1794000100_sample.jpg"
+            other_date.parent.mkdir(parents=True)
+            other_date.write_bytes(b"\xff\xd8\xff")
+
+            keys = materializer.scan_root_keys([root], dates=["2026-11-08"])
+
+        self.assertEqual(keys, [f"2026-11-08/{CAM_A}/1794000000_sample.jpg"])
+
 
 # ---------------------------------------------------------------------------
 # 2. Local proof directory precedence over R2
@@ -1094,6 +1110,28 @@ class TestCliDryRun(unittest.TestCase):
 
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn(missing["snapshot_key"], completed.stdout + completed.stderr)
+        self.assertFalse(fixture.out.exists())
+        self.assertFalse(fixture.manifest.exists())
+
+    @requires("main", "CameraOnlyPairingError")
+    def test_stray_label_from_a_known_camera_fails_as_camera_only(self):
+        """A label whose camera is in the proof scan but whose timestamp is not
+        must be refused as camera-only, not silently accepted or misreported as
+        an R2 configuration gap."""
+        fixture = CliFixture(self.tmp / "repo")
+        present = make_label(CAM_A, 1794000000)
+        stray = make_label(CAM_A, 1794009999)
+        fixture.add_frame(present["snapshot_key"])
+        fixture.add_label(present)
+        fixture.add_label(stray)
+
+        completed = fixture.run()
+
+        output = completed.stdout + completed.stderr
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("camera-only", output.lower())
+        self.assertIn(CAM_A, output)
+        self.assertIn("1794009999", output)
         self.assertFalse(fixture.out.exists())
         self.assertFalse(fixture.manifest.exists())
 

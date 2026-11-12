@@ -51,7 +51,7 @@
 
 > **Ho Chi Minh City traffic camera viewer and explorer optimized for low latency, clean monochromatic high-contrast UI, chained hierarchical filtering, multi-camera pin dock, and extensible modular architecture — extending toward real-time computer vision and flood alerting.**
 
-The system is organized as a **clean monorepo**, decoupling the Web Client (`apps/web`) from a Go backend (`services/go-server`), with a separate Python service (`services/cv-engine`) for model inference. See [`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md) for the full architectural rationale.
+The system is organized as a **clean monorepo**, decoupling the Web Client (`apps/web`) from a Go backend (`services/go-server`), with a separate Python service (`services/cv-engine`) for model inference. See [`docs/ADR-001-flood-alert-architecture.md`](docs/ADR-001-flood-alert-architecture.md) for architecture rationale.
 
 ## 1. Project Directory Structure (Monorepo)
 
@@ -174,7 +174,7 @@ make dev-all
 | Service | Port | Endpoint URL | Verification Check |
 |---|:---:|---|---|
 | **Web Map Explorer** | `3001` | http://localhost:3001 | Interactive Leaflet map, corridor dock |
-| **Collaborative Labeler** | `3001` | http://localhost:3001/labeler | Snapshot labeling tool with auto-harvest review filters, in-memory partition cache, Shift+Enter fast approval, and a segmentation mode for drawing 6-class polygon ground truth (ADR-011 D1) |
+| **Collaborative Labeler** | `3001` | http://localhost:3001/labeler | Snapshot labeling tool with auto-harvest review filters, partition cache, Shift+Enter approval, and a 6-class polygon segmentation mode (ADR-011 D1) |
 | **Go Backend API** | `3000` | http://localhost:3000 | Core Gin HTTP REST server |
 | **Subscription API** | `3000` | http://localhost:3000/api/subscriptions | `POST`, `GET`, `DELETE` flood alert subscriptions |
 | **Swagger UI** | `3000` | http://localhost:3000/swagger/index.html | Interactive OpenAPI documentation |
@@ -191,7 +191,7 @@ make dev-all
 
 ### 2.3. Dataset Labeling & Model Training Workflow
 
-The project incorporates an end-to-end active learning and computer vision pipeline — spanning automated snapshot harvesting, interactive quadrilateral/polygon ground-truth annotation, YOLOv8 segmentation dataset export, model training, and OpenVINO optimization.
+The pipeline spans automated snapshot harvesting, interactive polygon ground-truth annotation, YOLO segmentation export, model training and OpenVINO optimization.
 
 #### Step 1: Frame Annotation & Directional Ground Truth (`/labeler`)
 
@@ -200,10 +200,10 @@ The project incorporates an end-to-end active learning and computer vision pipel
 </p>
 
 Access the Collaborative Labeler at `http://localhost:3001/labeler`:
-*   **Dual-Trigger Harvesting**: Frames are ingested continuously via scheduled peak harvests and weather-triggered rain watchers (`internal/harvester`), streamed to Cloudflare R2 object storage (`warded-proofs`).
+*   **Dual-Trigger Harvesting**: Frames are ingested continuously via scheduled peak harvests and weather-triggered rain watchers (`internal/harvester`), then streamed to Cloudflare R2 (`warded-proofs`).
 *   **Assisted Pre-Labeling (SAM)**: Run `make prelabel-sam` (`tools/seg/prelabel_sam.py`) to stream R2 frames and generate MobileSAM + YOLOv8n polygon segment candidates for human review.
-*   **Quadrilateral Roadway & Flood Polygons**: Annotators switch to polygon mode (`S`) to outline drivable roadways and inundation zones directly on camera snapshots:
-    *   **Directional Roadway Polygons**: For the `roadway` class, annotators draw quadrilateral/polygon lane boundaries and assign directional flow — **Direction A** (`Chiều A`, near/approaching lane) or **Direction B** (`Chiều B`, far/receding lane). This isolates opposing traffic corridors for per-direction saturation and PCU ground truth.
+*   **Quadrilateral Roadway & Flood Polygons**: Annotators switch to polygon mode (`S`) to outline roadways and inundation zones on camera snapshots:
+    *   **Directional Roadway Polygons**: For the `roadway` class, annotators draw quadrilateral/polygon lane boundaries and assign directional flow — **Direction A** (`Chiều A`, near/approaching lane) or **Direction B** (`Chiều B`, far/receding lane). This separates opposing corridors for per-direction saturation and PCU ground truth.
     *   **Water & Flood Masks**: Delineate localized water bodies (`water_puddle`, `water_severe`) anchored to physical tire-depth markers.
     *   **Review Acceleration**: In-memory partition caching, hotkey accelerators (`Shift+Enter` to approve, `1`–`4` for traffic severity), and facet filtering (Rain, Daylight, Hot Set).
 
@@ -244,13 +244,13 @@ tensors (`--allow-untrained-head` stays `UNVERIFIED`). Evidence:
 *   **Monochromatic & Intuitive Interface**: Minimalist high-contrast design using black, dark gray, and white tones.
 *   **Bilingual i18n Support**: Instant switching between Vietnamese (`vi`, default) and English (`en`), persisted across sessions.
 *   **Clean Standard OSM Basemap**: OpenStreetMap tiles, no watermark, geographically constrained to Southeastern Vietnam (`maxBounds`).
-*   **Map Clutter Hygiene & Offline Camera Filtering**: Hides 135 offline or no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default, with a header counter and monochromatic toggle.
+*   **Map Clutter Hygiene & Offline Camera Filtering**: Hides 135 offline or no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default, with a header counter and a toggle.
 *   **Chained Deep Filter**: Multi-tier faceted filtering — *Zone* ➔ *Road / Corridor* ➔ *Intersection / Node*.
-*   **Real-Time Arterial Marker Saturation Coloring**: Styles Hot Set markers from 30s ONNX PCU saturation: Clear (`#10b981`, $SI < 0.30$), Moderate (`#f59e0b`, $0.30 \le SI < 0.60$), Congested (`#ef4444`, $SI \ge 0.60$), with CSS pulse, tooltip metrics, and legend.
+*   **Real-Time Arterial Marker Saturation Coloring**: Styles Hot Set markers from 30s ONNX PCU saturation: Clear (`#10b981`, $SI < 0.30$), Moderate (`#f59e0b`, $0.30 \le SI < 0.60$), Congested (`#ef4444`, $SI \ge 0.60$), with legend and tooltip metrics.
 *   **Calibrated Doppler Rain Radar (S8-T1)**: RainViewer tiles at Zoom 8 with meteorological RGB reflectivity decoding (18–29 dBZ light, 30–39 moderate, $\ge 40$ heavy), hexagon quorum, and ground-camera cross-validation.
 *   **Multi-Camera Corridor Tracking Dock**: Pin cameras into the bottom tracking dock with synchronized snapshot refresh.
-*   **Human-in-the-Loop Flood Reporting (S8-T7)**: Commuter flood reports bridge live to SSE map streams and hex aggregators, with amber markers, 15m sliding TTL, and multi-reporter escalation.
-*   **Directional Multi-Lane Taxonomy & Physical Flood Markers**: Classifies traffic density independently by direction (Direction A approaching vs Direction B receding) to resolve asymmetric divided boulevards, and anchors flood severity to physical wheel-depth markers.
+*   **Human-in-the-Loop Flood Reporting (S8-T7)**: Commuter flood reports bridge to SSE map streams and hex aggregators, with amber markers, 15m TTL, and multi-reporter escalation.
+*   **Directional Multi-Lane Taxonomy & Physical Flood Markers**: Classifies traffic density by direction (A approaching, B receding) for asymmetric boulevards, and anchors flood severity to wheel-depth markers.
 *   **Physical Flood Hazard Levels (cm)**: Depth anchored to the in-frame 110 cm motorcycle reference (per-camera overrides ±25%); the 15 cm curb reference is deferred until a curb segmenter lands. Three stall-risk bands plus an avoidance-inferred Level 3 for upstream-stopped traffic — never a fabricated depth.
 *   **Responsive Layout (100dvh)**: Desktop, tablet, and smartphone friendly with collapsible legend and mobile bottom-sheet drawer.
 *   **Go Backend**: Single static binary, no runtime dependency install, in-memory + SQLite state, goroutine-based Hot Set scheduler.
@@ -317,7 +317,7 @@ Operations: [Inference Worker Capacity Runbook](docs/runbooks/inference_worker_c
 
 #### Operational Verification: Staging Telegram Flood Alerts
 
-Citizens subscribe from the bell button in the web UI (city-wide, zone, ward or
+Citizens subscribe from the bell button (city-wide, zone, ward or
 chokepoint); the bot answers `/start`, `/status`, `/stop` and `/help`. Verify
 live delivery on staging before enabling public subscriptions:
 

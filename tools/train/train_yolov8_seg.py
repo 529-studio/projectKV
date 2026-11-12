@@ -108,6 +108,11 @@ V2_GATE_THRESHOLDS = {
 # Minimum completed epochs for a run to qualify as evidence (AC10).
 MIN_EVIDENCE_EPOCHS = 50
 
+# Fields a run manifest may bind to a val_metrics artifact (AC10). Only fields
+# present in the manifest are compared, so a partial manifest narrows the
+# binding instead of silently widening it.
+METRIC_BINDING_FIELDS = ("dataset_manifest_sha256", "split_sha256", "weights_sha256", "git_sha")
+
 # Authentic-weight acceptance floor (Issue #399): the committed stub was 65,536 B.
 MIN_EXPORT_BIN_MB = 6.0
 MIN_WEIGHT_ENTROPY = 3.0     # Shannon entropy, bits/byte (CI gate parity)
@@ -216,13 +221,18 @@ def build_training_metadata_block(
     }
 
 
-def load_val_metrics(path: Path) -> Dict[str, Any]:
+def load_val_metrics(
+    path: Path, *, allow_short_run: bool = False, min_epochs: int = MIN_EVIDENCE_EPOCHS
+) -> Dict[str, Any]:
     """Load a measured `val_metrics.json` and refuse anything unmeasured.
 
     The gate exists to certify a measurement, so this loader is deliberately
     strict: every §5.2 field must be present, the class order must match the
     canonical six, the provenance must name the run artifact rather than a
-    copied report constant, and the anti-cherry-pick margin must hold.
+    copied report constant, the anti-cherry-pick margin must hold, and AC10
+    requires at least ``min_epochs`` completed epochs. A short run can only be
+    loaded by an explicit ``allow_short_run=True`` caller (a bootstrap or
+    diagnostic path), never by the promotion gate.
     """
     path = Path(path)
     try:
@@ -277,11 +287,21 @@ def load_val_metrics(path: Path) -> Dict[str, Any]:
         )
 
     epochs_completed = int(payload.get("epochs_completed") or 0)
-    if epochs_completed < MIN_EVIDENCE_EPOCHS:
-        logging.warning(
-            "val_metrics reports only %d completed epoch(s); AC10 requires >= %d for evidence",
-            epochs_completed,
-            MIN_EVIDENCE_EPOCHS,
+    if epochs_completed < int(min_epochs):
+        message = (
+            f"val_metrics reports only {epochs_completed} completed epoch(s); AC10 requires "
+            f">= {int(min_epochs)} for evidence. A short run cannot certify the model, and "
+            f"there is no promotion bypass: re-run the training to the required epoch count"
+        )
+        if not allow_short_run:
+            raise ValueError(message)
+        logging.warning("%s (permitted by an explicit allow_short_run bypass)", message)
+
+    best_epoch = payload.get("best_epoch")
+    if best_epoch is not None and int(best_epoch) > epochs_completed:
+        raise ValueError(
+            f"val_metrics best_epoch {best_epoch} exceeds epochs_completed {epochs_completed}; "
+            f"the best checkpoint cannot come from an epoch that never ran"
         )
 
     try:
@@ -305,14 +325,30 @@ def load_val_metrics(path: Path) -> Dict[str, Any]:
 def verify_metric_binding(
     metrics: Dict[str, Any], run_manifest: Dict[str, Any]
 ) -> None:
-    """The dataset/split SHA in val_metrics.json must equal the run manifest's."""
-    for field in ("dataset_manifest_sha256", "split_sha256"):
+    """Every provenance field the run manifest binds must equal val_metrics'.
+
+    A measured artifact is only evidence for the run that produced it, so the
+    dataset SHA, split SHA, weights SHA and git SHA are compared whenever the
+    manifest declares them. ``epochs`` is compared against ``epochs_completed``
+    so a manifest cannot bind 100 epochs to a 10-epoch measurement.
+    """
+    for field in METRIC_BINDING_FIELDS:
         measured = str(metrics.get(field) or "")
         bound = str(run_manifest.get(field) or "")
         if bound and measured != bound:
             raise ValueError(
                 f"{field} mismatch: val_metrics reports {measured or '<missing>'} but the run "
-                f"manifest binds {bound}; these metrics were not measured on this run's dataset"
+                f"manifest binds {bound}; these metrics were not measured on this run's artifact"
+            )
+
+    if run_manifest.get("epochs") is not None:
+        bound_epochs = int(run_manifest["epochs"])
+        measured_epochs = int(metrics.get("epochs_completed") or 0)
+        if bound_epochs != measured_epochs:
+            raise ValueError(
+                f"epochs mismatch: val_metrics reports {measured_epochs} completed epoch(s) but "
+                f"the run manifest binds {bound_epochs}; the metrics and the run are not the "
+                f"same training job"
             )
 
 

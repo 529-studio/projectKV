@@ -133,10 +133,14 @@ trainable Dataset v3 is:
    `make materialize-seg DATASET_DATES=2026-10-23,2026-10-24`. Frames resolve by exact
    `snapshot_key` (local proof roots before R2), labels pair on
    `(camera_id, timestamp)` only, and the camera/date group split is frozen in
-   `split.json`. `--allow-synthetic` does not exist for v3, and there is no
-   `--allow-unreviewed` flag: a proposal-only annotator, a missing `reviewed_at` or a
-   retired template polygon fails the build.
+   `split.json`. The CLI pairs against the frame keys it scans from the local proof
+   roots, so a stray label on a known camera with an unknown timestamp fails as
+   camera-only instead of binding to unrelated pixels. `--allow-synthetic` does not
+   exist for v3, and there is no `--allow-unreviewed` flag: a proposal-only annotator,
+   a missing `reviewed_at` or a retired template polygon fails the build.
 4. **Train** on a CUDA host: `make train-seg DATA=data/yolo_seg/dataset.yaml EPOCHS=100 SEED=42`.
+   AC10 evidence needs **≥ 50 completed epochs**; a shorter run is refused by the gate
+   (there is no promotion bypass).
 5. **Gate and export**: `make export-seg-openvino SEG_CHECKPOINT=... EXTRA="--metrics .../val_metrics.json"`,
    then `make bench-seg-avx2` on the AVX2 worker.
 
