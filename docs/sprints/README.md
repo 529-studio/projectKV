@@ -22,6 +22,7 @@ permanent directory made readers pay for a document with a shelf life.
 | 12 | [`s12_t3_spec.md`](s12_t3_spec.md) | Closed — #401 closed; retrospective in [`docs/reports/sprint12_report.md`](../reports/sprint12_report.md) |
 | 12 | [`s12_t4_spec.md`](s12_t4_spec.md) | Closed — #402 closed; retrospective in [`docs/reports/sprint12_report.md`](../reports/sprint12_report.md) |
 | 12 | [`s12_t5_spec.md`](s12_t5_spec.md) | Closed — #411 closed; retrospective in [`docs/reports/sprint12_report.md`](../reports/sprint12_report.md) |
+| 13 | [`s13_t1_spec.md`](s13_t1_spec.md) | Open — #438; retro at close |
 
 ## Lifecycle
 

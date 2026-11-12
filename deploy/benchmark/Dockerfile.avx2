@@ -1,0 +1,79 @@
+# syntax=docker/dockerfile:1.7
+#
+# AVX2 latency-soak image for the segmentation IR (S12-T5 §2.9 / S13-T1 #438).
+#
+# The gate number is only evidence when it was measured on the x86-64 AVX2
+# worker that serves inference, so this image is built for linux/amd64 and the
+# runner refuses any container runtime that cannot prove a native x86-64 AVX2
+# CPU before the benchmark starts. The image itself stays deliberately small:
+# Python, OpenVINO, NumPy, Pillow and PyYAML are the entire runtime surface.
+#
+# Build (context is the repository root, the harness is copied from tools/train):
+#   docker build --platform linux/amd64 \
+#       -f deploy/benchmark/Dockerfile.avx2 \
+#       -t projectkv/bench-seg-avx2:2026.4.1 .
+#
+# Run through tools/train/bench_avx2_docker.sh; it mounts the IR, the proof
+# frame and the evidence directory and never bakes data into the image.
+#
+# Version pins are evidence inputs, not conveniences: a different OpenVINO
+# build produces a different p95. Override with --build-arg only when the
+# worker's runtime version is deliberately changed, and disclose it in the
+# sprint report.
+
+FROM python:3.12.7-slim-bookworm
+
+ARG OPENVINO_VERSION=2026.4.1
+ARG NUMPY_VERSION=2.1.3
+ARG PILLOW_VERSION=11.0.0
+ARG PYYAML_VERSION=6.0.2
+
+LABEL org.opencontainers.image.title="projectkv-bench-seg-avx2" \
+      org.opencontainers.image.description="AVX2 worker latency soak for the ProjectKV segmentation OpenVINO IR" \
+      org.opencontainers.image.source="https://github.com/529-studio/projectKV" \
+      org.opencontainers.image.licenses="Proprietary"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TZ=Asia/Ho_Chi_Minh
+
+# util-linux provides lscpu, which bench_seg_latency.py records in the evidence
+# fingerprint. libgomp1 is OpenVINO's OpenMP runtime; the CPU thread count is
+# intentionally left at the worker default so the measurement matches §2.9.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --no-install-suggests \
+        ca-certificates \
+        libgomp1 \
+        tzdata \
+        util-linux \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --no-cache-dir \
+        "openvino==${OPENVINO_VERSION}" \
+        "numpy==${NUMPY_VERSION}" \
+        "pillow==${PILLOW_VERSION}" \
+        "PyYAML==${PYYAML_VERSION}"
+
+# Non-root runtime user. The benchmark only needs read access to the mounted
+# repository and write access to the mounted evidence directory.
+RUN groupadd --gid 10001 bench \
+    && useradd --uid 10001 --gid 10001 --no-log-init \
+        --create-home --home-dir /home/bench --shell /usr/sbin/nologin bench
+
+WORKDIR /opt/bench
+
+COPY tools/train/bench_seg_latency.py /opt/bench/bench_seg_latency.py
+COPY tools/train/bench_avx2_host_probe.py /opt/bench/bench_avx2_host_probe.py
+COPY tools/train/bench_avx2_evidence_check.py /opt/bench/bench_avx2_evidence_check.py
+
+RUN chmod 0555 /opt/bench/*.py \
+    && chown -R root:root /opt/bench
+
+WORKDIR /work
+
+USER 10001:10001
+
+# The runner overrides --entrypoint for the host probe and the evidence check.
+ENTRYPOINT ["python3", "/opt/bench/bench_seg_latency.py"]
