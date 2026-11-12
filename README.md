@@ -208,28 +208,30 @@ Access the Collaborative Labeler at `http://localhost:3001/labeler`:
     *   **Review Acceleration**: In-memory partition caching, hotkey accelerators (`Shift+Enter` to approve, `1`–`4` for traffic severity), and facet filtering (Rain, Daylight, Hot Set).
 
 #### Step 2: Dataset Compilation & Directional Sidecar Export
-Export annotated labels from `tools/eval/labels_gold_standard` into YOLO segmentation format:
+Export curated labels into YOLO segmentation:
 ```bash
 make export-seg
-# Runs: python3 tools/eval/export_yolo_seg.py --labels-dir tools/eval/labels_gold_standard --output-dir data/yolo_seg --verify
 ```
-*   **Standard YOLO Polygon Labels**: Normalizes polygon vertices into standard Ultralytics YOLO segmentation `.txt` format (`0: roadway`) split into train/val/test partitions.
-*   **Directional Roadway Sidecars**: Emits `roadway_regions.json` alongside masks, preserving exact normalized coordinates and lane flow (`a` vs `b`) for downstream traffic forecasting.
+*   **Dataset v3**: `make materialize-seg DATASET_DATES=...` pairs every label to its own frame by exact `snapshot_key` and freezes the camera/date split. Camera-only pairing, duplicate pixels and a different `--seed` are refused. Detail: [`docs/runbooks/sam_prelabeling.md`](docs/runbooks/sam_prelabeling.md).
+*   **Standard YOLO Polygon Labels**: Normalizes polygon vertices into standard Ultralytics YOLO segmentation `.txt` format (`0: roadway`) split into train/val partitions.
+*   **Directional Roadway Sidecars**: Emits `roadway_regions.json` alongside masks, preserving exact coordinates and lane flow (`a`/`b`) for downstream forecasting.
 
 #### Step 3: Off-Box Training & OpenVINO Deployment
-Train and export optimized inference weights:
 ```bash
-# Fine-tune YOLOv8n-seg (EPOCHS=50) and export Intel OpenVINO FP16 IR
+# Fine-tune YOLOv8n-seg and export FP16 IR
 make train-seg
 
-# Export + verify an existing fine-tuned checkpoint
+# Export + verify checkpoint
 make export-seg-openvino SEG_CHECKPOINT=runs/segment/train_yolov8n_seg/weights/best.pt
 
-# Verify PCU saturation and flood segmentation accuracy against ground-truth benchmarks
+# Accuracy benchmark
 make benchmark-real
+
+# AVX2 latency gate (p95 <= 25.0 ms); other hosts exit 2
+make bench-seg-avx2
 ```
-The export converts the 6-class (42-channel) graph the cv-engine decodes to real FP16 IR and
-refuses a re-initialised head (`--allow-untrained-head` is bootstrap-only). Evidence:
+`--verify-gate` requires measured `--metrics`; `head_status: trained` needs 0 re-initialised
+tensors (`--allow-untrained-head` stays `UNVERIFIED`). Evidence:
 [`docs/reports/seg_eval_v3.md`](docs/reports/seg_eval_v3.md).
 
 ### 2.4. Verification, Forecast & Evidence Integrity Gates
