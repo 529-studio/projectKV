@@ -1,10 +1,13 @@
 package middleware_test
 
 import (
+	"bufio"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/gin-gonic/gin"
@@ -176,5 +179,212 @@ func TestSecretSanitizer_PreservesClockTimes(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("expected benign value %q preserved, got: %s", want, body)
 		}
+	}
+}
+
+// TestSecretSanitizer_BypassesSSEStream verifies Issue #420:
+// text/event-stream responses bypass memory buffering so frames and comments
+// reach the wire immediately via http.Flusher without blocking on handler completion.
+func TestSecretSanitizer_BypassesSSEStream(t *testing.T) {
+	r := gin.New()
+	r.Use(middleware.SecretSanitizer())
+
+	started := make(chan struct{})
+	done := make(chan struct{})
+
+	const eventFrame = "event: camera_update\ndata: {\"cam_id\":\"cam-test\",\"severity\":\"low\"}\n\n"
+
+	r.GET("/stream", func(c *gin.Context) {
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+
+		flusher, ok := c.Writer.(http.Flusher)
+		if !ok {
+			t.Error("expected c.Writer to implement http.Flusher")
+			return
+		}
+
+		_, err := c.Writer.Write([]byte(eventFrame))
+		if err != nil {
+			t.Errorf("write error: %v", err)
+			return
+		}
+		flusher.Flush()
+
+		close(started)
+		<-done
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/stream", nil)
+
+	go func() {
+		r.ServeHTTP(w, req)
+	}()
+
+	<-started
+	defer close(done)
+
+	// Handler is still running (blocked on <-done).
+	// Verify frames bypassed memory buffering and arrived at recorder immediately.
+	if w.Body.Len() == 0 {
+		t.Fatalf("expected non-empty recorder body while handler is active, got 0 bytes")
+	}
+	if !strings.Contains(w.Body.String(), eventFrame) {
+		t.Errorf("expected body to contain %q, got: %s", eventFrame, w.Body.String())
+	}
+	if !w.Flushed {
+		t.Errorf("expected flusher to mark recorder as flushed")
+	}
+}
+
+// TestSecretSanitizer_SSEStreamingEndToEnd spins up a real HTTP server with
+// SecretSanitizer enabled and verifies real-time frame and heartbeat delivery
+// over a persistent connection from a client perspective.
+func TestSecretSanitizer_SSEStreamingEndToEnd(t *testing.T) {
+	r := gin.New()
+	r.Use(middleware.SecretSanitizer())
+
+	eventsToSend := make(chan string, 5)
+	clientClosed := make(chan struct{})
+
+	r.GET("/api/live/stream", func(c *gin.Context) {
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+		c.Header("X-Accel-Buffering", "no")
+
+		flusher, ok := c.Writer.(http.Flusher)
+		if !ok {
+			c.String(http.StatusInternalServerError, "streaming unsupported")
+			return
+		}
+		flusher.Flush()
+
+		ctx := c.Request.Context()
+		for {
+			select {
+			case <-ctx.Done():
+				close(clientClosed)
+				return
+			case msg, ok := <-eventsToSend:
+				if !ok {
+					return
+				}
+				_, _ = fmt.Fprint(c.Writer, msg)
+				flusher.Flush()
+			}
+		}
+	})
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/api/live/stream", nil)
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
+	req.Header.Set("Accept", "text/event-stream")
+
+	resp, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("connect SSE: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/event-stream") {
+		t.Fatalf("expected Content-Type text/event-stream, got %q", ct)
+	}
+
+	reader := bufio.NewReader(resp.Body)
+
+	// Step 1: Send a camera_update event frame and read line-by-line immediately.
+	eventsToSend <- "event: camera_update\ndata: {\"cam_id\":\"cam-42\"}\n\n"
+
+	line1, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read line 1: %v", err)
+	}
+	if strings.TrimSpace(line1) != "event: camera_update" {
+		t.Errorf("expected 'event: camera_update', got %q", line1)
+	}
+
+	line2, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read line 2: %v", err)
+	}
+	if strings.TrimSpace(line2) != "data: {\"cam_id\":\"cam-42\"}" {
+		t.Errorf("expected 'data: {\"cam_id\":\"cam-42\"}', got %q", line2)
+	}
+
+	line3, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read empty line 3: %v", err)
+	}
+	if strings.TrimSpace(line3) != "" {
+		t.Errorf("expected empty line separator, got %q", line3)
+	}
+
+	// Step 2: Send a heartbeat comment and verify receipt.
+	eventsToSend <- ": heartbeat\n\n"
+
+	hbLine, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read heartbeat line: %v", err)
+	}
+	if strings.TrimSpace(hbLine) != ": heartbeat" {
+		t.Errorf("expected ': heartbeat', got %q", hbLine)
+	}
+
+	// Close client body to trigger context cancellation on server.
+	resp.Body.Close()
+
+	select {
+	case <-clientClosed:
+		// Clean disconnect observed.
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for server to observe client disconnect")
+	}
+}
+
+// TestSecretSanitizer_SSEZeroMemoryBuildup verifies that high-volume SSE frames
+// stream directly to the underlying response writer without accumulating inside
+// the sanitizingResponseWriter memory buffer.
+func TestSecretSanitizer_SSEZeroMemoryBuildup(t *testing.T) {
+	r := gin.New()
+	r.Use(middleware.SecretSanitizer())
+
+	const totalFrames = 500
+	expectedBytes := 0
+
+	r.GET("/stream-bulk", func(c *gin.Context) {
+		c.Header("Content-Type", "text/event-stream")
+		flusher, ok := c.Writer.(http.Flusher)
+		if !ok {
+			t.Error("expected http.Flusher")
+			return
+		}
+
+		for i := range totalFrames {
+			frame := fmt.Sprintf("event: camera_update\ndata: {\"seq\":%d}\n\n", i)
+			expectedBytes += len(frame)
+			_, _ = fmt.Fprint(c.Writer, frame)
+			flusher.Flush()
+		}
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/stream-bulk", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Body.Len() != expectedBytes {
+		t.Fatalf("expected exactly %d bytes in body, got %d", expectedBytes, w.Body.Len())
+	}
+	if !w.Flushed {
+		t.Errorf("expected recorder to be marked as flushed")
 	}
 }

@@ -57,18 +57,33 @@ type sanitizingResponseWriter struct {
 	statusCode int
 }
 
+var (
+	_ gin.ResponseWriter = (*sanitizingResponseWriter)(nil)
+	_ http.Flusher       = (*sanitizingResponseWriter)(nil)
+)
+
 func (w *sanitizingResponseWriter) Write(b []byte) (int, error) {
-	// If it's a binary media stream (image/jpeg, image/png, tiles), bypass buffering
-	// to avoid extra memory allocation on high-frequency snapshot proxying.
+	// If it's a binary media stream (image/jpeg, image/png, tiles) or an SSE stream
+	// (text/event-stream), bypass buffering to avoid extra memory allocation and
+	// prevent stream buffering deadlocks.
 	ct := w.Header().Get("Content-Type")
-	if strings.HasPrefix(ct, "image/") || strings.HasPrefix(ct, "application/octet-stream") {
+	if strings.HasPrefix(ct, "image/") || strings.HasPrefix(ct, "application/octet-stream") || strings.HasPrefix(ct, "text/event-stream") {
 		return w.ResponseWriter.Write(b)
 	}
 	return w.buf.Write(b)
 }
 
 func (w *sanitizingResponseWriter) WriteString(s string) (int, error) {
-	return w.Write([]byte(s))
+	ct := w.Header().Get("Content-Type")
+	if strings.HasPrefix(ct, "image/") || strings.HasPrefix(ct, "application/octet-stream") || strings.HasPrefix(ct, "text/event-stream") {
+		return w.ResponseWriter.WriteString(s)
+	}
+	return w.buf.WriteString(s)
+}
+
+// Flush implements http.Flusher, explicitly delegating to the underlying gin.ResponseWriter.
+func (w *sanitizingResponseWriter) Flush() {
+	w.ResponseWriter.Flush()
 }
 
 func (w *sanitizingResponseWriter) WriteHeader(code int) {

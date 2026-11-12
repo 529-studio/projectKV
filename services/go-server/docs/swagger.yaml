@@ -76,7 +76,6 @@ definitions:
         description: '[[x, y], ...] normalized to [0, 1]'
         items:
           items:
-            format: float64
             type: number
           type: array
         type: array
@@ -191,7 +190,6 @@ definitions:
         description: Normalized [[x, y], ...] in [0, 1] range
         items:
           items:
-            format: float64
             type: number
           type: array
         type: array
@@ -750,7 +748,6 @@ definitions:
         description: '[[lat,lng], ...] boundary for rendering'
         items:
           items:
-            format: float64
             type: number
           type: array
         type: array
