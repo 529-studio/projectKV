@@ -22,3 +22,6 @@
      - `cmd/server/main.go` was reduced from 1,778 lines to **229 lines** (< 250 lines acceptance criterion), serving strictly as the declarative orchestrator for config loading, subsystem instantiation, and graceful shutdown.
   4. **Package-Level Test Invocation**:
      - When decomposing `package main` across multiple files, integration tests invoking `exec.Command("go", "run", "./main.go")` only compile `main.go` and fail with undefined symbol errors. Updated all integration test harnesses (`server_test.go`, `abuse_guard_test.go`) to invoke `exec.Command("go", "run", ".")` to compile the entire directory package.
+  5. **Static Asset Path Confinement**:
+     - The SPA fallback opens requested assets through the rooted `http.Dir` filesystem and serves the opened file descriptor with `http.ServeContent`, avoiding user-derived paths passed to `os.Stat` or Gin's path-based `Context.File` APIs.
+     - Added an integration regression case with a marker file outside the static root; traversal-shaped requests must never disclose its contents.

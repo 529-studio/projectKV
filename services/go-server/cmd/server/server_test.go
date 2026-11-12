@@ -431,7 +431,16 @@ func TestStartup_StaticWebServing_NextJSExportAndPurgedVanillaJS(t *testing.T) {
 		t.Fatalf("resolve cameras path: %v", err)
 	}
 
-	tmpStaticDir := t.TempDir()
+	staticParent := t.TempDir()
+	tmpStaticDir := filepath.Join(staticParent, "public")
+	if err := os.MkdirAll(tmpStaticDir, 0755); err != nil {
+		t.Fatalf("mkdir static directory: %v", err)
+	}
+	secretContent := "outside-static-root-secret"
+	secretPath := filepath.Join(staticParent, "private.txt")
+	if err := os.WriteFile(secretPath, []byte(secretContent), 0644); err != nil {
+		t.Fatalf("write outside marker: %v", err)
+	}
 	indexContent := "<html><body>NextJS App Root</body></html>"
 	if err := os.WriteFile(filepath.Join(tmpStaticDir, "index.html"), []byte(indexContent), 0644); err != nil {
 		t.Fatalf("write index.html: %v", err)
@@ -515,5 +524,15 @@ func TestStartup_StaticWebServing_NextJSExportAndPurgedVanillaJS(t *testing.T) {
 	cssBody, _ := io.ReadAll(respCSS.Body)
 	if string(cssBody) != indexContent {
 		t.Errorf("expected SPA fallback to index.html for unmapped /styles.css, got: %s", string(cssBody))
+	}
+	// 4. Traversal cannot expose a sibling file outside the static root.
+	respTraversal, err := client.Get(baseURL + "/%2e%2e/private.txt")
+	if err != nil {
+		t.Fatalf("GET traversal path failed: %v", err)
+	}
+	defer respTraversal.Body.Close()
+	traversalBody, _ := io.ReadAll(respTraversal.Body)
+	if strings.Contains(string(traversalBody), secretContent) {
+		t.Fatalf("path traversal exposed file outside static root: %s", string(traversalBody))
 	}
 }

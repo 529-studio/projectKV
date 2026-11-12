@@ -175,27 +175,41 @@ func setupRouter(p routerConfig) *gin.Engine {
 	// Purged obsolete vanilla JS routes: styles.css and app.js (Issue #425).
 	if fi, err := os.Stat(cfg.StaticWebDir); err == nil && fi.IsDir() {
 		log.Printf("[INIT] Serving static web UI from: %s", cfg.StaticWebDir)
-		router.StaticFile("/", filepath.Join(cfg.StaticWebDir, "index.html"))
-		router.StaticFile("/index.html", filepath.Join(cfg.StaticWebDir, "index.html"))
+		absStaticDir, err := filepath.Abs(cfg.StaticWebDir)
+		if err != nil {
+			absStaticDir = filepath.Clean(cfg.StaticWebDir)
+		}
+		fs := http.Dir(absStaticDir)
+		indexFile := filepath.Join(absStaticDir, "index.html")
 
-		nextDir := filepath.Join(cfg.StaticWebDir, "_next")
+		router.StaticFile("/", indexFile)
+		router.StaticFile("/index.html", indexFile)
+
+		nextDir := filepath.Join(absStaticDir, "_next")
 		if info, err := os.Stat(nextDir); err == nil && info.IsDir() {
 			router.Static("/_next", nextDir)
 		}
 
-		// Handle any additional assets or SPA fallback
+		// Handle any additional assets or SPA fallback using hardened http.Dir
 		router.NoRoute(func(c *gin.Context) {
 			reqPath := c.Request.URL.Path
 			if strings.HasPrefix(reqPath, "/api/") || strings.HasPrefix(reqPath, "/swagger") || strings.HasPrefix(reqPath, "/ws") {
 				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 				return
 			}
-			filePath := filepath.Join(cfg.StaticWebDir, filepath.Clean(reqPath))
-			if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
-				c.File(filePath)
+			cleanRel := strings.TrimPrefix(filepath.Clean("/"+reqPath), "/")
+			if cleanRel == "" || cleanRel == "." {
+				c.File(indexFile)
 				return
 			}
-			c.File(filepath.Join(cfg.StaticWebDir, "index.html"))
+			if f, err := fs.Open(cleanRel); err == nil {
+				defer f.Close()
+				if info, err := f.Stat(); err == nil && !info.IsDir() {
+					http.ServeContent(c.Writer, c.Request, filepath.Base(cleanRel), info.ModTime(), f)
+					return
+				}
+			}
+			c.File(indexFile)
 		})
 	} else {
 		log.Printf("[WARN] Static web directory not found: %s", cfg.StaticWebDir)
