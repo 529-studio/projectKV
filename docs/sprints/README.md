@@ -21,6 +21,7 @@ permanent directory made readers pay for a document with a shelf life.
 | 12 | [`s12_t2_spec.md`](s12_t2_spec.md) | Implemented & Verified — Close #400 |
 | 12 | [`s12_t3_spec.md`](s12_t3_spec.md) | Implemented; Rule-10 evidence **blocked** on S12-T5 trained segmentation head — [evidence](../reports/s12_t3_manual_evidence.md) |
 | 12 | [`s12_t4_spec.md`](s12_t4_spec.md) | Implemented; Rule-10 live bot DM evidence **pending staging credentials** — [evidence](../reports/s12_t4_manual_evidence.md) |
+| 12 | [`s12_t5_spec.md`](s12_t5_spec.md) | Implemented & Verified — tooling, contract suites, materializer, measured gate and AVX2 harness for Close #411; GPU fine-tune and worker soak run off-box |
 
 ## Lifecycle
 

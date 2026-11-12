@@ -117,3 +117,44 @@ Verification command:
 ```bash
 python3 -m unittest discover -s tools/seg -p "*_test.py"
 ```
+
+---
+
+## 7. Handoff: Pre-Label, Review, Materialize, Train (S12-T5)
+
+SAM output is a proposal, never ground truth. The chain that turns proposals into a
+trainable Dataset v3 is:
+
+1. **Pre-label** the harvested date: `make prelabel-sam DATE=2026-11-08`.
+2. **Human review** in `/labeler`: correct every `water_puddle` boundary, remove phantom
+   puddles, fix roadway/vehicle polygons, and save with a named human `annotator`. The
+   validation frames get a second independent review.
+3. **Materialize** the reviewed set:
+   `make materialize-seg DATASET_DATES=2026-10-23,2026-10-24`. Frames resolve by exact
+   `snapshot_key` (local proof roots before R2), labels pair on
+   `(camera_id, timestamp)` only, and the camera/date group split is frozen in
+   `split.json`. The CLI pairs against the frame keys it scans from the local proof
+   roots, so a stray label on a known camera with an unknown timestamp fails as
+   camera-only instead of binding to unrelated pixels. `--allow-synthetic` does not
+   exist for v3, and there is no `--allow-unreviewed` flag: a proposal-only annotator,
+   a missing `reviewed_at` or a retired template polygon fails the build.
+4. **Train** on a CUDA host: `make train-seg DATA=data/yolo_seg/dataset.yaml EPOCHS=100 SEED=42`.
+   AC10 evidence needs **≥ 50 completed epochs**; a shorter run is refused by the gate
+   (there is no promotion bypass).
+5. **Gate and export**: `make export-seg-openvino SEG_CHECKPOINT=... EXTRA="--metrics .../val_metrics.json"`,
+   then `make bench-seg-avx2` on the AVX2 worker.
+
+### Retirement of the October label sets
+
+`data/yolo_seg`, `data/yolo_seg_v2` and `data/seg_prelabels` are **audit inputs only**. The
+October frames no longer exist on R2, so their 301 labels join to 0/301 proof frames, and 261
+of the v2 labels were template-generated. Re-running the pairing against them is the negative
+control for AC3:
+
+```bash
+python3 tools/eval/materialize_seg_dataset.py --dates 2026-10-16 --min-frames 1 \
+  --labels-dir data/seg_prelabels --dry-run --limit 5
+# non-zero exit, every key listed, nothing written
+```
+
+Never re-enable those labels by relaxing the materializer. Re-annotate the frames instead.

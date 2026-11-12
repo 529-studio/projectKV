@@ -147,6 +147,9 @@ class BenchmarkResult:
     time_of_day_slices: Dict[str, Dict[str, Any]]
     composition_progress: List[Dict[str, Any]]
     predictions: List[Dict[str, Any]] = field(default_factory=list)
+    # Wall latency (decode + letterbox + analyze) over the evaluated frames, plus the
+    # AVX2 graph block when `--latency-json` supplies gate-grade evidence (S12-T5 §5.3).
+    latency: Dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -855,6 +858,26 @@ def evaluate_composition_progress(frames: List[LabeledFrame]) -> List[Dict[str, 
     return results
 
 
+def compute_latency_summary(values: List[float]) -> Dict[str, Any]:
+    """Nearest-rank p50/p95/p99 over a latency series; empty input yields {}."""
+    data = sorted(float(value) for value in values if value is not None)
+    if not data:
+        return {}
+
+    def rank(pct: float) -> float:
+        index = max(0, int(math.ceil(pct / 100.0 * len(data))) - 1)
+        return round(data[index], 3)
+
+    return {
+        "p50_ms": rank(50),
+        "p95_ms": rank(95),
+        "p99_ms": rank(99),
+        "n": len(data),
+        "min_ms": round(data[0], 3),
+        "max_ms": round(data[-1], 3),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Runner & Report Generation
 # ---------------------------------------------------------------------------
@@ -865,6 +888,7 @@ def run_benchmark(
     schema: Dict[str, List[str]],
     labels_dir_str: str,
     max_flood_fnr: float = 0.05,
+    latency_evidence: Optional[Dict[str, Any]] = None,
 ) -> BenchmarkResult:
     """Runs analyzer on frames and produces a full BenchmarkResult."""
     predictions: List[Prediction] = []
@@ -910,6 +934,23 @@ def run_benchmark(
         for f, p in zip(frames, predictions)
     ]
 
+    latency = compute_latency_summary([p.latency_ms for p in predictions])
+    if latency_evidence:
+        graph = latency_evidence.get("latency") or {}
+        latency["graph_avx2"] = {
+            "source": latency_evidence.get("_source"),
+            "resolution": (latency_evidence.get("gate") or {}).get("resolution", 416),
+            "p50_ms": graph.get("p50_ms"),
+            "p95_ms": graph.get("p95_ms"),
+            "p99_ms": graph.get("p99_ms"),
+            "n": graph.get("n"),
+            "worst_repeat_p95_ms": graph.get("worst_repeat_p95_ms"),
+            "threshold_ms": (latency_evidence.get("gate") or {}).get("threshold_ms"),
+            "verdict": (latency_evidence.get("gate") or {}).get("verdict"),
+            "head_status": latency_evidence.get("head_status"),
+            "host": latency_evidence.get("host"),
+        }
+
     return BenchmarkResult(
         timestamp=datetime.now(timezone.utc).isoformat(),
         analyzer_name=analyzer.name,
@@ -931,6 +972,7 @@ def run_benchmark(
         time_of_day_slices=tod_slices,
         composition_progress=comp_progress,
         predictions=pred_records,
+        latency=latency,
     )
 
 
@@ -1062,6 +1104,35 @@ def generate_markdown_report(res: BenchmarkResult) -> str:
         lines.append(f"| **{tod}** | {data['total_frames']} | {data['traffic_accuracy'] * 100:.1f}% | {data['flood_accuracy'] * 100:.1f}% |")
     lines.append("")
 
+    # Inference latency (S12-T5 §2.9 / §5.3)
+    lines.append("## 7. Inference Latency")
+    lines.append("")
+    latency = res.latency or {}
+    if not latency:
+        lines.append("**Not measured** for this run (pass `--latency-json` for AVX2 graph evidence).")
+        lines.append("")
+    else:
+        lines.append("| Measurement | p50 | p95 | p99 | n |")
+        lines.append("|---|---|---|---|---|")
+        if latency.get("n"):
+            lines.append(
+                f"| Wall (decode + letterbox + analyze) | {latency['p50_ms']} ms | "
+                f"{latency['p95_ms']} ms | {latency['p99_ms']} ms | {latency['n']} |"
+            )
+        graph = latency.get("graph_avx2") or {}
+        if graph.get("n"):
+            lines.append(
+                f"| AVX2 graph @{graph.get('resolution', 416)} px (gate) | {graph.get('p50_ms')} ms | "
+                f"{graph.get('p95_ms')} ms | {graph.get('p99_ms')} ms | {graph.get('n')} |"
+            )
+            lines.append("")
+            lines.append(
+                f"> Graph p95 is the gate number (ceiling {graph.get('threshold_ms')} ms, "
+                f"verdict **{graph.get('verdict')}**, worst repeat p95 "
+                f"{graph.get('worst_repeat_p95_ms')} ms). Wall p95 is context only."
+            )
+        lines.append("")
+
     return "\n".join(lines)
 
 
@@ -1103,6 +1174,7 @@ def main():
     parser.add_argument("--gate-max-fnr", type=float, default=0.05, help="Maximum allowed flood false-negative rate (default 0.05 = 5%%)")
     parser.add_argument("--strict", action="store_true", help="Exit with code 1 if accuracy gate fails")
     parser.add_argument("--simulate-flood-miss", action="store_true", help="Simulate flood detection miss in mock mode (for gate testing)")
+    parser.add_argument("--latency-json", default=None, help="AVX2 latency evidence JSON (tools/train/bench_seg_latency.py) to embed in the report")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent.parent
@@ -1152,12 +1224,21 @@ def main():
         sys.exit(1)
 
     print(f"[INFO] Running benchmark using analyzer: {analyzer.name} ({analyzer.model})...")
+    latency_evidence = None
+    if args.latency_json:
+        latency_path = Path(args.latency_json)
+        if not latency_path.is_file():
+            raise SystemExit(f"latency evidence not found: {latency_path}")
+        latency_evidence = json.loads(latency_path.read_text(encoding="utf-8"))
+        latency_evidence["_source"] = str(latency_path)
+
     result = run_benchmark(
         frames=frames,
         analyzer=analyzer,
         schema=schema,
         labels_dir_str=str(labels_path),
         max_flood_fnr=args.gate_max_fnr,
+        latency_evidence=latency_evidence,
     )
 
     print_cli_summary(result)

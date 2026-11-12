@@ -52,7 +52,20 @@ Danh sách đầy đủ các biến nằm ở mục **Configuration Reference** 
 | Kiểm tra sức khỏe | `3000` | http://localhost:3000/health |
 | CV Engine | `8000` | http://localhost:8000/healthz |
 
-## 4. Đọc tiếp
+## 4. Huấn luyện & benchmark (tùy chọn)
+
+```bash
+# Dựng Dataset v3 từ kho proof (khớp tuyệt đối snapshot_key, khóa split theo camera/ngày)
+make materialize-seg DATASET_DATES=2026-10-23,2026-10-24
+
+# Fine-tune YOLOv8n-seg rồi export OpenVINO FP16
+make train-seg
+
+# Đo p95 trên worker AVX2 (máy khác thoát mã 2, không ghi evidence)
+make bench-seg-avx2
+```
+
+## 5. Đọc tiếp
 
 - Kiến trúc backend Go: [`docs/GO_BACKEND_ARCHITECTURE.md`](docs/GO_BACKEND_ARCHITECTURE.md)
 - Điểm bắt đầu cho developer: [`docs/ONBOARDING.md`](docs/ONBOARDING.md)

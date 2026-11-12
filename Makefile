@@ -1,14 +1,30 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint lint-deploy test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast train-forecast-daemon export-seg export-seg-openvino train-seg benchmark-mock benchmark-real smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint lint-deploy test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast train-forecast-daemon export-seg export-seg-openvino train-seg benchmark-mock benchmark-real bench-seg-avx2 materialize-seg smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close
 
 # Segmentation training defaults (S11-T5). Override on the command line:
 #   make train-seg EPOCHS=100 DATA=data/yolo_seg/dataset.yaml
 EPOCHS ?= 50
+SEED ?= 42
 SEG_CHECKPOINT ?= yolov8n-seg.pt
-DATA ?= data/yolo_seg/dataset.yaml
+DATA_DIR ?= data/yolo_seg
+DATA ?= $(DATA_DIR)/dataset.yaml
 SEG_PYTHON ?= $(shell if [ -f .venv-seg/bin/python3 ]; then echo .venv-seg/bin/python3; else echo python3; fi)
+
+# AVX2 worker latency benchmark (S12-T5 §2.9). Run on the x86-64 worker only:
+# the harness exits 2 and writes no evidence anywhere else.
+SEG_IR ?= models/yolov8n_seg_openvino_416
+SEG_FRAME ?= $(firstword $(wildcard data/proofs/proofs/*/*/*_sample.jpg))
+LATENCY_OUT ?= docs/reports/s12_t5_latency_avx2.json
+LATENCY_RUNS ?= 200
+LATENCY_WARMUP ?= 10
+LATENCY_REPEATS ?= 3
+
+# Dataset v3 materializer (S12-T5 §2.4).
+DATASET_DATES ?=
+DATASET_MIN_FRAMES ?= 550
+DATASET_MANIFEST ?= docs/reports/s12_t5_dataset_manifest.json
 
 help:
 	@echo "========================================================"
@@ -49,6 +65,8 @@ help:
 	@echo "  make export-seg-openvino - Export+verify OpenVINO FP16 IR from an existing checkpoint (SEG_CHECKPOINT)"
 	@echo "  make benchmark-mock  - Run AI benchmark harness in mock mode"
 	@echo "  make benchmark-real  - Run AI benchmark harness against live OpenVINO cv-engine (T4)"
+	@echo "  make bench-seg-avx2  - Benchmark segmentation IR latency on the AVX2 worker (S12-T5)"
+	@echo "  make materialize-seg - Materialize Dataset v3 from the live proof archive (S12-T5)"
 	@echo "  make smoke-eval      - Run known-state smoke camera verification (mock dry-run)"
 	@echo "  make collect-frames  - Fetch real camera frames from Hot Set into data/proofs"
 	@echo "  make dataset-progress - Audit evaluation dataset composition progress (T3 / D6)"
@@ -170,7 +188,10 @@ export-seg:
 	python3 tools/eval/export_yolo_seg.py --labels-dir tools/eval/labels_gold_standard --output-dir data/yolo_seg --verify
 
 train-seg:
-	$(SEG_PYTHON) tools/train/train_yolov8_seg.py --data $(DATA) --epochs $(EPOCHS) --export-openvino models/yolov8n_seg_openvino_416
+	$(SEG_PYTHON) tools/train/train_yolov8_seg.py --data $(DATA) --epochs $(EPOCHS) --seed $(SEED) --export-openvino models/yolov8n_seg_openvino_416
+
+materialize-seg:
+	python3 tools/eval/materialize_seg_dataset.py --dates $(DATASET_DATES) --min-frames $(DATASET_MIN_FRAMES) --out $(DATA_DIR) --val-split 0.2 --seed $(SEED) --manifest $(DATASET_MANIFEST)
 
 export-seg-openvino:
 	$(SEG_PYTHON) tools/train/train_yolov8_seg.py --export-only --model $(SEG_CHECKPOINT) --export-openvino models/yolov8n_seg_openvino_416 --verify-gate $(EXTRA)
@@ -179,7 +200,10 @@ benchmark-mock:
 	python3 tools/eval/benchmark.py --analyzer mock
 
 benchmark-real:
-	python3 tools/eval/benchmark.py --analyzer cv-engine --output-report docs/reports/eval_report_d6_real.md --output-json tools/eval/results/eval_d6_real_openvino.json
+	python3 tools/eval/benchmark.py --analyzer cv-engine --output-report docs/reports/eval_report_d6_real.md --output-json tools/eval/results/eval_d6_real_openvino.json $(if $(wildcard $(LATENCY_OUT)),--latency-json $(LATENCY_OUT),)
+
+bench-seg-avx2:
+	$(SEG_PYTHON) tools/train/bench_seg_latency.py --ir $(SEG_IR) --frame $(SEG_FRAME) --out $(LATENCY_OUT) --runs $(LATENCY_RUNS) --warmup $(LATENCY_WARMUP) --repeats $(LATENCY_REPEATS)
 
 smoke-eval:
 	python3 tools/eval/verify_smoke_set.py --mock --strict
