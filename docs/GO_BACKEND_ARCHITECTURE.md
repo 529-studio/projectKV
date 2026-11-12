@@ -62,6 +62,10 @@ archiver       → storage, hotset   (event-driven snapshot archiver and retenti
 corridor       → camera, hotset    (camera for road_key lookup, hotset for verdict types)
 weather        → (leaf — Open-Meteo & RainViewer radar caching service)
 harvester      → (leaf — autonomous scheduled peak & rain watcher ingestor)
+notify         → (leaf — outbound alert channels, bilingual HTML formatter, debouncer)
+subscription   → (leaf — SQLite subscription store and citizen HTTP handler)
+telegrambot    → (leaf — inbound webhook, deep-link codec, command renderers)
+middleware     → (leaf — auth, rate limiting and response sanitization)
 ```
 If you find yourself needing an import not in this table, stop and reconsider the design — most likely you need an interface, not a direct import.
 
@@ -104,10 +108,13 @@ services/go-server/
 │   │   ├── debounce.go                # 30-minute anti-spam sliding debouncer
 │   │   ├── manager.go                 # notification manager dispatching alerts across registered channels
 │   │   ├── telegram.go                # TelegramChannel adapter + FormatTelegramMessage HTML formatter
-│   │   └── telegram_webhook.go        # inbound webhook handler for telegram bot commands
 │   ├── subscription/
 │   │   ├── service.go                 # Subscribe(ctx, channel, recipientID, zone) — validates zone against camera.Catalog, upserts via store
 │   │   └── handler.go                 # POST /api/subscriptions (for web-push based subscribe flow), DELETE /api/subscriptions/:id
+│   ├── telegrambot/
+│   │   ├── deeplink.go                # sub_<target> codec, base64url slug, 64-char Telegram bound
+│   │   ├── commands.go                # command parser and bilingual HTML renderers
+│   │   └── handler.go                 # POST /api/notify/telegram/webhook: secret, dedupe, queue, workers, per-chat limit
 │   ├── store/
 │   │   ├── sqlite.go                  # db *sql.DB setup, runs embedded migrations on startup
 │   │   ├── migrations/

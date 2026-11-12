@@ -36,6 +36,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/storage"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
 	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
+	"github.com/529-studio/projectKV/services/go-server/internal/telegrambot"
 	"github.com/529-studio/projectKV/services/go-server/internal/tilecache"
 	"github.com/529-studio/projectKV/services/go-server/internal/weather"
 	"github.com/529-studio/projectKV/services/go-server/internal/ws"
@@ -241,6 +242,138 @@ func (a *subscriptionTaxonomyAdapter) HasChokepoint(id string) bool {
 	_, ok := a.catalog.ByID(id)
 	return ok
 }
+
+// telegramBotStoreAdapter adapts the subscription SQLite store to
+// telegrambot.Store (Dependency Inversion: the bot package imports no internal
+// package, so the composition root maps the shapes, S12-T4 spec §4.1).
+type telegramBotStoreAdapter struct {
+	store *subscription.SQLiteStore
+}
+
+func (a *telegramBotStoreAdapter) Subscribe(ctx context.Context, channelName, chatID string, rec telegrambot.Record) error {
+	return a.store.Subscribe(ctx, subscription.Subscription{
+		ChannelName: channelName,
+		ChatID:      chatID,
+		TargetType:  subscription.TargetType(rec.TargetType),
+		TargetID:    rec.TargetID,
+		CreatedAt:   rec.CreatedAt,
+	})
+}
+
+func (a *telegramBotStoreAdapter) UnsubscribeAll(ctx context.Context, channelName, chatID string) (int64, error) {
+	return a.store.UnsubscribeAll(ctx, channelName, chatID)
+}
+
+func (a *telegramBotStoreAdapter) List(ctx context.Context, channelName, chatID string) ([]telegrambot.Record, error) {
+	subs, err := a.store.ListSubscriptions(ctx, channelName, chatID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]telegrambot.Record, len(subs))
+	for i, sub := range subs {
+		out[i] = telegrambot.Record{
+			TargetType: string(sub.TargetType),
+			TargetID:   sub.TargetID,
+			CreatedAt:  sub.CreatedAt,
+		}
+	}
+	return out, nil
+}
+
+// telegramBotTaxonomyAdapter adapts the camera catalog to telegrambot.Taxonomy.
+// Canonicalisation is the security-relevant part: a deep link carries a raw id,
+// and only a value that resolves against the live catalog may reach the store.
+type telegramBotTaxonomyAdapter struct {
+	catalog camera.Reader
+}
+
+func (a *telegramBotTaxonomyAdapter) CanonicalZone(raw string) (string, bool) {
+	canonical, ok := subscription.NormalizeZone(raw)
+	if !ok {
+		return "", false
+	}
+	if a == nil || a.catalog == nil {
+		return canonical, true
+	}
+	for _, zone := range a.catalog.Zones() {
+		if strings.EqualFold(zone, canonical) {
+			return zone, true
+		}
+	}
+	return "", false
+}
+
+func (a *telegramBotTaxonomyAdapter) CanonicalWard(raw string) (string, bool) {
+	if a == nil || a.catalog == nil {
+		return "", false
+	}
+	name := stripWardPrefix(strings.TrimSpace(raw))
+	if name == "" {
+		return "", false
+	}
+	for _, phuong := range a.catalog.Phuongs() {
+		if strings.EqualFold(phuong.Name, name) {
+			return phuong.Name, true
+		}
+	}
+	return "", false
+}
+
+func (a *telegramBotTaxonomyAdapter) CanonicalChokepoint(id string) (string, bool) {
+	if a == nil || a.catalog == nil {
+		return "", false
+	}
+	cam, ok := a.catalog.ByID(strings.TrimSpace(id))
+	if !ok || cam == nil {
+		return "", false
+	}
+	return cam.ID, true
+}
+
+func (a *telegramBotTaxonomyAdapter) Label(target telegrambot.Target) string {
+	switch target.Type {
+	case "all":
+		return ""
+	case "zone":
+		if canonical, ok := a.CanonicalZone(target.ID); ok {
+			return canonical
+		}
+	case "ward":
+		if canonical, ok := a.CanonicalWard(target.ID); ok {
+			return canonical
+		}
+	case "chokepoint":
+		if a != nil && a.catalog != nil {
+			if cam, ok := a.catalog.ByID(target.ID); ok && cam != nil {
+				if cam.DisplayName != "" {
+					return cam.DisplayName
+				}
+				if cam.Title != "" {
+					return cam.Title
+				}
+				return cam.ID
+			}
+		}
+	}
+	return strings.TrimSpace(target.ID)
+}
+
+// stripWardPrefix tolerates "Phường ", "Xã " and "Thị trấn " prefixes from a
+// deep link; the stored value is always the bare administrative name (spec E3).
+func stripWardPrefix(raw string) string {
+	lower := strings.ToLower(raw)
+	for _, prefix := range []string{"phường ", "xã ", "thị trấn "} {
+		if strings.HasPrefix(lower, prefix) {
+			return strings.TrimSpace(raw[len(prefix):])
+		}
+	}
+	return raw
+}
+
+// telegramAPIBaseURL redirects outbound Bot API calls to a local capture
+// endpoint when the verifier links it in with -ldflags. Empty in every shipped
+// binary, so production always talks to api.telegram.org.
+var telegramAPIBaseURL string
 
 // criticalKeywords are used to prioritise well-known traffic choke points
 // (e.g. An Suong, Cat Lai port cluster, My Thuy, major corridors) when
@@ -679,7 +812,6 @@ func main() {
 	if camCatalog != nil {
 		taxonomyProv = &subscriptionTaxonomyAdapter{catalog: camCatalog}
 	}
-	subHandler := subscription.NewHandler(subStore, taxonomyProv)
 	defer db.Close()
 
 	// 5-retention. 30-Day raw data retention job (ADR-012 D2)
@@ -732,12 +864,67 @@ func main() {
 		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.Zone, alert.Ward)
 	})
 
-	telegramChan := notify.NewTelegramChannel(cfg.TelegramBotToken, subFinder)
+	// telegramAPIBaseURL is empty in production builds, so the channel talks to
+	// api.telegram.org. The Rule-10 verifier injects a local capture endpoint at
+	// link time (-ldflags "-X main.telegramAPIBaseURL=...") to observe the real
+	// outbound Bot API calls. It is deliberately not an environment variable:
+	// a deployed binary cannot be redirected through configuration (Rule 8).
+	telegramOpts := make([]notify.TelegramOption, 0, 1)
+	if telegramAPIBaseURL != "" {
+		telegramOpts = append(telegramOpts, notify.WithBaseURL(telegramAPIBaseURL))
+	}
+	telegramChan := notify.NewTelegramChannel(cfg.TelegramBotToken, subFinder, telegramOpts...)
 	notifyManager.Register(telegramChan)
 	if cfg.TelegramBotToken != "" {
 		log.Println("[INIT] Telegram notification channel registered and active.")
 	} else {
 		log.Println("[INIT] TELEGRAM_BOT_TOKEN not configured: Telegram channel registered in simulation mode (delivery skipped).")
+	}
+
+	// 5b. Inbound Telegram bot (S12-T4 / Issue #402). Fail-closed: the webhook
+	// route is mounted only when the token, the public handle and the secret are
+	// all present and syntactically valid; otherwise it answers 404 and the
+	// channel above stays in simulation mode (spec §2.2, §2.6, AC10).
+	botUsername := cfg.TelegramBotUsername
+	webhookEnabled := cfg.TelegramBotToken != "" &&
+		telegrambot.ValidBotUsername(botUsername) &&
+		telegrambot.ValidWebhookSecret(cfg.TelegramWebhookSecret)
+
+	subOpts := []subscription.Option{
+		subscription.WithBotInfo(botUsername, webhookEnabled),
+	}
+	if cfg.TelegramBotToken != "" {
+		subOpts = append(subOpts, subscription.WithConfirmationSender(telegramChan))
+	}
+	subHandler := subscription.NewHandler(subStore, taxonomyProv, subOpts...)
+
+	botHandler := telegrambot.NewHandler(
+		telegrambot.Config{
+			BotUsername:   botUsername,
+			WebhookSecret: cfg.TelegramWebhookSecret,
+		},
+		&telegramBotStoreAdapter{store: subStore},
+		&telegramBotTaxonomyAdapter{catalog: camCatalog},
+		telegramChan,
+		slog.Default(),
+	)
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := botHandler.Shutdown(shutdownCtx); err != nil {
+			log.Printf("[WARN] Telegram bot shutdown: %v", err)
+		}
+	}()
+
+	switch {
+	case webhookEnabled:
+		log.Printf("[INIT] Telegram webhook active: bot=@%s path=%s", botUsername, telegrambot.WebhookPath)
+	case cfg.TelegramBotToken == "":
+		log.Println("[INIT] Telegram webhook disabled: token missing")
+	case !telegrambot.ValidBotUsername(botUsername):
+		log.Println("[INIT] Telegram webhook disabled: username invalid")
+	default:
+		log.Println("[INIT] Telegram webhook disabled: webhook secret missing")
 	}
 
 	// Load authentic municipal flood chokepoints fixture
@@ -1438,6 +1625,24 @@ func main() {
 		swaggerHandler(c)
 	})
 
+	// 5b. Telegram bot webhook (S12-T4 / Issue #402). RegisterRoutes is a no-op
+	// unless the handler is enabled, and the explicit token check closes the one
+	// gap the handler cannot see: a valid handle and secret with no Bot API
+	// token must still leave the endpoint unmounted (404, spec §2.2 AC10).
+	if webhookEnabled {
+		botHandler.RegisterRoutes(router)
+	}
+
+	// Dev authentication gate. Built before the API group because it is needed
+	// by routes registered inside it (subscription audit listing, archiver,
+	// harvester) — S12-T4 spec §4.4.
+	devAuth := middleware.RequireDevAuth(cfg.DevAccessToken, cfg.AppEnv, middleware.DevAuthConfig{
+		CFAccessAudience:     cfg.CFAccessAudience,
+		CFAccessCertsURL:     cfg.CFAccessCertsURL,
+		CFAccessClientID:     cfg.CFAccessClientID,
+		CFAccessClientSecret: cfg.CFAccessClientSecret,
+	})
+
 	// API Group
 	api := router.Group("/api")
 	{
@@ -1466,18 +1671,13 @@ func main() {
 		if floodHandler != nil {
 			floodHandler.RegisterRoutes(api)
 		}
-		// Flood alert subscriptions (Issue #225 / S6-T5)
+		// Flood alert subscriptions (Issue #225 / S6-T5, citizen UI S12-T4).
+		// POST/DELETE stay public; GET enumerates chat ids and is dev-gated.
 		if subHandler != nil {
-			subHandler.RegisterRoutes(api)
+			subHandler.RegisterRoutes(api, subscription.WithAuditAuth(devAuth))
 		}
 		// Shared archiver snapshots and collaborative team labeler endpoints (Issue #214)
 		// Harvester flywheel observability (Issue #299 / S9-T3)
-		devAuth := middleware.RequireDevAuth(cfg.DevAccessToken, cfg.AppEnv, middleware.DevAuthConfig{
-			CFAccessAudience:     cfg.CFAccessAudience,
-			CFAccessCertsURL:     cfg.CFAccessCertsURL,
-			CFAccessClientID:     cfg.CFAccessClientID,
-			CFAccessClientSecret: cfg.CFAccessClientSecret,
-		})
 		if archiverHandler != nil {
 			archiverHandler.RegisterRoutes(api, devAuth)
 		}

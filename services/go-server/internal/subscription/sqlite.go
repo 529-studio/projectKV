@@ -12,6 +12,7 @@ import (
 type Store interface {
 	Subscribe(ctx context.Context, sub Subscription) error
 	Unsubscribe(ctx context.Context, channelName, chatID string, targetType TargetType, targetID string) error
+	UnsubscribeAll(ctx context.Context, channelName, chatID string) (int64, error)
 	GetSubscribersForChokepoint(ctx context.Context, channelName, chokepointID, zone, ward string) ([]string, error)
 	ListSubscriptions(ctx context.Context, channelName, chatID string) ([]Subscription, error)
 }
@@ -20,6 +21,10 @@ type Store interface {
 type SQLiteStore struct {
 	db *sql.DB
 }
+
+// Compile-time proof that the concrete store satisfies the interface the bot and
+// HTTP handler depend on.
+var _ Store = (*SQLiteStore)(nil)
 
 // NewSQLiteStore creates a new subscription store backed by SQLite.
 func NewSQLiteStore(db *sql.DB) *SQLiteStore {
@@ -73,6 +78,28 @@ func (s *SQLiteStore) Unsubscribe(ctx context.Context, channelName, chatID strin
 		return fmt.Errorf("unsubscribe: %w", err)
 	}
 	return nil
+}
+
+// UnsubscribeAll removes every subscription a chat holds on a channel and
+// reports the number of deleted rows. Zero is a valid outcome, not an error:
+// /stop must be idempotent (spec E7).
+func (s *SQLiteStore) UnsubscribeAll(ctx context.Context, channelName, chatID string) (int64, error) {
+	query := `
+		DELETE FROM flood_subscriptions
+		WHERE channel_name = ? AND chat_id = ?
+	`
+	res, err := s.db.ExecContext(ctx, query,
+		strings.TrimSpace(channelName),
+		strings.TrimSpace(chatID),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("unsubscribe all (%s, %s): %w", channelName, chatID, err)
+	}
+	deleted, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("unsubscribe all rows affected: %w", err)
+	}
+	return deleted, nil
 }
 
 // GetSubscribersForChokepoint queries all distinct chat IDs subscribed to a given flood event.

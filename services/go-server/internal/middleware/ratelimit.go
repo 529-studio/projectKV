@@ -110,6 +110,12 @@ func isExempt(p string) bool {
 	switch p {
 	case "/health", "/healthz":
 		return true
+	// The Telegram webhook is called from Telegram's shared egress IPs, so a
+	// single burst would exhaust a per-IP bucket and the bot would answer 429 to
+	// Telegram, which then retries for minutes. The bot enforces its own
+	// per-chat limit (6 commands/minute) inside telegrambot.Handler instead.
+	case "/api/notify/telegram/webhook":
+		return true
 	}
 
 	ext := strings.ToLower(path.Ext(p))

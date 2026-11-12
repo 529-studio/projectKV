@@ -158,6 +158,112 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 	}
 }
 
+// TestSQLiteStore_UnsubscribeAll covers the /stop and /unsubscribe path
+// (spec §4.3, E7): every row for one chat on one channel is removed, the count
+// is reported, other chats and other channels are untouched, and a second call
+// is a clean zero.
+func TestSQLiteStore_UnsubscribeAll(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	store := NewSQLiteStore(db)
+	ctx := context.Background()
+
+	seed := []Subscription{
+		{ChannelName: "telegram", ChatID: "888000111", TargetType: TargetAll},
+		{ChannelName: "telegram", ChatID: "888000111", TargetType: TargetZone, TargetID: "Quận 7 - Nhà Bè"},
+		{ChannelName: "telegram", ChatID: "888000111", TargetType: TargetWard, TargetID: "Bến Nghé"},
+		{ChannelName: "telegram", ChatID: "999000222", TargetType: TargetChokepoint, TargetID: "cam-vvk-01"},
+		{ChannelName: "webhook", ChatID: "888000111", TargetType: TargetAll},
+	}
+	for _, sub := range seed {
+		if err := store.Subscribe(ctx, sub); err != nil {
+			t.Fatalf("seed Subscribe(%+v) failed: %v", sub, err)
+		}
+	}
+
+	// Whitespace in the arguments is tolerated, matching every other store call.
+	deleted, err := store.UnsubscribeAll(ctx, " telegram ", " 888000111 ")
+	if err != nil {
+		t.Fatalf("UnsubscribeAll failed: %v", err)
+	}
+	if deleted != 3 {
+		t.Fatalf("deleted = %d, want 3", deleted)
+	}
+
+	remaining, err := store.ListSubscriptions(ctx, "telegram", "888000111")
+	if err != nil {
+		t.Fatalf("ListSubscriptions failed: %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Fatalf("telegram rows for the chat must be gone, got %v", remaining)
+	}
+
+	// Nothing else was touched: other chat on the same channel.
+	other, err := store.ListSubscriptions(ctx, "telegram", "999000222")
+	if err != nil {
+		t.Fatalf("ListSubscriptions(other chat) failed: %v", err)
+	}
+	if len(other) != 1 || other[0].TargetID != "cam-vvk-01" {
+		t.Fatalf("other chat must be untouched, got %v", other)
+	}
+
+	// Same chat id on a different channel keeps its row.
+	otherChannel, err := store.ListSubscriptions(ctx, "webhook", "888000111")
+	if err != nil {
+		t.Fatalf("ListSubscriptions(other channel) failed: %v", err)
+	}
+	if len(otherChannel) != 1 {
+		t.Fatalf("other channel must be untouched, got %v", otherChannel)
+	}
+
+	// Idempotent: a second /stop reports zero and does not error (E7).
+	deleted, err = store.UnsubscribeAll(ctx, "telegram", "888000111")
+	if err != nil {
+		t.Fatalf("second UnsubscribeAll failed: %v", err)
+	}
+	if deleted != 0 {
+		t.Fatalf("second UnsubscribeAll deleted = %d, want 0", deleted)
+	}
+
+	// Empty identifiers cannot delete anything.
+	deleted, err = store.UnsubscribeAll(ctx, "", "")
+	if err != nil {
+		t.Fatalf("UnsubscribeAll with empty identifiers failed: %v", err)
+	}
+	if deleted != 0 {
+		t.Fatalf("empty identifiers deleted = %d, want 0", deleted)
+	}
+
+	// The opaque rows survived the empty-identifier sweep.
+	if rows, _ := store.ListSubscriptions(ctx, "telegram", "999000222"); len(rows) != 1 {
+		t.Fatalf("empty identifiers must not delete rows, got %v", rows)
+	}
+}
+
+// TestSQLiteStore_UnsubscribeAllReachableFromBotPort proves the store satisfies
+// the narrower port the telegrambot handler needs (Subscribe/UnsubscribeAll/List)
+// without the bot package importing subscription.
+func TestSQLiteStore_UnsubscribeAllReachableFromBotPort(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	store := NewSQLiteStore(db)
+	ctx := context.Background()
+
+	if err := store.Subscribe(ctx, Subscription{ChannelName: "telegram", ChatID: "777000111", TargetType: TargetAll}); err != nil {
+		t.Fatalf("Subscribe failed: %v", err)
+	}
+	subs, err := store.ListSubscriptions(ctx, "telegram", "777000111")
+	if err != nil || len(subs) != 1 {
+		t.Fatalf("ListSubscriptions = (%v, %v), want one row", subs, err)
+	}
+	deleted, err := store.UnsubscribeAll(ctx, "telegram", "777000111")
+	if err != nil || deleted != 1 {
+		t.Fatalf("UnsubscribeAll = (%d, %v), want (1, nil)", deleted, err)
+	}
+}
+
 func TestSubscription_Validation(t *testing.T) {
 	s1 := Subscription{}
 	if err := s1.IsValid(); err != ErrInvalidChatID {

@@ -259,20 +259,20 @@ refuses a re-initialised head (`--allow-untrained-head` is bootstrap-only). Evid
 | Service | Technology | Port | Host & Node Role | Primary Responsibilities |
 |---|---|:---:|---|---|
 | **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `edge host` | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal corridor dock, bilingual UI (`vi` / `en`). |
-| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` | Snapshot proxy cache (15s TTL), camera catalog, hotset scheduler (30s cycle), crowdsourced flood report archiver (`internal/feedback`), PCU Saturation Index, SSE stream, Cloudflare R2 storage integration. |
-| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n-seg FP16 | `8000` | `inference worker` | High-throughput vehicle detection, directional roadway polygon assignment & road water segmentation (`POST /predict` supporting multipart metadata), Dual-Layer Physical Triangulation (Layer 1 surface water ratio, Layer 2 motorcycle wheel submersion), `GET /healthz` healthchecks (< 38.5ms latency). |
+| **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` | Snapshot proxy cache, camera catalog, hotset scheduler, flood report archiver, PCU Saturation Index, SSE stream, R2 storage. |
+| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n-seg FP16 | `8000` | `inference worker` | Vehicle detection, directional roadway assignment, water segmentation (`POST /predict`), Dual-Layer Physical Triangulation, `GET /healthz`. |
 | **Storage & Edge CDN** | Cloudflare R2, AWS Signature V4 | `443` | Cloudflare Edge (`file.529studio.site`) | S3-compatible snapshot proof repository (`warded-proofs`), Vietnam ICT (`UTC+7`) key hierarchy (`YYYY-MM-DD/<camera_id>/<unix_ts>_<reason>.jpg`). |
 
 ### Tech Stack & Core Libraries
 
 | Layer | Technologies | Purpose |
 |---|---|---|
-| **Frontend** | [Next.js 15.5+](https://nextjs.org/), [TypeScript 5](https://www.typescriptlang.org/), [Tailwind CSS 3.4](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/), [Leaflet](https://leafletjs.com/) | Next.js App Router client, responsive UI, interactive GIS mapping |
+| **Frontend** | [Next.js 15.5+](https://nextjs.org/), [TypeScript 5](https://www.typescriptlang.org/), [Tailwind CSS 3.4](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/), [Leaflet](https://leafletjs.com/) | App Router client, responsive UI, interactive GIS map |
 | **Backend** | [Go 1.26+](https://go.dev/), [Gin](https://gin-gonic.com/), [SQLite 3](https://sqlite.org/), [SSE](docs/ADR-001-flood-alert-architecture.md#adr-003-sprint-1-scope--live-updates-sse-hot-set-scoped-congestion-colors-phường-based-filter) | Single static binary, proxy caching, Hot Set scheduler, live streams |
 | **Cloud Storage** | [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/), [AWS SDK v2 (Go)](https://github.com/aws/aws-sdk-go-v2) | S3-compatible snapshot proofs (`warded-proofs`), public edge delivery |
 | **Computer Vision** | [Python 3.11+](https://python.org/), [PyTorch](https://pytorch.org/), [OpenCV](https://opencv.org/), [Intel OpenVINO](https://openvino.ai/) | High-throughput vehicle detection and road surface water segmentation |
 | **Weather & Radar** | [Open-Meteo](https://open-meteo.com/), [RainViewer API](https://www.rainviewer.com/api.html) | Real-time rainfall metrics and composite Doppler radar reflectivity tiles |
-| **Tooling & Ops** | [GitHub Actions](https://github.com/features/actions), [AGPLv3](LICENSE), [Shapely](tools/geo-enrich) | CI/CD automation, golangci-lint, point-in-polygon boundary enrichment |
+| **Tooling & Ops** | [GitHub Actions](https://github.com/features/actions), [AGPLv3](LICENSE), [Shapely](tools/geo-enrich) | CI/CD, golangci-lint, boundary enrichment |
 
 ### Configuration Reference
 
@@ -291,8 +291,10 @@ refuses a re-initialised head (`--allow-untrained-head` is bootstrap-only). Evid
 | `CV_ENGINE_URL` | `http://localhost:8000` | URL of self-hosted CV inference worker |
 | `ANALYZER` | `none` | Traffic analyzer (`none`, `mock`, `vlm`, `onnx`) |
 | `SNAPSHOT_UPSTREAM_BASE_URL` | *(required)* | DOT upstream image snapshot endpoint |
-| `TELEGRAM_BOT_TOKEN` | `""` | Telegram Bot API token for flood warning dispatch (empty for simulation mode) |
-| `TELEGRAM_DEBOUNCE_MINUTES` | `30` | Anti-spam quiet period debounce window per chokepoint (in minutes) |
+| `TELEGRAM_BOT_TOKEN` | `""` | Bot API token; empty keeps dispatch in simulation mode |
+| `TELEGRAM_BOT_USERNAME` | `""` | Public bot handle for deep links; empty disables the webhook |
+| `TELEGRAM_WEBHOOK_SECRET` | `""` | Webhook secret (`openssl rand -hex 32`); empty disables the webhook |
+| `TELEGRAM_DEBOUNCE_MINUTES` | `30` | Per-chokepoint anti-spam debounce window (minutes) |
 | `HARVESTER_ENABLED` | `false` | Enable background dual-trigger scheduled & rain harvester |
 | `HARVESTER_SCHEDULE_HOURS` | `7,12,17` | Daily peak harvest schedule in ICT (UTC+7, e.g. `07:30,12:00,17:30`) |
 | `HARVESTER_RAIN_COOLDOWN_MINUTES` | `60` | Sliding window cooldown for rain watcher triggers (in minutes) |
@@ -313,8 +315,9 @@ Operations: [Inference Worker Capacity Runbook](docs/runbooks/inference_worker_c
 
 #### Operational Verification: Staging Telegram Flood Alerts
 
-Before enabling public subscriptions, verify live alert delivery on the staging
-stack with the pre-flight script:
+Citizens subscribe from the bell button in the web UI (city-wide, zone, ward or
+chokepoint); the bot answers `/start`, `/status`, `/stop` and `/help`. Verify
+live delivery on staging before enabling public subscriptions:
 
 ```bash
 # Credentials are read from environment variables or the gitignored .env (never hardcoded)
@@ -322,10 +325,10 @@ TELEGRAM_BOT_TOKEN=<your-telegram-bot-token> TELEGRAM_CHAT_ID=<your-telegram-cha
   ./scripts/verify_staging_telegram.sh
 ```
 
-The script validates the bot token (`getMe`), the bilingual zero-emoji message
-contract, and live `sendMessage` delivery (HTTP 200). The 30-minute sliding
-debouncer and token redaction are enforced deterministically by
-`go test -race ./cmd/server -run TestNotifyIntegration`.
+The script checks `getMe`, the bilingual zero-emoji copy and a real `sendMessage`
+(HTTP 200). The inbound `POST /api/notify/telegram/webhook` is mounted only when
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` and `TELEGRAM_WEBHOOK_SECRET` are
+all valid; otherwise it answers `404` (fail-closed).
 
 ## 4. Next Evolution Steps
 

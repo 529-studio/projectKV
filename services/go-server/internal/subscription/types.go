@@ -184,6 +184,13 @@ type TaxonomyResponse struct {
 	Zones       []string         `json:"zones"`
 	Wards       []WardInfo       `json:"wards"`
 	Chokepoints []ChokepointInfo `json:"chokepoints"`
+	// BotUsername is the public Telegram handle the web UI turns into a deep
+	// link. Empty when the bot is unprovisioned; the UI then disables the CTA
+	// and keeps the manual chat-id form usable (S12-T4 spec §4.3, AC4).
+	BotUsername string `json:"bot_username,omitempty"`
+	// DeepLinkEnabled reports whether the server considers the bot fully
+	// provisioned (token, username and webhook secret all present and valid).
+	DeepLinkEnabled bool `json:"deep_link_enabled"`
 }
 
 // TaxonomyProvider defines the interface for verifying and introspecting canonical taxonomy targets.

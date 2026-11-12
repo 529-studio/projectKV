@@ -44,6 +44,8 @@ export const API_ENDPOINTS = Object.freeze({
   ARCHIVER_RAW: '/api/archiver/snapshots/raw',
   HOTSET_STATUS: '/api/v1/cameras/hotset/status',
   FORECAST: (id: string) => `/api/v1/cameras/${encodeURIComponent(id)}/forecast`,
+  SUBSCRIPTIONS: '/api/subscriptions',
+  SUBSCRIPTIONS_TAXONOMY: '/api/subscriptions/taxonomy',
 });
 
 export const getApiUrl = (endpoint: string): string => {
@@ -707,4 +709,70 @@ export const HAZARD_I18N = Object.freeze({
     en: (n: number) => `Hazard level ${n} of 3`,
   },
   STALE: { vi: 'Dữ liệu cũ', en: 'Stale data' },
+});
+
+// =======================================================
+// CITIZEN SUBSCRIPTIONS (S12-T4 / Issue #402)
+// =======================================================
+// Every leaf ships in VI (default, full diacritics) and EN, zero emoji.
+// The bot's replies use the same vocabulary; see internal/telegrambot/commands.go.
+export const SUBSCRIPTION_I18N = Object.freeze({
+  TITLE: { vi: 'Đăng ký nhận cảnh báo', en: 'Subscribe to alerts' },
+  SUBTITLE: {
+    vi: 'Chọn phạm vi bạn muốn nhận cảnh báo ngập qua Telegram.',
+    en: 'Choose the flood alerts you want to receive on Telegram.',
+  },
+  SCOPE_ALL: { vi: 'Toàn thành phố', en: 'City-wide' },
+  SCOPE_ZONE: { vi: 'Khu vực', en: 'Zone' },
+  SCOPE_WARD: { vi: 'Phường / Xã', en: 'Ward / Commune' },
+  SCOPE_CHOKEPOINT: { vi: 'Điểm ngập', en: 'Chokepoint' },
+  ZONE_LABEL: { vi: 'Khu vực vận hành', en: 'Operational zone' },
+  WARD_LABEL: { vi: 'Phường / Xã', en: 'Ward / Commune' },
+  CHOKEPOINT_LABEL: { vi: 'Camera / Điểm ngập', en: 'Camera / Chokepoint' },
+  ZONE_PLACEHOLDER: { vi: 'Chọn khu vực', en: 'Select a zone' },
+  SEARCH_WARD: { vi: 'Tìm phường hoặc xã', en: 'Search for a ward' },
+  SEARCH_CHOKEPOINT: { vi: 'Tìm điểm ngập hoặc camera', en: 'Search for a chokepoint or camera' },
+  TELEGRAM_CTA: { vi: 'Mở Telegram để đăng ký', en: 'Open Telegram to subscribe' },
+  TELEGRAM_HINT: {
+    vi: 'Bạn sẽ nhận tin nhắn xác nhận từ bot ngay sau khi bấm.',
+    en: 'You will receive a confirmation message from the bot right after tapping.',
+  },
+  BOT_UNAVAILABLE: {
+    vi: 'Bot Telegram chưa được cấu hình. Bạn vẫn có thể nhập Chat ID bên dưới.',
+    en: 'The Telegram bot is not configured yet. You can still enter your chat ID below.',
+  },
+  MANUAL_TOGGLE: { vi: 'Nhập Chat ID thủ công', en: 'Enter chat ID manually' },
+  CHAT_ID_LABEL: { vi: 'Chat ID Telegram', en: 'Telegram chat ID' },
+  CHAT_ID_HINT: {
+    vi: 'Chuỗi 5 đến 20 chữ số. Gửi /start cho bot để lấy Chat ID của bạn.',
+    en: '5 to 20 digits. Send /start to the bot to get your chat ID.',
+  },
+  CHAT_ID_INVALID: { vi: 'Chat ID phải gồm 5 đến 20 chữ số.', en: 'Chat ID must contain 5 to 20 digits.' },
+  SUBMIT: { vi: 'Đăng ký', en: 'Subscribe' },
+  SUBMITTING: { vi: 'Đang đăng ký', en: 'Subscribing' },
+  SUCCESS_TITLE: { vi: 'Đã đăng ký', en: 'Subscribed' },
+  SUCCESS_BODY: {
+    vi: 'Bạn sẽ nhận cảnh báo ngập cho phạm vi đã chọn. Gửi /stop để huỷ bất cứ lúc nào.',
+    en: 'You will receive flood alerts for the selected scope. Send /stop to unsubscribe at any time.',
+  },
+  ALREADY_HINT: { vi: 'Phạm vi này đã được đăng ký trước đó.', en: 'This scope is already active.' },
+  ERROR_NETWORK: {
+    vi: 'Không kết nối được máy chủ. Vui lòng thử lại.',
+    en: 'Could not reach the server. Please try again.',
+  },
+  ERROR_RATE_LIMIT: {
+    vi: 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau một phút.',
+    en: 'You sent too many requests. Please try again in a minute.',
+  },
+  ERROR_UNKNOWN_TARGET: {
+    vi: 'Phạm vi không hợp lệ. Vui lòng chọn lại.',
+    en: 'Invalid scope. Please choose again.',
+  },
+  RETRY: { vi: 'Thử lại', en: 'Retry' },
+  CLOSE: { vi: 'Đóng', en: 'Close' },
+  PRIVACY_NOTE: {
+    vi: 'Chúng tôi chỉ lưu Chat ID và phạm vi bạn chọn. Gửi /stop để huỷ bất cứ lúc nào.',
+    en: 'We store only your chat ID and chosen scope. Send /stop to unsubscribe at any time.',
+  },
+  OPEN_TELEGRAM: { vi: 'Mở Telegram', en: 'Open Telegram' },
 });

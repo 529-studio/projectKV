@@ -17,10 +17,13 @@ import {
   NEAR_ME_I18N,
   PINNED_DOCK_CAP,
   PINNED_DOCK_I18N,
+  SUBSCRIPTION_I18N,
 } from '../config/constants';
+import type { TargetSelection } from '../utils/subscriptionUtils';
 import LandingOverlay from '../components/LandingOverlay';
 import CameraModal from '../components/CameraModal';
 import NearMeModal from '../components/NearMeModal';
+import SubscriptionModal from '../components/SubscriptionModal';
 import PinnedDock from '../components/PinnedDock';
 import MapLegend from '../components/MapLegend';
 import MobileCameraDrawer from '../components/MobileCameraDrawer';
@@ -61,6 +64,9 @@ export default function Home() {
   // S12-T2 / Issue #400: one geolocation instance for the whole page.
   const geo = useGeolocation();
   const [nearMeOpen, setNearMeOpen] = useState(false);
+  // S12-T4 / Issue #402: citizen alert subscription dialog.
+  const [subscriptionOpen, setSubscriptionOpen] = useState(false);
+  const [subscriptionTarget, setSubscriptionTarget] = useState<TargetSelection>({ type: 'all', id: '' });
   const hasFlownToFixRef = useRef(false);
 
   const [map, setMap] = useState<L.Map | null>(null);
@@ -188,11 +194,11 @@ export default function Home() {
   }, []);
 
   // Escape key clears open camera modal first, then active filter (Issue #65).
-  // The Near-Me sheet owns Esc while it is open (focus trap handler).
+  // The Near-Me and subscription sheets own Esc while they are open.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (nearMeOpen) return;
+        if (nearMeOpen || subscriptionOpen) return;
         if (selectedCameraId) {
           handleSelectCamera(null);
         } else if (isFiltered) {
@@ -202,7 +208,7 @@ export default function Home() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nearMeOpen, selectedCameraId, isFiltered, handleFilterClear, handleSelectCamera]);
+  }, [nearMeOpen, subscriptionOpen, selectedCameraId, isFiltered, handleFilterClear, handleSelectCamera]);
 
   // Set of camera IDs matching the active filter for focus dimming (ADR-004 A3)
   const filteredCameraIds = useMemo(() => {
@@ -322,6 +328,7 @@ export default function Home() {
     // Each activation may center the map once on its first fix; watch fixes
     // that follow never move the map (E11).
     hasFlownToFixRef.current = false;
+    setSubscriptionOpen(false);
     setNearMeOpen(true);
     const fix = geo.fix;
     const isFresh = Boolean(fix) && Date.now() - (fix ? fix.timestamp : 0) < NEAR_ME_FIX_MAX_AGE_MS;
@@ -330,6 +337,16 @@ export default function Home() {
 
   const handleNearMeClose = useCallback(() => {
     setNearMeOpen(false);
+  }, []);
+
+  const handleSubscriptionOpen = useCallback(() => {
+    setNearMeOpen(false);
+    setSubscriptionTarget({ type: 'all', id: '' });
+    setSubscriptionOpen(true);
+  }, []);
+
+  const handleSubscriptionClose = useCallback(() => {
+    setSubscriptionOpen(false);
   }, []);
 
   const handleNearMeRecenter = useCallback(() => {
@@ -514,6 +531,30 @@ export default function Home() {
             }
             weatherControl={
               <div className="flex items-center gap-2">
+                {/* S12-T4 / Issue #402: citizen alert subscription entry point (desktop) */}
+                <button
+                  type="button"
+                  onClick={handleSubscriptionOpen}
+                  aria-label={SUBSCRIPTION_I18N.TITLE[lang]}
+                  title={SUBSCRIPTION_I18N.TITLE[lang]}
+                  aria-haspopup="dialog"
+                  aria-expanded={subscriptionOpen}
+                  className="flex h-12 min-h-[48px] w-12 min-w-[48px] items-center justify-center rounded-lg border border-zinc-700 bg-zinc-950/95 text-zinc-200 shadow-2xl backdrop-blur-md transition-colors hover:border-zinc-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-900 cursor-pointer"
+                >
+                  <svg
+                    className="h-4 w-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7" />
+                    <path d="M10.5 20a2 2 0 0 0 3 0" />
+                  </svg>
+                </button>
                 {/* S12-T2 / Issue #400: one-click proximity entry point (desktop stack) */}
                 <button
                   type="button"
@@ -632,6 +673,31 @@ export default function Home() {
             </div>
           </button>
 
+          {/* S12-T4 / Issue #402: subscription bell between search and weather */}
+          <button
+            type="button"
+            onClick={handleSubscriptionOpen}
+            aria-label={SUBSCRIPTION_I18N.TITLE[lang]}
+            title={SUBSCRIPTION_I18N.TITLE[lang]}
+            aria-haspopup="dialog"
+            aria-expanded={subscriptionOpen}
+            className="shrink-0 w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-lg bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-zinc-100 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7" />
+              <path d="M10.5 20a2 2 0 0 0 3 0" />
+            </svg>
+          </button>
+
           {/* Mobile Weather Widget Trigger */}
           <div className="shrink-0">
             <WeatherWidget
@@ -728,6 +794,16 @@ export default function Home() {
       </main>
 
       {/* MODAL — global viewport overlay */}
+      {/* S12-T4 / Issue #402: citizen subscription dialog. Opening it closes the
+          Near-Me sheet (and vice versa) so two focus traps never coexist. */}
+      <SubscriptionModal
+        isOpen={subscriptionOpen}
+        onClose={handleSubscriptionClose}
+        lang={lang}
+        initialTarget={subscriptionTarget}
+        botUsernameFallback={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
+      />
+
       {/* S12-T2 / Issue #400: sheet renders under CameraModal (z-[9999]) and is
           closed before a row opens the camera detail modal. */}
       <NearMeModal

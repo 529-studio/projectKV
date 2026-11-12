@@ -29,7 +29,7 @@ func TestNotifyIntegration_EndToEnd(t *testing.T) {
 	defer db.Close()
 
 	subStore := subscription.NewSQLiteStore(db)
-	subHandler := subscription.NewHandler(subStore)
+	subHandler := subscription.NewHandler(subStore, nil, subscription.WithSubscribeLimiter(nil))
 
 	// 2. Setup mock Telegram Bot API server
 	var mu sync.Mutex
@@ -73,11 +73,11 @@ func TestNotifyIntegration_EndToEnd(t *testing.T) {
 		targetType string
 		targetID   string
 	}{
-		{"chat-all-1001", "all", ""},
-		{"chat-cam-1002", "chokepoint", "cam-hotspot-binh-thanh"},
-		{"chat-zone-1003", "zone", "Quận Bình Thạnh"},
-		{"chat-ward-1004", "ward", "Phường 25"},
-		{"chat-unrelated-1005", "zone", "Quận 7 - Nhà Bè"}, // Unrelated zone, should not receive alert
+		{"10000001001", "all", ""},
+		{"10000001002", "chokepoint", "cam-hotspot-binh-thanh"},
+		{"10000001003", "zone", "Quận Bình Thạnh"},
+		{"10000001004", "ward", "Phường 25"},
+		{"10000001005", "zone", "Quận 7 - Nhà Bè"}, // Unrelated zone, should not receive alert
 	}
 
 	for _, s := range subs {
@@ -131,7 +131,7 @@ func TestNotifyIntegration_EndToEnd(t *testing.T) {
 
 	// 6. Verify recipients
 	mu.Lock()
-	matchedChats := []string{"chat-all-1001", "chat-cam-1002", "chat-zone-1003", "chat-ward-1004"}
+	matchedChats := []string{"10000001001", "10000001002", "10000001003", "10000001004"}
 	for _, chatID := range matchedChats {
 		msgs, ok := receivedMessages[chatID]
 		if !ok || len(msgs) == 0 {
@@ -159,8 +159,8 @@ func TestNotifyIntegration_EndToEnd(t *testing.T) {
 	}
 
 	// Verify unrelated chat got 0 messages
-	if msgs, ok := receivedMessages["chat-unrelated-1005"]; ok && len(msgs) > 0 {
-		t.Errorf("chat-unrelated-1005 should not receive alert, but received %d messages", len(msgs))
+	if msgs, ok := receivedMessages["10000001005"]; ok && len(msgs) > 0 {
+		t.Errorf("10000001005 should not receive alert, but received %d messages", len(msgs))
 	}
 	initialCount := len(receivedMessages)
 	mu.Unlock()
@@ -210,7 +210,7 @@ func TestNotifyIntegration_DebounceFiveMinuteWindow(t *testing.T) {
 	defer db.Close()
 
 	subStore := subscription.NewSQLiteStore(db)
-	subHandler := subscription.NewHandler(subStore)
+	subHandler := subscription.NewHandler(subStore, nil, subscription.WithSubscribeLimiter(nil))
 
 	var mu sync.Mutex
 	receivedCount := 0
@@ -231,7 +231,7 @@ func TestNotifyIntegration_DebounceFiveMinuteWindow(t *testing.T) {
 
 	reqBody, _ := json.Marshal(subscription.SubscribeRequest{
 		ChannelName: "telegram",
-		ChatID:      "chat-staging-verify",
+		ChatID:      "10000002001",
 		TargetType:  "chokepoint",
 		TargetID:    "586e2995f9fab7001111b0b5",
 	})

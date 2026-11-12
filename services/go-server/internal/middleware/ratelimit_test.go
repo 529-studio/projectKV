@@ -129,6 +129,7 @@ func TestIsExempt(t *testing.T) {
 		{"/_next/static/chunk.js", true},
 		{"/swagger/index.html", true},
 		{"/styles.css", true},
+		{"/api/notify/telegram/webhook", true},
 		{"/api/cameras", false},
 		{"/api/traffic-status", false},
 	}
