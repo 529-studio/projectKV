@@ -17,11 +17,11 @@ permanent directory made readers pay for a document with a shelf life.
 | 10 | [`s10_t1_forecast_contract_spec.md`](s10_t1_forecast_contract_spec.md) | Contract spec for #372 (closed) |
 | 10 | [`s10_t1_offline_verification.md`](s10_t1_offline_verification.md) | #372 evidence split (closed) |
 | 11 | [`sprint11_issue_commands.md`](sprint11_issue_commands.md) | Closed — retrospective in [`docs/reports/sprint11_report.md`](../reports/sprint11_report.md) |
-| 12 | [`s12_t1_issue.md`](s12_t1_issue.md) | Implemented & Verified — Close #413, PR in review |
-| 12 | [`s12_t2_spec.md`](s12_t2_spec.md) | Implemented & Verified — Close #400 |
-| 12 | [`s12_t3_spec.md`](s12_t3_spec.md) | Implemented; Rule-10 evidence **blocked** on S12-T5 trained segmentation head — [evidence](../reports/s12_t3_manual_evidence.md) |
-| 12 | [`s12_t4_spec.md`](s12_t4_spec.md) | Implemented; Rule-10 live bot DM evidence **pending staging credentials** — [evidence](../reports/s12_t4_manual_evidence.md) |
-| 12 | [`s12_t5_spec.md`](s12_t5_spec.md) | Implemented & Verified — tooling, contract suites, materializer, measured gate and AVX2 harness for Close #411; GPU fine-tune and worker soak run off-box |
+| 12 | [`s12_t1_issue.md`](s12_t1_issue.md) | Closed — retrospective in [`docs/reports/sprint12_report.md`](../reports/sprint12_report.md) |
+| 12 | [`s12_t2_spec.md`](s12_t2_spec.md) | Closed — #400 closed; retrospective in [`docs/reports/sprint12_report.md`](../reports/sprint12_report.md) |
+| 12 | [`s12_t3_spec.md`](s12_t3_spec.md) | Closed — #401 closed; retrospective in [`docs/reports/sprint12_report.md`](../reports/sprint12_report.md) |
+| 12 | [`s12_t4_spec.md`](s12_t4_spec.md) | Closed — #402 closed; retrospective in [`docs/reports/sprint12_report.md`](../reports/sprint12_report.md) |
+| 12 | [`s12_t5_spec.md`](s12_t5_spec.md) | Closed — #411 closed; retrospective in [`docs/reports/sprint12_report.md`](../reports/sprint12_report.md) |
 
 ## Lifecycle
 
