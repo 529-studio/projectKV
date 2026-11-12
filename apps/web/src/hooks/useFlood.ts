@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_ENDPOINTS, getApiUrl } from '../config/constants';
 import {
   type TrafficVerdict,
@@ -16,6 +16,12 @@ import {
   deriveFloodHexCounts,
   isUserReportActive,
 } from '../utils/floodUtils';
+import {
+  useLiveStream,
+  useCameraUpdate,
+  useFloodHexUpdate,
+  useUserFloodReport,
+} from '../contexts/LiveStreamContext.ts';
 
 export interface UseFloodReturn {
   floodVerdicts: Map<string, TrafficVerdict>;
@@ -40,14 +46,15 @@ export function useFlood(): UseFloodReturn {
   const [floodHexCells, setFloodHexCells] = useState<Map<string, FloodHexCell>>(new Map());
   const [userFloodReports, setUserFloodReports] = useState<Map<string, UserFloodReport>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
-  const [appEnv, setAppEnv] = useState<string>('production');
+  const { connected } = useLiveStream();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateVerdict = useCallback((raw: any) => {
+  const appEnvRef = useRef<string>('production');
+
+  const updateVerdict = useCallback((raw: unknown) => {
+    if (!raw || typeof raw !== 'object') return;
     const v = normalizeVerdict(raw);
     const id = v.camera_id;
-    if (!id || !isVerdictValid(v) || isMockHidden(v.source, appEnv)) {
+    if (!id || !isVerdictValid(v) || isMockHidden(v.source, appEnvRef.current)) {
       return;
     }
 
@@ -58,10 +65,9 @@ export function useFlood(): UseFloodReturn {
       next.set(id, v);
       return next;
     });
-  }, [appEnv]);
+  }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateFloodHexCell = useCallback((raw: any) => {
+  const updateFloodHexCell = useCallback((raw: unknown) => {
     const cell = normalizeFloodHexCell(raw);
     if (!cell) return;
 
@@ -76,8 +82,79 @@ export function useFlood(): UseFloodReturn {
     });
   }, []);
 
+  // Subscribe to consolidated live SSE stream
+  useCameraUpdate(
+    useCallback(
+      (payload: unknown) => {
+        if (Array.isArray(payload)) {
+          payload.forEach(updateVerdict);
+        } else if (payload && typeof payload === 'object' && 'data' in payload) {
+          const innerData = payload.data;
+          if (Array.isArray(innerData)) innerData.forEach(updateVerdict);
+          else updateVerdict(innerData);
+        } else if (payload) {
+          updateVerdict(payload);
+        }
+      },
+      [updateVerdict]
+    )
+  );
+
+  useFloodHexUpdate(
+    useCallback(
+      (payload: unknown) => {
+        if (Array.isArray(payload)) {
+          payload.forEach(updateFloodHexCell);
+        } else if (payload && typeof payload === 'object' && 'data' in payload) {
+          const innerData = payload.data;
+          if (Array.isArray(innerData)) innerData.forEach(updateFloodHexCell);
+          else updateFloodHexCell(innerData);
+        } else if (payload) {
+          updateFloodHexCell(payload);
+        }
+      },
+      [updateFloodHexCell]
+    )
+  );
+
+  useUserFloodReport(
+    useCallback((payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      if (!('camera_id' in payload) || typeof payload.camera_id !== 'string') return;
+      const id = payload.camera_id;
+      const ttlSec = ('ttl_seconds' in payload && typeof payload.ttl_seconds === 'number')
+        ? payload.ttl_seconds
+        : 900;
+      const expiresAt = Date.now() + ttlSec * 1000;
+      const clientIpHash = ('client_ip_hash' in payload && typeof payload.client_ip_hash === 'string')
+        ? payload.client_ip_hash
+        : undefined;
+      const timestamp = ('timestamp' in payload && typeof payload.timestamp === 'string')
+        ? payload.timestamp
+        : new Date().toISOString();
+      const reportCount = ('report_count' in payload && typeof payload.report_count === 'number')
+        ? payload.report_count
+        : 1;
+      const escalated = ('escalated' in payload && Boolean(payload.escalated)) || false;
+
+      const report: UserFloodReport = {
+        camera_id: id,
+        client_ip_hash: clientIpHash,
+        timestamp,
+        report_count: reportCount,
+        escalated,
+        ttl_seconds: ttlSec,
+        expires_at: expiresAt,
+      };
+      setUserFloodReports((prev) => {
+        const next = new Map(prev);
+        next.set(id, report);
+        return next;
+      });
+    }, [])
+  );
+
   useEffect(() => {
-    let es: EventSource | null = null;
     let isCancelled = false;
 
     async function fetchInitial() {
@@ -107,22 +184,25 @@ export function useFlood(): UseFloodReturn {
             return null;
           });
 
-        const [statusData, hexData, userReportsData] = await Promise.all([statusPromise, hexPromise, userReportsPromise]);
+        const [statusData, hexData, userReportsData] = await Promise.all([
+          statusPromise,
+          hexPromise,
+          userReportsPromise,
+        ]);
         if (isCancelled) return;
 
         let currentEnv = 'production';
         if (statusData && typeof statusData === 'object') {
           if ('app_env' in statusData && typeof statusData.app_env === 'string') {
             currentEnv = statusData.app_env;
-            setAppEnv(statusData.app_env);
+            appEnvRef.current = statusData.app_env;
           }
           const list = Array.isArray(statusData)
             ? statusData
             : (statusData.verdicts || []);
 
           const initialVerdicts = new Map<string, TrafficVerdict>();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          list.forEach((raw: any) => {
+          list.forEach((raw: unknown) => {
             const v = normalizeVerdict(raw);
             const id = v.camera_id;
             if (id && isVerdictValid(v) && !isMockHidden(v.source, currentEnv) && v.flood_severity) {
@@ -134,8 +214,7 @@ export function useFlood(): UseFloodReturn {
 
         if (Array.isArray(hexData)) {
           const initialHex = new Map<string, FloodHexCell>();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          hexData.forEach((raw: any) => {
+          hexData.forEach((raw: unknown) => {
             const cell = normalizeFloodHexCell(raw);
             if (cell && cell.camera_count > 0 && cell.flood_severity !== 'DRY') {
               initialHex.set(cell.h3_id, cell);
@@ -146,17 +225,31 @@ export function useFlood(): UseFloodReturn {
 
         if (Array.isArray(userReportsData)) {
           const initialUserReports = new Map<string, UserFloodReport>();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          userReportsData.forEach((item: any) => {
-            if (item && item.camera_id) {
-              const expiresAt = item.expires_at ? new Date(item.expires_at).getTime() : Date.now() + 900000;
+          userReportsData.forEach((item: unknown) => {
+            if (item && typeof item === 'object' && 'camera_id' in item && typeof item.camera_id === 'string') {
+              const expiresAt = ('expires_at' in item && typeof item.expires_at === 'string')
+                ? new Date(item.expires_at).getTime()
+                : Date.now() + 900000;
               if (Date.now() < expiresAt) {
+                const clientIpHash = ('client_ip_hash' in item && typeof item.client_ip_hash === 'string')
+                  ? item.client_ip_hash
+                  : undefined;
+                const timestamp = ('latest_at' in item && typeof item.latest_at === 'string')
+                  ? item.latest_at
+                  : ('timestamp' in item && typeof item.timestamp === 'string')
+                    ? item.timestamp
+                    : new Date().toISOString();
+                const reportCount = ('report_count' in item && typeof item.report_count === 'number')
+                  ? item.report_count
+                  : 1;
+                const escalated = Boolean('escalated' in item && item.escalated);
+
                 initialUserReports.set(item.camera_id, {
                   camera_id: item.camera_id,
-                  client_ip_hash: item.client_ip_hash,
-                  timestamp: item.latest_at || item.timestamp || new Date().toISOString(),
-                  report_count: item.report_count || 1,
-                  escalated: Boolean(item.escalated),
+                  client_ip_hash: clientIpHash,
+                  timestamp,
+                  report_count: reportCount,
+                  escalated,
                   ttl_seconds: 900,
                   expires_at: expiresAt,
                 });
@@ -169,7 +262,9 @@ export function useFlood(): UseFloodReturn {
         const elapsed = Date.now() - startTime;
         const minDelay = 700;
         if (elapsed < minDelay) {
-          await new Promise((resolve) => setTimeout(resolve, minDelay - elapsed));
+          const { promise, resolve } = Promise.withResolvers<void>();
+          setTimeout(resolve, minDelay - elapsed);
+          await promise;
         }
         if (!isCancelled) {
           setLoading(false);
@@ -177,104 +272,12 @@ export function useFlood(): UseFloodReturn {
       }
     }
 
-    function initSSE() {
-      if (typeof window === 'undefined' || typeof EventSource === 'undefined') {
-        return;
-      }
-
-      try {
-        es = new EventSource(getApiUrl(API_ENDPOINTS.SSE_LIVE));
-
-        es.onopen = () => {
-          setConnected(true);
-        };
-
-        es.addEventListener('camera_update', (event: MessageEvent) => {
-          setConnected(true);
-          try {
-            const payload = JSON.parse(event.data);
-            if (Array.isArray(payload)) {
-              payload.forEach(updateVerdict);
-            } else if (payload.data) {
-              if (Array.isArray(payload.data)) payload.data.forEach(updateVerdict);
-              else updateVerdict(payload.data);
-            } else {
-              updateVerdict(payload);
-            }
-          } catch (err) {
-            console.warn('Failed to parse SSE camera_update message for flood:', err);
-          }
-        });
-
-        es.addEventListener('flood_hex_update', (event: MessageEvent) => {
-          setConnected(true);
-          try {
-            const payload = JSON.parse(event.data);
-            if (Array.isArray(payload)) {
-              payload.forEach(updateFloodHexCell);
-            } else if (payload.data) {
-              if (Array.isArray(payload.data)) payload.data.forEach(updateFloodHexCell);
-              else updateFloodHexCell(payload.data);
-            } else {
-              updateFloodHexCell(payload);
-            }
-          } catch (err) {
-            console.warn('Failed to parse SSE flood_hex_update message:', err);
-          }
-        });
-
-        // S8-T7: Crowdsourced user flood report SSE broadcast listener
-        es.addEventListener('user_flood_report', (event: MessageEvent) => {
-          setConnected(true);
-          try {
-            const payload = JSON.parse(event.data);
-            const id = payload.camera_id;
-            if (!id) return;
-            const ttlSec = payload.ttl_seconds || 900;
-            const expiresAt = Date.now() + ttlSec * 1000;
-            const report: UserFloodReport = {
-              camera_id: id,
-              client_ip_hash: payload.client_ip_hash,
-              timestamp: payload.timestamp || new Date().toISOString(),
-              report_count: payload.report_count || 1,
-              escalated: Boolean(payload.escalated),
-              ttl_seconds: ttlSec,
-              expires_at: expiresAt,
-            };
-            setUserFloodReports((prev) => {
-              const next = new Map(prev);
-              next.set(id, report);
-              return next;
-            });
-          } catch (err) {
-            console.warn('Failed to parse SSE user_flood_report message:', err);
-          }
-        });
-
-        es.onerror = (err) => {
-          setConnected(false);
-          if (es?.readyState === EventSource.CLOSED) {
-            console.warn('Flood SSE connection closed:', err);
-          }
-        };
-      } catch (err) {
-        console.warn('Failed to initialize Flood EventSource:', err);
-      }
-    }
-
-    fetchInitial().then(() => {
-      if (!isCancelled) {
-        initSSE();
-      }
-    });
+    fetchInitial();
 
     return () => {
       isCancelled = true;
-      if (es) {
-        es.close();
-      }
     };
-  }, [updateVerdict, updateFloodHexCell]);
+  }, []);
 
   // Periodic pruning of expired user flood reports (sliding 15-minute TTL)
   useEffect(() => {
@@ -289,6 +292,7 @@ export function useFlood(): UseFloodReturn {
           }
         }
         if (!hasExpired) return prev;
+
         const next = new Map<string, UserFloodReport>();
         for (const [id, report] of prev.entries()) {
           if (isUserReportActive(report, now)) {
@@ -297,7 +301,7 @@ export function useFlood(): UseFloodReturn {
         }
         return next;
       });
-    }, 15000);
+    }, 30000);
 
     return () => clearInterval(pruneTimer);
   }, []);

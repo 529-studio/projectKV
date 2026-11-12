@@ -85,6 +85,18 @@ class TestTimestampParsing(unittest.TestCase):
     def test_rfc3339_timestamp(self):
         parsed = parse_timestamp("2026-11-05T08:00:00Z", ICT)
         self.assertEqual(parsed, datetime(2026, 11, 5, 8, 0, tzinfo=UTC))
+    def test_rfc3339nano_fixed_layout_nine_digits(self):
+        parsed = parse_timestamp("2026-11-06T10:00:00.000000000Z", ICT)
+        self.assertEqual(parsed, datetime(2026, 11, 6, 10, 0, 0, 0, tzinfo=UTC))
+
+    def test_rfc3339nano_fractional_truncation(self):
+        parsed = parse_timestamp("2026-11-06T10:00:00.123456789Z", ICT)
+        self.assertEqual(parsed, datetime(2026, 11, 6, 10, 0, 0, 123456, tzinfo=UTC))
+
+    def test_rfc3339nano_explicit_offset(self):
+        parsed = parse_timestamp("2026-11-06T17:00:00.123456789+07:00", ICT)
+        self.assertEqual(parsed, datetime(2026, 11, 6, 10, 0, 0, 123456, tzinfo=UTC))
+
 
     def test_naive_timestamp_uses_local_timezone(self):
         parsed = parse_timestamp("2026-11-05 08:00:00", ICT)

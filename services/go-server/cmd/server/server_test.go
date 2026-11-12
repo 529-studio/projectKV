@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -242,5 +243,182 @@ func TestStartup_HotsetStatusEndpoint_ServesCachedState(t *testing.T) {
 		}
 
 		t.Logf("%s: successfully returned %d cameras in %v", ep, statusResp.Total, latency)
+	}
+}
+
+func TestStartup_CatalogGzipCompressionAndCachingHeaders(t *testing.T) {
+	port := getFreePort(t)
+	absCameras, err := filepath.Abs("../../../../cameras_enriched.json")
+	if err != nil {
+		t.Fatalf("resolve cameras path: %v", err)
+	}
+
+	cmd := exec.Command("go", "run", "./main.go")
+	cmd.Dir = "."
+	var outputBuf bytes.Buffer
+	cmd.Stdout = &outputBuf
+	cmd.Stderr = &outputBuf
+	cmd.Env = append(cmd.Environ(),
+		"PORT="+port,
+		"ANALYZER=none",
+		"APP_ENV=production",
+		"CAMERAS_FILE_PATH="+absCameras,
+		"SQLITE_PATH=:memory:",
+	)
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	defer func() {
+		_ = cmd.Process.Kill()
+	}()
+
+	baseURL := "http://localhost:" + port
+
+	// Wait for server to become ready
+	ready := false
+	for range 150 {
+		time.Sleep(100 * time.Millisecond)
+		resp, err := http.Get(baseURL + "/health")
+		if err == nil && resp.StatusCode == http.StatusOK {
+			_ = resp.Body.Close()
+			ready = true
+			break
+		}
+	}
+	if !ready {
+		t.Fatalf("server failed to become ready on %s; output:\n%s", baseURL, outputBuf.String())
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	// 1. Test /api/cameras with Accept-Encoding: gzip
+	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/cameras", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("GET /api/cameras: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	// Check Cache-Control header
+	cc := resp.Header.Get("Cache-Control")
+	expectedCC := "public, max-age=300, stale-while-revalidate=600"
+	if cc != expectedCC {
+		t.Errorf("expected Cache-Control %q, got %q", expectedCC, cc)
+	}
+
+	// Check ETag header
+	etag := resp.Header.Get("ETag")
+	if etag == "" {
+		t.Fatalf("expected non-empty ETag header")
+	}
+
+	// Check Content-Encoding: gzip
+	ce := resp.Header.Get("Content-Encoding")
+	if ce != "gzip" {
+		t.Fatalf("expected Content-Encoding: gzip, got %q", ce)
+	}
+
+	// Read compressed body and verify wire size
+	compressedBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read response body: %v", err)
+	}
+
+	wireSize := len(compressedBytes)
+	t.Logf("/api/cameras headers: %+v", resp.Header)
+	t.Logf("/api/cameras gzipped wire size: %d bytes (%.1f KB), last 10 bytes: %x", wireSize, float64(wireSize)/1024, compressedBytes[wireSize-10:])
+	if wireSize > 120*1024 {
+		t.Errorf("expected gzipped wire size to be under 120 KB, got %d bytes", wireSize)
+	}
+
+	// Decompress and verify content
+	gzReader, err := gzip.NewReader(bytes.NewReader(compressedBytes))
+	if err != nil {
+		t.Fatalf("new gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	uncompressedBytes, err := io.ReadAll(gzReader)
+	t.Logf("gzReader read: %d uncompressed bytes, err: %v", len(uncompressedBytes), err)
+	if err != nil {
+		t.Fatalf("decompress gzip body: %v", err)
+	}
+
+	t.Logf("/api/cameras uncompressed size: %d bytes (%.1f KB)", len(uncompressedBytes), float64(len(uncompressedBytes))/1024)
+	if len(uncompressedBytes) < 300*1024 {
+		t.Errorf("expected uncompressed catalog size > 300 KB, got %d", len(uncompressedBytes))
+	}
+
+	var cameras []map[string]interface{}
+	if err := json.Unmarshal(uncompressedBytes, &cameras); err != nil {
+		t.Fatalf("unmarshal decompressed JSON: %v", err)
+	}
+	if len(cameras) == 0 {
+		t.Fatalf("expected cameras list to not be empty")
+	}
+
+	// 2. Test conditional request with If-None-Match
+	reqCond, err := http.NewRequest(http.MethodGet, baseURL+"/api/cameras", nil)
+	if err != nil {
+		t.Fatalf("new conditional request: %v", err)
+	}
+	reqCond.Header.Set("If-None-Match", etag)
+	reqCond.Header.Set("Accept-Encoding", "gzip")
+
+	respCond, err := client.Do(reqCond)
+	if err != nil {
+		t.Fatalf("GET /api/cameras conditional: %v", err)
+	}
+	defer respCond.Body.Close()
+
+	if respCond.StatusCode != http.StatusNotModified {
+		t.Fatalf("expected 304 Not Modified, got %d", respCond.StatusCode)
+	}
+
+	// 3. Test /api/zones caching and conditional request
+	reqZones, err := http.NewRequest(http.MethodGet, baseURL+"/api/zones", nil)
+	if err != nil {
+		t.Fatalf("new zones request: %v", err)
+	}
+	respZones, err := client.Do(reqZones)
+	if err != nil {
+		t.Fatalf("GET /api/zones: %v", err)
+	}
+	defer respZones.Body.Close()
+
+	if respZones.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", respZones.StatusCode)
+	}
+	if respZones.Header.Get("Cache-Control") != expectedCC {
+		t.Errorf("expected zones Cache-Control %q, got %q", expectedCC, respZones.Header.Get("Cache-Control"))
+	}
+	zonesETag := respZones.Header.Get("ETag")
+	if zonesETag == "" {
+		t.Fatalf("expected non-empty ETag for zones")
+	}
+
+	reqZonesCond, err := http.NewRequest(http.MethodGet, baseURL+"/api/zones", nil)
+	if err != nil {
+		t.Fatalf("new zones cond request: %v", err)
+	}
+	reqZonesCond.Header.Set("If-None-Match", zonesETag)
+	respZonesCond, err := client.Do(reqZonesCond)
+	if err != nil {
+		t.Fatalf("GET /api/zones cond: %v", err)
+	}
+	defer respZonesCond.Body.Close()
+
+	if respZonesCond.StatusCode != http.StatusNotModified {
+		t.Fatalf("expected 304 Not Modified for zones, got %d", respZonesCond.StatusCode)
 	}
 }

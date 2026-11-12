@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -394,5 +395,102 @@ func TestGetCameras_FilterPhuong(t *testing.T) {
 	}
 	if len(cameras2) != 1 || cameras2[0].ID != "cam-d1" {
 		t.Errorf("expected 1 camera (cam-d1) with prefix, got %d (%v)", len(cameras2), cameras2)
+	}
+}
+
+func TestGetCameras_CacheControlAndETag(t *testing.T) {
+	router, _ := setupTestRouter()
+
+	// 1. Initial request without If-None-Match
+	req, _ := http.NewRequest(http.MethodGet, "/api/cameras", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	cc := rec.Header().Get("Cache-Control")
+	if cc != CatalogCacheControl {
+		t.Errorf("expected Cache-Control %q, got %q", CatalogCacheControl, cc)
+	}
+
+	etag := rec.Header().Get("ETag")
+	if etag == "" || !strings.HasPrefix(etag, `"`) || !strings.HasSuffix(etag, `"`) {
+		t.Fatalf("expected valid quoted ETag, got %q", etag)
+	}
+
+	// 2. Conditional request with matching If-None-Match
+	reqCond, _ := http.NewRequest(http.MethodGet, "/api/cameras", nil)
+	reqCond.Header.Set("If-None-Match", etag)
+	recCond := httptest.NewRecorder()
+	router.ServeHTTP(recCond, reqCond)
+
+	if recCond.Code != http.StatusNotModified {
+		t.Errorf("expected 304 Not Modified, got %d", recCond.Code)
+	}
+	if recCond.Body.Len() != 0 {
+		t.Errorf("expected empty body for 304, got %d bytes", recCond.Body.Len())
+	}
+	if recCond.Header().Get("ETag") != etag {
+		t.Errorf("expected ETag %q on 304, got %q", etag, recCond.Header().Get("ETag"))
+	}
+	if recCond.Header().Get("Cache-Control") != CatalogCacheControl {
+		t.Errorf("expected Cache-Control on 304, got %q", recCond.Header().Get("Cache-Control"))
+	}
+
+	// 3. Conditional request with weak ETag format W/"..."
+	reqWeak, _ := http.NewRequest(http.MethodGet, "/api/cameras", nil)
+	reqWeak.Header.Set("If-None-Match", "W/"+etag)
+	recWeak := httptest.NewRecorder()
+	router.ServeHTTP(recWeak, reqWeak)
+
+	if recWeak.Code != http.StatusNotModified {
+		t.Errorf("expected 304 for weak ETag, got %d", recWeak.Code)
+	}
+
+	// 4. Conditional request with mismatched ETag
+	reqMismatch, _ := http.NewRequest(http.MethodGet, "/api/cameras", nil)
+	reqMismatch.Header.Set("If-None-Match", `"non-matching-etag"`)
+	recMismatch := httptest.NewRecorder()
+	router.ServeHTTP(recMismatch, reqMismatch)
+
+	if recMismatch.Code != http.StatusOK {
+		t.Errorf("expected 200 for mismatched ETag, got %d", recMismatch.Code)
+	}
+}
+
+func TestGetZones_CacheControlAndETag(t *testing.T) {
+	router, _ := setupTestRouter()
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/zones", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	cc := rec.Header().Get("Cache-Control")
+	if cc != CatalogCacheControl {
+		t.Errorf("expected Cache-Control %q, got %q", CatalogCacheControl, cc)
+	}
+
+	etag := rec.Header().Get("ETag")
+	if etag == "" || !strings.HasPrefix(etag, `"`) || !strings.HasSuffix(etag, `"`) {
+		t.Fatalf("expected valid quoted ETag, got %q", etag)
+	}
+
+	// Conditional request
+	reqCond, _ := http.NewRequest(http.MethodGet, "/api/zones", nil)
+	reqCond.Header.Set("If-None-Match", etag)
+	recCond := httptest.NewRecorder()
+	router.ServeHTTP(recCond, reqCond)
+
+	if recCond.Code != http.StatusNotModified {
+		t.Errorf("expected 304 Not Modified, got %d", recCond.Code)
+	}
+	if recCond.Body.Len() != 0 {
+		t.Errorf("expected empty body on 304, got %d bytes", recCond.Body.Len())
 	}
 }

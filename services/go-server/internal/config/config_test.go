@@ -889,3 +889,60 @@ func TestCleanEnv_UtilityFunction(t *testing.T) {
 		t.Errorf("expected 'hello world', got %q", cleaned)
 	}
 }
+
+func TestLoadConfig_AllowedOrigins_Default(t *testing.T) {
+	_ = os.Unsetenv("ALLOWED_ORIGINS")
+
+	cfg := config.LoadConfig()
+	if len(cfg.AllowedOrigins) != len(config.DefaultAllowedOrigins) {
+		t.Fatalf("expected %d default allowed origins, got %d", len(config.DefaultAllowedOrigins), len(cfg.AllowedOrigins))
+	}
+	if cfg.AllowedOrigins[0] != "http://localhost:3000" {
+		t.Errorf("expected first origin http://localhost:3000, got %q", cfg.AllowedOrigins[0])
+	}
+}
+
+func TestLoadConfig_AllowedOrigins_Custom(t *testing.T) {
+	_ = os.Setenv("ALLOWED_ORIGINS", " https://custom1.domain.com , https://custom2.domain.com/ ")
+	defer func() {
+		_ = os.Unsetenv("ALLOWED_ORIGINS")
+	}()
+
+	cfg := config.LoadConfig()
+	if len(cfg.AllowedOrigins) != 2 {
+		t.Fatalf("expected 2 custom allowed origins, got %d", len(cfg.AllowedOrigins))
+	}
+	if cfg.AllowedOrigins[0] != "https://custom1.domain.com" {
+		t.Errorf("expected https://custom1.domain.com, got %q", cfg.AllowedOrigins[0])
+	}
+	if cfg.AllowedOrigins[1] != "https://custom2.domain.com/" {
+		t.Errorf("expected https://custom2.domain.com/, got %q", cfg.AllowedOrigins[1])
+	}
+}
+
+func TestLoadConfig_CFAccess_Config(t *testing.T) {
+	_ = os.Setenv("CF_ACCESS_AUDIENCE", "test-aud-123")
+	_ = os.Setenv("CF_ACCESS_TEAM_NAME", "myteam")
+	_ = os.Setenv("CF_ACCESS_CLIENT_ID", "test-client-id")
+	_ = os.Setenv("CF_ACCESS_CLIENT_SECRET", "test-client-secret")
+	defer func() {
+		_ = os.Unsetenv("CF_ACCESS_AUDIENCE")
+		_ = os.Unsetenv("CF_ACCESS_TEAM_NAME")
+		_ = os.Unsetenv("CF_ACCESS_CLIENT_ID")
+		_ = os.Unsetenv("CF_ACCESS_CLIENT_SECRET")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.CFAccessAudience != "test-aud-123" {
+		t.Errorf("expected CFAccessAudience=test-aud-123, got %q", cfg.CFAccessAudience)
+	}
+	if cfg.CFAccessCertsURL != "https://myteam.cloudflareaccess.com/cdn-cgi/access/certs" {
+		t.Errorf("expected CFAccessCertsURL='https://myteam.cloudflareaccess.com/cdn-cgi/access/certs', got %q", cfg.CFAccessCertsURL)
+	}
+	if cfg.CFAccessClientID != "test-client-id" {
+		t.Errorf("expected CFAccessClientID=test-client-id, got %q", cfg.CFAccessClientID)
+	}
+	if cfg.CFAccessClientSecret != "test-client-secret" {
+		t.Errorf("expected CFAccessClientSecret=test-client-secret, got %q", cfg.CFAccessClientSecret)
+	}
+}

@@ -1,4 +1,4 @@
-# Lesson 86: Physical Depth Hazard Classification — Evidence of Impasse, Not of Safety
+# Lesson 90: Physical Depth Hazard Classification — Evidence of Impasse, Not of Safety
 
 ## Navigation Aid & Quick Reference
 

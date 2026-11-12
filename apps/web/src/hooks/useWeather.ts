@@ -60,22 +60,65 @@ export function useWeather(): UseWeatherReturn {
   }, []);
 
   useEffect(() => {
-    fetchData();
+    let isCancelled = false;
+    let intervalId: NodeJS.Timeout | null = null;
 
-    const interval = setInterval(() => {
-      fetchData();
-    }, REFRESH_INTERVAL_MS);
+    const startPolling = () => {
+      if (intervalId) return;
+      intervalId = setInterval(() => {
+        if (!isCancelled && (typeof document === 'undefined' || document.visibilityState !== 'hidden')) {
+          fetchData();
+        }
+      }, REFRESH_INTERVAL_MS);
+    };
 
-    const handleFocus = () => {
-      if (Date.now() - lastFetchedRef.current > REFRESH_INTERVAL_MS) {
-        fetchData();
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
       }
     };
 
-    window.addEventListener('focus', handleFocus);
+    const handleVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState === 'visible') {
+        fetchData();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+
+    const handleFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        if (Date.now() - lastFetchedRef.current > 5000) {
+          fetchData();
+        }
+      }
+    };
+
+    // Initial fetch and start polling if visible
+    if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+      fetchData();
+      startPolling();
+    }
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleFocus);
+    }
+
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      isCancelled = true;
+      stopPolling();
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleFocus);
+      }
     };
   }, [fetchData]);
 

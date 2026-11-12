@@ -1157,7 +1157,7 @@ function buildMarkdown(context) {
     .sort(([a], [b]) => Number(a.slice(1)) - Number(b.slice(1)))
     .map(([id, r]) => {
       const verdict = r.passed ? '**PASS**' : r.status === 'BLOCKED' ? '**BLOCKED**' : '**FAIL**';
-      const observed = observationFor(id, r).replace(/\|/g, '\\|');
+      const observed = observationFor(id, r).replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
       return `| ${id} | ${r.scenario} | ${verdict} | ${observed} | ${r.screenshot ? `\`${r.screenshot}\`` : '—'} |`;
     })
     .join('\n');
