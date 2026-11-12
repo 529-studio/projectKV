@@ -443,15 +443,13 @@ class TestMeasuredGateBoundaries(unittest.TestCase):
         self.assertFalse(passed)
         self.assertTrue(any("roadway" in f and "dropped" in f for f in failures))
 
-    @unittest.expectedFailure
     def test_class_drop_of_exactly_0_020_is_allowed(self):
-        """Boundary defect found by this suite: 0.721 - 0.741 is -0.020000000000000018.
+        """A drop of exactly the documented tolerance is allowed.
 
-        ``evaluate_retraining_gate`` compares the raw float delta against
-        ``-0.020``, so a drop of exactly the documented tolerance is reported as
-        a violation. The spec allows a drop of 0.02 ("no drop > 0.02"). Fix by
-        comparing ``round(delta, 4)`` or by allowing a 1e-9 epsilon, then remove
-        this expectedFailure marker.
+        0.721 - 0.741 is -0.020000000000000018 in IEEE-754, so comparing the raw
+        float delta against ``-0.020`` reported a compliant model as a violation.
+        ``evaluate_retraining_gate`` now rounds the delta to four decimals before
+        the comparison; this test pins that behaviour.
         """
         baseline = V1_BASELINE_METRICS["class_iou"]["roadway"]
 

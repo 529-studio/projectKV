@@ -53,12 +53,15 @@ import json
 import logging
 import math
 import os
+import re
 import shutil
+import statistics
 import sys
 import tempfile
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logging.basicConfig(
     level=logging.INFO,
@@ -97,9 +100,13 @@ V2_GATE_THRESHOLDS = {
     "water_puddle_iou_min": 0.612,       # +0.03 over v1's 0.582
     "mask_map50_95_min": 0.496,          # Non-regression on mask mAP50-95
     "max_class_iou_drop": 0.020,         # No class IoU drop beyond 0.02
+    "max_stability_margin": 0.020,       # best epoch <= last-10 median + 0.02 (anti-cherry-pick)
     "p95_latency_ms_max": 25.0,          # Budget ceiling at 416 px on AVX2 worker
     "model_size_mb_max": 10.0,           # OpenVINO FP16 model size ceiling
 }
+
+# Minimum completed epochs for a run to qualify as evidence (AC10).
+MIN_EVIDENCE_EPOCHS = 50
 
 # Authentic-weight acceptance floor (Issue #399): the committed stub was 65,536 B.
 MIN_EXPORT_BIN_MB = 6.0
@@ -144,6 +151,218 @@ CANONICAL_V2_METRICS: Dict[str, Any] = {
     },
 }
 
+# Fields §5.2 of docs/sprints/s12_t5_spec.md requires in a measured val_metrics.json.
+VAL_METRICS_REQUIRED_FIELDS = (
+    "provenance",
+    "split",
+    "conf",
+    "iou",
+    "imgsz",
+    "weights_sha256",
+    "dataset_manifest_sha256",
+    "split_sha256",
+    "generated_at",
+    "epochs_completed",
+    "best_epoch",
+    "mask_map50",
+    "mask_map50_95",
+    "class_iou",
+    "stability",
+)
+
+REFERENCE_PROVENANCE_TOKENS = ("reference baseline", "reference_baseline", "canonical_v2_metrics")
+
+
+def _is_reference_provenance(value: Any) -> bool:
+    """True when a provenance string admits the numbers were not measured."""
+    text = str(value or "").strip().lower()
+    return any(token in text for token in REFERENCE_PROVENANCE_TOKENS)
+
+
+def derive_head_status(reinitialised_tensors: Optional[int]) -> str:
+    """A head is `trained` only when zero tensors had to be re-initialised.
+
+    Anything else (a COCO 80-class head re-headed to 6 classes, or an unknown
+    build stat) is untrained, and untrained weights must never be promoted:
+    they emit zero detections and the cv-engine reports CLEAR everywhere.
+    """
+    if reinitialised_tensors is None:
+        return "reinitialised_untrained"
+    return "trained" if int(reinitialised_tensors) == 0 else "reinitialised_untrained"
+
+
+def build_training_metadata_block(
+    dataset_manifest_sha256: str,
+    split_sha256: str,
+    best_pt_sha256: str,
+    val_metrics_sha256: str,
+    git_sha: str,
+    gpu: str,
+    epochs: int,
+    gate_verdict: str,
+    trained_at: str,
+) -> Dict[str, Any]:
+    """The `training` provenance block written into metadata.yaml (spec §2.8)."""
+    return {
+        "dataset_manifest_sha256": str(dataset_manifest_sha256),
+        "split_sha256": str(split_sha256),
+        "best_pt_sha256": str(best_pt_sha256),
+        "val_metrics_sha256": str(val_metrics_sha256),
+        "git_sha": str(git_sha),
+        "gpu": str(gpu),
+        "epochs": int(epochs),
+        "gate_verdict": str(gate_verdict),
+        "trained_at": str(trained_at),
+    }
+
+
+def load_val_metrics(path: Path) -> Dict[str, Any]:
+    """Load a measured `val_metrics.json` and refuse anything unmeasured.
+
+    The gate exists to certify a measurement, so this loader is deliberately
+    strict: every §5.2 field must be present, the class order must match the
+    canonical six, the provenance must name the run artifact rather than a
+    copied report constant, and the anti-cherry-pick margin must hold.
+    """
+    path = Path(path)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"val_metrics file not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"val_metrics file {path} is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"val_metrics file {path} is not a JSON object")
+
+    missing = [field for field in VAL_METRICS_REQUIRED_FIELDS if field not in payload]
+    if missing:
+        raise ValueError(
+            f"val_metrics {path} is missing required field(s): {', '.join(missing)}"
+        )
+
+    provenance = payload.get("provenance")
+    if _is_reference_provenance(provenance):
+        raise ValueError(
+            f"val_metrics provenance '{provenance}' is a reference baseline, not a measured "
+            f"run artifact; a gate may only PASS on numbers produced by model.val()"
+        )
+
+    class_iou = payload.get("class_iou")
+    if not isinstance(class_iou, dict):
+        raise ValueError(f"val_metrics class_iou must be an object, got {type(class_iou).__name__}")
+    if list(class_iou) != TARGET_CLASSES:
+        raise ValueError(
+            f"val_metrics class_iou order {list(class_iou)} does not match the canonical class "
+            f"order {TARGET_CLASSES}; a reordered confusion matrix silently swaps roadway and "
+            f"water_puddle IoU"
+        )
+
+    if str(payload.get("split")) != "val":
+        raise ValueError(
+            f"val_metrics split must be 'val' (the frozen held-out split), got "
+            f"'{payload.get('split')}'"
+        )
+
+    stability = payload.get("stability") or {}
+    if not isinstance(stability, dict) or "best_minus_median" not in stability:
+        raise ValueError(
+            "val_metrics stability block must report best_minus_median over the last 10 epochs"
+        )
+    margin = round(float(stability["best_minus_median"]), 4)
+    if margin > V2_GATE_THRESHOLDS["max_stability_margin"]:
+        raise ValueError(
+            f"val_metrics stability margin {margin:.4f} exceeds the "
+            f"{V2_GATE_THRESHOLDS['max_stability_margin']:.4f} anti-cherry-pick ceiling; the "
+            f"best epoch is a single lucky epoch, not a stable model"
+        )
+
+    epochs_completed = int(payload.get("epochs_completed") or 0)
+    if epochs_completed < MIN_EVIDENCE_EPOCHS:
+        logging.warning(
+            "val_metrics reports only %d completed epoch(s); AC10 requires >= %d for evidence",
+            epochs_completed,
+            MIN_EVIDENCE_EPOCHS,
+        )
+
+    try:
+        generated = datetime.fromisoformat(str(payload.get("generated_at")).replace("Z", "+00:00"))
+    except ValueError:
+        generated = None
+    if generated is not None:
+        if generated.tzinfo is None:
+            raise ValueError("val_metrics generated_at must carry a timezone offset")
+        if generated > datetime.now(timezone.utc) + timedelta(seconds=300):
+            raise ValueError(
+                f"val_metrics generated_at {payload.get('generated_at')} is in the future; "
+                f"evidence may not be pre-dated (ADR-013 D1)"
+            )
+
+    normalized = dict(payload)
+    normalized["class_iou"] = {name: float(class_iou[name]) for name in TARGET_CLASSES}
+    return normalized
+
+
+def verify_metric_binding(
+    metrics: Dict[str, Any], run_manifest: Dict[str, Any]
+) -> None:
+    """The dataset/split SHA in val_metrics.json must equal the run manifest's."""
+    for field in ("dataset_manifest_sha256", "split_sha256"):
+        measured = str(metrics.get(field) or "")
+        bound = str(run_manifest.get(field) or "")
+        if bound and measured != bound:
+            raise ValueError(
+                f"{field} mismatch: val_metrics reports {measured or '<missing>'} but the run "
+                f"manifest binds {bound}; these metrics were not measured on this run's dataset"
+            )
+
+
+def compute_epoch_stability(epochs: Sequence[float]) -> Dict[str, Any]:
+    """Report the best epoch against the median of the last 10 epochs.
+
+    A gate that reads only `best.pt` rewards a single lucky epoch. Requiring the
+    best epoch to stay within 0.02 of the trailing median proves the model
+    improved, not that the validation set happened to smile once.
+    """
+    values = [float(value) for value in epochs]
+    if not values:
+        return {
+            "best_map50_95": 0.0,
+            "last10_median_map50_95": 0.0,
+            "best_minus_median": 0.0,
+            "stable": False,
+            "epochs": 0,
+        }
+    best = max(values)
+    last10 = values[-10:]
+    median = statistics.median(last10)
+    margin = round(best - median, 4)
+    return {
+        "best_map50_95": round(best, 4),
+        "last10_median_map50_95": round(float(median), 4),
+        "best_minus_median": margin,
+        "stable": margin <= V2_GATE_THRESHOLDS["max_stability_margin"],
+        "epochs": len(values),
+    }
+
+
+def assert_epoch_stability(epochs: Sequence[float]) -> List[str]:
+    """Return the stability failures for an epoch series (empty means stable)."""
+    values = [float(value) for value in epochs]
+    if len(values) < 10:
+        return [
+            f"epoch stability cannot be claimed from {len(values)} epoch(s); at least 10 "
+            f"epochs are required to compute the trailing median"
+        ]
+    stability = compute_epoch_stability(values)
+    if stability["stable"]:
+        return []
+    return [
+        f"epoch stability margin {stability['best_minus_median']:.4f} exceeds "
+        f"{V2_GATE_THRESHOLDS['max_stability_margin']:.4f}: the best epoch "
+        f"({stability['best_map50_95']:.4f}) is a cherry-picked outlier above the last-10 "
+        f"median ({stability['last10_median_map50_95']:.4f})"
+    ]
+
 
 def evaluate_retraining_gate(
     metrics: Optional[Dict[str, Any]] = None,
@@ -167,6 +386,10 @@ def evaluate_retraining_gate(
     labels the verdict as UNVERIFIED, and appends an unmeasured metric failure reason
     so bootstrap / export artifacts cannot falsely claim PASSED 100%.
 
+    A measured `metrics` dict additionally has to survive the anti-cherry-pick
+    check: when it carries a `stability` block, `best_minus_median` may not exceed
+    0.02, and a provenance that admits to being a reference baseline is refused.
+
     Returns (passed, evaluation_results, failure_reasons).
     """
     is_measured = metrics is not None
@@ -180,12 +403,28 @@ def evaluate_retraining_gate(
         "mask_map50_95": metrics.get("mask_map50_95", 0.0),
         "class_iou": metrics.get("class_iou", {}),
         "class_deltas": {},
+        "stability": metrics.get("stability") or {},
         "p95_latency_ms": p95_latency_ms,
         "model_size_mb": model_size_mb,
         "metrics_provenance": metrics_provenance,
         "gate_thresholds": V2_GATE_THRESHOLDS,
         "verdict": "FAILED",
     }
+
+    if is_measured:
+        if _is_reference_provenance(metrics_provenance) or _is_reference_provenance(
+            metrics.get("provenance")
+        ):
+            failures.append(
+                "metrics provenance names a reference baseline rather than a measured run "
+                "artifact; a gate cannot PASS on copied constants"
+            )
+        measured_classes = list(metrics.get("class_iou", {}))
+        if measured_classes and measured_classes != TARGET_CLASSES:
+            failures.append(
+                f"class order {measured_classes} does not match the canonical order "
+                f"{TARGET_CLASSES}; a reordered confusion matrix swaps class IoU silently"
+            )
 
     # 1. water_puddle IoU check (target >= 0.612)
     puddle_iou = eval_summary["puddle_iou"]
@@ -206,21 +445,35 @@ def evaluate_retraining_gate(
     # 3. Class IoU non-regression check (no class drop > 0.02 vs v1)
     for cls_name, v1_iou in V1_BASELINE_METRICS["class_iou"].items():
         v2_iou = metrics.get("class_iou", {}).get(cls_name, 0.0)
-        delta = v2_iou - v1_iou
-        eval_summary["class_deltas"][cls_name] = round(delta, 4)
+        # Round before comparing: 0.721 - 0.741 is -0.020000000000000018 in IEEE-754,
+        # which would report a drop of exactly the documented tolerance as a violation.
+        delta = round(v2_iou - v1_iou, 4)
+        eval_summary["class_deltas"][cls_name] = delta
         if delta < -V2_GATE_THRESHOLDS["max_class_iou_drop"]:
             failures.append(
                 f"Class '{cls_name}' IoU dropped by {abs(delta):.4f} "
                 f"(exceeds allowed max drop {V2_GATE_THRESHOLDS['max_class_iou_drop']:.4f})"
             )
 
-    # 4. Latency p95 check (target <= 25.0 ms)
+    # 4. Anti-cherry-pick stability margin (best epoch vs last-10 median)
+    stability = eval_summary["stability"] if isinstance(eval_summary["stability"], dict) else {}
+    if stability and "best_minus_median" in stability:
+        margin = round(float(stability["best_minus_median"]), 4)
+        eval_summary["stability_margin"] = margin
+        if margin > V2_GATE_THRESHOLDS["max_stability_margin"]:
+            failures.append(
+                f"epoch stability margin {margin:.4f} exceeds "
+                f"{V2_GATE_THRESHOLDS['max_stability_margin']:.4f}: the best epoch is a "
+                f"cherry-picked outlier above the last-10 median"
+            )
+
+    # 5. Latency p95 check (target <= 25.0 ms)
     if p95_latency_ms > V2_GATE_THRESHOLDS["p95_latency_ms_max"]:
         failures.append(
             f"p95 latency {p95_latency_ms:.2f} ms exceeds 25.0 ms ceiling"
         )
 
-    # 5. Model size check (target < 10.0 MB)
+    # 6. Model size check (target < 10.0 MB)
     if model_size_mb > V2_GATE_THRESHOLDS["model_size_mb_max"]:
         failures.append(
             f"Model size {model_size_mb:.2f} MB exceeds 10.0 MB ceiling"
@@ -469,6 +722,105 @@ def build_segmentation_model(
     return model, stats
 
 
+def _git_sha() -> str:
+    """Best-effort clean-tree commit SHA; empty when the repo cannot be read."""
+    import subprocess
+
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    value = completed.stdout.strip() if completed.returncode == 0 else ""
+    return value if re.fullmatch(r"[0-9a-f]{7,40}", value) else ""
+
+
+def _detect_gpu() -> str:
+    """Name the training GPU, or state honestly that none is visible."""
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return torch.cuda.get_device_name(0)
+    except Exception:  # noqa: BLE001 - torch is optional on the export host
+        pass
+    return "unavailable"
+
+
+def build_training_block_from_artifacts(
+    source_weights: Path,
+    metrics_path: Optional[Path] = None,
+    dataset_manifest_path: Optional[Path] = None,
+    training_context: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Bind the exported weights to the dataset, split and measured metrics.
+
+    Returns ``None`` when a SHA is unavailable: an incomplete provenance block is
+    worse than none, because a reader would trust fields that were never bound.
+    """
+    context = dict(training_context or {})
+    metrics: Dict[str, Any] = {}
+    metrics_file = Path(metrics_path) if metrics_path else None
+    if metrics_file is not None and metrics_file.is_file():
+        try:
+            payload = json.loads(metrics_file.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                metrics = payload
+        except json.JSONDecodeError:
+            metrics = {}
+
+    dataset_sha = str(metrics.get("dataset_manifest_sha256") or "")
+    if not dataset_sha and dataset_manifest_path:
+        manifest_file = Path(dataset_manifest_path)
+        if manifest_file.is_file():
+            dataset_sha = _sha256(manifest_file)
+    split_sha = str(metrics.get("split_sha256") or "")
+    val_metrics_sha = _sha256(metrics_file) if metrics_file and metrics_file.is_file() else ""
+    weights_sha = _sha256(Path(source_weights))
+
+    block = build_training_metadata_block(
+        dataset_manifest_sha256=dataset_sha,
+        split_sha256=split_sha,
+        best_pt_sha256=weights_sha,
+        val_metrics_sha256=val_metrics_sha,
+        git_sha=str(context.get("git_sha") or _git_sha()),
+        gpu=str(context.get("gpu") or _detect_gpu()),
+        epochs=int(context.get("epochs") or metrics.get("epochs_completed") or 0),
+        gate_verdict=str(
+            context.get("gate_verdict") or metrics.get("gate_verdict") or "UNVERIFIED"
+        ),
+        trained_at=str(
+            metrics.get("generated_at")
+            or context.get("trained_at")
+            or time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        ),
+    )
+
+    required = (
+        "dataset_manifest_sha256",
+        "split_sha256",
+        "best_pt_sha256",
+        "val_metrics_sha256",
+    )
+    missing = [name for name in required if not re.fullmatch(r"[0-9a-f]{64}", block[name])]
+    if missing:
+        logging.warning(
+            "Training provenance block incomplete: %s. Pass --metrics <val_metrics.json> "
+            "(and --dataset-manifest) so the export can bind the dataset and split SHAs.",
+            ", ".join(missing),
+        )
+        return None
+    if not re.fullmatch(r"[0-9a-f]{7,40}", block["git_sha"]):
+        logging.warning("Training provenance block incomplete: git_sha could not be resolved")
+        return None
+    return block
+
+
 def export_to_openvino_fp16(
     model_or_onnx_path: Path,
     export_dir: Path,
@@ -477,6 +829,9 @@ def export_to_openvino_fp16(
     dry_run: bool = False,
     dynamic: bool = True,
     allow_untrained_head: bool = False,
+    metrics_path: Optional[Path] = None,
+    dataset_manifest_path: Optional[Path] = None,
+    training_context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[Path], Optional[Path]]:
     """
     Exports a trained PyTorch checkpoint to authentic OpenVINO FP16 IR:
@@ -611,12 +966,10 @@ def export_to_openvino_fp16(
             loaded = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
             if isinstance(loaded, dict):
                 metadata = loaded
-        head_status = "trained"
-        if build_stats is None:
-            head_status = "converted_external_graph"
-        elif build_stats["reinitialised_tensors"]:
-            head_status = "reinitialised_untrained"
-        metadata["projectkv"] = {
+        head_status = "converted_external_graph"
+        if build_stats is not None:
+            head_status = derive_head_status(build_stats["reinitialised_tensors"])
+        provenance: Dict[str, Any] = {
             "head_status": head_status,
             "class_names": TARGET_CLASSES[:nc],
             "class_count": nc,
@@ -629,6 +982,18 @@ def export_to_openvino_fp16(
             "export_imgsz": imgsz,
             "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
+        if head_status == "trained":
+            # head_status is written from build stats, never hand-edited: `trained`
+            # means exactly zero re-initialised tensors (spec §2.8 / AC14).
+            training_block = build_training_block_from_artifacts(
+                source_weights=source,
+                metrics_path=metrics_path,
+                dataset_manifest_path=dataset_manifest_path,
+                training_context=training_context,
+            )
+            if training_block is not None:
+                provenance["training"] = training_block
+        metadata["projectkv"] = provenance
         metadata_path.write_text(yaml.safe_dump(metadata, sort_keys=False), encoding="utf-8")
         if head_status != "trained":
             logging.warning(
@@ -893,6 +1258,7 @@ def train_yolov8_seg(
     export_openvino_dir: Optional[Path] = None,
     dry_run: bool = False,
     nc: int = len(TARGET_CLASSES),
+    seed: int = 42,
 ) -> Dict[str, Any]:
     """
     Executes YOLOv8 segmentation training and exports a real OpenVINO FP16 model.
@@ -915,6 +1281,7 @@ def train_yolov8_seg(
         "imgsz": imgsz,
         "batch": batch,
         "nc": nc,
+        "seed": seed,
         "dry_run": dry_run,
         "train_completed": False,
         "exported_openvino": False,
@@ -964,6 +1331,18 @@ def train_yolov8_seg(
             workers=workers,
             project=str(output_dir),
             name="train_yolov8n_seg",
+            seed=seed,
+            deterministic=True,
+            patience=25,
+            optimizer="AdamW",
+            lr0=0.001,
+            lrf=0.01,
+            weight_decay=0.0005,
+            warmup_epochs=3,
+            amp=True,
+            flipud=0.0,
+            degrees=0.0,
+            close_mosaic=10,
         )
         result_stats["train_completed"] = True
 
@@ -1010,6 +1389,13 @@ def run_export_only(args: argparse.Namespace) -> Dict[str, Any]:
         dry_run=False,
         dynamic=not args.static,
         allow_untrained_head=args.allow_untrained_head,
+        metrics_path=args.metrics,
+        dataset_manifest_path=args.dataset_manifest,
+        training_context={
+            "gpu": args.gpu,
+            "epochs": args.epochs,
+            "gate_verdict": "UNVERIFIED",
+        },
     )
     evidence = verify_openvino_ir(
         xml_p,
@@ -1142,6 +1528,38 @@ def parse_args():
         help="Evaluate quantitative retraining benchmark gate against held-out validation criteria",
     )
     parser.add_argument(
+        "--metrics",
+        type=Path,
+        default=None,
+        help="Measured val_metrics.json from model.val() on the frozen val split "
+             "(mandatory for --verify-gate unless --allow-untrained-head)",
+    )
+    parser.add_argument(
+        "--dataset-manifest",
+        type=Path,
+        default=None,
+        help="Dataset manifest written by tools/eval/materialize_seg_dataset.py; binds the "
+             "export's training block to the dataset that produced the weights",
+    )
+    parser.add_argument(
+        "--run-manifest",
+        type=Path,
+        default=None,
+        help="Run manifest (run_manifest.json) whose dataset/split SHAs must match --metrics",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Training seed; the dataset split is frozen with the same seed (default: 42)",
+    )
+    parser.add_argument(
+        "--gpu",
+        type=str,
+        default="",
+        help="Training GPU identity recorded in metadata.yaml (default: auto-detect)",
+    )
+    parser.add_argument(
         "--test-rollback",
         action="store_true",
         help="Verify operational rollback procedure: fallback to detection model and recovery",
@@ -1182,10 +1600,55 @@ def main():
 
         # 3. Retraining benchmark gate evaluation
         if args.verify_gate:
+            # A PASS must be earned by a measured artifact. Without --metrics there is
+            # nothing to certify, so the only honest outcomes are exit 2 (refusal) or a
+            # bootstrap UNVERIFIED verdict that exits 1 and blocks promotion.
+            if args.metrics is None and not args.allow_untrained_head:
+                logging.error(
+                    "--verify-gate requires --metrics <val_metrics.json>: a gate PASS must come "
+                    "from a measured model.val() artifact, never from a copied constant. Pass "
+                    "--allow-untrained-head only for a bootstrap run whose verdict stays "
+                    "UNVERIFIED."
+                )
+                sys.exit(2)
+
+            measured_metrics: Optional[Dict[str, Any]] = None
+            if args.metrics is not None:
+                try:
+                    measured_metrics = load_val_metrics(args.metrics)
+                except ValueError as exc:
+                    logging.error("Measured metrics refused: %s", exc)
+                    sys.exit(1)
+                if args.run_manifest is not None:
+                    try:
+                        run_manifest = json.loads(
+                            Path(args.run_manifest).read_text(encoding="utf-8")
+                        )
+                        verify_metric_binding(measured_metrics, run_manifest)
+                    except (OSError, json.JSONDecodeError, ValueError) as exc:
+                        logging.error("Run-manifest binding failed: %s", exc)
+                        sys.exit(1)
+
             # Gate inputs are measured from the artifact when available.
             size_mb = evidence["total_size_mb"] if evidence else None
             p95_ms = evidence["latency_p95_ms"] if evidence else None
+            if measured_metrics is not None:
+                if size_mb is None:
+                    size_mb = measured_metrics.get("model_size_mb")
+                if p95_ms is None:
+                    p95_ms = measured_metrics.get("p95_latency_ms")
+                if size_mb is None or p95_ms is None:
+                    logging.error(
+                        "--metrics was supplied without a measured IR: run --export-only in the "
+                        "same invocation (or record p95_latency_ms and model_size_mb in the "
+                        "metrics artifact) so latency and size are measured, not assumed."
+                    )
+                    sys.exit(2)
+
             gate_kwargs: Dict[str, Any] = {}
+            if measured_metrics is not None:
+                gate_kwargs["metrics"] = measured_metrics
+                gate_kwargs["metrics_provenance"] = str(args.metrics)
             if size_mb is not None:
                 gate_kwargs["model_size_mb"] = size_mb
             if p95_ms is not None:
@@ -1197,22 +1660,44 @@ def main():
             logging.info("  water_puddle IoU:     %.4f (Threshold >= %.4f)", summary["puddle_iou"], V2_GATE_THRESHOLDS["water_puddle_iou_min"])
             logging.info("  Mask mAP50-95:        %.4f (Threshold >= %.4f)", summary["mask_map50_95"], V2_GATE_THRESHOLDS["mask_map50_95_min"])
             logging.info("  Class IoU Deltas:     %s", summary["class_deltas"])
+            if summary.get("stability_margin") is not None:
+                logging.info(
+                    "  Stability margin:     %.4f (Threshold <= %.4f)",
+                    summary["stability_margin"],
+                    V2_GATE_THRESHOLDS["max_stability_margin"],
+                )
             logging.info("  p95 Latency:          %.2f ms (Threshold <= %.2f ms)", summary["p95_latency_ms"], V2_GATE_THRESHOLDS["p95_latency_ms_max"])
             logging.info("  Model Size:           %.2f MiB (Threshold <= %.2f MiB)", summary["model_size_mb"], V2_GATE_THRESHOLDS["model_size_mb_max"])
             report["gate"] = summary
             if not passed:
-                if getattr(args, "allow_untrained_head", False) and summary["verdict"] == "UNVERIFIED":
+                if args.allow_untrained_head and summary["verdict"] == "UNVERIFIED":
                     logging.warning(
-                        "Quantitative benchmark gate is UNVERIFIED (held-out metrics unmeasured for bootstrap IR). "
-                        "Permitted on staging artifact under --allow-untrained-head."
+                        "Quantitative benchmark gate is UNVERIFIED (held-out metrics unmeasured "
+                        "for bootstrap IR). Permitted on staging artifact under "
+                        "--allow-untrained-head; promotion is blocked."
                     )
-                else:
-                    logging.error("Benchmark gate failed with %d violation(s):", len(failures))
-                    for f in failures:
-                        logging.error("  - %s", f)
+                    if args.report:
+                        args.report.parent.mkdir(parents=True, exist_ok=True)
+                        args.report.write_text(
+                            json.dumps(report, indent=2) + "\n", encoding="utf-8"
+                        )
                     sys.exit(1)
+                logging.error("Benchmark gate failed with %d violation(s):", len(failures))
+                for f in failures:
+                    logging.error("  - %s", f)
+                sys.exit(1)
             else:
                 logging.info("Quantitative benchmark gate PASSED 100%% (%s)!", summary["verdict"])
+                if not args.export_only:
+                    # --verify-gate is a verification mode: it certifies an artifact that
+                    # already exists and must never roll into a training run.
+                    if args.report:
+                        args.report.parent.mkdir(parents=True, exist_ok=True)
+                        args.report.write_text(
+                            json.dumps(report, indent=2) + "\n", encoding="utf-8"
+                        )
+                        logging.info("Evidence written to %s", args.report)
+                    return
 
         if args.export_only:
             if args.report:
@@ -1237,6 +1722,7 @@ def main():
             export_openvino_dir=args.export_openvino,
             dry_run=args.dry_run,
             nc=args.nc,
+            seed=args.seed,
         )
 
         logging.info("Training pipeline result summary:")
