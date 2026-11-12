@@ -16,7 +16,7 @@ func TestServer_RateLimiting_BlocksBurstAndExemptsHealth(t *testing.T) {
 		t.Fatalf("resolve cameras path: %v", err)
 	}
 
-	cmd := exec.Command("go", "run", "./main.go")
+	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = "."
 	var outputBuf bytes.Buffer
 	cmd.Stdout = &outputBuf

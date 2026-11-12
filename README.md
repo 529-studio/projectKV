@@ -71,10 +71,14 @@ hcm-traffic-cameras/
 ├── services/
 │   ├── go-server/                     # [BACKEND — Go] Single static binary (Gin + SQLite + R2 Storage)
 │   │   ├── cmd/
-│   │   │   ├── server/main.go         # Composition root, routing, graceful shutdown
-│   │   │   ├── notify-preview/main.go # CLI for single-source Telegram flood alert message preview
-│   │   │   ├── sync-proofs/main.go    # High-concurrency Cloudflare R2 proofs sync CLI
-│   │   │   └── verify-r2/main.go      # Cloudflare R2 connectivity verification tool
+│   │   │   ├── server/
+│   │   │   │   ├── main.go
+│   │   │   │   ├── adapters.go
+│   │   │   │   ├── jobs.go
+│   │   │   │   └── routes.go
+│   │   │   ├── notify-preview/main.go
+│   │   │   ├── sync-proofs/main.go
+│   │   │   └── verify-r2/main.go
 │   │   └── internal/
 │   │       ├── live/                  # Server-Sent Events (SSE) hub & live stream endpoint
 │   │       ├── camera/                # Camera catalog, Phường indexing, query endpoints

@@ -1,743 +1,42 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
-	_ "github.com/529-studio/projectKV/services/go-server/docs"
+	"github.com/gin-gonic/gin"
+
 	"github.com/529-studio/projectKV/services/go-server/internal/archiver"
 	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
 	"github.com/529-studio/projectKV/services/go-server/internal/corridor"
-	"github.com/529-studio/projectKV/services/go-server/internal/cvclient"
-	"github.com/529-studio/projectKV/services/go-server/internal/feedback"
-	"github.com/529-studio/projectKV/services/go-server/internal/flood"
-	"github.com/529-studio/projectKV/services/go-server/internal/forecast"
-	"github.com/529-studio/projectKV/services/go-server/internal/harvester"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
-	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
-	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/notify"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
-	"github.com/529-studio/projectKV/services/go-server/internal/storage"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
 	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
 	"github.com/529-studio/projectKV/services/go-server/internal/telegrambot"
 	"github.com/529-studio/projectKV/services/go-server/internal/tilecache"
 	"github.com/529-studio/projectKV/services/go-server/internal/weather"
 	"github.com/529-studio/projectKV/services/go-server/internal/ws"
-
-	"github.com/gin-contrib/gzip"
-	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
-
-// verdictStoreAdapter adapts *store.VerdictRepo to hotset.VerdictStorer
-// (Dependency Inversion Principle: consumer package hotset defines the interface,
-// composition root adapts the persistent store).
-type verdictStoreAdapter struct {
-	repo *store.VerdictRepo
-}
-
-// hotsetVerdictFromStore converts a persisted verdict into the in-memory/API shape.
-//
-// It is the single mapping used both by the GET endpoints (verdictStoreAdapter) and by
-// the boot-time hydration of the in-memory store. Duplicating that mapping is how a new
-// column silently reaches SQLite and never reaches the wire (Issue #401 AC11).
-func hotsetVerdictFromStore(v store.Verdict) hotset.Verdict {
-	return hotset.Verdict{
-		CameraID:             v.CameraID,
-		Severity:             v.Severity,
-		FloodSeverity:        v.FloodSeverity,
-		Confidence:           v.Confidence,
-		Source:               v.Source,
-		ObservedAt:           v.ObservedAt,
-		Timestamp:            v.Timestamp,
-		FloodDepthCm:         v.FloodDepthCm,
-		FloodHazardLevel:     v.FloodHazardLevel,
-		FloodHazardBasis:     v.FloodHazardBasis,
-		FloodDepthConfidence: v.FloodDepthConfidence,
-		FloodCalibrationRef:  v.FloodCalibrationRef,
-	}
-}
-
-func (a *verdictStoreAdapter) GetLatest() []hotset.Verdict {
-	if a.repo == nil {
-		return []hotset.Verdict{}
-	}
-	verdicts, err := a.repo.GetLatest(context.Background())
-	if err != nil {
-		log.Printf("[WARN] Failed to query latest verdicts: %v", err)
-		return []hotset.Verdict{}
-	}
-	out := make([]hotset.Verdict, len(verdicts))
-	for i, v := range verdicts {
-		out[i] = hotsetVerdictFromStore(v)
-	}
-	return out
-}
-
-// forecastHistoryAdapter adapts *store.VerdictHistoryRepo to forecast.HistoryReader
-// (Dependency Inversion Principle: consumer package forecast defines the interface,
-// composition root adapts the persistent store).
-type forecastHistoryAdapter struct {
-	repo *store.VerdictHistoryRepo
-}
-
-func (a *forecastHistoryAdapter) GetRecentByCamera(ctx context.Context, cameraID string, window time.Duration, limit int) ([]forecast.Observation, error) {
-	return a.GetRecentByCameraBefore(ctx, cameraID, time.Now().UTC(), window, limit)
-}
-
-func (a *forecastHistoryAdapter) GetRecentByCameraBefore(ctx context.Context, cameraID string, before time.Time, window time.Duration, limit int) ([]forecast.Observation, error) {
-	if a == nil || a.repo == nil {
-		return nil, fmt.Errorf("verdict history repo is nil")
-	}
-	rows, err := a.repo.GetRecentByCameraBefore(ctx, cameraID, before, window, limit)
-	if err != nil {
-		return nil, err
-	}
-	obs := make([]forecast.Observation, len(rows))
-	for i, r := range rows {
-		obs[i] = forecast.Observation{
-			CameraID:        r.CameraID,
-			PCUTotal:        r.PCUTotal,
-			SaturationIndex: r.SaturationIndex,
-			Severity:        r.Severity,
-			Confidence:      r.Confidence,
-			Source:          r.Source,
-			ObservedAt:      r.ObservedAt,
-		}
-	}
-	return obs, nil
-}
-
-// forecastCameraAdapter adapts camera.Reader to forecast.CameraCatalog.
-type forecastCameraAdapter struct {
-	catalog camera.Reader
-}
-
-func (a *forecastCameraAdapter) GetCamera(id string) (forecast.CameraInfo, bool) {
-	if a == nil || a.catalog == nil {
-		return forecast.CameraInfo{}, false
-	}
-	cam, ok := a.catalog.ByID(id)
-	if !ok || cam == nil {
-		return forecast.CameraInfo{}, false
-	}
-	return forecast.CameraInfo{
-		ID:           cam.ID,
-		RoadKey:      cam.RoadKey,
-		RoadKeys:     cam.RoadKeys,
-		BaseCapacity: cam.BaseCapacity,
-	}, true
-}
-
-// subscriptionTaxonomyAdapter adapts camera.Reader to subscription.TaxonomyProvider
-// (Dependency Inversion Principle: consumer package subscription defines the interface,
-// composition root adapts the catalog).
-type subscriptionTaxonomyAdapter struct {
-	catalog camera.Reader
-}
-
-func (a *subscriptionTaxonomyAdapter) Zones() []string {
-	if a == nil || a.catalog == nil {
-		return subscription.CanonicalZones
-	}
-	return a.catalog.Zones()
-}
-
-func (a *subscriptionTaxonomyAdapter) Wards() []subscription.WardInfo {
-	if a == nil || a.catalog == nil {
-		return nil
-	}
-	phuongs := a.catalog.Phuongs()
-	out := make([]subscription.WardInfo, len(phuongs))
-	for i, p := range phuongs {
-		out[i] = subscription.WardInfo{Type: p.Type, Name: p.Name}
-	}
-	return out
-}
-
-func (a *subscriptionTaxonomyAdapter) Chokepoints() []subscription.ChokepointInfo {
-	if a == nil || a.catalog == nil {
-		return nil
-	}
-	cams := a.catalog.All()
-	out := make([]subscription.ChokepointInfo, 0, len(cams))
-	for _, c := range cams {
-		name := c.DisplayName
-		if name == "" {
-			name = c.Title
-		}
-		out = append(out, subscription.ChokepointInfo{ID: c.ID, Name: name})
-	}
-	return out
-}
-
-func (a *subscriptionTaxonomyAdapter) HasZone(zone string) bool {
-	if a == nil || a.catalog == nil {
-		for _, z := range subscription.CanonicalZones {
-			if strings.EqualFold(z, zone) {
-				return true
-			}
-		}
-		return false
-	}
-	for _, z := range a.catalog.Zones() {
-		if strings.EqualFold(z, zone) {
-			return true
-		}
-	}
-	return false
-}
-
-func (a *subscriptionTaxonomyAdapter) HasWard(ward string) bool {
-	if a == nil || a.catalog == nil {
-		return false
-	}
-	trimmed := strings.TrimSpace(ward)
-	if trimmed == "" {
-		return false
-	}
-	for _, p := range a.catalog.Phuongs() {
-		if strings.EqualFold(p.Name, trimmed) || strings.EqualFold(p.Type+" "+p.Name, trimmed) {
-			return true
-		}
-	}
-	// Prefix-less check
-	target := trimmed
-	for _, prefix := range []string{"phường ", "xã ", "thị trấn "} {
-		if strings.HasPrefix(strings.ToLower(target), prefix) {
-			target = strings.TrimSpace(target[len(prefix):])
-			break
-		}
-	}
-	for _, p := range a.catalog.Phuongs() {
-		if strings.EqualFold(p.Name, target) {
-			return true
-		}
-	}
-	return false
-}
-
-func (a *subscriptionTaxonomyAdapter) HasChokepoint(id string) bool {
-	if a == nil || a.catalog == nil {
-		return false
-	}
-	_, ok := a.catalog.ByID(id)
-	return ok
-}
-
-// telegramBotStoreAdapter adapts the subscription SQLite store to
-// telegrambot.Store (Dependency Inversion: the bot package imports no internal
-// package, so the composition root maps the shapes, S12-T4 spec §4.1).
-type telegramBotStoreAdapter struct {
-	store *subscription.SQLiteStore
-}
-
-func (a *telegramBotStoreAdapter) Subscribe(ctx context.Context, channelName, chatID string, rec telegrambot.Record) error {
-	return a.store.Subscribe(ctx, subscription.Subscription{
-		ChannelName: channelName,
-		ChatID:      chatID,
-		TargetType:  subscription.TargetType(rec.TargetType),
-		TargetID:    rec.TargetID,
-		CreatedAt:   rec.CreatedAt,
-	})
-}
-
-func (a *telegramBotStoreAdapter) UnsubscribeAll(ctx context.Context, channelName, chatID string) (int64, error) {
-	return a.store.UnsubscribeAll(ctx, channelName, chatID)
-}
-
-func (a *telegramBotStoreAdapter) List(ctx context.Context, channelName, chatID string) ([]telegrambot.Record, error) {
-	subs, err := a.store.ListSubscriptions(ctx, channelName, chatID)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]telegrambot.Record, len(subs))
-	for i, sub := range subs {
-		out[i] = telegrambot.Record{
-			TargetType: string(sub.TargetType),
-			TargetID:   sub.TargetID,
-			CreatedAt:  sub.CreatedAt,
-		}
-	}
-	return out, nil
-}
-
-// telegramBotTaxonomyAdapter adapts the camera catalog to telegrambot.Taxonomy.
-// Canonicalisation is the security-relevant part: a deep link carries a raw id,
-// and only a value that resolves against the live catalog may reach the store.
-type telegramBotTaxonomyAdapter struct {
-	catalog camera.Reader
-}
-
-func (a *telegramBotTaxonomyAdapter) CanonicalZone(raw string) (string, bool) {
-	canonical, ok := subscription.NormalizeZone(raw)
-	if !ok {
-		return "", false
-	}
-	if a == nil || a.catalog == nil {
-		return canonical, true
-	}
-	for _, zone := range a.catalog.Zones() {
-		if strings.EqualFold(zone, canonical) {
-			return zone, true
-		}
-	}
-	return "", false
-}
-
-func (a *telegramBotTaxonomyAdapter) CanonicalWard(raw string) (string, bool) {
-	if a == nil || a.catalog == nil {
-		return "", false
-	}
-	name := stripWardPrefix(strings.TrimSpace(raw))
-	if name == "" {
-		return "", false
-	}
-	for _, phuong := range a.catalog.Phuongs() {
-		if strings.EqualFold(phuong.Name, name) {
-			return phuong.Name, true
-		}
-	}
-	return "", false
-}
-
-func (a *telegramBotTaxonomyAdapter) CanonicalChokepoint(id string) (string, bool) {
-	if a == nil || a.catalog == nil {
-		return "", false
-	}
-	cam, ok := a.catalog.ByID(strings.TrimSpace(id))
-	if !ok || cam == nil {
-		return "", false
-	}
-	return cam.ID, true
-}
-
-func (a *telegramBotTaxonomyAdapter) Label(target telegrambot.Target) string {
-	switch target.Type {
-	case "all":
-		return ""
-	case "zone":
-		if canonical, ok := a.CanonicalZone(target.ID); ok {
-			return canonical
-		}
-	case "ward":
-		if canonical, ok := a.CanonicalWard(target.ID); ok {
-			return canonical
-		}
-	case "chokepoint":
-		if a != nil && a.catalog != nil {
-			if cam, ok := a.catalog.ByID(target.ID); ok && cam != nil {
-				if cam.DisplayName != "" {
-					return cam.DisplayName
-				}
-				if cam.Title != "" {
-					return cam.Title
-				}
-				return cam.ID
-			}
-		}
-	}
-	return strings.TrimSpace(target.ID)
-}
-
-// stripWardPrefix tolerates "Phường ", "Xã " and "Thị trấn " prefixes from a
-// deep link; the stored value is always the bare administrative name (spec E3).
-func stripWardPrefix(raw string) string {
-	lower := strings.ToLower(raw)
-	for _, prefix := range []string{"phường ", "xã ", "thị trấn "} {
-		if strings.HasPrefix(lower, prefix) {
-			return strings.TrimSpace(raw[len(prefix):])
-		}
-	}
-	return raw
-}
-
-// telegramAPIBaseURL redirects outbound Bot API calls to a local capture
-// endpoint when the verifier links it in with -ldflags. Empty in every shipped
-// binary, so production always talks to api.telegram.org.
-var telegramAPIBaseURL string
-
-// criticalKeywords are used to prioritise well-known traffic choke points
-// (e.g. An Suong, Cat Lai port cluster, My Thuy, major corridors) when
-// seeding the Hot Set at startup. Vietnamese keywords are normalised to
-// lowercase for case-insensitive matching.
-var criticalKeywords = []string{
-	"an sương", "cát lái", "mỹ thủy", "ngã 4 ga", "quốc lộ 1",
-	"nguyễn văn linh", "điện biên phủ", "võ văn kiệt", "mai chí thọ",
-	"cộng hòa", "phạm văn đồng", "cầu sài gòn", "xô viết nghệ tĩnh",
-	"hành trình", "bình thái", "trường chinh", "quốc lộ 1", "ql1",
-}
-
-// priorityCorridors contains the priority arterial corridors confirmed in S1 Option 1b and S7-T5.
-// Reference: docs/spike-vehicle-capacity.md §5 and Issue #250.
-var priorityCorridors = map[string]struct{}{
-	"vo_van_kiet":   {},
-	"mai_chi_tho":   {},
-	"dien_bien_phu": {},
-	"cong_hoa":      {},
-	"truong_chinh":  {},
-	"quoc_lo_1":     {},
-}
-
-// buildFixedHotSet selects a deterministic set of critical cameras from the
-// loaded catalog to seed the Hot Set registry at startup. This guarantees the
-// mock/dev scheduler has cameras to analyse immediately, instead of waiting
-// for a user to view/pin a feed.
-func buildFixedHotSet(reader camera.Reader, maxCameras int) []hotset.Camera {
-	if reader == nil {
-		return nil
-	}
-	all := reader.All()
-	if len(all) == 0 {
-		return nil
-	}
-
-	// Filter out offline, ghost (catalog-sourced via audit resync), and
-	// duplicate streams so the Hot Set only contains feeds that can actually
-	// produce snapshots.
-	eligible := make([]camera.Camera, 0, len(all))
-	for _, c := range all {
-		if !c.IsOnline || c.IsGhost || c.DuplicateOf != "" {
-			continue
-		}
-		eligible = append(eligible, c)
-	}
-
-	var critical []hotset.Camera
-	used := make(map[string]struct{}, len(eligible))
-
-	// Pass 1: Prioritize S2 curated intersection cameras on S1 priority corridors (Option 1b).
-	// Exactly 2 road_keys ensures intersection choke points are selected over mid-block cameras.
-	for _, c := range eligible {
-		if len(c.RoadKeys) == 2 {
-			isPriority := false
-			for _, rk := range c.RoadKeys {
-				if _, ok := priorityCorridors[rk]; ok {
-					isPriority = true
-					break
-				}
-			}
-			if isPriority {
-				critical = append(critical, cameraToHotSet(c))
-				used[c.ID] = struct{}{}
-				if maxCameras > 0 && len(critical) >= maxCameras {
-					return critical
-				}
-			}
-		}
-	}
-
-	// Pass 2: Prefer remaining known critical choke points via criticalKeywords.
-	for _, c := range eligible {
-		if _, ok := used[c.ID]; ok {
-			continue
-		}
-		name := strings.ToLower(c.DisplayName)
-		if name == "" {
-			name = strings.ToLower(c.Title)
-		}
-		for _, kw := range criticalKeywords {
-			if strings.Contains(name, kw) {
-				critical = append(critical, cameraToHotSet(c))
-				used[c.ID] = struct{}{}
-				break
-			}
-		}
-		if maxCameras > 0 && len(critical) >= maxCameras {
-			return critical
-		}
-	}
-
-	// Pass 3: Pad with the remaining eligible cameras up to maxCameras.
-	for _, c := range eligible {
-		if _, ok := used[c.ID]; ok {
-			continue
-		}
-		critical = append(critical, cameraToHotSet(c))
-		used[c.ID] = struct{}{}
-		if maxCameras > 0 && len(critical) >= maxCameras {
-			break
-		}
-	}
-
-	return critical
-}
-
-func cameraToHotSet(c camera.Camera) hotset.Camera {
-	name := strings.TrimSpace(c.DisplayName)
-	if name == "" {
-		name = strings.TrimSpace(c.Title)
-	}
-	var hotsetRegions []hotset.RoadwayRegion
-	if len(c.Regions) > 0 {
-		hotsetRegions = make([]hotset.RoadwayRegion, len(c.Regions))
-		for i, r := range c.Regions {
-			hotsetRegions[i] = hotset.RoadwayRegion{
-				RegionID:      r.RegionID,
-				Direction:     r.Direction,
-				Polygon:       r.Polygon,
-				CapacityShare: r.CapacityShare,
-			}
-		}
-	}
-	return hotset.Camera{
-		ID:                c.ID,
-		Name:              name,
-		Zone:              c.Zone,
-		SnapshotURL:       c.SnapshotURL,
-		BaseCapacity:      c.BaseCapacity,
-		Regions:           hotsetRegions,
-		DirectionCoverage: c.DirectionCoverage,
-	}
-}
-
-type cameraTitleAdapter struct {
-	catalog *camera.Catalog
-}
-
-func (a cameraTitleAdapter) GetCameraTitle(id string) string {
-	if a.catalog != nil {
-		if cam, ok := a.catalog.ByID(id); ok {
-			if cam.DisplayName != "" {
-				return cam.DisplayName
-			}
-			return cam.Title
-		}
-	}
-	return ""
-}
-
-// harvesterWeatherAdapter adapts *weather.Service to harvester.WeatherProvider.
-type harvesterWeatherAdapter struct {
-	service *weather.Service
-}
-
-func (a *harvesterWeatherAdapter) GetWeather(ctx context.Context) (*harvester.WeatherInfo, error) {
-	if a.service == nil {
-		return nil, nil
-	}
-	w, err := a.service.GetWeather(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if w == nil {
-		return nil, nil
-	}
-	return &harvester.WeatherInfo{
-		RainfallMm:  w.RainMm,
-		WeatherCode: w.WeatherCode,
-	}, nil
-}
-
-// weatherStoreAdapter adapts *store.WeatherRepo to weather.Persister (ADR-012 D3).
-type weatherStoreAdapter struct {
-	repo *store.WeatherRepo
-}
-
-func (a *weatherStoreAdapter) RecordObservation(ctx context.Context, obs weather.ObservationRecord) error {
-	if a.repo == nil {
-		return fmt.Errorf("weather store adapter: repo is nil")
-	}
-	return a.repo.Record(ctx, &store.WeatherObservation{
-		PrecipitationMm: obs.PrecipitationMm,
-		WeatherCode:     obs.WeatherCode,
-		TemperatureC:    obs.TemperatureC,
-		HumidityPct:     obs.HumidityPct,
-		RadarActive:     obs.RadarActive,
-		RadarFrameAgeS:  obs.RadarFrameAgeS,
-		Source:          obs.Source,
-		PayloadHash:     obs.PayloadHash,
-		ObservedAt:      obs.ObservedAt,
-		RecordedAt:      obs.RecordedAt,
-	})
-}
-
-// harvesterSnapshotFetcher adapts proxycache.Cache and HTTP client to harvester.SnapshotFetcher.
-type harvesterSnapshotFetcher struct {
-	cache        *proxycache.Cache
-	upstreamBase string
-	client       *http.Client
-}
-
-func (f *harvesterSnapshotFetcher) FetchSnapshot(ctx context.Context, cam harvester.Camera) ([]byte, error) {
-	if f.cache != nil {
-		if data, ok := f.cache.Get(cam.ID); ok && len(data) > 0 {
-			return data, nil
-		}
-	}
-	snapURL := cam.SnapshotURL
-	if snapURL == "" {
-		snapURL = fmt.Sprintf("%s?id=%s", f.upstreamBase, cam.ID)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, snapURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CameraViewHarvester/1.0)")
-	resp, err := f.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("snapshot returned status %d", resp.StatusCode)
-	}
-	return io.ReadAll(resp.Body)
-}
-
-// feedbackCameraChecker adapts *camera.Catalog to feedback.CameraChecker.
-type feedbackCameraChecker struct {
-	catalog *camera.Catalog
-}
-
-func (c *feedbackCameraChecker) CameraExists(cameraID string) bool {
-	if c.catalog == nil {
-		return false
-	}
-	_, ok := c.catalog.ByID(cameraID)
-	return ok
-}
-
-// feedbackSnapshotFetcher adapts proxycache.Cache and HTTP client to feedback.SnapshotFetcher.
-type feedbackSnapshotFetcher struct {
-	cache        *proxycache.Cache
-	catalog      *camera.Catalog
-	upstreamBase string
-	client       *http.Client
-}
-
-func (f *feedbackSnapshotFetcher) FetchSnapshot(ctx context.Context, cameraID string) ([]byte, error) {
-	if f.cache != nil {
-		if data, ok := f.cache.Get(cameraID); ok && len(data) > 0 {
-			return data, nil
-		}
-	}
-	var snapURL string
-	if f.catalog != nil {
-		if cam, ok := f.catalog.ByID(cameraID); ok && cam.SnapshotURL != "" {
-			snapURL = cam.SnapshotURL
-		}
-	}
-	if snapURL == "" {
-		snapURL = fmt.Sprintf("%s?id=%s", f.upstreamBase, cameraID)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, snapURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CameraViewFeedback/1.0)")
-	resp, err := f.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("snapshot returned status %d", resp.StatusCode)
-	}
-	return io.ReadAll(resp.Body)
-}
-
-// harvesterPredictorAdapter adapts CVEngine /predict endpoint to harvester.VisionPredictor.
-type harvesterPredictorAdapter struct {
-	url    string
-	client *http.Client
-}
-
-func (p *harvesterPredictorAdapter) Predict(ctx context.Context, cam harvester.Camera, frame []byte) (*harvester.PredictionResult, error) {
-	if p.url == "" {
-		return &harvester.PredictionResult{
-			TrafficSeverity: "CLEAR",
-			Confidence:      0.8,
-		}, nil
-	}
-	predictURL := p.url + "/predict"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, predictURL, bytes.NewReader(frame))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/octet-stream")
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("predict endpoint returned status %d", resp.StatusCode)
-	}
-	var parsed struct {
-		TrafficSeverity  string                  `json:"traffic_severity"`
-		Confidence       float64                 `json:"confidence"`
-		VehiclesDetected int                     `json:"vehicles_detected"`
-		VehicleCounts    harvester.VehicleCounts `json:"vehicle_counts"`
-		LatencyMs        float64                 `json:"latency_ms"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return nil, err
-	}
-	return &harvester.PredictionResult{
-		TrafficSeverity:  parsed.TrafficSeverity,
-		Confidence:       parsed.Confidence,
-		VehiclesDetected: parsed.VehiclesDetected,
-		VehicleCounts:    parsed.VehicleCounts,
-		LatencyMs:        parsed.LatencyMs,
-	}, nil
-}
-
-// hotsetCoverageAdapter adapts store.VerdictHistoryRepo to hotset.HistoryCoverageProvider (ADR-012 D2).
-type hotsetCoverageAdapter struct {
-	repo *store.VerdictHistoryRepo
-}
-
-func (a *hotsetCoverageAdapter) GetCoverage(ctx context.Context, cameraID string, window time.Duration, now time.Time) (*hotset.CoverageReport, error) {
-	if a.repo == nil {
-		return nil, fmt.Errorf("history repo unavailable")
-	}
-	r, err := a.repo.GetCoverage(ctx, cameraID, window, now)
-	if err != nil {
-		return nil, err
-	}
-	return &hotset.CoverageReport{
-		CameraID:             r.CameraID,
-		Window:               r.Window,
-		BinIntervalMinutes:   r.BinIntervalMinutes,
-		ExpectedBins:         r.ExpectedBins,
-		ObservedBins:         r.ObservedBins,
-		CoverageRatio:        r.CoverageRatio,
-		TotalObservations:    r.TotalObservations,
-		ObservationBounds:    hotset.ObservationBounds{Earliest: r.ObservationBounds.Earliest, Latest: r.ObservationBounds.Latest},
-		LongestGapSeconds:    r.LongestGapSeconds,
-		HorizonEligibility:   r.HorizonEligibility,
-		HistoryCoverageHours: r.HistoryCoverageHours,
-		Status:               r.Status,
-		CamerasCount:         r.CamerasCount,
-	}, nil
-}
 
 func main() {
 	cfg := config.LoadConfig()
-
-	// Release mode in production
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
+
+	appCtx, appCancel := context.WithCancel(context.Background())
+	defer appCancel()
 
 	// 1. Load camera catalog into memory
 	log.Printf("[INIT] Loading cameras from: %s", cfg.CamerasFilePath)
@@ -747,56 +46,23 @@ func main() {
 	}
 	camCatalogHandler := camera.NewHandler(camCatalog)
 
-	// 2. Initialize HotSet registry for active camera tracking.
-	// activeTTL = 120 s; seed fixed critical cameras when analysis is enabled
-	// (e.g. mock/dev mode) so the scheduler has work immediately at startup.
+	// 2. Initialize HotSet registry & proxycache with TTL purge job
 	var fixedCameras []hotset.Camera
 	if camCatalog != nil && cfg.HotsetFixedMaxCameras > 0 {
 		fixedCameras = buildFixedHotSet(camCatalog, cfg.HotsetFixedMaxCameras)
 	}
 	hotsetRegistry := hotset.NewRegistry(fixedCameras, 120*time.Second)
-
-	// 3. Initialize proxycache with TTL cache and periodic background purge (Issue #124)
 	proxyCache := proxycache.NewCache(cfg.CacheTTL)
-	stopPurgeCh := make(chan struct{})
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-stopPurgeCh:
-				return
-			case <-ticker.C:
-				proxyCache.Purge()
-			}
-		}
-	}()
+	startProxyCachePurge(appCtx, proxyCache)
 
-	// 4. proxycache handler — wraps the DOT portal proxy with TTL cache and
-	// HotSet Touch (Dependency Inversion: Touch is injected as a callback so
-	// proxycache does not import hotset directly).
 	upstreamBase := os.Getenv("SNAPSHOT_UPSTREAM_BASE_URL")
 	if upstreamBase == "" {
 		upstreamBase = "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx"
 	}
-	proxyHandler := proxycache.NewHandler(proxyCache, upstreamBase, func(id, name, zone, snapshotURL string) {
-		if camCatalog != nil {
-			if cam, ok := camCatalog.ByID(id); ok {
-				hotsetRegistry.Touch(cameraToHotSet(*cam))
-				return
-			}
-		}
-		if snapshotURL == "" {
-			snapshotURL = fmt.Sprintf("%s?id=%s", upstreamBase, id)
-		}
-		hotsetRegistry.Touch(hotset.Camera{ID: id, Name: name, Zone: zone, SnapshotURL: snapshotURL})
-	})
+	proxyHandler := proxycache.NewHandler(proxyCache, upstreamBase, makeProxyTouchCallback(camCatalog, hotsetRegistry, upstreamBase))
+	tileHandler := tilecache.NewHandler(tilecache.NewManager(cfg.TileCacheDir))
 
-	// Initialize tilecache Manager and Handler for self-hosted map tiles
-	tileManager := tilecache.NewManager(cfg.TileCacheDir)
-	tileHandler := tilecache.NewHandler(tileManager)
-
-	// 5. Initialize SQLite DB and Verdict Repository
+	// 3. Initialize SQLite DB and Repositories
 	db, err := store.NewDB(cfg.SQLitePath)
 	if err != nil {
 		log.Fatalf("[FATAL] Failed to initialize SQLite database (%s): %v", cfg.SQLitePath, err)
@@ -804,105 +70,49 @@ func main() {
 	if err := store.AssertSchemaReady(db); err != nil {
 		log.Fatalf("[FATAL] Database schema assertion failed (ADR-012 D2): %v", err)
 	}
+	defer db.Close()
+
 	verdictRepo := store.NewVerdictRepo(db)
 	verdictHistoryRepo := store.NewVerdictHistoryRepo(db)
 	weatherRepo := store.NewWeatherRepo(db)
 	subStore := subscription.NewSQLiteStore(db)
-	var taxonomyProv subscription.TaxonomyProvider
-	if camCatalog != nil {
-		taxonomyProv = &subscriptionTaxonomyAdapter{catalog: camCatalog}
+	startRetentionPurge(appCtx, verdictHistoryRepo)
+
+	// 4. Notifications & Inbound Telegram bot
+	debounceMins := cfg.TelegramDebounceMinutes
+	if debounceMins <= 0 {
+		debounceMins = 30
 	}
-	defer db.Close()
-
-	// 5-retention. 30-Day raw data retention job (ADR-012 D2)
-	retentionCtx, cancelRetention := context.WithCancel(context.Background())
-	defer cancelRetention()
-	go func() {
-		// Run a non-blocking chunked purge shortly after startup
-		select {
-		case <-time.After(15 * time.Second):
-			cutoff := time.Now().UTC().Add(-30 * 24 * time.Hour)
-			if deleted, err := verdictHistoryRepo.PurgeOlderThan(retentionCtx, cutoff, 5000); err != nil {
-				log.Printf("[WARN] Initial 30-day retention purge failed: %v", err)
-			} else if deleted > 0 {
-				log.Printf("[RETENTION] Initial purge cleared %d observations older than 30 days (%s)", deleted, cutoff.Format(time.RFC3339))
-			}
-		case <-retentionCtx.Done():
-			return
-		}
-
-		ticker := time.NewTicker(24 * time.Hour)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-retentionCtx.Done():
-				return
-			case <-ticker.C:
-				cutoff := time.Now().UTC().Add(-30 * 24 * time.Hour)
-				if deleted, err := verdictHistoryRepo.PurgeOlderThan(retentionCtx, cutoff, 5000); err != nil {
-					log.Printf("[WARN] Daily 30-day retention purge failed: %v", err)
-				} else if deleted > 0 {
-					log.Printf("[RETENTION] Daily purge cleared %d observations older than 30 days", deleted)
-				}
-			}
-		}
-	}()
-
-	// 5a. Initialize notification subsystem (Issue #225 / S6-T5)
-	debounceMinutes := cfg.TelegramDebounceMinutes
-	if debounceMinutes <= 0 {
-		debounceMinutes = 30
-	}
-	notifyDebouncer := notify.NewDebouncer(time.Duration(debounceMinutes) * time.Minute)
-	notifyManager := notify.NewManager(notifyDebouncer)
-
-	// Dependency Inversion: adapt subscription store to notify.SubscriberFinder
+	notifyManager := notify.NewManager(notify.NewDebouncer(time.Duration(debounceMins) * time.Minute))
 	subFinder := notify.SubscriberFinderFunc(func(ctx context.Context, channelName string, alert notify.FloodAlert) ([]string, error) {
 		if subStore == nil {
 			return nil, nil
 		}
 		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.Zone, alert.Ward)
 	})
-
-	// telegramAPIBaseURL is empty in production builds, so the channel talks to
-	// api.telegram.org. The Rule-10 verifier injects a local capture endpoint at
-	// link time (-ldflags "-X main.telegramAPIBaseURL=...") to observe the real
-	// outbound Bot API calls. It is deliberately not an environment variable:
-	// a deployed binary cannot be redirected through configuration (Rule 8).
 	telegramOpts := make([]notify.TelegramOption, 0, 1)
 	if telegramAPIBaseURL != "" {
 		telegramOpts = append(telegramOpts, notify.WithBaseURL(telegramAPIBaseURL))
 	}
 	telegramChan := notify.NewTelegramChannel(cfg.TelegramBotToken, subFinder, telegramOpts...)
 	notifyManager.Register(telegramChan)
-	if cfg.TelegramBotToken != "" {
-		log.Println("[INIT] Telegram notification channel registered and active.")
-	} else {
-		log.Println("[INIT] TELEGRAM_BOT_TOKEN not configured: Telegram channel registered in simulation mode (delivery skipped).")
-	}
 
-	// 5b. Inbound Telegram bot (S12-T4 / Issue #402). Fail-closed: the webhook
-	// route is mounted only when the token, the public handle and the secret are
-	// all present and syntactically valid; otherwise it answers 404 and the
-	// channel above stays in simulation mode (spec §2.2, §2.6, AC10).
 	botUsername := cfg.TelegramBotUsername
 	webhookEnabled := cfg.TelegramBotToken != "" &&
 		telegrambot.ValidBotUsername(botUsername) &&
 		telegrambot.ValidWebhookSecret(cfg.TelegramWebhookSecret)
 
-	subOpts := []subscription.Option{
-		subscription.WithBotInfo(botUsername, webhookEnabled),
+	var taxonomyProv subscription.TaxonomyProvider
+	if camCatalog != nil {
+		taxonomyProv = &subscriptionTaxonomyAdapter{catalog: camCatalog}
 	}
+	subOpts := []subscription.Option{subscription.WithBotInfo(botUsername, webhookEnabled)}
 	if cfg.TelegramBotToken != "" {
 		subOpts = append(subOpts, subscription.WithConfirmationSender(telegramChan))
 	}
 	subHandler := subscription.NewHandler(subStore, taxonomyProv, subOpts...)
-
 	botHandler := telegrambot.NewHandler(
-		telegrambot.Config{
-			BotUsername:   botUsername,
-			WebhookSecret: cfg.TelegramWebhookSecret,
-		},
+		telegrambot.Config{BotUsername: botUsername, WebhookSecret: cfg.TelegramWebhookSecret},
 		&telegramBotStoreAdapter{store: subStore},
 		&telegramBotTaxonomyAdapter{catalog: camCatalog},
 		telegramChan,
@@ -916,152 +126,12 @@ func main() {
 		}
 	}()
 
-	switch {
-	case webhookEnabled:
-		log.Printf("[INIT] Telegram webhook active: bot=@%s path=%s", botUsername, telegrambot.WebhookPath)
-	case cfg.TelegramBotToken == "":
-		log.Println("[INIT] Telegram webhook disabled: token missing")
-	case !telegrambot.ValidBotUsername(botUsername):
-		log.Println("[INIT] Telegram webhook disabled: username invalid")
-	default:
-		log.Println("[INIT] Telegram webhook disabled: webhook secret missing")
-	}
+	// 5. Flood chokepoints & real-time alert dispatcher
+	chokepointMap, floodChokepoints := loadFloodChokepoints()
+	dispatchFloodAlert := makeFloodAlertDispatcher(camCatalog, chokepointMap, notifyManager)
 
-	// Load authentic municipal flood chokepoints fixture
-	floodChokepointsPath := config.ResolvePath("tools/eval/fixtures/flood_chokepoints.json")
-	floodChokepoints, err := flood.LoadChokepoints(floodChokepointsPath)
-	chokepointMap := make(map[string]flood.FloodChokepoint)
-	if err != nil {
-		log.Printf("[WARN] Failed to load authentic flood chokepoints from %s: %v", floodChokepointsPath, err)
-	} else {
-		log.Printf("[INIT] Loaded %d authentic municipal flood chokepoints from %s", len(floodChokepoints), floodChokepointsPath)
-		for _, cp := range floodChokepoints {
-			chokepointMap[cp.CameraID] = cp
-		}
-	}
-
-	dispatchFloodAlert := func(v hotset.Verdict) {
-		if !notify.IsFloodSeverity(v.FloodSeverity) {
-			return
-		}
-
-		camName := v.CameraID
-		zone := ""
-		ward := ""
-		snapshotURL := ""
-		if camCatalog != nil {
-			if cam, ok := camCatalog.ByID(v.CameraID); ok {
-				if cam.DisplayName != "" {
-					camName = cam.DisplayName
-				} else if cam.Title != "" {
-					camName = cam.Title
-				}
-				zone = cam.Zone
-				ward = cam.PhuongName
-				snapshotURL = cam.SnapshotURL
-			}
-		}
-
-		var typicalDepth int
-		if cp, ok := chokepointMap[v.CameraID]; ok {
-			typicalDepth = cp.TypicalDepthCm
-		}
-
-		obs := v.ObservedAt
-		if obs.IsZero() {
-			obs = v.Timestamp
-		}
-
-		alert := notify.BuildFloodAlert(
-			v.CameraID,
-			camName,
-			zone,
-			ward,
-			snapshotURL,
-			typicalDepth,
-			v.FloodSeverity,
-			obs,
-		)
-
-		go func() {
-			dispatchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			if err := notifyManager.Dispatch(dispatchCtx, alert); err != nil {
-				log.Printf("[WARN] Failed to dispatch flood alert for %s: %v", v.CameraID, err)
-			}
-		}()
-	}
-
-	// 5b. Analyzer selection and environment validation (ADR-004 H0)
-	var analyzer hotset.Analyzer
-	analysisEnabled := false
-
-	switch cfg.Analyzer {
-	case "mock":
-		if cfg.AppEnv != "dev" {
-			log.Fatalf("[FATAL] Refusing to start: ANALYZER=mock is strictly forbidden when APP_ENV is %q (only allowed in 'dev'). Fabricated mock verdicts must never run on non-dev environments.", cfg.AppEnv)
-		}
-		analyzer = cvclient.NewMockAnalyzer()
-		analysisEnabled = true
-		log.Println("[INIT] ANALYZER=mock active in 'dev' environment. Hot Set scheduler will run mock analysis.")
-	case "vlm":
-		if cfg.CloudVisionAPIKey == "" {
-			log.Fatalf("[FATAL] Refusing to start: ANALYZER=vlm requires CLOUD_VISION_API_KEY to be set.")
-		}
-		analyzer = cvclient.NewCloudVisionAnalyzer(
-			cfg.CloudVisionAPIKey,
-			cvclient.WithModel(cfg.GeminiModel),
-		)
-		analysisEnabled = true
-		log.Printf("[INIT] ANALYZER=vlm active (model=%s, interval=%ds, maxParallel=%d, fixedCameras=%d). Hot Set scheduler will run Gemini multimodal vision analysis.",
-			cfg.GeminiModel, cfg.HotsetIntervalSeconds, cfg.HotsetMaxParallel, cfg.HotsetFixedMaxCameras)
-	case "onnx":
-		if cfg.CVEngineURL == "" {
-			log.Fatalf("[FATAL] Refusing to start: ANALYZER=onnx requires CV_ENGINE_URL to be set.")
-		}
-		pcuConfig := cvclient.PCUConfig{
-			Weights: cvclient.PCUWeights{
-				Motorcycle: cfg.PCUWeightMotorcycle,
-				Car:        cfg.PCUWeightCar,
-				Bus:        cfg.PCUWeightBus,
-				Truck:      cfg.PCUWeightTruck,
-				Container:  cfg.PCUWeightContainer,
-			},
-			Thresholds: cvclient.PCUBucketThresholds{
-				Moderate:  cfg.PCUThresholdModerate,
-				Heavy:     cfg.PCUThresholdHeavy,
-				Congested: cfg.PCUThresholdCongested,
-			},
-			CapacityFloor: cfg.PCUCapacityFloor,
-		}
-		pcuCalc := cvclient.NewPCUCalculator(pcuConfig)
-		if camCatalog != nil {
-			for _, cam := range camCatalog.All() {
-				if cam.BaseCapacity > 0 {
-					pcuCalc.SetBaseCapacity(cam.ID, cam.BaseCapacity)
-				}
-			}
-		}
-		if db != nil {
-			capacityRepo := store.NewCapacityRepo(db)
-			pcuCalc.SetCapacityStore(capacityRepo)
-			if err := pcuCalc.LoadLearnedCapacities(context.Background()); err != nil {
-				log.Printf("[WARN] Failed to load learned camera capacities from SQLite: %v", err)
-			} else {
-				log.Printf("[INIT] Loaded persistent learned camera capacities from SQLite")
-			}
-		}
-		analyzer = cvclient.NewCVEngineAnalyzer(cfg.CVEngineURL, nil, cvclient.WithPCUCalculator(pcuCalc))
-		analysisEnabled = true
-		log.Printf("[INIT] ANALYZER=onnx active (url=%s, interval=%ds, maxParallel=%d, fixedCameras=%d, pcuFloor=%.1f). Hot Set scheduler will run self-hosted OpenVINO inference with corridor-specific PCU capacity.",
-			cfg.CVEngineURL, cfg.HotsetIntervalSeconds, cfg.HotsetMaxParallel, cfg.HotsetFixedMaxCameras, cfg.PCUCapacityFloor)
-	case "none", "":
-		log.Println("[INIT] ANALYZER=none: Analysis scheduler is disabled. No camera_verdicts will be recorded and no SSE camera_update will be emitted.")
-	default:
-		log.Fatalf("[FATAL] Unknown ANALYZER=%q (valid options: none, mock, vlm, onnx)", cfg.Analyzer)
-	}
-
-	frozenDetector := hotset.NewFrozenDetector(cfg.FrozenFrameThreshold)
+	// 6. Analyzer selection & Core Handlers (Hotset, Corridor, Forecast, Weather)
+	analyzer, analysisEnabled := initAnalyzer(cfg, camCatalog, db)
 	hotsetStore := hotset.NewStore(time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second)
 	hotsetHandler := hotset.NewHandlerWithConfig(hotsetStore, analysisEnabled, cfg.AppEnv)
 	hotsetHandler.SetStaleTTL(time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second)
@@ -1071,708 +141,89 @@ func main() {
 
 	var corridorHandler *corridor.Handler
 	if camCatalog != nil {
-		corridorService := corridor.NewService(
-			camCatalog,
-			&verdictStoreAdapter{repo: verdictRepo},
-			cfg.AppEnv,
-			time.Duration(cfg.VerdictStaleTTLSeconds)*time.Second,
-		)
-		corridorHandler = corridor.NewHandler(corridorService)
+		corridorHandler = corridor.NewHandler(corridor.NewService(
+			camCatalog, &verdictStoreAdapter{repo: verdictRepo}, cfg.AppEnv, time.Duration(cfg.VerdictStaleTTLSeconds)*time.Second,
+		))
 	}
 
-	// 5d. Initialize short-horizon congestion forecast service (Issue #302 / S9-T6 / Issue #372).
-	var forecastHandler *forecast.Handler
-	if camCatalog != nil {
-		var forecastHistAdapter forecast.HistoryReader
-		if verdictHistoryRepo != nil {
-			forecastHistAdapter = &forecastHistoryAdapter{repo: verdictHistoryRepo}
-		}
-		forecastCamAdapter := &forecastCameraAdapter{catalog: camCatalog}
-
-		// Boot guard: FORECAST_ALLOW_SYNTHETIC is strictly prohibited in staging and production
-		envAllowSynth := strings.EqualFold(os.Getenv("FORECAST_ALLOW_SYNTHETIC"), "true") || os.Getenv("FORECAST_ALLOW_SYNTHETIC") == "1"
-		if envAllowSynth {
-			if cfg.AppEnv == "staging" || cfg.AppEnv == "production" {
-				log.Fatalf("FATAL: FORECAST_ALLOW_SYNTHETIC is prohibited in %s environment", cfg.AppEnv)
-			}
-			slog.Warn("FORECAST_ALLOW_SYNTHETIC is enabled (dev escape hatch); predictions are marked experimental")
-		}
-
-		var forecastOpts []forecast.Option
-		if modelPath := strings.TrimSpace(os.Getenv("FORECAST_MODEL_PATH")); modelPath != "" {
-			forecastOpts = append(forecastOpts, forecast.WithModelPath(modelPath))
-		}
-
-		forecastService := forecast.NewService(forecastHistAdapter, forecastCamAdapter, forecastOpts...)
-		forecastHandler = forecast.NewHandler(forecastService)
-
-		if forecastService.ReloadInterval() > 0 && forecastService.ModelPath() != "" {
-			forecastCtx, cancelForecast := context.WithCancel(context.Background())
-			defer cancelForecast()
-			forecastService.StartReloader(forecastCtx, forecastService.ReloadInterval())
-		}
-	}
-
-	// 5c. Initialize live weather forecast and RainViewer radar metadata service (Issue #120).
+	forecastHandler := initForecastHandler(appCtx, cfg, camCatalog, verdictHistoryRepo)
 	weatherService := weather.NewService()
 	weatherHandler := weather.NewHandler(weatherService)
+	startWeatherSamplerJob(appCtx, weather.NewSampler(weatherService, &weatherStoreAdapter{repo: weatherRepo}, slog.Default()), 10*time.Minute)
 
-	// 5d. Start 10-minute weather sampling ticker for feature store v2 (ADR-012 D3 / Issue #376).
-	weatherSampler := weather.NewSampler(
-		weatherService,
-		&weatherStoreAdapter{repo: weatherRepo},
-		slog.Default(),
-	)
-	weatherCtx, cancelWeather := context.WithCancel(context.Background())
-	defer cancelWeather()
-	go weatherSampler.Start(weatherCtx, 10*time.Minute)
-
-	// 6. Initialize WebSocket Hub for real-time verdict streaming (Issue #9).
-	// Kept in place — will be retired after D1 (EventSource migration) is verified.
+	// 7. Live Hubs (WS + SSE) & Hex Spatial Aggregators
 	wsHub := ws.NewHub()
 	defer wsHub.Close()
-
-	// 6b. Initialize SSE Hub (ADR-003 Decision 1 — replaces WebSocket for new clients).
-	// internal/live broadcasts camera_update events to all EventSource subscribers.
 	liveHub := live.NewHub()
 	defer liveHub.Close()
 
-	// 6c. Initialize H3 Hex Aggregator for aggregated spatial overlay (Sprint 2 Issue #73).
-	var hexPolygons map[string][][]float64
-	if hexPolygonsData, err := live.LoadPolygons(cfg.HexPolygonFilePath); err != nil {
-		log.Printf("[WARN] Failed to load H3 hex polygon lookup from %s: %v", cfg.HexPolygonFilePath, err)
-	} else {
-		hexPolygons = hexPolygonsData
-		log.Printf("[INIT] Loaded %d H3 hex polygon boundaries from %s", len(hexPolygons), cfg.HexPolygonFilePath)
-	}
+	hexAggregator, floodHexAggregator := initHexAggregators(cfg, camCatalog, liveHub)
+	startFloodHexReaper(appCtx, floodHexAggregator)
+	preseedHotsetFromStore(verdictRepo, hotsetStore, hexAggregator, floodHexAggregator, time.Duration(cfg.VerdictStaleTTLSeconds)*time.Second)
 
-	var allCameras []camera.Camera
-	if camCatalog != nil {
-		allCameras = camCatalog.All()
-	}
-	hexAggregator := live.NewHexAggregator(allCameras, hexPolygons, cfg.HexResolution, cfg.HexMinCameras, liveHub, nil)
-	if cfg.AppEnv == "dev" && cfg.Analyzer == "mock" {
-		hexAggregator.SetAllowMock(true)
-		log.Println("[INIT] Hex cell aggregation enabled for mock analyzer in 'dev' environment.")
-	}
-
-	floodHexAggregator := live.NewFloodHexAggregator(allCameras, hexPolygons, cfg.HexResolution, 1, liveHub, nil)
-	floodStaleTTL := time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second
-	if floodStaleTTL <= 0 {
-		floodStaleTTL = 180 * time.Second
-	}
-	floodHexAggregator.SetStaleTTL(floodStaleTTL)
-	if cfg.AppEnv == "dev" && cfg.Analyzer == "mock" {
-		floodHexAggregator.SetAllowMock(true)
-		log.Println("[INIT] Flood hex cell aggregation enabled for mock analyzer in 'dev' environment.")
-	}
-	liveHub.SetFloodHexAggregator(floodHexAggregator)
-
-	// Background stale flood hex cell reaper (runs every 30s)
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			cleared := floodHexAggregator.ReapStaleCells()
-			if len(cleared) > 0 {
-				log.Printf("[LIVE] Reaped %d stale flood hex cells", len(cleared))
-			}
-		}
-	}()
-
-	// Pre-seed in-memory hotset store and aggregators with latest stored verdicts from SQLite so GET /api/v1/cameras/hotset/status,
-	// GET /api/flood-hex, and GET /api/traffic-status return cached data immediately on cold boot with sub-5ms latency.
-	if verdictRepo != nil {
-		if storedVerdicts, err := verdictRepo.GetLatest(context.Background()); err == nil && len(storedVerdicts) > 0 {
-			staleThreshold := time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second
-			if staleThreshold <= 0 {
-				staleThreshold = 180 * time.Second
-			}
-			now := time.Now()
-			for _, sv := range storedVerdicts {
-				obs := sv.ObservedAt
-				if obs.IsZero() {
-					obs = sv.Timestamp
-				}
-				isStale := false
-				if !obs.IsZero() && now.Sub(obs) > staleThreshold {
-					isStale = true
-				}
-				hv := hotsetVerdictFromStore(sv)
-				hv.ObservedAt = obs
-				hv.Stale = isStale
-				hotsetStore.Set(hv)
-				hexAggregator.OnVerdict(hv)
-				floodHexAggregator.OnVerdict(hv)
-			}
-			log.Printf("[INIT] Pre-seeded in-memory hotset store and hex aggregators with %d stored verdicts from database", len(storedVerdicts))
-		}
-	}
-
-	// 6c-2. Initialize Decoupled Multimodal Flood Pipeline (Issue #209 / S5-T3).
-	// Strictly quota-guarded (10 RPM / 300 RPD) with dual triggers:
-	// Trigger 1: background environmental rain event polling on authentic municipal chokepoints.
-	// Trigger 2: on-demand commuter verification via POST /api/flood/verify.
-	var floodAnalyzer hotset.Analyzer
-	if cfg.CloudVisionAPIKey != "" {
-		floodAnalyzer = cvclient.NewCloudVisionAnalyzer(
-			cfg.CloudVisionAPIKey,
-			cvclient.WithModel(cfg.GeminiModel),
-		)
-		log.Printf("[INIT] Flood service initialized with Gemini Cloud Vision analyzer (model=%s)", cfg.GeminiModel)
-	} else if cfg.AppEnv == "dev" || cfg.Analyzer == "mock" {
-		floodAnalyzer = cvclient.NewMockAnalyzer()
-		log.Println("[INIT] Flood service initialized with Mock analyzer (dev mode)")
-	}
-
-	var floodHandler *flood.Handler
-	if floodAnalyzer != nil && camCatalog != nil {
-		floodLimiter := flood.NewQuotaLimiter(10, 300)
-		onFloodVerdict := func(v hotset.Verdict) {
-			if verdictRepo != nil {
-				sv := store.Verdict{
-					CameraID:             v.CameraID,
-					Severity:             v.Severity,
-					FloodSeverity:        v.FloodSeverity,
-					Confidence:           v.Confidence,
-					Source:               v.Source,
-					ObservedAt:           v.ObservedAt,
-					Timestamp:            v.Timestamp,
-					FloodDepthCm:         v.FloodDepthCm,
-					FloodHazardLevel:     v.FloodHazardLevel,
-					FloodHazardBasis:     v.FloodHazardBasis,
-					FloodDepthConfidence: v.FloodDepthConfidence,
-					FloodCalibrationRef:  v.FloodCalibrationRef,
-				}
-				if err := verdictRepo.Save(context.Background(), sv); err != nil {
-					log.Printf("[WARN] Failed to persist flood verdict for %s: %v", v.CameraID, err)
-				}
-			}
-			floodHexAggregator.OnVerdict(v)
-			liveHub.Broadcast(v)
-			dispatchFloodAlert(v)
-		}
-		floodService := flood.NewService(
-			floodAnalyzer,
-			weatherService,
-			camCatalog,
-			floodChokepoints,
-			floodLimiter,
-			flood.WithOnVerdict(onFloodVerdict),
-		)
-		floodHandler = flood.NewHandler(floodService)
-
-		// Start background environmental rain polling (Trigger 1)
-		floodCtx, cancelFlood := context.WithCancel(context.Background())
-		defer cancelFlood()
-		go floodService.StartEnvironmentalTrigger(floodCtx, 60*time.Second, onFloodVerdict)
-	}
-
-	// 6d. Initialize object storage driver and shared team archiver handler (Issue #62, #214)
-	var storeDriver storage.Storage
-	var retentionRootDir string
-
-	switch strings.ToLower(cfg.StorageDriver) {
-	case "r2", "s3":
-		r2Store, err := storage.NewR2Storage(context.Background(), storage.R2Config{
-			Endpoint:        cfg.R2Endpoint,
-			AccountID:       cfg.R2AccountID,
-			BucketName:      cfg.R2BucketName,
-			Region:          cfg.R2Region,
-			AccessKeyID:     cfg.R2AccessKeyID,
-			SecretAccessKey: cfg.R2SecretAccessKey,
-			PublicBaseURL:   cfg.R2PublicURL,
-		})
-		if err != nil {
-			log.Fatalf("[FATAL] Refusing to start: failed to initialize Cloudflare R2 storage driver: %v", err)
-		}
-		storeDriver = r2Store
-		retentionRootDir = ""
-		log.Printf("[INIT] Cloudflare R2 storage driver initialized (bucket=%s, endpoint=%s, publicURL=%s)",
-			cfg.R2BucketName, cfg.R2Endpoint, cfg.R2PublicURL)
-	case "local":
-		fallthrough
-	default:
-		localStore, err := storage.NewLocalStorage(cfg.StorageLocalRoot)
-		if err != nil {
-			log.Printf("[WARN] Failed to initialize storage driver (%s): %v", cfg.StorageLocalRoot, err)
-		} else {
-			storeDriver = localStore
-			retentionRootDir = cfg.StorageLocalRoot
-			log.Printf("[INIT] Local storage driver initialized (root=%s)", cfg.StorageLocalRoot)
-		}
-	}
-
+	// 8. Decoupled Multimodal Flood Pipeline & Storage/Archiver
+	floodHandler := initFloodPipeline(appCtx, cfg, camCatalog, weatherService, floodChokepoints, verdictRepo, floodHexAggregator, liveHub, dispatchFloodAlert)
+	storeDriver, retentionRootDir := initStorageDriver(cfg)
 	var archiverHandler *archiver.Handler
 	if storeDriver != nil {
 		archiverHandler = archiver.NewHandler(storeDriver, cameraTitleAdapter{catalog: camCatalog})
 	}
+	feedbackHandler := initFeedbackHandler(camCatalog, proxyCache, upstreamBase, storeDriver, floodHexAggregator, liveHub)
 
-	// 6d2. Initialize crowdsourced flood feedback handler & R2 ground-truth archiver (Issue #249 / S7-T4 / S8-T2)
-	feedbackChecker := &feedbackCameraChecker{catalog: camCatalog}
-	feedbackFetcher := &feedbackSnapshotFetcher{
-		cache:        proxyCache,
-		catalog:      camCatalog,
-		upstreamBase: upstreamBase,
-		client:       cvclient.SharedClient,
-	}
-	feedbackLimiter := feedback.NewRateLimiter(5 * time.Minute)
-	feedbackArchiver := feedback.NewArchiver(feedbackFetcher, storeDriver, nil)
-	feedbackHandler := feedback.NewHandler(feedbackChecker, feedbackLimiter, feedbackArchiver)
-
-	// S8-T7 (Issue #289 / [KV-19]): Wire crowdsourced flood reports to liveHub and floodHexAggregator
-	if feedbackHandler != nil {
-		feedbackHandler.SetOnReportAccepted(func(cameraID string, report feedback.Report) {
-			reportCount, escalated := 1, false
-			if floodHexAggregator != nil {
-				reportCount, escalated = floodHexAggregator.OnUserReport(cameraID, report.ClientIPHash, report.Timestamp)
-			}
-			if liveHub != nil {
-				liveHub.BroadcastUserFloodReport(live.UserFloodReport{
-					CameraID:     cameraID,
-					ClientIPHash: report.ClientIPHash,
-					Timestamp:    report.Timestamp,
-					ReportCount:  reportCount,
-					Escalated:    escalated,
-					TTLSeconds:   900,
-				})
-			}
-			slog.Info("feedback: crowdsource flood report bridged to live stream",
-				"camera_id", cameraID,
-				"report_count", reportCount,
-				"escalated", escalated)
-		})
-	}
-
-	// 6e. Wire the Hot Set scheduler with OnVerdict only if analysis is enabled.
-	var hotsetScheduler *hotset.Scheduler
-	if analysisEnabled && analyzer != nil {
-		var arch *archiver.Archiver
-		if storeDriver != nil {
-			archCfg := archiver.Config{
-				SampleInterval: time.Duration(cfg.ArchiveSampleIntervalSeconds) * time.Second,
-				RetentionDays:  cfg.ArchiveRetentionDays,
-				MaxDiskMB:      cfg.ArchiveMaxDiskMB,
-				CheckInterval:  cfg.ArchiveRetentionCheckInterval,
-			}
-			arch = archiver.New(storeDriver, retentionRootDir, archCfg, nil)
-
-			if retentionRootDir != "" {
-				retentionCtx, cancelRetention := context.WithCancel(context.Background())
-				defer cancelRetention()
-				go arch.StartRetention(retentionCtx)
-				log.Printf("[INIT] Snapshot archiver enabled with local disk retention (root=%s, retention=%dd, maxDisk=%dMB, sampleInterval=%ds)",
-					retentionRootDir, cfg.ArchiveRetentionDays, cfg.ArchiveMaxDiskMB, cfg.ArchiveSampleIntervalSeconds)
-			} else {
-				log.Printf("[INIT] Snapshot archiver enabled with Cloudflare R2 cloud storage (bucket=%s, sampleInterval=%ds)",
-					cfg.R2BucketName, cfg.ArchiveSampleIntervalSeconds)
-			}
-		}
-
-		onVerdict := func(v hotset.Verdict) {
-
-			now := time.Now()
-			if v.ObservedAt.IsZero() {
-				v.ObservedAt = now
-			}
-			if v.Timestamp.IsZero() {
-				v.Timestamp = v.ObservedAt
-			}
-
-			// Check frozen frame detector if cached frame data is available
-			if cachedData, ok := proxyCache.Get(v.CameraID); ok && len(cachedData) > 0 {
-				if frozenDetector.CheckBytes(v.CameraID, cachedData) {
-					v.Stale = true
-				}
-			}
-
-			// Fan-out 0: record in thread-safe in-memory cache for GET /api/v1/cameras/hotset/status (< 5ms latency).
-			hotsetStore.Set(v)
-
-			// Fan-out 1: push to all SSE clients immediately.
-			liveHub.Broadcast(v)
-
-			// Fan-out 1b: push hex cell update if floor of qualifying cameras is met.
-			if hexAggregator != nil {
-				hexAggregator.OnVerdict(v)
-			}
-
-			// Fan-out 1c: push flood hex cell update if safety floor (>= 1 camera) is met.
-			if floodHexAggregator != nil {
-				floodHexAggregator.OnVerdict(v)
-			}
-
-			// Fan-out 1d: dispatch real-time flood alert notification to subscribers.
-			dispatchFloodAlert(v)
-
-			// Fan-out 2: persist to SQLite for GET /api/traffic-status hydration.
-			if verdictRepo != nil {
-				sv := store.Verdict{
-					CameraID:             v.CameraID,
-					Severity:             v.Severity,
-					Confidence:           v.Confidence,
-					Source:               v.Source,
-					ObservedAt:           v.ObservedAt,
-					Timestamp:            v.Timestamp,
-					FloodSeverity:        v.FloodSeverity,
-					FloodDepthCm:         v.FloodDepthCm,
-					FloodHazardLevel:     v.FloodHazardLevel,
-					FloodHazardBasis:     v.FloodHazardBasis,
-					FloodDepthConfidence: v.FloodDepthConfidence,
-					FloodCalibrationRef:  v.FloodCalibrationRef,
-				}
-				if err := verdictRepo.Save(context.Background(), sv); err != nil {
-					log.Printf("[WARN] Failed to persist verdict for %s: %v", v.CameraID, err)
-				}
-			}
-
-			// Fan-out 2b: append to the Hot Set time series consumed by the
-			// short-horizon congestion forecast feature store (Issue #302).
-			// Stale or frozen verdicts are excluded: replaying an unchanged
-			// frame as a fresh observation would poison lag and rolling
-			// features with fabricated variation. Verdicts without a PCU/SI
-			// series are skipped for the same reason; a VLM-only label or an
-			// UNKNOWN error verdict must not be persisted as a zero-saturation
-			// observation.
-			hasPCUSeries := v.Severity != hotset.SeverityUnknown &&
-				(v.Source == "onnx" || v.PCUTotal > 0 || v.SaturationIndex > 0)
-			if verdictHistoryRepo != nil && !v.Stale && hasPCUSeries {
-				observedAt := v.ObservedAt
-				if observedAt.IsZero() {
-					observedAt = v.Timestamp
-				}
-				// 1. Frame-wide observation (direction = '')
-				hv := store.VerdictHistory{
-					CameraID:        v.CameraID,
-					Direction:       "",
-					RegionID:        "",
-					PCUTotal:        v.PCUTotal,
-					SaturationIndex: v.SaturationIndex,
-					Severity:        v.Severity,
-					Confidence:      v.Confidence,
-					Source:          v.Source,
-					ObservedAt:      observedAt,
-				}
-				if err := verdictHistoryRepo.Record(context.Background(), hv); err != nil {
-					log.Printf("[WARN] Failed to record verdict history for %s: %v", v.CameraID, err)
-				}
-
-				// 2. Directional observations (ADR-012 D1)
-				for _, dir := range v.Directions {
-					dirHV := store.VerdictHistory{
-						CameraID:        v.CameraID,
-						Direction:       dir.Direction,
-						RegionID:        dir.RegionID,
-						PCUTotal:        dir.PCUTotal,
-						SaturationIndex: dir.SaturationIndex,
-						Severity:        dir.Severity,
-						Confidence:      v.Confidence,
-						Source:          v.Source,
-						ObservedAt:      observedAt,
-					}
-					if err := verdictHistoryRepo.Record(context.Background(), dirHV); err != nil {
-						log.Printf("[WARN] Failed to record directional verdict history for %s (dir %s): %v", v.CameraID, dir.Direction, err)
-					}
-				}
-			}
-
-			// Fan-out 3: event-driven snapshot archiver with retention policy (Issue #62, #182).
-			if arch != nil {
-				var frameReader io.Reader
-				if len(v.RawFrame) > 0 {
-					// Direct frame delivery from analysis pipeline (T2b / Issue #182)
-					frameReader = bytes.NewReader(v.RawFrame)
-				} else if cachedData, ok := proxyCache.Get(v.CameraID); ok && len(cachedData) > 0 {
-					// Preserved fallback for non-HotSet or viewer-touched flows
-					frameReader = bytes.NewReader(cachedData)
-				} else if cfg.Analyzer == "mock" {
-					// In mock analysis mode without pre-fetched proxy cache, provide a minimal mock JPEG
-					// so dev environment starts collecting proof frames immediately.
-					frameReader = bytes.NewReader(archiver.MockJPEGData)
-				}
-				if frameReader != nil {
-					if err := arch.OnVerdict(v, frameReader); err != nil {
-						log.Printf("[WARN] Archiver failed for %s: %v", v.CameraID, err)
-					}
-				}
-			}
-		}
-
-		hotsetScheduler = hotset.NewScheduler(
-			hotsetRegistry,
-			analyzer,
-			time.Duration(cfg.HotsetIntervalSeconds)*time.Second,
-			cfg.HotsetMaxParallel,
-			onVerdict,
-			nil, // uses slog.Default()
-		)
-		hotsetScheduler.SetStore(hotsetStore)
-
-		// Global daily analyzer budget (ADR-004 §D9). When exhausted the
-		// scheduler degrades to UNKNOWN verdicts instead of invoking the analyzer.
-		analysisBudget := hotset.NewAnalysisBudget(cfg.AnalyzerDailyBudget)
-		hotsetScheduler.SetBudget(analysisBudget)
-
-		// Start the Hot Set scheduler in background; cancelled on graceful shutdown.
-		schedulerCtx, cancelScheduler := context.WithCancel(context.Background())
-		defer cancelScheduler()
-		go hotsetScheduler.Run(schedulerCtx)
-	}
-
-	// 6f. Initialize autonomous harvester subsystem (Issue #262 / S7-T7b)
-	var harvesterCoord *harvester.Coordinator
+	// 9. Hot Set Scheduler & Harvester Coordinator
+	var arch *archiver.Archiver
 	if storeDriver != nil {
-		var allHarvesterCameras []harvester.Camera
-		if camCatalog != nil {
-			for _, c := range camCatalog.All() {
-				if c.IsOnline && !c.IsGhost && c.DuplicateOf == "" {
-					allHarvesterCameras = append(allHarvesterCameras, harvester.Camera{
-						ID:          c.ID,
-						DisplayName: c.DisplayName,
-						Title:       c.Title,
-						SnapshotURL: c.SnapshotURL,
-						RoadKeys:    c.RoadKeys,
-					})
-				}
-			}
-		}
-		harvesterHotsetCams := harvester.FilterHotsetCameras(allHarvesterCameras)
-		harvesterRainCams := harvester.FilterFloodCorridorCameras(allHarvesterCameras)
+		arch = archiver.New(storeDriver, retentionRootDir, archiver.Config{
+			SampleInterval: time.Duration(cfg.ArchiveSampleIntervalSeconds) * time.Second,
+			RetentionDays:  cfg.ArchiveRetentionDays,
+			MaxDiskMB:      cfg.ArchiveMaxDiskMB,
+			CheckInterval:  cfg.ArchiveRetentionCheckInterval,
+		}, nil)
+		startArchiverRetention(appCtx, arch, retentionRootDir)
+	}
 
-		harvesterCfg := harvester.Config{
-			Enabled:             cfg.HarvesterEnabled,
-			ScheduleHours:       cfg.HarvesterScheduleHours,
-			RainCooldownMinutes: cfg.HarvesterRainCooldownMinutes,
-			Concurrency:         cfg.HarvesterConcurrency,
-			CatchupWindow:       time.Duration(cfg.HarvesterCatchupMinutes) * time.Minute,
-		}
-
-		var weatherProv harvester.WeatherProvider
-		if weatherService != nil {
-			weatherProv = &harvesterWeatherAdapter{service: weatherService}
-		}
-
-		snapFetcher := &harvesterSnapshotFetcher{
-			cache:        proxyCache,
-			upstreamBase: upstreamBase,
-			client:       cvclient.SharedClient,
-		}
-
-		predictor := &harvesterPredictorAdapter{
-			url:    cfg.CVEngineURL,
-			client: cvclient.SharedClient,
-		}
-
-		var err error
-		harvesterCoord, err = harvester.New(harvesterCfg, harvester.Dependencies{
-			Weather:       weatherProv,
-			Fetcher:       snapFetcher,
-			Predictor:     predictor,
-			Storage:       storeDriver,
-			HotsetCameras: harvesterHotsetCams,
-			RainCameras:   harvesterRainCams,
+	if analysisEnabled && analyzer != nil {
+		onVerdict := buildHotsetOnVerdict(hotsetDispatcherParams{
+			proxyCache: proxyCache, frozenDetector: hotset.NewFrozenDetector(cfg.FrozenFrameThreshold),
+			hotsetStore: hotsetStore, liveHub: liveHub, hexAggregator: hexAggregator,
+			floodHexAggregator: floodHexAggregator, dispatchFloodAlert: dispatchFloodAlert,
+			verdictRepo: verdictRepo, verdictHistoryRepo: verdictHistoryRepo, arch: arch, analyzerMode: cfg.Analyzer,
 		})
-		if err != nil {
-			log.Printf("[WARN] Failed to initialize autonomous harvester: %v", err)
-		} else if cfg.HarvesterEnabled {
-			harvesterCtx, cancelHarvester := context.WithCancel(context.Background())
-			defer cancelHarvester()
-			if err := harvesterCoord.Start(harvesterCtx); err != nil {
-				log.Printf("[WARN] Failed to start autonomous harvester: %v", err)
-			} else {
-				log.Printf("[INIT] Autonomous harvester enabled (scheduleSlots=%s, rainCooldown=%dm, concurrency=%d, hotsetCams=%d, rainCams=%d)",
-					cfg.HarvesterScheduleHours, cfg.HarvesterRainCooldownMinutes, cfg.HarvesterConcurrency,
-					len(harvesterHotsetCams), len(harvesterRainCams))
-			}
-		} else {
-			log.Printf("[INIT] Autonomous harvester disabled via configuration (HARVESTER_ENABLED=false)")
-		}
-	} else {
-		log.Printf("[INIT] Autonomous harvester disabled: storage driver is uninitialized")
+		sched := hotset.NewScheduler(hotsetRegistry, analyzer, time.Duration(cfg.HotsetIntervalSeconds)*time.Second, cfg.HotsetMaxParallel, onVerdict, nil)
+		sched.SetStore(hotsetStore)
+		sched.SetBudget(hotset.NewAnalysisBudget(cfg.AnalyzerDailyBudget))
+		startHotsetScheduler(appCtx, sched)
 	}
 
-	// 8. Setup Gin Engine
-	router := gin.Default()
-	router.Use(middleware.CORSMiddleware(cfg.AllowedOrigins...))
-	router.Use(gzip.Gzip(gzip.DefaultCompression,
-		gzip.WithExcludedPaths([]string{"/api/snapshot", "/api/cameras/snapshot", "/api/live/stream", "/ws"}),
-	))
-	router.Use(middleware.SecretSanitizer())
-	router.Use(middleware.RateLimitMiddleware(cfg.RateLimitRPS, cfg.RateLimitBurst))
+	harvesterCoord := initHarvesterCoordinator(cfg, camCatalog, weatherService, proxyCache, upstreamBase, storeDriver)
+	startHarvesterJob(appCtx, harvesterCoord, cfg.HarvesterEnabled)
 
-	// Health check probes
-	router.GET("/health", httpserver.Healthz)
-	router.HEAD("/health", httpserver.Healthz)
-	router.GET("/healthz", httpserver.Healthz)
-
-	// WebSocket Live Broadcast (Issue #9: GET /ws/live) — kept until D1 FE migration verified.
-	wsHub.RegisterRoutes(router)
-
-	// SSE Live Stream (ADR-003 Decision 1: GET /api/live/stream).
-	liveHub.RegisterRoutes(router)
-
-	// Swagger documentation UI
-	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
-	router.GET("/swagger", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
-	})
-	router.GET("/swagger/*any", func(c *gin.Context) {
-		p := c.Param("any")
-		if p == "" || p == "/" {
-			c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
-			return
-		}
-		swaggerHandler(c)
+	// 10. Gin Router & HTTP Server
+	router := setupRouter(routerConfig{
+		cfg: cfg, camCatalogHandler: camCatalogHandler, proxyHandler: proxyHandler,
+		hotsetHandler: hotsetHandler, corridorHandler: corridorHandler, forecastHandler: forecastHandler,
+		weatherHandler: weatherHandler, tileHandler: tileHandler, floodHandler: floodHandler,
+		subHandler: subHandler, archiverHandler: archiverHandler, harvesterCoord: harvesterCoord,
+		feedbackHandler: feedbackHandler, wsHub: wsHub, liveHub: liveHub, botHandler: botHandler,
+		webhookEnabled: webhookEnabled,
 	})
 
-	// 5b. Telegram bot webhook (S12-T4 / Issue #402). RegisterRoutes is a no-op
-	// unless the handler is enabled, and the explicit token check closes the one
-	// gap the handler cannot see: a valid handle and secret with no Bot API
-	// token must still leave the endpoint unmounted (404, spec §2.2 AC10).
-	if webhookEnabled {
-		botHandler.RegisterRoutes(router)
-	}
+	srv := &http.Server{Addr: fmt.Sprintf(":%s", cfg.Port), Handler: router}
+	go runServer(srv, cfg, camCatalog)
 
-	// Dev authentication gate. Built before the API group because it is needed
-	// by routes registered inside it (subscription audit listing, archiver,
-	// harvester) — S12-T4 spec §4.4.
-	devAuth := middleware.RequireDevAuth(cfg.DevAccessToken, cfg.AppEnv, middleware.DevAuthConfig{
-		CFAccessAudience:     cfg.CFAccessAudience,
-		CFAccessCertsURL:     cfg.CFAccessCertsURL,
-		CFAccessClientID:     cfg.CFAccessClientID,
-		CFAccessClientSecret: cfg.CFAccessClientSecret,
-	})
-
-	// API Group
-	api := router.Group("/api")
-	{
-		api.GET("/cameras", camCatalogHandler.GetCameras)
-		api.HEAD("/cameras", camCatalogHandler.GetCameras)
-		api.GET("/cameras/:id", camCatalogHandler.GetCameraByID)
-		api.GET("/zones", camCatalogHandler.GetZones)
-		api.GET("/phuong", camCatalogHandler.GetPhuongs)
-		// Proxy cache snapshot routes (wraps proxycache.Handler)
-		proxyHandler.RegisterRoutes(api)
-		// Traffic and flood congestion status endpoints (Issue #8)
-		hotsetHandler.RegisterRoutes(api)
-		// Traffic corridor status endpoints (ADR-004 §D1 / Issue #75)
-		if corridorHandler != nil {
-			corridorHandler.RegisterRoutes(api)
-		}
-		// Short-horizon congestion forecast endpoints (Issue #302 / S9-T6)
-		if forecastHandler != nil {
-			forecastHandler.RegisterRoutes(api)
-		}
-		// Live weather forecast & radar metadata endpoints (Issue #120)
-		weatherHandler.RegisterRoutes(api)
-		// Map tile proxy and local disk cache
-		tileHandler.RegisterRoutes(api)
-		// Decoupled multimodal flood pipeline endpoints (Issue #209)
-		if floodHandler != nil {
-			floodHandler.RegisterRoutes(api)
-		}
-		// Flood alert subscriptions (Issue #225 / S6-T5, citizen UI S12-T4).
-		// POST/DELETE stay public; GET enumerates chat ids and is dev-gated.
-		if subHandler != nil {
-			subHandler.RegisterRoutes(api, subscription.WithAuditAuth(devAuth))
-		}
-		// Shared archiver snapshots and collaborative team labeler endpoints (Issue #214)
-		// Harvester flywheel observability (Issue #299 / S9-T3)
-		if archiverHandler != nil {
-			archiverHandler.RegisterRoutes(api, devAuth)
-		}
-		harvester.NewHandler(harvesterCoord, cfg.HarvesterEnabled).RegisterRoutes(api, devAuth)
-		// Crowdsourced flood feedback & R2 archiver (Issue #249 / S7-T4 / S8-T2)
-		if feedbackHandler != nil {
-			feedbackHandler.RegisterRoutes(api)
-		}
-		// Legacy alias kept for backward compat with existing FE constants.js
-		api.GET("/cameras/snapshot/:id", proxyHandler.GetSnapshot)
-		api.HEAD("/cameras/snapshot/:id", proxyHandler.GetSnapshot)
-	}
-
-	// 5. Static Web Serving
-	if fi, err := os.Stat(cfg.StaticWebDir); err == nil && fi.IsDir() {
-		log.Printf("[INIT] Serving static web UI from: %s", cfg.StaticWebDir)
-		router.StaticFile("/", filepath.Join(cfg.StaticWebDir, "index.html"))
-		router.StaticFile("/index.html", filepath.Join(cfg.StaticWebDir, "index.html"))
-		router.StaticFile("/styles.css", filepath.Join(cfg.StaticWebDir, "styles.css"))
-		router.StaticFile("/app.js", filepath.Join(cfg.StaticWebDir, "app.js"))
-
-		nextDir := filepath.Join(cfg.StaticWebDir, "_next")
-		if info, err := os.Stat(nextDir); err == nil && info.IsDir() {
-			router.Static("/_next", nextDir)
-		}
-
-		// Handle any additional assets or SPA fallback
-		router.NoRoute(func(c *gin.Context) {
-			reqPath := c.Request.URL.Path
-			if strings.HasPrefix(reqPath, "/api/") || strings.HasPrefix(reqPath, "/swagger") || strings.HasPrefix(reqPath, "/ws") {
-				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-				return
-			}
-			filePath := filepath.Join(cfg.StaticWebDir, filepath.Clean(reqPath))
-			if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
-				c.File(filePath)
-				return
-			}
-			c.File(filepath.Join(cfg.StaticWebDir, "index.html"))
-		})
-	} else {
-		log.Printf("[WARN] Static web directory not found: %s", cfg.StaticWebDir)
-	}
-
-	// 6. HTTP Server with graceful shutdown
-	serverAddr := fmt.Sprintf(":%s", cfg.Port)
-	srv := &http.Server{
-		Addr:    serverAddr,
-		Handler: router,
-	}
-
-	go func() {
-		log.Println("================================================================")
-		log.Printf(" [OK] CAMERA VIEW GO-GIN SERVER RUNNING")
-		log.Printf(" [URL] Available at: http://localhost:%s", cfg.Port)
-		log.Printf(" [DOC] Swagger UI:   http://localhost:%s/swagger/index.html", cfg.Port)
-		log.Printf(" [WS]  WebSocket:    ws://localhost:%s%s", cfg.Port, ws.RouteLive)
-		log.Printf(" [SSE] Live stream:  http://localhost:%s%s", cfg.Port, live.RouteStream)
-		totalCams := 0
-		onlineCams := 0
-		if camCatalog != nil {
-			all := camCatalog.All()
-			totalCams = len(all)
-			for _, c := range all {
-				if c.IsOnline {
-					onlineCams++
-				}
-			}
-		}
-		log.Printf(" [CAM] Loaded %d cameras into memory (%d online)", totalCams, onlineCams)
-		log.Printf(" [NOTIF] Telegram:   debounce=%dm, active=%t", cfg.TelegramDebounceMinutes, cfg.TelegramBotToken != "")
-		log.Println("================================================================")
-
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("[FATAL] Server listen failed: %v", err)
-		}
-	}()
-
-	// Wait for interrupt signal to gracefully shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Println("[SHUTDOWN] Shutting down Camera View server...")
-	close(stopPurgeCh)
+	appCancel()
 	if harvesterCoord != nil {
 		harvesterCoord.Stop()
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("[FATAL] Server forced to shutdown: %v", err)
 	}
-
 	log.Println("[SHUTDOWN] Server exited cleanly.")
 }
