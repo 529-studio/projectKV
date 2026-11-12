@@ -5,20 +5,20 @@ is the only part an agent should read by default.
 
 | # | Lesson | Mandatory guardrail | File |
 |---|---|---|---|
-| 1 | Passing Unit Tests is Never Sufficient | End-to-end simulation: simulate real client workflows; unit tests alone are never sufficient. | [L01](L01-passing-unit-tests-is-never-sufficient-upstream-waf-header.md) |
-| 2 | Sequence Inversion Risk & Downstream Divergence | Document inversions; sequence tasks strictly to avoid downstream architectural divergence. | [L02](L02-sequence-inversion-risk-invisible-downstream-divergence.md) |
-| 3 | Completion Claims vs. Production Reality | Definition of Done: verify end-to-end against live endpoints before claiming completion. | [L03](L03-completion-claims-vs-production-reality-gap.md) |
-| 4 | Tooling & Environment Discrepancies | Multi-environment resilience: support both standalone binaries and containerized runtimes. | [L04](L04-tooling-environment-discrepancies-on-host-platforms.md) |
+| 1 | Passing Unit Tests is Never Sufficient | Simulate real client workflows end-to-end; unit tests alone are never sufficient. | [L01](L01-passing-unit-tests-is-never-sufficient-upstream-waf-header.md) |
+| 2 | Sequence Inversion Risk & Downstream Divergence | Document inversions; sequence tasks strictly to prevent architectural divergence. | [L02](L02-sequence-inversion-risk-invisible-downstream-divergence.md) |
+| 3 | Completion Claims vs. Production Reality | Verify end-to-end against live endpoints before claiming task completion. | [L03](L03-completion-claims-vs-production-reality-gap.md) |
+| 4 | Tooling & Environment Discrepancies | Multi-environment resilience: support standalone binaries and containerized runtimes. | [L04](L04-tooling-environment-discrepancies-on-host-platforms.md) |
 | 5 | Zero-Emoji Standard & Telemetry Streams | Zero emojis in UI and backend logs; use monochromatic SVGs and clean plaintext labels. | [L05](L05-zero-emoji-standard-telemetry-stream-corruption.md) |
-| 6 | Single-Threaded HTTP vs Concurrent Go | Internal services receiving concurrent requests from Go workers must handle concurrency. | [L06](L06-single-threaded-http-servers-vs-concurrent-go-dispatchers.md) |
+| 6 | Single-Threaded HTTP vs Concurrent Go | Services receiving concurrent requests from Go workers must handle concurrency safely. | [L06](L06-single-threaded-http-servers-vs-concurrent-go-dispatchers.md) |
 | 7 | Upstream Timestamp Mismatch & Mock Blind Spots | Normalize time series to common bins before joining; avoid mock blind spots. | [L07](L07-upstream-timestamp-resolution-mismatch-mock-contract-blind.md) |
 | 8 | GitHub Actions Billing & Duplicate Jobs | Steps are free, jobs are not: fold logic into an already-running job as a step when possible. | [L08](L08-github-actions-billing-ceiling-rounding-duplicate.md) |
 | 9 | Competing Sources of Truth & Silent Drift | Single source of truth: never hardcode a second copy of state that can be derived. | [L09](L09-competing-sources-of-truth-silent-drift-ghost-camera.md) |
 | 10 | CD Pipeline Configuration & Environment Propagation | Git as CD single source: never rely solely on ad-hoc UI or host edits on Portainer. | [L10](L10-cd-pipeline-configuration-overwrite-environment-propagation.md) |
-| 11 | Decoupled Scheduled Pipelines vs. On-Demand Proxy Caches | Scheduled pipelines and on-demand proxy caches must be cleanly separated with explicit boundaries. | [L11](L11-decoupled-scheduled-pipelines-vs-on-demand-proxy-caches.md) |
+| 11 | Decoupled Scheduled Pipelines vs. On-Demand Proxy Caches | Separate scheduled pipelines and on-demand proxy caches with explicit boundaries. | [L11](L11-decoupled-scheduled-pipelines-vs-on-demand-proxy-caches.md) |
 | 12 | Machine Learning Model Classes vs. Domain Formulas | Model-to-domain sync: business scoring formulas must stay synchronized with model classes. | [L12](L12-machine-learning-model-classes-vs-domain-business-formulas.md) |
 | 13 | Ground-Truth Baselines vs. Spot-Checking | Curate deterministic extremes: isolate cameras with predictable, extreme baselines. | [L13](L13-ground-truth-smoke-test-baselines-vs-anecdotal-spot-checking.md) |
-| 14 | Active Labeling vs. Passive Data Accumulation | Strict dataset authenticity: never fabricate labels or substitute mock frames to pass a gate. | [L14](L14-active-labeling-effort-vs-passive-environmental-data.md) |
+| 14 | Active Labeling vs. Passive Data Accumulation | Dataset authenticity: never fabricate labels or substitute mock frames to pass gates. | [L14](L14-active-labeling-effort-vs-passive-environmental-data.md) |
 | 15 | Empirical Auditing & Cold-Start Capacity | Strict gate integrity: evaluating safety-critical class requires authentic non-zero positives. | [L15](L15-empirical-ground-truth-auditing-cold-start-capacity.md) |
 | 16 | Heterogeneous Distributed Microservices | Decoupled topology: distribute microservices based on hardware affinity and compute cost. | [L16](L16-heterogeneous-distributed-microservices-multi-endpoint.md) |
 | 17 | CCTV Viewport Limits vs Link Capacity | Optical viewport geometry: calibrate visual saturation floors based on physical geometry. | [L17](L17-instantaneous-cctv-camera-viewport-physical-limits-vs.md) |
@@ -31,13 +31,13 @@ is the only part an agent should read by default.
 | 24 | Decoupled Multimodal Hybrid Architecture | Retain high-throughput local inference; guard cloud VLMs with strict quotas. | [L24](L24-decoupled-multimodal-hybrid-architecture-quota-guarded-dual.md) |
 | 25 | CI Linter Schema Validation Flakiness | Set verify: false in golangci-lint-action to prevent remote schema flakiness. | [L25](L25-ci-linter-schema-validation-flakiness-toolchain-version.md) |
 | 26 | GitHub Issue Auto-Closing Semantics | Every PR resolving an issue must begin directly with Close #<number>. | [L26](L26-github-issue-auto-closing-keyword-semantics-vs-descriptive.md) |
-| 27 | Centralized Collaborative Team Labeling | Centralized Team Labeling: Dual-driver List(ctx, prefix) abstraction for local and cloud storage. | [L27](L27-centralized-collaborative-team-labeling-over-local.md) |
-| 28 | Zero Unauthenticated Dev Endpoints | Fail-Closed Dev Gatekeeper: Endpoints managing labels or archives require dev token authentication. | [L28](L28-zero-unauthenticated-dev-endpoints-fail-closed-developer.md) |
+| 27 | Centralized Collaborative Team Labeling | Dual-driver List(ctx, prefix) abstraction for local and cloud storage. | [L27](L27-centralized-collaborative-team-labeling-over-local.md) |
+| 28 | Zero Unauthenticated Dev Endpoints | Endpoints managing labels or archives require dev token authentication. | [L28](L28-zero-unauthenticated-dev-endpoints-fail-closed-developer.md) |
 | 29 | Perception-Layer Fixes vs Scoring Hacks | Implemented standard NMS with letterbox preprocessing. | [L29](L29-perception-layer-fixes-vs-scoring-hacks-empirical.md) |
-| 30 | Uniform Capacity Floors vs Physical Geometry | Geometry-Based Capacity: Enriched camera catalog with physical corridor capacity baselines. | [L30](L30-uniform-capacity-floors-vs-physical-corridor-geometry.md) |
-| 31 | Active Environmental Opportunism & Cloud Synchronization | Meteorological Ingestion: Use real-time rain triggers to archive flood frames. | [L31](L31-active-environmental-opportunism-continuous-cloud-label.md) |
-| 32 | Affordance Collision & Rate-Limit Cooldown | Affordance Separation: Brackets reserved for badges; cooldowns prevent multi-clicks. | [L32](L32-affordance-collision-client-side-rate-limit-cooldown-in.md) |
-| 33 | Defense-in-Depth Secret Sanitization & Hysteresis | Fail-Safe Sanitization: middleware.SecretSanitizer() wraps responses; hysteresis deadband. | [L33](L33-defense-in-depth-secret-sanitization-hysteresis-filtering.md) |
+| 30 | Uniform Capacity Floors vs Physical Geometry | Enrich camera catalog with physical corridor capacity baselines. | [L30](L30-uniform-capacity-floors-vs-physical-corridor-geometry.md) |
+| 31 | Active Environmental Opportunism & Cloud Synchronization | Use real-time rain triggers to archive flood frames continuously. | [L31](L31-active-environmental-opportunism-continuous-cloud-label.md) |
+| 32 | Affordance Collision & Rate-Limit Cooldown | Brackets reserved for badges; cooldowns prevent multi-clicks. | [L32](L32-affordance-collision-client-side-rate-limit-cooldown-in.md) |
+| 33 | Defense-in-Depth Secret Sanitization & Hysteresis | middleware.SecretSanitizer() wraps responses; hysteresis deadband. | [L33](L33-defense-in-depth-secret-sanitization-hysteresis-filtering.md) |
 | 34 | Architectural Priority: Sound Solutions Precede Estimation | Strict Priority Inversion (Rule 2 Precedes Rule 3): Never anchor effort to shortcuts. | [L34](L34-architectural-psychological-priority-sound-solutions.md) |
 | 35 | Holistic Repository Knowledge Maintenance | Rule 6 Expansion: Audit and sync all affected docs across repo, not just status logs. | [L35](L35-holistic-repository-knowledge-maintenance-vs-isolated.md) |
 | 36 | Leaf-Modulith Notification Infrastructure & Debouncing | Pure Leaf Boundary: internal/notify has zero sibling imports; 30-min sliding debouncing. | [L36](L36-leaf-modulith-notification-infrastructure-30-minute-sliding.md) |
@@ -98,5 +98,6 @@ is the only part an agent should read by default.
 | 92 | Issue-Keyed Lessons & Fail-Closed Webhooks | Name files after issue; fail-closed webhook route without secret token; chat rate-limit. | [402](402-telegram-bot-and-web-subscription.md) |
 | 93 | Real Provenance vs Orphaned Segmentation Labels | Exact timestamp & hash join; purge dead labels; frozen split; measured retraining gate. | [411](411-dataset-v3-provenance-and-avx2-evidence.md) |
 | 94 | SSE Streaming Sanitizer Buffering & Flusher | Streaming content types bypass body buffering; explicit Flusher interface assertions. | [420](420-sse-streaming-sanitizer-buffering.md) |
-| 95 | Decomposing Monolithic Go Composition Root | Factor main.go into adapters.go, jobs.go, routes.go (<250 lines); package test 'go run .'. | [425](425-decompose-monolithic-cmd-server-main.md) |
+| 95 | Decomposing Monolithic Go Composition Root | Factor main.go into adapters, jobs, routes (<250 lines); test 'go run .'. | [425](425-decompose-monolithic-cmd-server-main.md) |
+| 96 | Moore Boundary Tracing & Jacob's Criterion | State tracking (pixel, backtrack); 8-connected merge; restores SAM proposal yield. | [438](438-moore-boundary-tracing-jacobs-criterion.md) |
 > Numbering note: Lesson 54 does not exist; numbers are preserved as cited.
