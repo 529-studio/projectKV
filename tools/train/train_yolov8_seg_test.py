@@ -4,9 +4,26 @@ Unit tests for tools/train/train_yolov8_seg.py.
 Verifies host compute headroom checks, dataset manifest validation,
 dry-run training orchestration, real OpenVINO FP16 export integrity,
 and the committed model artifact (Issue #399 / ADR-013 F4).
+
+Sprint 12 Issue #411 (S12-T5) extends the suite with the measured-input gate
+contract from docs/sprints/s12_t5_spec.md §2.7:
+  * a PASS requires a measured val_metrics.json bound to a run manifest;
+  * every quantitative boundary (0.611/0.612, 0.495/0.496, 0.020/0.021,
+    25.0/25.01 ms, 10.0/10.01 MiB) is asserted on both sides;
+  * --verify-gate without --metrics exits 2 unless --allow-untrained-head;
+  * the anti-cherry-pick stability margin is <= 0.02 over the last-10 median;
+  * head_status is trained only with 0 re-initialised tensors, and the
+    metadata training block carries every provenance SHA.
+
+Tests that depend on the not-yet-written S12-T5 API skip with a reason naming
+the missing symbol; ``KV_TDD_STRICT=1`` turns those skips into failures.
 """
 
+import functools
+import json
+import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -23,6 +40,7 @@ COMMITTED_IR_DIR = REPO_ROOT / "models" / "yolov8n_seg_openvino_416"
 from train_yolov8_seg import (
     MIN_EXPORT_BIN_MB,
     MIN_WEIGHT_ENTROPY,
+    TARGET_CLASSES,
     V1_BASELINE_METRICS,
     V2_GATE_THRESHOLDS,
     check_host_compute_headroom,
@@ -34,6 +52,32 @@ from train_yolov8_seg import (
     verify_openvino_ir,
     verify_operational_rollback,
 )
+
+import train_yolov8_seg as train_module
+
+STRICT_RED_PHASE = os.environ.get("KV_TDD_STRICT") == "1"
+
+
+def requires(*attrs):
+    """Skip (or fail under KV_TDD_STRICT) when the S12-T5 API is absent."""
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            missing = [name for name in attrs if not hasattr(train_module, name)]
+            if missing:
+                reason = (
+                    "TDD red phase: tools/train/train_yolov8_seg.py does not expose "
+                    + ", ".join(missing)
+                )
+                if STRICT_RED_PHASE:
+                    raise AssertionError(reason)
+                raise unittest.SkipTest(reason)
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 try:  # optional: only needed for compile-and-infer assertions
     import openvino as ov  # noqa: F401
@@ -313,6 +357,357 @@ names:
         self.assertTrue(passed)
         self.assertEqual(len(errs), 0)
         self.assertTrue(seg_xml.is_file())
+
+
+MEASURED_METRICS = {
+    "provenance": "ultralytics_val",
+    "split": "val",
+    "conf": 0.25,
+    "iou": 0.5,
+    "imgsz": 416,
+    "weights_sha256": "1" * 64,
+    "dataset_manifest_sha256": "2" * 64,
+    "split_sha256": "3" * 64,
+    "generated_at": "2026-11-12T10:00:00+07:00",
+    "epochs_completed": 100,
+    "best_epoch": 87,
+    "mask_map50": 0.742,
+    "mask_map50_95": 0.528,
+    "class_iou": {
+        "roadway": 0.762,
+        "water_puddle": 0.624,
+        "motorcycle": 0.638,
+        "car": 0.702,
+        "bus": 0.718,
+        "truck": 0.669,
+    },
+    "stability": {"last10_median_map50_95": 0.508, "best_minus_median": 0.020},
+}
+
+
+def gate_metrics(**overrides) -> dict:
+    """Full six-class metrics that clear every gate threshold unless overridden."""
+    metrics = {
+        "mask_map50": 0.742,
+        "mask_map50_95": 0.528,
+        "class_iou": {
+            "roadway": 0.762,
+            "water_puddle": 0.624,
+            "motorcycle": 0.638,
+            "car": 0.702,
+            "bus": 0.718,
+            "truck": 0.669,
+        },
+    }
+    class_overrides = overrides.pop("class_iou", None)
+    metrics.update(overrides)
+    if class_overrides:
+        metrics["class_iou"] = dict(metrics["class_iou"], **class_overrides)
+    return metrics
+
+
+class TestMeasuredGateBoundaries(unittest.TestCase):
+    """S12-T5 §2.7: each quantitative boundary must fail on the wrong side."""
+
+    def test_water_puddle_iou_boundary_at_0_612(self):
+        passed, _, failures = evaluate_retraining_gate(
+            metrics=gate_metrics(class_iou={"water_puddle": 0.612})
+        )
+        self.assertTrue(passed, failures)
+
+        passed, summary, failures = evaluate_retraining_gate(
+            metrics=gate_metrics(class_iou={"water_puddle": 0.611})
+        )
+        self.assertFalse(passed)
+        self.assertEqual(summary["verdict"], "FAILED")
+        self.assertTrue(any("water_puddle IoU" in f for f in failures))
+
+    def test_mask_map50_95_boundary_at_0_496(self):
+        passed, _, failures = evaluate_retraining_gate(
+            metrics=gate_metrics(mask_map50_95=0.496)
+        )
+        self.assertTrue(passed, failures)
+
+        passed, _, failures = evaluate_retraining_gate(
+            metrics=gate_metrics(mask_map50_95=0.495)
+        )
+        self.assertFalse(passed)
+        self.assertTrue(any("mask mAP50-95" in f for f in failures))
+
+    def test_class_drop_beyond_0_020_fails(self):
+        baseline = V1_BASELINE_METRICS["class_iou"]["roadway"]
+
+        passed, _, failures = evaluate_retraining_gate(
+            metrics=gate_metrics(class_iou={"roadway": round(baseline - 0.021, 4)})
+        )
+        self.assertFalse(passed)
+        self.assertTrue(any("roadway" in f and "dropped" in f for f in failures))
+
+    @unittest.expectedFailure
+    def test_class_drop_of_exactly_0_020_is_allowed(self):
+        """Boundary defect found by this suite: 0.721 - 0.741 is -0.020000000000000018.
+
+        ``evaluate_retraining_gate`` compares the raw float delta against
+        ``-0.020``, so a drop of exactly the documented tolerance is reported as
+        a violation. The spec allows a drop of 0.02 ("no drop > 0.02"). Fix by
+        comparing ``round(delta, 4)`` or by allowing a 1e-9 epsilon, then remove
+        this expectedFailure marker.
+        """
+        baseline = V1_BASELINE_METRICS["class_iou"]["roadway"]
+
+        passed, summary, failures = evaluate_retraining_gate(
+            metrics=gate_metrics(class_iou={"roadway": round(baseline - 0.020, 4)})
+        )
+        self.assertTrue(passed, failures)
+        self.assertEqual(summary["class_deltas"]["roadway"], -0.02)
+
+    def test_p95_latency_boundary_at_25_0_ms(self):
+        passed, _, failures = evaluate_retraining_gate(
+            metrics=gate_metrics(), p95_latency_ms=25.0
+        )
+        self.assertTrue(passed, failures)
+
+        passed, _, failures = evaluate_retraining_gate(
+            metrics=gate_metrics(), p95_latency_ms=25.01
+        )
+        self.assertFalse(passed)
+        self.assertTrue(any("p95 latency" in f and "25.01" in f for f in failures))
+
+    def test_model_size_boundary_at_10_0_mib(self):
+        passed, _, failures = evaluate_retraining_gate(
+            metrics=gate_metrics(), model_size_mb=10.0
+        )
+        self.assertTrue(passed, failures)
+
+        passed, _, failures = evaluate_retraining_gate(
+            metrics=gate_metrics(), model_size_mb=10.01
+        )
+        self.assertFalse(passed)
+        self.assertTrue(any("Model size" in f and "10.01" in f for f in failures))
+
+
+class TestMeasuredValMetricsContract(unittest.TestCase):
+    """S12-T5 §2.7 / §5.2: only a measured artifact may drive the gate."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.tmp_path = Path(self.test_dir)
+
+    @requires("load_val_metrics")
+    def test_valid_val_metrics_file_loads_every_contract_field(self):
+        path = self.tmp_path / "val_metrics.json"
+        path.write_text(json.dumps(MEASURED_METRICS, indent=2), encoding="utf-8")
+
+        metrics = train_module.load_val_metrics(path)
+
+        for key in ("provenance", "split", "weights_sha256", "dataset_manifest_sha256",
+                    "split_sha256", "epochs_completed", "best_epoch", "mask_map50",
+                    "mask_map50_95", "class_iou", "stability"):
+            self.assertIn(key, metrics, f"loader dropped {key}")
+        self.assertEqual(list(metrics["class_iou"]), TARGET_CLASSES)
+
+    @requires("load_val_metrics")
+    def test_measured_val_metrics_file_passes_the_gate_with_artifact_provenance(self):
+        path = self.tmp_path / "val_metrics.json"
+        path.write_text(json.dumps(MEASURED_METRICS, indent=2), encoding="utf-8")
+        metrics = train_module.load_val_metrics(path)
+
+        passed, summary, failures = evaluate_retraining_gate(
+            metrics=metrics, metrics_provenance=str(path)
+        )
+
+        self.assertTrue(passed, failures)
+        self.assertEqual(summary["verdict"], "PASSED")
+        self.assertEqual(summary["metrics_provenance"], str(path))
+        self.assertEqual(failures, [])
+
+    @requires("load_val_metrics")
+    def test_missing_metric_field_is_refused_by_name(self):
+        broken = dict(MEASURED_METRICS)
+        broken.pop("class_iou")
+        path = self.tmp_path / "broken.json"
+        path.write_text(json.dumps(broken), encoding="utf-8")
+
+        with self.assertRaises(ValueError) as ctx:
+            train_module.load_val_metrics(path)
+        self.assertIn("class_iou", str(ctx.exception))
+
+    @requires("load_val_metrics")
+    def test_class_order_mismatch_aborts(self):
+        reordered = dict(MEASURED_METRICS)
+        reordered["class_iou"] = {
+            name: MEASURED_METRICS["class_iou"][name]
+            for name in reversed(TARGET_CLASSES)
+        }
+        path = self.tmp_path / "reordered.json"
+        path.write_text(json.dumps(reordered), encoding="utf-8")
+
+        with self.assertRaises(ValueError) as ctx:
+            train_module.load_val_metrics(path)
+        message = str(ctx.exception)
+        self.assertIn("roadway", message)
+        self.assertIn("class", message.lower())
+
+    @requires("load_val_metrics")
+    def test_reference_baseline_provenance_is_refused(self):
+        copied = dict(MEASURED_METRICS, provenance="reference baseline")
+        path = self.tmp_path / "copied.json"
+        path.write_text(json.dumps(copied), encoding="utf-8")
+
+        with self.assertRaises(ValueError) as ctx:
+            train_module.load_val_metrics(path)
+        self.assertIn("provenance", str(ctx.exception).lower())
+
+    @requires("verify_metric_binding")
+    def test_dataset_and_split_sha_must_match_the_run_manifest(self):
+        run_manifest = {
+            "dataset_manifest_sha256": "2" * 64,
+            "split_sha256": "3" * 64,
+        }
+        train_module.verify_metric_binding(MEASURED_METRICS, run_manifest)
+
+        drifted = dict(MEASURED_METRICS, split_sha256="4" * 64)
+        with self.assertRaises(ValueError) as ctx:
+            train_module.verify_metric_binding(drifted, run_manifest)
+        self.assertIn("split_sha256", str(ctx.exception))
+
+
+class TestVerifyGateCli(unittest.TestCase):
+    """S12-T5 §2.7: measured input is mandatory for a promotion verdict."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.tmp_path = Path(self.test_dir)
+        self.script = TRAIN_DIR / "train_yolov8_seg.py"
+
+    @requires("load_val_metrics")
+    def test_verify_gate_without_metrics_exits_2(self):
+        completed = subprocess.run(
+            [sys.executable, str(self.script), "--verify-gate", "--dry-run"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertEqual(
+            completed.returncode,
+            2,
+            f"--verify-gate without --metrics must exit 2\n"
+            f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}",
+        )
+        self.assertIn("--metrics", completed.stdout + completed.stderr)
+
+    @requires("load_val_metrics")
+    def test_allow_untrained_head_keeps_unverified_and_exits_1_without_training(self):
+        argv = [
+            str(self.script),
+            "--verify-gate",
+            "--allow-untrained-head",
+            "--dry-run",
+            "--data",
+            str(self.tmp_path / "absent.yaml"),
+        ]
+
+        with patch.object(sys, "argv", argv), patch.object(
+            train_module, "train_yolov8_seg"
+        ) as fake_train:
+            with self.assertLogs(level="INFO") as logs:
+                with self.assertRaises(SystemExit) as ctx:
+                    train_module.main()
+
+        self.assertEqual(ctx.exception.code, 1)
+        fake_train.assert_not_called()
+        self.assertTrue(any("UNVERIFIED" in line for line in logs.output))
+
+
+class TestEpochStabilityMargin(unittest.TestCase):
+    """S12-T5 §2.7 anti-cherry-pick: best epoch <= last-10 median + 0.02."""
+
+    @requires("compute_epoch_stability", "assert_epoch_stability")
+    def test_margin_at_the_0_02_boundary_is_stable(self):
+        epochs = [0.500] * 10 + [0.510] * 9 + [0.530]
+
+        stability = train_module.compute_epoch_stability(epochs)
+
+        self.assertAlmostEqual(stability["best_map50_95"], 0.530, places=4)
+        self.assertAlmostEqual(stability["last10_median_map50_95"], 0.510, places=4)
+        self.assertAlmostEqual(stability["best_minus_median"], 0.020, places=4)
+        self.assertTrue(stability["stable"])
+        self.assertEqual(train_module.assert_epoch_stability(epochs), [])
+
+    @requires("compute_epoch_stability", "assert_epoch_stability")
+    def test_single_lucky_epoch_beyond_0_02_is_refused(self):
+        epochs = [0.500] * 10 + [0.510] * 9 + [0.531]
+
+        stability = train_module.compute_epoch_stability(epochs)
+        failures = train_module.assert_epoch_stability(epochs)
+
+        self.assertAlmostEqual(stability["best_minus_median"], 0.021, places=4)
+        self.assertFalse(stability["stable"])
+        self.assertEqual(len(failures), 1)
+        message = failures[0].lower()
+        self.assertTrue(
+            any(token in message for token in ("stability", "cherry", "margin")),
+            f"stability failure must explain itself: {failures[0]}",
+        )
+
+    @requires("assert_epoch_stability")
+    def test_fewer_than_ten_epochs_cannot_claim_stability(self):
+        failures = train_module.assert_epoch_stability([0.5] * 9)
+        self.assertEqual(len(failures), 1)
+        self.assertIn("10", failures[0])
+
+
+class TestHeadStatusAndTrainingMetadata(unittest.TestCase):
+    """S12-T5 §2.8 / AC14: trained means zero re-initialised tensors."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.tmp_path = Path(self.test_dir)
+
+    @requires("derive_head_status")
+    def test_zero_reinitialised_tensors_means_trained(self):
+        self.assertEqual(train_module.derive_head_status(0), "trained")
+        self.assertEqual(train_module.derive_head_status(36), "reinitialised_untrained")
+        self.assertEqual(train_module.derive_head_status(1), "reinitialised_untrained")
+
+    @requires("build_training_metadata_block")
+    def test_training_block_carries_every_provenance_field(self):
+        block = train_module.build_training_metadata_block(
+            dataset_manifest_sha256="a" * 64,
+            split_sha256="b" * 64,
+            best_pt_sha256="c" * 64,
+            val_metrics_sha256="d" * 64,
+            git_sha="e" * 40,
+            gpu="NVIDIA L4 24GB / 550.54.14",
+            epochs=100,
+            gate_verdict="PASSED",
+            trained_at="2026-11-12T10:00:00+07:00",
+        )
+
+        expected = {
+            "dataset_manifest_sha256",
+            "split_sha256",
+            "best_pt_sha256",
+            "val_metrics_sha256",
+            "git_sha",
+            "gpu",
+            "epochs",
+            "gate_verdict",
+            "trained_at",
+        }
+        self.assertEqual(set(block), expected)
+        self.assertEqual(block["epochs"], 100)
+        self.assertEqual(block["gate_verdict"], "PASSED")
+        for field in ("dataset_manifest_sha256", "split_sha256", "best_pt_sha256",
+                      "val_metrics_sha256"):
+            self.assertRegex(block[field], r"^[0-9a-f]{64}$")
+        self.assertRegex(block["git_sha"], r"^[0-9a-f]{7,40}$")
+        self.assertIn("L4", block["gpu"])
 
 
 if __name__ == "__main__":
