@@ -218,15 +218,10 @@ func buildHotsetOnVerdict(p hotsetDispatcherParams) func(v hotset.Verdict) {
 
 		// Fan-out 2b: append to the Hot Set time series consumed by the
 		// short-horizon congestion forecast feature store (Issue #302).
-		// Stale or frozen verdicts are excluded: replaying an unchanged
-		// frame as a fresh observation would poison lag and rolling
-		// features with fabricated variation. Verdicts without a PCU/SI
-		// series are skipped for the same reason; a VLM-only label or an
-		// UNKNOWN error verdict must not be persisted as a zero-saturation
-		// observation.
-		hasPCUSeries := v.Severity != hotset.SeverityUnknown &&
-			(v.Source == "onnx" || v.PCUTotal > 0 || v.SaturationIndex > 0)
-		if p.verdictHistoryRepo != nil && !v.Stale && hasPCUSeries {
+		// The recordability gate lives in hotset.RecordableObservation so the
+		// 24h coverage verification harness shares one definition with
+		// production (Issue #441).
+		if p.verdictHistoryRepo != nil && hotset.RecordableObservation(v) {
 			observedAt := v.ObservedAt
 			if observedAt.IsZero() {
 				observedAt = v.Timestamp
@@ -332,6 +327,15 @@ func startHotsetScheduler(ctx context.Context, s *hotset.Scheduler) {
 		return
 	}
 	go s.Run(ctx)
+}
+
+// startOpsWatchdogJob runs the operational alert watchdog (S14-T1, Issue #441).
+// It owns its own ticker so a stuck analysis cycle cannot silence alerting.
+func startOpsWatchdogJob(ctx context.Context, w *hotset.Watchdog) {
+	if w == nil {
+		return
+	}
+	go w.Run(ctx)
 }
 
 // startHarvesterJob starts the autonomous harvester coordinator.

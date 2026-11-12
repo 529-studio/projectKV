@@ -18,6 +18,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
 	"github.com/529-studio/projectKV/services/go-server/internal/corridor"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
+	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
 	"github.com/529-studio/projectKV/services/go-server/internal/notify"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
@@ -132,6 +133,14 @@ func main() {
 
 	// 6. Analyzer selection & Core Handlers (Hotset, Corridor, Forecast, Weather)
 	analyzer, analysisEnabled := initAnalyzer(cfg, camCatalog, db)
+	healthChecker := initCVEngineHealthChecker(analyzer)
+	opsWatchdog := hotset.NewWatchdog(
+		hotset.WithFeedDropoutThreshold(cfg.OpsAlertFeedDropoutThreshold),
+		hotset.WithCVEngineFailureThreshold(cfg.OpsAlertCVEngineThreshold),
+		hotset.WithWatchdogEvaluateInterval(cfg.OpsAlertEvaluateInterval),
+	)
+	opsWatchdog.SetEngineProbe(initCVEngineHealthProbe(healthChecker))
+	startOpsWatchdogJob(appCtx, opsWatchdog)
 	hotsetStore := hotset.NewStore(time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second)
 	hotsetHandler := hotset.NewHandlerWithConfig(hotsetStore, analysisEnabled, cfg.AppEnv)
 	hotsetHandler.SetStaleTTL(time.Duration(cfg.VerdictStaleTTLSeconds) * time.Second)
@@ -192,6 +201,7 @@ func main() {
 		sched := hotset.NewScheduler(hotsetRegistry, analyzer, time.Duration(cfg.HotsetIntervalSeconds)*time.Second, cfg.HotsetMaxParallel, onVerdict, nil)
 		sched.SetStore(hotsetStore)
 		sched.SetBudget(hotset.NewAnalysisBudget(cfg.AnalyzerDailyBudget))
+		sched.SetWatchdog(opsWatchdog)
 		startHotsetScheduler(appCtx, sched)
 	}
 
@@ -205,7 +215,7 @@ func main() {
 		weatherHandler: weatherHandler, tileHandler: tileHandler, floodHandler: floodHandler,
 		subHandler: subHandler, archiverHandler: archiverHandler, harvesterCoord: harvesterCoord,
 		feedbackHandler: feedbackHandler, wsHub: wsHub, liveHub: liveHub, botHandler: botHandler,
-		webhookEnabled: webhookEnabled,
+		webhookEnabled: webhookEnabled, healthHandler: httpserver.NewHealthHandler(healthChecker),
 	})
 
 	srv := &http.Server{Addr: fmt.Sprintf(":%s", cfg.Port), Handler: router}

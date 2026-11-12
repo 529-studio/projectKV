@@ -328,7 +328,7 @@ func LoadFromEnv() (*Config, error) {
 		ArchiveMaxDiskMB:              parseEnvInt64("ARCHIVE_MAX_DISK_MB", 20000, 1),
 		ArchiveRetentionCheckInterval: parseEnvDuration("ARCHIVE_RETENTION_CHECK_INTERVAL", 1*time.Hour),
 		VerdictStaleTTLSeconds:        parseEnvInt("VERDICT_STALE_TTL_SECONDS", 180, 1),
-		FrozenFrameThreshold:          parseEnvInt("FROZEN_FRAME_THRESHOLD", 3, 1),
+		FrozenFrameThreshold:          parseEnvInt("FROZEN_FRAME_THRESHOLD", 10, 1),
 		HexResolution:                 parseEnvInt("HEX_RESOLUTION", 7, 1),
 		HexMinCameras:                 parseEnvInt("HEX_MIN_CAMERAS", 3, 1),
 		HarvesterEnabled:              parseEnvBool("HARVESTER_ENABLED", false),
@@ -411,10 +411,13 @@ type ServerConfig struct {
 	ArchiveMaxDiskMB              int64         // default: 20000
 	ArchiveRetentionCheckInterval time.Duration // default: 1h
 	VerdictStaleTTLSeconds        int           // default: 180
-	FrozenFrameThreshold          int           // default: 3
+	FrozenFrameThreshold          int           // default: 10 (5 minutes at the 30s Hot Set interval)
 	HotsetIntervalSeconds         int           // default: 30 (mock) or 60 (vlm)
 	HotsetMaxParallel             int           // default: 10 (mock) or 1 (vlm)
 	HotsetFixedMaxCameras         int           // default: 40 (mock) or 2 (vlm)
+	OpsAlertFeedDropoutThreshold  time.Duration // default: 5m (OPS_ALERT_FEED_DROPOUT_THRESHOLD)
+	OpsAlertCVEngineThreshold     time.Duration // default: 5m (OPS_ALERT_CV_ENGINE_FAILURE_THRESHOLD)
+	OpsAlertEvaluateInterval      time.Duration // default: 30s (OPS_ALERT_EVALUATE_INTERVAL)
 	HexResolution                 int           // default: 7 (HEX_RESOLUTION)
 	HexMinCameras                 int           // default: 3 (HEX_MIN_CAMERAS)
 	HexPolygonFilePath            string        // default: resolvePath("h3_hex_polygons.json")
@@ -550,7 +553,10 @@ func LoadConfig() *ServerConfig {
 	rateLimitBurst := parseEnvInt("RATE_LIMIT_BURST", 30, 1)
 	analyzerDailyBudget := parseEnvInt("ANALYZER_DAILY_BUDGET", 5000, 1)
 	verdictStaleTTLSeconds := parseEnvInt("VERDICT_STALE_TTL_SECONDS", 180, 1)
-	frozenFrameThreshold := parseEnvInt("FROZEN_FRAME_THRESHOLD", 3, 1)
+	frozenFrameThreshold := parseEnvInt("FROZEN_FRAME_THRESHOLD", 10, 1)
+	opsAlertFeedDropoutThreshold := parseEnvDuration("OPS_ALERT_FEED_DROPOUT_THRESHOLD", 5*time.Minute)
+	opsAlertCVEngineThreshold := parseEnvDuration("OPS_ALERT_CV_ENGINE_FAILURE_THRESHOLD", 5*time.Minute)
+	opsAlertEvaluateInterval := parseEnvDuration("OPS_ALERT_EVALUATE_INTERVAL", 30*time.Second)
 
 	hotsetIntervalSeconds := 30
 	if analyzer == "vlm" {
@@ -636,6 +642,9 @@ func LoadConfig() *ServerConfig {
 		HotsetIntervalSeconds:         hotsetIntervalSeconds,
 		HotsetMaxParallel:             hotsetMaxParallel,
 		HotsetFixedMaxCameras:         hotsetFixedMaxCameras,
+		OpsAlertFeedDropoutThreshold:  opsAlertFeedDropoutThreshold,
+		OpsAlertCVEngineThreshold:     opsAlertCVEngineThreshold,
+		OpsAlertEvaluateInterval:      opsAlertEvaluateInterval,
 		HexResolution:                 hexResolution,
 		HexMinCameras:                 hexMinCameras,
 		HexPolygonFilePath:            hexPolygonFilePath,

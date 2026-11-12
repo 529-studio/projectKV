@@ -6,11 +6,18 @@ import (
 	"sync"
 )
 
-// DefaultFrozenThreshold is the default number of consecutive identical frames required to mark a feed as frozen.
-const DefaultFrozenThreshold = 3
+// DefaultFrozenThreshold is the default number of consecutive identical frames
+// required to mark a feed as frozen.
+//
+// K=10 at the 30s Hot Set polling interval is five minutes of an unchanged
+// frame. Slower-refresh sources (60-90s) legitimately repeat a frame for a few
+// cycles, and a threshold that low marked them stale prematurely, which dropped
+// them from verdict history. Ten cycles still catches a genuinely frozen feed
+// within one polling window while tolerating normal upstream refresh jitter.
+const DefaultFrozenThreshold = 10
 
 // FrozenDetector detects frozen camera feeds by comparing frame hashes across cycles.
-// When a camera produces K identical frame hashes in a row (default K=3),
+// When a camera produces K identical frame hashes in a row (default K=10),
 // the camera's feed is considered frozen, and Check returns true (stale).
 type FrozenDetector struct {
 	mu        sync.Mutex
@@ -24,7 +31,7 @@ type cameraFrameHistory struct {
 }
 
 // NewFrozenDetector creates a FrozenDetector with the given consecutive identical frame threshold K.
-// If threshold <= 0, DefaultFrozenThreshold (3) is used.
+// If threshold <= 0, DefaultFrozenThreshold (10) is used.
 func NewFrozenDetector(threshold int) *FrozenDetector {
 	if threshold <= 0 {
 		threshold = DefaultFrozenThreshold

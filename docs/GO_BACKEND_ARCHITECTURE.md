@@ -95,6 +95,8 @@ services/go-server/
 │   │   └── handler.go                 # GET /api/snapshot/:id — proxies to upstream DOT portal, serves from cache
 │   ├── hotset/
 │   │   ├── scheduler.go               # [ALREADY PROVIDED — paste as-is, do not regenerate]
+│   │   ├── watchdog.go                # operational liveness watchdog: [OPS_ALERT] on 5m feed dropout / cv-engine failure, debounced per episode
+│   │   ├── observation.go             # RecordableObservation: the single gate for continuous Hot Set history
 │   │   └── handler.go                 # GET /api/traffic-status, GET /api/flood-status (reads latest verdicts from a small in-memory or store-backed cache)
 │   ├── cvclient/
 │   │   ├── analyzer.go                # shared HTTP client setup for the analyzers below

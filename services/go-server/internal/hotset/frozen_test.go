@@ -102,6 +102,36 @@ func TestFrozenDetector_CheckBytes(t *testing.T) {
 	}
 }
 
+func TestFrozenDetector_DefaultThresholdToleratesSlowRefreshFeeds(t *testing.T) {
+	if hotset.DefaultFrozenThreshold != 10 {
+		t.Fatalf("expected DefaultFrozenThreshold=10, got %d", hotset.DefaultFrozenThreshold)
+	}
+
+	d := hotset.NewFrozenDetector(0) // 0 selects the default threshold
+	camID := "cam-slow-refresh"
+	hash := "sha256_hash_slow_refresh"
+
+	// A 60-90s refresh source repeats the same frame for up to three 30s
+	// cycles; it must not be marked stale.
+	for cycle := 1; cycle <= 3; cycle++ {
+		if d.Check(camID, hash) {
+			t.Fatalf("cycle %d: slow-refresh feed must not be stale within 3 cycles", cycle)
+		}
+	}
+
+	// Nine identical frames (4.5 minutes) still tolerated.
+	for cycle := 4; cycle < 10; cycle++ {
+		if d.Check(camID, hash) {
+			t.Fatalf("cycle %d: feed must not be stale before 10 identical frames", cycle)
+		}
+	}
+
+	// The tenth identical frame marks the feed frozen (5 minutes at 30s).
+	if !d.Check(camID, hash) {
+		t.Error("expected 10th identical frame to mark the feed frozen")
+	}
+}
+
 func TestFrozenDetector_EmptyAndReset(t *testing.T) {
 	d := hotset.NewFrozenDetector(3)
 

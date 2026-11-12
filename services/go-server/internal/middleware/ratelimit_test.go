@@ -124,6 +124,7 @@ func TestIsExempt(t *testing.T) {
 	}{
 		{"/health", true},
 		{"/healthz", true},
+		{"/api/health", true},
 		{"/", true},
 		{"/index.html", true},
 		{"/_next/static/chunk.js", true},

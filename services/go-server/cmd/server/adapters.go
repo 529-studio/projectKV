@@ -22,6 +22,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/forecast"
 	"github.com/529-studio/projectKV/services/go-server/internal/harvester"
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
+	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
 	"github.com/529-studio/projectKV/services/go-server/internal/notify"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
@@ -789,6 +790,64 @@ func initAnalyzer(cfg *config.ServerConfig, camCatalog *camera.Catalog, db *sql.
 	return analyzer, analysisEnabled
 }
 
+// cvEngineHealthProbe is implemented by analyzers that can report the health of
+// their downstream inference engine (currently *cvclient.CVEngineAnalyzer).
+type cvEngineHealthProbe interface {
+	ProbeHealth(ctx context.Context) (cvclient.CVEngineHealth, error)
+}
+
+// initCVEngineHealthChecker adapts the analyzer's cv-engine health probe into
+// an httpserver.HealthChecker. It returns nil when the selected analyzer has no
+// downstream engine to probe (ANALYZER=none, mock or vlm), so /health reports
+// healthy without claiming an engine is up.
+func initCVEngineHealthChecker(analyzer hotset.Analyzer) httpserver.HealthChecker {
+	probe, ok := analyzer.(cvEngineHealthProbe)
+	if !ok {
+		return nil
+	}
+	return httpserver.NewProbeHealthChecker(func(ctx context.Context) (httpserver.CVEngineHealth, error) {
+		health, err := probe.ProbeHealth(ctx)
+		return httpserver.CVEngineHealth{
+			Status:            health.Status,
+			Service:           health.Service,
+			OpenVINOAvailable: health.OpenVINOAvailable,
+			ModelLoaded:       health.ModelLoaded,
+			LatencyMs:         health.LatencyMs,
+			Error:             health.Error,
+			CheckedAt:         health.CheckedAt,
+		}, err
+	})
+}
+
+// initCVEngineHealthProbe adapts the cv-engine health checker into the
+// hotset.Watchdog's engine liveness probe (Issue #441 scope 4).
+//
+// "degraded" (the engine is up but reports model_loaded=false) cannot serve
+// inference and therefore counts as unhealthy for alerting, even though /health
+// still distinguishes it from an unreachable engine for diagnostics.
+//
+// It returns nil when no checker is wired, which leaves engine alerting off and
+// feed alerting fully operational.
+func initCVEngineHealthProbe(checker httpserver.HealthChecker) hotset.EngineProbe {
+	if checker == nil {
+		return nil
+	}
+	return func(ctx context.Context) (bool, string) {
+		health := checker.CheckCVEngineHealth(ctx)
+		if health.Status == httpserver.HealthStatusHealthy {
+			return true, ""
+		}
+		status := health.Status
+		if status == "" {
+			status = httpserver.HealthStatusUnhealthy
+		}
+		if health.Error != "" {
+			return false, status + ": " + health.Error
+		}
+		return false, status
+	}
+}
+
 // initStorageDriver initializes the Cloudflare R2 or local filesystem object storage driver.
 func initStorageDriver(cfg *config.ServerConfig) (storage.Storage, string) {
 	var storeDriver storage.Storage
@@ -896,6 +955,8 @@ func initHarvesterCoordinator(
 					Title:       c.Title,
 					SnapshotURL: c.SnapshotURL,
 					RoadKeys:    c.RoadKeys,
+					IsOnline:    c.IsOnline,
+					IsGhost:     c.IsGhost,
 				})
 			}
 		}

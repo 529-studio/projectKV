@@ -22,6 +22,13 @@ type Camera struct {
 	Title       string   `json:"title,omitempty"`
 	SnapshotURL string   `json:"snapshotUrl"`
 	RoadKeys    []string `json:"road_keys,omitempty"`
+	// IsOnline reports whether the catalog considers the feed reachable.
+	// Harvesting an offline camera only burns a concurrency slot on a request
+	// that must fail, so HarvestCameras skips it before scheduling.
+	IsOnline bool `json:"isOnline"`
+	// IsGhost marks a catalog placeholder that intentionally has no live feed
+	// (for example a retired camera kept for map continuity).
+	IsGhost bool `json:"isGhost,omitempty"`
 }
 
 // Name returns the best available human-readable name for the camera.
