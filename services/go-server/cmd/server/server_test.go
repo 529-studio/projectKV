@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -25,7 +26,7 @@ func getFreePort(t *testing.T) string {
 }
 
 func TestStartup_RefusesMockOutsideDev(t *testing.T) {
-	cmd := exec.Command("go", "run", "./main.go")
+	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = "."
 	absCameras, err := filepath.Abs("../../../../cameras_enriched.json")
 	if err != nil {
@@ -56,7 +57,7 @@ func TestStartup_AnalyzerNone_EmptyVerdictsAndNoSSE(t *testing.T) {
 		t.Fatalf("resolve cameras path: %v", err)
 	}
 
-	cmd := exec.Command("go", "run", "./main.go")
+	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = "."
 	var outputBuf bytes.Buffer
 	cmd.Stdout = &outputBuf
@@ -160,7 +161,7 @@ func TestStartup_HotsetStatusEndpoint_ServesCachedState(t *testing.T) {
 		t.Fatalf("resolve cameras path: %v", err)
 	}
 
-	cmd := exec.Command("go", "run", "./main.go")
+	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = "."
 	serverBuf := &bytes.Buffer{}
 	cmd.Stdout = serverBuf
@@ -253,7 +254,7 @@ func TestStartup_CatalogGzipCompressionAndCachingHeaders(t *testing.T) {
 		t.Fatalf("resolve cameras path: %v", err)
 	}
 
-	cmd := exec.Command("go", "run", "./main.go")
+	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = "."
 	var outputBuf bytes.Buffer
 	cmd.Stdout = &outputBuf
@@ -420,5 +421,99 @@ func TestStartup_CatalogGzipCompressionAndCachingHeaders(t *testing.T) {
 
 	if respZonesCond.StatusCode != http.StatusNotModified {
 		t.Fatalf("expected 304 Not Modified for zones, got %d", respZonesCond.StatusCode)
+	}
+}
+
+func TestStartup_StaticWebServing_NextJSExportAndPurgedVanillaJS(t *testing.T) {
+	port := getFreePort(t)
+	absCameras, err := filepath.Abs("../../../../cameras_enriched.json")
+	if err != nil {
+		t.Fatalf("resolve cameras path: %v", err)
+	}
+
+	tmpStaticDir := t.TempDir()
+	indexContent := "<html><body>NextJS App Root</body></html>"
+	if err := os.WriteFile(filepath.Join(tmpStaticDir, "index.html"), []byte(indexContent), 0644); err != nil {
+		t.Fatalf("write index.html: %v", err)
+	}
+	nextDir := filepath.Join(tmpStaticDir, "_next")
+	if err := os.MkdirAll(nextDir, 0755); err != nil {
+		t.Fatalf("mkdir _next: %v", err)
+	}
+	chunkContent := "console.log('next-chunk');"
+	if err := os.WriteFile(filepath.Join(nextDir, "chunk.js"), []byte(chunkContent), 0644); err != nil {
+		t.Fatalf("write chunk.js: %v", err)
+	}
+
+	cmd := exec.Command("go", "run", ".")
+	cmd.Dir = "."
+	var outputBuf bytes.Buffer
+	cmd.Stdout = &outputBuf
+	cmd.Stderr = &outputBuf
+	cmd.Env = append(cmd.Environ(),
+		"PORT="+port,
+		"ANALYZER=none",
+		"APP_ENV=production",
+		"CAMERAS_FILE_PATH="+absCameras,
+		"SQLITE_PATH=:memory:",
+		"STATIC_WEB_DIR="+tmpStaticDir,
+	)
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	defer func() {
+		_ = cmd.Process.Kill()
+	}()
+
+	baseURL := "http://localhost:" + port
+	ready := false
+	for range 150 {
+		time.Sleep(100 * time.Millisecond)
+		resp, err := http.Get(baseURL + "/health")
+		if err == nil && resp.StatusCode == http.StatusOK {
+			_ = resp.Body.Close()
+			ready = true
+			break
+		}
+	}
+	if !ready {
+		t.Fatalf("server failed to become ready on %s; output:\n%s", baseURL, outputBuf.String())
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	// 1. Root / serves index.html
+	respRoot, err := client.Get(baseURL + "/")
+	if err != nil {
+		t.Fatalf("GET / failed: %v", err)
+	}
+	defer respRoot.Body.Close()
+	rootBody, _ := io.ReadAll(respRoot.Body)
+	if respRoot.StatusCode != http.StatusOK || string(rootBody) != indexContent {
+		t.Errorf("GET / expected 200 with index.html, got %d: %s", respRoot.StatusCode, string(rootBody))
+	}
+
+	// 2. Next.js static asset /_next/chunk.js is served
+	respNext, err := client.Get(baseURL + "/_next/chunk.js")
+	if err != nil {
+		t.Fatalf("GET /_next/chunk.js failed: %v", err)
+	}
+	defer respNext.Body.Close()
+	nextBody, _ := io.ReadAll(respNext.Body)
+	if respNext.StatusCode != http.StatusOK || string(nextBody) != chunkContent {
+		t.Errorf("GET /_next/chunk.js expected 200 with chunk.js, got %d: %s", respNext.StatusCode, string(nextBody))
+	}
+
+	// 3. Obsolete vanilla JS routes /styles.css and /app.js are not static files:
+	// when absent from disk, SPA fallback returns index.html rather than looking for a missing static file
+	respCSS, err := client.Get(baseURL + "/styles.css")
+	if err != nil {
+		t.Fatalf("GET /styles.css failed: %v", err)
+	}
+	defer respCSS.Body.Close()
+	cssBody, _ := io.ReadAll(respCSS.Body)
+	if string(cssBody) != indexContent {
+		t.Errorf("expected SPA fallback to index.html for unmapped /styles.css, got: %s", string(cssBody))
 	}
 }
