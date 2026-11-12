@@ -445,6 +445,10 @@ func TestStartup_StaticWebServing_NextJSExportAndPurgedVanillaJS(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(tmpStaticDir, "index.html"), []byte(indexContent), 0644); err != nil {
 		t.Fatalf("write index.html: %v", err)
 	}
+	assetContent := "static-public-asset"
+	if err := os.WriteFile(filepath.Join(tmpStaticDir, "asset.txt"), []byte(assetContent), 0644); err != nil {
+		t.Fatalf("write asset.txt: %v", err)
+	}
 	nextDir := filepath.Join(tmpStaticDir, "_next")
 	if err := os.MkdirAll(nextDir, 0755); err != nil {
 		t.Fatalf("mkdir _next: %v", err)
@@ -502,8 +506,18 @@ func TestStartup_StaticWebServing_NextJSExportAndPurgedVanillaJS(t *testing.T) {
 	if respRoot.StatusCode != http.StatusOK || string(rootBody) != indexContent {
 		t.Errorf("GET / expected 200 with index.html, got %d: %s", respRoot.StatusCode, string(rootBody))
 	}
+	// 2. Additional export assets are opened within the static root.
+	respAsset, err := client.Get(baseURL + "/asset.txt")
+	if err != nil {
+		t.Fatalf("GET /asset.txt failed: %v", err)
+	}
+	defer respAsset.Body.Close()
+	assetBody, _ := io.ReadAll(respAsset.Body)
+	if respAsset.StatusCode != http.StatusOK || string(assetBody) != assetContent {
+		t.Errorf("GET /asset.txt expected 200 with asset content, got %d: %s", respAsset.StatusCode, string(assetBody))
+	}
 
-	// 2. Next.js static asset /_next/chunk.js is served
+	// 3. Next.js static asset /_next/chunk.js is served
 	respNext, err := client.Get(baseURL + "/_next/chunk.js")
 	if err != nil {
 		t.Fatalf("GET /_next/chunk.js failed: %v", err)
@@ -514,7 +528,7 @@ func TestStartup_StaticWebServing_NextJSExportAndPurgedVanillaJS(t *testing.T) {
 		t.Errorf("GET /_next/chunk.js expected 200 with chunk.js, got %d: %s", respNext.StatusCode, string(nextBody))
 	}
 
-	// 3. Obsolete vanilla JS routes /styles.css and /app.js are not static files:
+	// 4. Obsolete vanilla JS routes /styles.css and /app.js are not static files:
 	// when absent from disk, SPA fallback returns index.html rather than looking for a missing static file
 	respCSS, err := client.Get(baseURL + "/styles.css")
 	if err != nil {
@@ -525,7 +539,7 @@ func TestStartup_StaticWebServing_NextJSExportAndPurgedVanillaJS(t *testing.T) {
 	if string(cssBody) != indexContent {
 		t.Errorf("expected SPA fallback to index.html for unmapped /styles.css, got: %s", string(cssBody))
 	}
-	// 4. Traversal cannot expose a sibling file outside the static root.
+	// 5. Traversal cannot expose a sibling file outside the static root.
 	respTraversal, err := client.Get(baseURL + "/%2e%2e/private.txt")
 	if err != nil {
 		t.Fatalf("GET traversal path failed: %v", err)
