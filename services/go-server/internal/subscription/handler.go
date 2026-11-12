@@ -1,34 +1,160 @@
 package subscription
 
 import (
+	"context"
+	"fmt"
+	"html"
+	"log/slog"
+	"math"
 	"net/http"
+	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+const (
+	// telegramChannel is the only citizen-facing delivery channel today.
+	telegramChannel = "telegram"
+	// confirmationTimeout bounds the best-effort confirmation DM so a slow Bot
+	// API can never hold the POST response (S12-T4 spec §2.5).
+	confirmationTimeout = 3 * time.Second
+	// subscribeRatePerMinute / subscribeBurst protect the public POST route.
+	// Web users are private chats; five subscriptions a minute is far above any
+	// legitimate interaction and far below a useful enumeration rate.
+	subscribeRatePerMinute = 5
+	subscribeBurst         = 3
+)
+
+// chatIDPattern is the web direct-path contract: private chat ids only, 5 to 20
+// digits. Group ids ("-100…") are rejected (S12-T4 spec §2.5). It lives here
+// rather than in IsValid so historical rows stay readable.
+var chatIDPattern = regexp.MustCompile(`^[0-9]{5,20}$`)
+
+// MessageSender delivers one HTML message to a chat. notify.TelegramChannel
+// satisfies it structurally; the composition root wires the adapter so this
+// leaf package never imports notify (DIP, spec §4.3).
+type MessageSender interface {
+	SendMessage(ctx context.Context, chatID, html string) error
+}
 
 // Handler handles HTTP requests for managing flood alert subscriptions.
 type Handler struct {
 	store    Store
 	taxonomy TaxonomyProvider
+
+	botUsername      string
+	deepLinkEnabled  bool
+	confirmation     func(Subscription) string
+	confirmationSend MessageSender
+	subscribeLimiter gin.HandlerFunc
+	logger           *slog.Logger
 }
 
-// NewHandler creates a new subscription Handler with optional taxonomy provider.
-func NewHandler(store Store, taxonomy ...TaxonomyProvider) *Handler {
-	var tp TaxonomyProvider
-	if len(taxonomy) > 0 {
-		tp = taxonomy[0]
+// Option configures the subscription Handler.
+type Option func(*Handler)
+
+// WithBotInfo publishes the bot handle and provisioning state on
+// GET /api/subscriptions/taxonomy. The web UI disables its deep-link CTA when
+// either is absent (AC4).
+func WithBotInfo(username string, enabled bool) Option {
+	return func(h *Handler) {
+		h.botUsername = strings.TrimPrefix(strings.TrimSpace(username), "@")
+		h.deepLinkEnabled = enabled && h.botUsername != ""
 	}
-	return &Handler{store: store, taxonomy: tp}
+}
+
+// WithConfirmationRenderer replaces the bilingual confirmation copy sent after
+// a successful direct-path subscription. The signature takes the stored row so
+// callers can name the exact scope.
+func WithConfirmationRenderer(renderer func(Subscription) string) Option {
+	return func(h *Handler) {
+		if renderer != nil {
+			h.confirmation = renderer
+		}
+	}
+}
+
+// WithConfirmationSender installs the best-effort confirmation DM transport.
+// Without it, POST /api/subscriptions behaves exactly as before.
+func WithConfirmationSender(sender MessageSender) Option {
+	return func(h *Handler) {
+		if sender != nil {
+			h.confirmationSend = sender
+		}
+	}
+}
+
+// WithSubscribeLimiter replaces the default per-IP limiter on POST. Passing nil
+// disables limiting (tests and non-citizen deployments only).
+func WithSubscribeLimiter(mw gin.HandlerFunc) Option {
+	return func(h *Handler) {
+		h.subscribeLimiter = mw
+	}
+}
+
+// NewHandler creates a subscription Handler. taxonomy may be nil; the default
+// confirmation copy and per-IP limiter are always installed unless overridden.
+func NewHandler(store Store, taxonomy TaxonomyProvider, opts ...Option) *Handler {
+	h := &Handler{
+		store:            store,
+		taxonomy:         taxonomy,
+		confirmation:     DefaultConfirmationMessage,
+		subscribeLimiter: newSubscribeLimiterWithClock(subscribeRatePerMinute, subscribeBurst, time.Now),
+		logger:           slog.Default(),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(h)
+		}
+	}
+	return h
+}
+
+// RouteOption configures route registration.
+type RouteOption func(*routeOptions)
+
+type routeOptions struct {
+	auditAuth gin.HandlerFunc
+}
+
+// WithAuditAuth puts GET /api/subscriptions behind developer authentication.
+// The endpoint enumerates chat ids, which must never be publicly readable
+// (S12-T4 spec §2.5).
+func WithAuditAuth(mw gin.HandlerFunc) RouteOption {
+	return func(o *routeOptions) {
+		o.auditAuth = mw
+	}
 }
 
 // RegisterRoutes registers subscription endpoints on the given router group.
-func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
+func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, opts ...RouteOption) {
+	if rg == nil {
+		return
+	}
+	options := routeOptions{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
+		}
+	}
+
 	subs := rg.Group("/subscriptions")
 	{
-		subs.POST("", h.Subscribe)
+		postHandlers := make([]gin.HandlerFunc, 0, 2)
+		if h.subscribeLimiter != nil {
+			postHandlers = append(postHandlers, h.subscribeLimiter)
+		}
+		postHandlers = append(postHandlers, h.Subscribe)
+		subs.POST("", postHandlers...)
 		subs.DELETE("", h.Unsubscribe)
-		subs.GET("", h.ListSubscriptions)
+		if options.auditAuth != nil {
+			subs.GET("", options.auditAuth, h.ListSubscriptions)
+		} else {
+			subs.GET("", h.ListSubscriptions)
+		}
 		subs.GET("/taxonomy", h.GetTaxonomy)
 	}
 }
@@ -50,6 +176,7 @@ type SubscribeRequest struct {
 // @Param request body SubscribeRequest true "Subscription details"
 // @Success 201 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
+// @Failure 429 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/subscriptions [post]
 func (h *Handler) Subscribe(c *gin.Context) {
@@ -76,6 +203,15 @@ func (h *Handler) Subscribe(c *gin.Context) {
 			resp["valid_zones"] = CanonicalZones
 		}
 		c.JSON(http.StatusBadRequest, resp)
+		return
+	}
+
+	// Web users are private chats. Reject group ids and any non-digit value
+	// before touching the database so a typo cannot create an unreachable row.
+	if strings.EqualFold(sub.ChannelName, telegramChannel) && !chatIDPattern.MatchString(sub.ChatID) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid chat_id: telegram web subscriptions require 5 to 20 digits",
+		})
 		return
 	}
 
@@ -114,10 +250,64 @@ func (h *Handler) Subscribe(c *gin.Context) {
 		return
 	}
 
+	// Best-effort confirmation DM. A failure never changes the response: the
+	// owner may still not own the chat id (accepted risk R1), but the message
+	// tells the real owner what was registered and how to revoke it.
+	h.sendConfirmation(sub)
+
 	c.JSON(http.StatusCreated, gin.H{
 		"status":       "subscribed",
 		"subscription": sub,
 	})
+}
+
+// sendConfirmation delivers the §2.5 confirmation DM with a hard 3 s budget.
+func (h *Handler) sendConfirmation(sub Subscription) {
+	if h.confirmationSend == nil || h.confirmation == nil {
+		return
+	}
+	if !strings.EqualFold(sub.ChannelName, telegramChannel) {
+		return
+	}
+	text := h.confirmation(sub)
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), confirmationTimeout)
+	defer cancel()
+	if err := h.confirmationSend.SendMessage(ctx, sub.ChatID, text); err != nil {
+		h.logger.Warn("subscription: confirmation DM failed",
+			"chat", tailChatID(sub.ChatID), "target_type", string(sub.TargetType), "error", err)
+	}
+}
+
+// DefaultConfirmationMessage is the bilingual DM sent when a subscription is
+// created through the public web form. Zero emoji, HTML parse mode, /stop hint.
+func DefaultConfirmationMessage(sub Subscription) string {
+	vi, en := confirmationScope(sub)
+	return fmt.Sprintf(
+		"Bạn đã đăng ký nhận cảnh báo ngập cho phạm vi: <b>%s</b>.\n"+
+			"Gửi /status để xem lại, gửi /stop để huỷ bất cứ lúc nào.\n\n"+
+			"You subscribed to flood alerts for: <b>%s</b>.\n"+
+			"Send /status to review, /stop to unsubscribe at any time.",
+		html.EscapeString(vi), html.EscapeString(en),
+	)
+}
+
+func confirmationScope(sub Subscription) (string, string) {
+	target := strings.TrimSpace(sub.TargetID)
+	switch sub.TargetType {
+	case TargetAll:
+		return "Toàn thành phố", "City-wide"
+	case TargetZone:
+		return "Khu vực: " + target, "Zone: " + target
+	case TargetWard:
+		return "Phường / Xã: " + target, "Ward / Commune: " + target
+	case TargetChokepoint:
+		return "Điểm ngập: " + target, "Chokepoint: " + target
+	default:
+		return target, target
+	}
 }
 
 // Unsubscribe deletes an existing flood alert subscription.
@@ -219,17 +409,19 @@ func (h *Handler) ListSubscriptions(c *gin.Context) {
 
 // GetTaxonomy returns the canonical subscription taxonomy (target types, zones, wards, chokepoints).
 // @Summary Get subscription taxonomy
-// @Description Retrieves all canonical targets available for subscription (operational zones, administrative wards, camera chokepoints, and target types).
+// @Description Retrieves all canonical targets available for subscription (operational zones, administrative wards, camera chokepoints, and target types) plus the public bot handle for deep links.
 // @Tags Subscriptions
 // @Produce json
 // @Success 200 {object} TaxonomyResponse
 // @Router /api/subscriptions/taxonomy [get]
 func (h *Handler) GetTaxonomy(c *gin.Context) {
 	resp := TaxonomyResponse{
-		TargetTypes: CanonicalTargetTypes,
-		Zones:       CanonicalZones,
-		Wards:       []WardInfo{},
-		Chokepoints: []ChokepointInfo{},
+		TargetTypes:     CanonicalTargetTypes,
+		Zones:           CanonicalZones,
+		Wards:           []WardInfo{},
+		Chokepoints:     []ChokepointInfo{},
+		BotUsername:     h.botUsername,
+		DeepLinkEnabled: h.deepLinkEnabled,
 	}
 
 	if h.taxonomy != nil {
@@ -245,4 +437,91 @@ func (h *Handler) GetTaxonomy(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+// --- Per-IP limiter --------------------------------------------------------
+
+type subscribeBucket struct {
+	tokens float64
+	last   time.Time
+}
+
+type subscribeLimiter struct {
+	mu      sync.Mutex
+	buckets map[string]*subscribeBucket
+	rate    float64 // tokens per second
+	burst   float64
+	now     func() time.Time
+}
+
+// newSubscribeLimiterWithClock builds the dedicated POST /api/subscriptions
+// limiter: 5 requests per minute per IP with a burst of 3. The clock is
+// injectable so the table test does not sleep.
+func newSubscribeLimiterWithClock(perMinute, burst int, now func() time.Time) gin.HandlerFunc {
+	if perMinute <= 0 || burst <= 0 {
+		return func(c *gin.Context) { c.Next() }
+	}
+	if now == nil {
+		now = time.Now
+	}
+	l := &subscribeLimiter{
+		buckets: make(map[string]*subscribeBucket),
+		rate:    float64(perMinute) / 60,
+		burst:   float64(burst),
+		now:     now,
+	}
+	retryAfter := fmt.Sprintf("%d", int(math.Ceil(60/float64(perMinute))))
+
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		if ip == "" {
+			ip = "unknown"
+		}
+		if !l.allow(ip) {
+			c.Header("Retry-After", retryAfter)
+			c.AbortWithStatus(http.StatusTooManyRequests)
+			return
+		}
+		c.Next()
+	}
+}
+
+func (l *subscribeLimiter) allow(ip string) bool {
+	now := l.now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// Bound memory: a public endpoint can see many source addresses, so prune
+	// idle buckets before the map grows without limit.
+	if len(l.buckets) > 4096 {
+		for key, bucket := range l.buckets {
+			if now.Sub(bucket.last) > 10*time.Minute {
+				delete(l.buckets, key)
+			}
+		}
+	}
+
+	bucket, ok := l.buckets[ip]
+	if !ok {
+		l.buckets[ip] = &subscribeBucket{tokens: l.burst - 1, last: now}
+		return true
+	}
+	elapsed := now.Sub(bucket.last).Seconds()
+	if elapsed > 0 {
+		bucket.tokens = math.Min(l.burst, bucket.tokens+elapsed*l.rate)
+		bucket.last = now
+	}
+	if bucket.tokens >= 1 {
+		bucket.tokens--
+		return true
+	}
+	return false
+}
+
+// tailChatID returns the last four characters of a chat id for logs.
+func tailChatID(chatID string) string {
+	if len(chatID) <= 4 {
+		return chatID
+	}
+	return chatID[len(chatID)-4:]
 }

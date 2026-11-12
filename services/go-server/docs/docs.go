@@ -734,6 +734,15 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -814,7 +823,7 @@ const docTemplate = `{
         },
         "/api/subscriptions/taxonomy": {
             "get": {
-                "description": "Retrieves all canonical targets available for subscription (operational zones, administrative wards, camera chokepoints, and target types).",
+                "description": "Retrieves all canonical targets available for subscription (operational zones, administrative wards, camera chokepoints, and target types) plus the public bot handle for deep links.",
                 "produces": [
                     "application/json"
                 ],
@@ -1486,7 +1495,8 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
@@ -1658,7 +1668,8 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
@@ -2480,7 +2491,8 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
@@ -2557,11 +2569,19 @@ const docTemplate = `{
         "subscription.TaxonomyResponse": {
             "type": "object",
             "properties": {
+                "bot_username": {
+                    "description": "BotUsername is the public Telegram handle the web UI turns into a deep\nlink. Empty when the bot is unprovisioned; the UI then disables the CTA\nand keeps the manual chat-id form usable (S12-T4 spec §4.3, AC4).",
+                    "type": "string"
+                },
                 "chokepoints": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/subscription.ChokepointInfo"
                     }
+                },
+                "deep_link_enabled": {
+                    "description": "DeepLinkEnabled reports whether the server considers the bot fully\nprovisioned (token, username and webhook secret all present and valid).",
+                    "type": "boolean"
                 },
                 "target_types": {
                     "type": "array",

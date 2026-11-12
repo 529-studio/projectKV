@@ -76,6 +76,7 @@ definitions:
         description: '[[x, y], ...] normalized to [0, 1]'
         items:
           items:
+            format: float64
             type: number
           type: array
         type: array
@@ -190,6 +191,7 @@ definitions:
         description: Normalized [[x, y], ...] in [0, 1] range
         items:
           items:
+            format: float64
             type: number
           type: array
         type: array
@@ -748,6 +750,7 @@ definitions:
         description: '[[lat,lng], ...] boundary for rendering'
         items:
           items:
+            format: float64
             type: number
           type: array
         type: array
@@ -801,10 +804,21 @@ definitions:
     type: object
   subscription.TaxonomyResponse:
     properties:
+      bot_username:
+        description: |-
+          BotUsername is the public Telegram handle the web UI turns into a deep
+          link. Empty when the bot is unprovisioned; the UI then disables the CTA
+          and keeps the manual chat-id form usable (S12-T4 spec §4.3, AC4).
+        type: string
       chokepoints:
         items:
           $ref: '#/definitions/subscription.ChokepointInfo'
         type: array
+      deep_link_enabled:
+        description: |-
+          DeepLinkEnabled reports whether the server considers the bot fully
+          provisioned (token, username and webhook secret all present and valid).
+        type: boolean
       target_types:
         items:
           type: string
@@ -1448,6 +1462,12 @@ paths:
           schema:
             additionalProperties: true
             type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
           description: Internal Server Error
           schema:
@@ -1460,7 +1480,8 @@ paths:
   /api/subscriptions/taxonomy:
     get:
       description: Retrieves all canonical targets available for subscription (operational
-        zones, administrative wards, camera chokepoints, and target types).
+        zones, administrative wards, camera chokepoints, and target types) plus the
+        public bot handle for deep links.
       produces:
       - application/json
       responses:

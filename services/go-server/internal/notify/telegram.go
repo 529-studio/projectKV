@@ -22,6 +22,7 @@ const (
 var (
 	ErrTelegramTokenMissing = errors.New("telegram bot token is empty")
 	ErrTelegramNoRecipient  = errors.New("recipient chat_id is empty")
+	ErrTelegramEmptyText    = errors.New("telegram message text is empty")
 )
 
 // TelegramChannel implements Channel using the official Telegram Bot HTTP API.
@@ -103,6 +104,24 @@ type telegramAPIResponse struct {
 	OK          bool   `json:"ok"`
 	ErrorCode   int    `json:"error_code,omitempty"`
 	Description string `json:"description,omitempty"`
+	Parameters  *struct {
+		RetryAfter int `json:"retry_after,omitempty"`
+	} `json:"parameters,omitempty"`
+}
+
+// telegramAPIError carries the HTTP status and Telegram's retry hint so the
+// caller can distinguish a blocked bot (403) from a rate limit (429).
+type telegramAPIError struct {
+	StatusCode  int
+	Description string
+	RetryAfter  time.Duration
+}
+
+func (e *telegramAPIError) Error() string {
+	if e.Description == "" {
+		return fmt.Sprintf("telegram api error (status %d)", e.StatusCode)
+	}
+	return fmt.Sprintf("telegram api error (status %d): %s", e.StatusCode, e.Description)
 }
 
 // Send dispatches alert to all subscribers registered on Telegram for this alert.
@@ -144,6 +163,21 @@ func (c *TelegramChannel) Send(ctx context.Context, alert FloodAlert) error {
 
 // SendTo sends a formatted flood alert message directly to a specific Telegram chat ID.
 func (c *TelegramChannel) SendTo(ctx context.Context, chatID string, alert FloodAlert) error {
+	return c.SendMessage(ctx, chatID, FormatTelegramMessage(alert))
+}
+
+// SendMessage delivers one already-rendered HTML message to a chat. It is the
+// single Bot API write path: SendTo (alerts) and the subscription handler
+// (confirmation DMs) both come through here, so token redaction, the timeout and
+// Telegram error handling cannot drift apart (S12-T4 spec §4.2).
+//
+// Telegram semantics handled explicitly:
+//   - 429: retried exactly once after `retry_after`, only when that hint is at
+//     most 2 s; anything longer is returned to the caller.
+//   - 403 (bot blocked by the user): logged, error returned, and the stored
+//     subscription is deliberately left in place so /stop still works after the
+//     owner unblocks the bot.
+func (c *TelegramChannel) SendMessage(ctx context.Context, chatID, htmlText string) error {
 	if !c.IsConfigured() {
 		return ErrTelegramTokenMissing
 	}
@@ -151,11 +185,44 @@ func (c *TelegramChannel) SendTo(ctx context.Context, chatID string, alert Flood
 	if chatID == "" {
 		return ErrTelegramNoRecipient
 	}
+	text := strings.TrimSpace(htmlText)
+	if text == "" {
+		return ErrTelegramEmptyText
+	}
 
-	text := FormatTelegramMessage(alert)
+	err := c.postSendMessage(ctx, chatID, text)
+	var apiErr *telegramAPIError
+	if errors.As(err, &apiErr) {
+		switch {
+		case apiErr.StatusCode == http.StatusTooManyRequests && apiErr.RetryAfter > 0 && apiErr.RetryAfter <= 2*time.Second:
+			c.log.Warn("telegram: rate limited, retrying once",
+				"chat", tailChatID(chatID), "retry_after_s", apiErr.RetryAfter.Seconds())
+			timer := time.NewTimer(apiErr.RetryAfter)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			case <-timer.C:
+			}
+			err = c.postSendMessage(ctx, chatID, text)
+			// Re-read the error so a second 429/403 is classified below.
+			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusForbidden {
+				c.log.Warn("telegram: chat blocked the bot; subscription retained",
+					"chat", tailChatID(chatID), "status", apiErr.StatusCode)
+			}
+		case apiErr.StatusCode == http.StatusForbidden:
+			c.log.Warn("telegram: chat blocked the bot; subscription retained",
+				"chat", tailChatID(chatID), "status", apiErr.StatusCode)
+		}
+	}
+	return err
+}
+
+// postSendMessage performs one Bot API sendMessage call.
+func (c *TelegramChannel) postSendMessage(ctx context.Context, chatID, htmlText string) error {
 	payload := telegramSendMessagePayload{
 		ChatID:                chatID,
-		Text:                  text,
+		Text:                  htmlText,
 		ParseMode:             "HTML",
 		DisableWebPagePreview: false,
 	}
@@ -188,10 +255,23 @@ func (c *TelegramChannel) SendTo(ctx context.Context, chatID string, alert Flood
 		if desc == "" {
 			desc = strings.TrimSpace(string(respBytes))
 		}
-		return fmt.Errorf("telegram api error (status %d): %s", resp.StatusCode, desc)
+		apiErr := &telegramAPIError{StatusCode: resp.StatusCode, Description: desc}
+		if apiResp.Parameters != nil && apiResp.Parameters.RetryAfter > 0 {
+			apiErr.RetryAfter = time.Duration(apiResp.Parameters.RetryAfter) * time.Second
+		}
+		return apiErr
 	}
 
 	return nil
+}
+
+// tailChatID returns the last four characters of a chat id, the only part that
+// may appear in logs. Full chat ids are personal data (spec §2.3).
+func tailChatID(chatID string) string {
+	if len(chatID) <= 4 {
+		return chatID
+	}
+	return chatID[len(chatID)-4:]
 }
 
 // FormatTelegramMessage formats a FloodAlert into clean, monochromatic, bilingual HTML.

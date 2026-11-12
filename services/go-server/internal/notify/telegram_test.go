@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode"
@@ -147,6 +148,61 @@ func TestTelegramChannel_UnconfiguredTokenNoop(t *testing.T) {
 	// Should gracefully return nil without error when unconfigured
 	if err := ch.Send(context.Background(), alert); err != nil {
 		t.Fatalf("expected nil when token is unconfigured, got %v", err)
+	}
+}
+
+func TestTelegramChannel_SendMessage_RateLimitRetriesOnce(t *testing.T) {
+	var mu sync.Mutex
+	calls := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls++
+		attempt := calls
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		if attempt == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"ok":false,"error_code":429,"description":"Too Many Requests","parameters":{"retry_after":1}}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	ch := NewTelegramChannel("retry-token", nil, WithBaseURL(server.URL))
+	if err := ch.SendMessage(context.Background(), "123456789", "<b>Xin chào</b>"); err != nil {
+		t.Fatalf("expected the single 429 retry to succeed, got %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if calls != 2 {
+		t.Fatalf("sendMessage calls = %d, want 2 (one retry)", calls)
+	}
+}
+
+func TestTelegramChannel_SendMessage_BlockedBotReturnsError(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"ok":false,"error_code":403,"description":"Forbidden: bot was blocked by the user"}`))
+	}))
+	defer server.Close()
+
+	ch := NewTelegramChannel("blocked-token", nil, WithBaseURL(server.URL))
+	err := ch.SendMessage(context.Background(), "987654321", "hello")
+	if err == nil {
+		t.Fatal("expected an error when the bot is blocked")
+	}
+	if calls != 1 {
+		t.Fatalf("a 403 must not be retried: calls = %d, want 1", calls)
+	}
+	if strings.Contains(err.Error(), "blocked-token") {
+		t.Fatalf("Rule 8 violation: token leaked in error: %v", err)
 	}
 }
 

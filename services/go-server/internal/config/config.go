@@ -391,6 +391,8 @@ type ServerConfig struct {
 	AppEnv                        string // "dev" | "production" | "staging" (default: "dev" or read from APP_ENV)
 	DevAccessToken                string // DEV_ACCESS_TOKEN or LABELER_SECRET_TOKEN
 	TelegramBotToken              string // TELEGRAM_BOT_TOKEN
+	TelegramBotUsername           string // TELEGRAM_BOT_USERNAME (public handle, empty disables the webhook)
+	TelegramWebhookSecret         string // TELEGRAM_WEBHOOK_SECRET (secret, empty disables the webhook)
 	TelegramDebounceMinutes       int    // default: 30 (TELEGRAM_DEBOUNCE_MINUTES)
 	StorageDriver                 string // default: "local"
 	StorageLocalRoot              string // default: "./data/proofs"
@@ -517,6 +519,11 @@ func LoadConfig() *ServerConfig {
 	cfAccessClientSecret := parseEnvString("CF_ACCESS_CLIENT_SECRET", "")
 
 	telegramBotToken := parseEnvString("TELEGRAM_BOT_TOKEN", "")
+	// Rule 8: a missing value is an empty string, never a placeholder credential.
+	// The bot username is a public handle, but it still has no baked-in default so
+	// that an unprovisioned deployment fails closed (webhook route absent).
+	telegramBotUsername := strings.TrimPrefix(strings.TrimSpace(parseEnvString("TELEGRAM_BOT_USERNAME", "")), "@")
+	telegramWebhookSecret := strings.TrimSpace(parseEnvString("TELEGRAM_WEBHOOK_SECRET", ""))
 	telegramDebounceMinutes := parseEnvInt("TELEGRAM_DEBOUNCE_MINUTES", 30, 1)
 
 	storageDriver := strings.ToLower(parseEnvString("STORAGE_DRIVER", "local"))
@@ -605,6 +612,8 @@ func LoadConfig() *ServerConfig {
 		AppEnv:                        appEnv,
 		DevAccessToken:                devAccessToken,
 		TelegramBotToken:              telegramBotToken,
+		TelegramBotUsername:           telegramBotUsername,
+		TelegramWebhookSecret:         telegramWebhookSecret,
 		TelegramDebounceMinutes:       telegramDebounceMinutes,
 		StorageDriver:                 storageDriver,
 		StorageLocalRoot:              storageLocalRoot,
