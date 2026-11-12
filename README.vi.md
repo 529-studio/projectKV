@@ -63,6 +63,10 @@ make train-seg
 
 # Đo p95 trên worker AVX2 (máy khác thoát mã 2, không ghi evidence)
 make bench-seg-avx2
+
+# Cùng phép đo trong container x86-64 AVX2 cố định phiên bản
+make bench-seg-avx2-docker
+make bench-seg-avx2-check
 ```
 
 ## 5. Đọc tiếp

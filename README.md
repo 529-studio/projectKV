@@ -233,10 +233,16 @@ make benchmark-real
 
 # AVX2 latency gate (p95 <= 25.0 ms); other hosts exit 2
 make bench-seg-avx2
+
+# Same gate inside the pinned x86-64 AVX2 container; refuses emulated runtimes
+# Evidence defaults to docs/reports/s13_t1_latency_avx2.json (override SOAK_OUT)
+make bench-seg-avx2-docker
+make bench-seg-avx2-check
 ```
 `--verify-gate` requires measured `--metrics`; `head_status: trained` needs 0 re-initialised
 tensors (`--allow-untrained-head` stays `UNVERIFIED`). Evidence:
-[`docs/reports/seg_eval_v3.md`](docs/reports/seg_eval_v3.md).
+[`docs/reports/seg_eval_v3.md`](docs/reports/seg_eval_v3.md). Container details:
+[`deploy/benchmark/README.md`](deploy/benchmark/README.md).
 
 ### 2.4. Verification, Forecast & Evidence Integrity Gates
 

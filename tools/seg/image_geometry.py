@@ -21,6 +21,10 @@ from numpy.lib.stride_tricks import sliding_window_view
 _NEIGHBORS: Tuple[Tuple[int, int], ...] = (
     (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1),
 )
+# Reverse lookup for Moore tracing: grid offset -> clockwise neighbor index.
+_DIR_INDEX: Dict[Tuple[int, int], int] = {
+    offset: i for i, offset in enumerate(_NEIGHBORS)
+}
 
 # Puddle proposer bounds: a standing-water candidate must be a small-ish,
 # well-formed region; anything larger is more likely roadway shadow or sky.
@@ -128,9 +132,11 @@ def largest_component(mask: np.ndarray) -> np.ndarray:
     """
     Returns the largest 8-connected component of a boolean mask.
 
-    Row-run based union-find labeling: each horizontal run becomes a node,
-    runs on adjacent rows overlapping in columns are merged. Vectorized per
-    row, so 1080p masks stay fast in pure NumPy/Python.
+    Row-run based union-find labeling: each horizontal run becomes a node and
+    runs on adjacent rows are merged when their column spans are at most one
+    pixel apart (8-connectivity, so diagonal-only contact still joins). The
+    per-row run detection is vectorized, so 1080p masks stay fast in pure
+    NumPy/Python.
     """
     m = np.ascontiguousarray(mask.astype(bool))
     h, w = m.shape
@@ -162,7 +168,13 @@ def largest_component(mask: np.ndarray) -> np.ndarray:
             parent.append(node)
             run_nodes[y, s:e] = node
             if y > 0:
-                above = run_nodes[y - 1, s:e]
+                # 8-connectivity: a run touches runs on the row above when
+                # their column spans are at most one pixel apart, including
+                # diagonal-only contact. A plain [s:e] slice would implement
+                # 4-connectivity and silently split one-pixel diagonal
+                # antennas off the component they are attached to.
+                lo = max(0, s - 1)
+                above = run_nodes[y - 1, lo:e + 1]
                 for prev in np.unique(above[above >= 0]):
                     union(node, int(prev))
 
@@ -185,35 +197,59 @@ def trace_boundary(mask: np.ndarray) -> List[Tuple[float, float]]:
     Traces the outer boundary of the largest component of a boolean mask with
     Moore-neighbor tracing (clockwise, starting from the topmost-leftmost
     boundary pixel). Returns (x, y) pixel-coordinate vertices.
+
+    Termination uses Jacob's stopping criterion: the trace is complete only
+    when it revisits the start pixel in the *same* state it started from (same
+    backtrack neighbor). Testing just "we are back at the start pixel" is not
+    enough: a single-pixel protrusion tip or a diagonally clipped corner is
+    re-entered two steps after leaving it, which used to end the trace with a
+    three-point path covering only the tip. Tracking the backtrack pixel makes
+    the state a function of the contour geometry, so closure is only detected
+    after the full outer boundary has been walked.
     """
     comp = largest_component(mask)
     if not comp.any():
         return []
-    padded = np.pad(comp, 1, mode="constant", constant_values=False)
-    coords = np.argwhere(padded)
+    # One-cell background border so every neighbor lookup stays in bounds.
+    grid = np.pad(comp, 1, mode="constant", constant_values=False)
+    coords = np.argwhere(grid)
     # Topmost, then leftmost boundary pixel (argwhere is row-major).
-    start_y, start_x = coords[0]
-    start = (int(start_y), int(start_x))
+    start = (int(coords[0][0]), int(coords[0][1]))
+    # The row-major scan reaches `start` from its west neighbor, which is a
+    # background cell. That pair is the closed contour's entry state: walking
+    # the outer boundary returns to exactly this (pixel, backtrack) pair.
+    start_backtrack = (start[0], start[1] - 1)
 
     path: List[Tuple[int, int]] = [start]
-    prev_dir = 6  # Arrived scanning downward; backtrack points north.
-    cur = start
-    for _ in range(padded.size * 4):
-        found_next = False
-        for k in range(8):
-            direction = (prev_dir + 5 + k) % 8
+    cur, backtrack = start, start_backtrack
+    seen = {(start, start_backtrack)}
+    # Safety net only: the state space is 9 * grid.size, and the loop provably
+    # stops when a state repeats, so this bound is never the normal exit.
+    for _ in range(grid.size * 9):
+        # Scan clockwise from the backtrack cell; the previous pixel itself is
+        # already foreground and must be skipped to avoid an immediate U-turn.
+        base = _DIR_INDEX[(backtrack[0] - cur[0], backtrack[1] - cur[1])]
+        next_state: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None
+        for k in range(1, 9):
+            direction = (base + k) % 8
             dy, dx = _NEIGHBORS[direction]
-            ny, nx = cur[0] + dy, cur[1] + dx
-            if padded[ny, nx]:
-                path.append((ny, nx))
-                cur = (ny, nx)
-                prev_dir = direction
-                found_next = True
+            nxt = (cur[0] + dy, cur[1] + dx)
+            if grid[nxt]:
+                # The pixel scanned just before `nxt` becomes the next
+                # backtrack cell (Moore neighbor bookkeeping).
+                by, bx = _NEIGHBORS[(base + k - 1) % 8]
+                next_state = (nxt, (cur[0] + by, cur[1] + bx))
                 break
-        if not found_next:
+        if next_state is None:
             break
-        if cur == start and len(path) > 2:
+        cur, backtrack = next_state
+        path.append(cur)
+        if next_state in seen:
+            # Jacob's stopping criterion, state form: the contour has returned
+            # to a (pixel, backtrack) pair it has already occupied, so the
+            # trace is a closed loop and every further step would repeat it.
             break
+        seen.add(next_state)
     # Convert padded coordinates back to unpadded (x, y) pixel space.
     return [(float(x - 1), float(y - 1)) for y, x in path]
 

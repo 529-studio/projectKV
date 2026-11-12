@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint lint-deploy test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast train-forecast-daemon export-seg export-seg-openvino train-seg benchmark-mock benchmark-real bench-seg-avx2 materialize-seg smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint lint-deploy test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast train-forecast-daemon export-seg export-seg-openvino train-seg benchmark-mock benchmark-real bench-seg-avx2 bench-seg-avx2-docker bench-seg-avx2-check materialize-seg smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close
 
 # Segmentation training defaults (S11-T5). Override on the command line:
 #   make train-seg EPOCHS=100 DATA=data/yolo_seg/dataset.yaml
@@ -20,6 +20,9 @@ LATENCY_OUT ?= docs/reports/s12_t5_latency_avx2.json
 LATENCY_RUNS ?= 200
 LATENCY_WARMUP ?= 10
 LATENCY_REPEATS ?= 3
+
+# S13-T1 soak evidence destination for the containerised gate.
+SOAK_OUT ?= docs/reports/s13_t1_latency_avx2.json
 
 # Dataset v3 materializer (S12-T5 §2.4).
 DATASET_DATES ?=
@@ -66,6 +69,8 @@ help:
 	@echo "  make benchmark-mock  - Run AI benchmark harness in mock mode"
 	@echo "  make benchmark-real  - Run AI benchmark harness against live OpenVINO cv-engine (T4)"
 	@echo "  make bench-seg-avx2  - Benchmark segmentation IR latency on the AVX2 worker (S12-T5)"
+	@echo "  make bench-seg-avx2-docker - Same gate inside the pinned x86-64 AVX2 container (S13-T1)"
+	@echo "  make bench-seg-avx2-check  - Prove the current container runtime is gate-eligible"
 	@echo "  make materialize-seg - Materialize Dataset v3 from the live proof archive (S12-T5)"
 	@echo "  make smoke-eval      - Run known-state smoke camera verification (mock dry-run)"
 	@echo "  make collect-frames  - Fetch real camera frames from Hot Set into data/proofs"
@@ -204,6 +209,14 @@ benchmark-real:
 
 bench-seg-avx2:
 	$(SEG_PYTHON) tools/train/bench_seg_latency.py --ir $(SEG_IR) --frame $(SEG_FRAME) --out $(LATENCY_OUT) --runs $(LATENCY_RUNS) --warmup $(LATENCY_WARMUP) --repeats $(LATENCY_REPEATS)
+
+# Same 3 x 200 gate inside the pinned x86-64 image. The runner refuses an
+# emulated or non-x86-64 container runtime before building or measuring.
+bench-seg-avx2-docker:
+	tools/train/bench_avx2_docker.sh --ir $(SEG_IR) --frame $(SEG_FRAME) --out $(SOAK_OUT)
+
+bench-seg-avx2-check:
+	tools/train/bench_avx2_docker.sh --check
 
 smoke-eval:
 	python3 tools/eval/verify_smoke_set.py --mock --strict

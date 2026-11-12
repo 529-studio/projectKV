@@ -103,6 +103,103 @@ class TestMaskToPolygon(unittest.TestCase):
         self.assertLessEqual(len(poly), 20)
 
 
+class TestTraceBoundaryTermination(unittest.TestCase):
+    """
+    Regression tests for the Moore-trace stopping condition (S13, premature
+    three-point termination).
+
+    The old termination test was "current pixel == start pixel and the path has
+    more than two points". A protrusion tip or a diagonally clipped corner is
+    re-entered two steps after the trace leaves it, so the trace stopped with a
+    three-point path (a single edge) even though the component was large. Every
+    case below fails against that condition and passes with Jacob's criterion.
+    """
+
+    @staticmethod
+    def _bbox(points):
+        return (
+            min(p[0] for p in points),
+            max(p[0] for p in points),
+            min(p[1] for p in points),
+            max(p[1] for p in points),
+        )
+
+    @staticmethod
+    def _mask_bbox(mask):
+        ys, xs = np.where(mask)
+        return (float(xs.min()), float(xs.max()), float(ys.min()), float(ys.max()))
+
+    def assert_polygon_covers_mask(self, mask):
+        poly = geom.mask_to_polygon(mask, max_vertices=48, epsilon=1.5)
+        self.assertGreaterEqual(
+            len(poly), 3, "boundary trace collapsed to a degenerate polygon"
+        )
+        for got, want in zip(self._bbox(poly), self._mask_bbox(mask)):
+            self.assertAlmostEqual(got, want, delta=1.0)
+
+    def test_protrusion_tip_traces_whole_component(self):
+        # A two-pixel-wide protrusion tip sitting on a large slab: the tip is
+        # the topmost-leftmost pixel, and the trace sees the start pixel again
+        # after only three steps.
+        mask = np.zeros((12, 12), dtype=bool)
+        mask[0, 1] = True
+        mask[1, 0:2] = True
+        mask[2:9, 0:8] = True
+        trace = geom.trace_boundary(mask)
+        self.assertGreater(len(trace), 4)
+        self.assert_polygon_covers_mask(mask)
+
+    def test_clipped_corner_traces_whole_component(self):
+        # Diagonal staircase: the top-left corner is clipped, so the start
+        # pixel has a single diagonal continuation and the trace wraps back to
+        # it immediately.
+        mask = np.zeros((12, 12), dtype=bool)
+        for y in range(9):
+            mask[y, max(0, 4 - y):9] = True
+        trace = geom.trace_boundary(mask)
+        self.assertGreater(len(trace), 4)
+        self.assert_polygon_covers_mask(mask)
+
+    def test_single_pixel_antenna_retained(self):
+        # A one-pixel antenna is the topmost pixel, so it is the start pixel.
+        mask = np.zeros((20, 20), dtype=bool)
+        mask[2:15, 3:17] = True
+        mask[0:2, 5] = True
+        self.assert_polygon_covers_mask(mask)
+
+    def test_diagonal_antenna_kept_in_component(self):
+        # A diagonally attached antenna only exists under 8-connectivity; the
+        # component labeling must not split it off before tracing.
+        mask = np.zeros((20, 20), dtype=bool)
+        mask[6:16, 4:15] = True
+        for i in range(5):
+            mask[5 - i, 4 - i] = True
+        comp = geom.largest_component(mask)
+        self.assertTrue(comp[1, 0])
+        self.assert_polygon_covers_mask(mask)
+
+    def test_trace_is_closed_and_eight_connected(self):
+        mask = np.zeros((24, 24), dtype=bool)
+        mask[3, 10] = True
+        mask[4, 10] = True
+        mask[5:20, 5:20] = True
+        trace = geom.trace_boundary(mask)
+        self.assertGreaterEqual(len(trace), 4)
+        self.assertEqual(trace[0], trace[-1])
+        for (x1, y1), (x2, y2) in zip(trace, trace[1:]):
+            self.assertLessEqual(abs(x2 - x1), 1)
+            self.assertLessEqual(abs(y2 - y1), 1)
+        self.assertNotEqual((x1, y1), (x2, y2))
+
+    def test_corner_touching_blocks_both_traced(self):
+        # Two slabs joined at a single diagonal corner: the outer contour must
+        # pass through both lobes, not close around the first one.
+        mask = np.zeros((20, 20), dtype=bool)
+        mask[2:8, 2:8] = True
+        mask[8:14, 8:14] = True
+        self.assert_polygon_covers_mask(mask)
+
+
 class TestNormalizePolygon(unittest.TestCase):
     def test_pixels_normalized_and_clamped(self):
         poly = geom.normalize_polygon([(0, 0), (100, 50), (200, 100)], 100, 100)
