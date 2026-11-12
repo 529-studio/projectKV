@@ -29,7 +29,14 @@ func openTestDB(t *testing.T) *sql.DB {
 			confidence     REAL NOT NULL,
 			source         TEXT NOT NULL DEFAULT '',
 			observed_at    TIMESTAMP,
-			updated_at     TIMESTAMP NOT NULL
+			updated_at     TIMESTAMP NOT NULL,
+			-- Migration 0011 (Issue #401). Mirrors the production schema so the
+			-- repository's hazard-column reads and writes are exercised, not skipped.
+			flood_depth_cm          REAL,
+			flood_hazard_level      INTEGER,
+			flood_hazard_basis      TEXT NOT NULL DEFAULT '',
+			flood_depth_confidence  TEXT NOT NULL DEFAULT '',
+			flood_calibration_ref   TEXT NOT NULL DEFAULT ''
 		);
 	`)
 	if err != nil {
@@ -231,5 +238,230 @@ func TestVerdictRepo_ConcurrentSaves(t *testing.T) {
 	}
 	if len(latest) != workers {
 		t.Errorf("expected %d saved verdicts, got %d", workers, len(latest))
+	}
+}
+
+// ── Physical hazard layer tests (Issue #401, spec §5.4/§8.1) ─────────────────
+
+// TestVerdictRepo_HazardRoundTrip covers the AC13 distinction that motivates the
+// pointer fields: nil must survive as nil ("never measured"), a measured 0.0 must
+// survive as 0.0 ("dry, verified"), and levels 1-3 must round-trip verbatim.
+func TestVerdictRepo_HazardRoundTrip(t *testing.T) {
+	db := openTestDB(t)
+	repo := store.NewVerdictRepo(db)
+	ctx := context.Background()
+
+	levelOne, levelTwo, levelThree := 1, 2, 3
+	zero, shallow, deep := 0.0, 14.5, 24.2
+	want := map[string]store.Verdict{
+		"dry-measured": {
+			CameraID:             "dry-measured",
+			Severity:             "CLEAR",
+			Confidence:           0.9,
+			Timestamp:            time.Now().UTC().Truncate(time.Second),
+			FloodDepthCm:         &zero,
+			FloodHazardLevel:     &levelOne,
+			FloodHazardBasis:     "DEPTH_MEASURED",
+			FloodDepthConfidence: "MEASURED",
+			FloodCalibrationRef:  "MOTORCYCLE_110CM",
+		},
+		"shallow-measured": {
+			CameraID:             "shallow-measured",
+			Severity:             "CLEAR",
+			Confidence:           0.8,
+			Timestamp:            time.Now().UTC().Truncate(time.Second),
+			FloodDepthCm:         &shallow,
+			FloodHazardLevel:     &levelTwo,
+			FloodHazardBasis:     "DEPTH_MEASURED",
+			FloodDepthConfidence: "MEASURED",
+			FloodCalibrationRef:  "CURB_15CM",
+		},
+		"deep-inferred": {
+			CameraID:             "deep-inferred",
+			Severity:             "MODERATE",
+			Confidence:           0.78,
+			Timestamp:            time.Now().UTC().Truncate(time.Second),
+			FloodDepthCm:         &deep,
+			FloodHazardLevel:     &levelThree,
+			FloodHazardBasis:     "AVOIDANCE_INFERRED",
+			FloodDepthConfidence: "INFERRED",
+			FloodCalibrationRef:  "CAMERA_OVERRIDE",
+		},
+		"unmeasured": {
+			CameraID:            "unmeasured",
+			Severity:            "CLEAR",
+			Confidence:          0.9,
+			Timestamp:           time.Now().UTC().Truncate(time.Second),
+			FloodCalibrationRef: "NONE",
+		},
+	}
+
+	for _, v := range want {
+		if err := repo.Save(ctx, v); err != nil {
+			t.Fatalf("Save %s: %v", v.CameraID, err)
+		}
+	}
+
+	got, err := repo.GetLatest(ctx)
+	if err != nil {
+		t.Fatalf("GetLatest: %v", err)
+	}
+	byID := make(map[string]store.Verdict, len(got))
+	for _, v := range got {
+		byID[v.CameraID] = v
+	}
+
+	for id, expected := range want {
+		actual, ok := byID[id]
+		if !ok {
+			t.Fatalf("verdict %q missing after round-trip", id)
+		}
+		if (expected.FloodDepthCm == nil) != (actual.FloodDepthCm == nil) {
+			t.Fatalf("%s: FloodDepthCm nil-ness = %v, want %v", id, actual.FloodDepthCm == nil, expected.FloodDepthCm == nil)
+		}
+		if expected.FloodDepthCm != nil && *actual.FloodDepthCm != *expected.FloodDepthCm {
+			t.Errorf("%s: FloodDepthCm = %v, want %v", id, *actual.FloodDepthCm, *expected.FloodDepthCm)
+		}
+		if (expected.FloodHazardLevel == nil) != (actual.FloodHazardLevel == nil) {
+			t.Fatalf("%s: FloodHazardLevel nil-ness = %v, want %v", id, actual.FloodHazardLevel == nil, expected.FloodHazardLevel == nil)
+		}
+		if expected.FloodHazardLevel != nil && *actual.FloodHazardLevel != *expected.FloodHazardLevel {
+			t.Errorf("%s: FloodHazardLevel = %d, want %d", id, *actual.FloodHazardLevel, *expected.FloodHazardLevel)
+		}
+		if actual.FloodHazardBasis != expected.FloodHazardBasis {
+			t.Errorf("%s: FloodHazardBasis = %q, want %q", id, actual.FloodHazardBasis, expected.FloodHazardBasis)
+		}
+		if actual.FloodDepthConfidence != expected.FloodDepthConfidence {
+			t.Errorf("%s: FloodDepthConfidence = %q, want %q", id, actual.FloodDepthConfidence, expected.FloodDepthConfidence)
+		}
+		if actual.FloodCalibrationRef != expected.FloodCalibrationRef {
+			t.Errorf("%s: FloodCalibrationRef = %q, want %q", id, actual.FloodCalibrationRef, expected.FloodCalibrationRef)
+		}
+	}
+}
+
+// TestVerdictRepo_CalibrationRefSurvivesRestart pins M5: the reference ladder string
+// must survive a process restart, because the boot-time hydration rebuilds the API
+// verdict from SQLite. A column that is written but never read back would drop the
+// claim (`MOTORCYCLE_110CM`, `CURB_15CM`, `CAMERA_OVERRIDE`, `NONE`) on every restart.
+func TestVerdictRepo_CalibrationRefSurvivesRestart(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "restart.db")
+	db, err := store.NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("NewDB: %v", err)
+	}
+
+	depth, level := 14.5, 3
+	if err := store.NewVerdictRepo(db).Save(context.Background(), store.Verdict{
+		CameraID:             "cam_dbp_01",
+		Severity:             "CLEAR",
+		FloodSeverity:        "FLOODED_SHALLOW",
+		Confidence:           0.78,
+		Source:               "onnx",
+		ObservedAt:           time.Now().UTC().Truncate(time.Second),
+		Timestamp:            time.Now().UTC().Truncate(time.Second),
+		FloodDepthCm:         &depth,
+		FloodHazardLevel:     &level,
+		FloodHazardBasis:     "DEPTH_MEASURED",
+		FloodDepthConfidence: "MEASURED",
+		FloodCalibrationRef:  "CURB_15CM",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	reopened, err := store.NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("reopen NewDB: %v", err)
+	}
+	defer reopened.Close() //nolint:errcheck
+
+	got, err := store.NewVerdictRepo(reopened).GetLatest(context.Background())
+	if err != nil {
+		t.Fatalf("GetLatest after restart: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 row after restart, got %d", len(got))
+	}
+	if got[0].FloodCalibrationRef != "CURB_15CM" {
+		t.Errorf("FloodCalibrationRef = %q after restart, want CURB_15CM", got[0].FloodCalibrationRef)
+	}
+	if got[0].FloodDepthCm == nil || *got[0].FloodDepthCm != depth {
+		t.Errorf("FloodDepthCm = %v after restart, want %v", got[0].FloodDepthCm, depth)
+	}
+}
+
+// TestVerdictRepo_Migration0011OnLegacyDatabase pins E20/AC14: applying 0011 to a
+// database that only has the pre-#401 schema keeps the old row readable, with NULL
+// hazard fields and no fabricated level. It also proves the migration is repeatable
+// by construction (schema_migrations records the version).
+func TestVerdictRepo_Migration0011OnLegacyDatabase(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "legacy_0011.db")
+
+	legacy, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open legacy db: %v", err)
+	}
+	if _, err := legacy.Exec(`
+		CREATE TABLE camera_verdicts (
+			camera_id      TEXT PRIMARY KEY,
+			severity       TEXT NOT NULL,
+			flood_severity TEXT NOT NULL DEFAULT '',
+			confidence     REAL NOT NULL,
+			source         TEXT NOT NULL DEFAULT '',
+			observed_at    TIMESTAMP,
+			updated_at     TIMESTAMP NOT NULL
+		);
+		CREATE TABLE schema_migrations (
+			version    INTEGER PRIMARY KEY,
+			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);`); err != nil {
+		t.Fatalf("create legacy schema: %v", err)
+	}
+	for version := 1; version <= 10; version++ {
+		if _, err := legacy.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
+			t.Fatalf("mark migration %d applied: %v", version, err)
+		}
+	}
+	observedAt := time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Second)
+	if _, err := legacy.Exec(
+		`INSERT INTO camera_verdicts (camera_id, severity, flood_severity, confidence, source, observed_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"legacy-cam", "HEAVY", "FLOODED_SHALLOW", 0.82, "onnx", observedAt, observedAt,
+	); err != nil {
+		t.Fatalf("insert legacy verdict: %v", err)
+	}
+	if err := legacy.Close(); err != nil {
+		t.Fatalf("close legacy db: %v", err)
+	}
+
+	db, err := store.NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("NewDB (applies 0011): %v", err)
+	}
+	defer db.Close() //nolint:errcheck
+
+	repo := store.NewVerdictRepo(db)
+	verdicts, err := repo.GetLatest(context.Background())
+	if err != nil {
+		t.Fatalf("GetLatest after migration: %v", err)
+	}
+	if len(verdicts) != 1 {
+		t.Fatalf("expected the legacy row to survive, got %d rows", len(verdicts))
+	}
+	got := verdicts[0]
+	if got.CameraID != "legacy-cam" || got.FloodSeverity != "FLOODED_SHALLOW" {
+		t.Errorf("legacy fields changed: %+v", got)
+	}
+	if got.FloodDepthCm != nil {
+		t.Errorf("FloodDepthCm = %v, want nil: no value may be backfilled (E20)", *got.FloodDepthCm)
+	}
+	if got.FloodHazardLevel != nil {
+		t.Errorf("FloodHazardLevel = %d, want nil: no fabricated level (E20)", *got.FloodHazardLevel)
+	}
+	if got.FloodHazardBasis != "" || got.FloodDepthConfidence != "" || got.FloodCalibrationRef != "" {
+		t.Errorf("hazard vocabularies = (%q, %q, %q), want empty", got.FloodHazardBasis, got.FloodDepthConfidence, got.FloodCalibrationRef)
 	}
 }

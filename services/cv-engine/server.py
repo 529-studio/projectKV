@@ -16,6 +16,9 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import hazard_classifier as hc
+from hazard_classifier import HazardAssessment, MotorcycleObservation
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -527,6 +530,97 @@ def calculate_motorcycle_submersion(
 WHEEL_SUBMERSION_DELTA = 0.18
 FLOOD_DEPTH_CM = 20.0
 
+# Operator calibration file (§2.2) and the in-process de-escalation latch (§2.5).
+# Both are module globals so the serving handler shares one validated view per process.
+CALIBRATION_PATH = str(os.environ.get("CV_CALIBRATION_PATH") or hc.DEFAULT_CALIBRATION_PATH)
+calibration_registry = hc.CalibrationRegistry(CALIBRATION_PATH).load()
+hazard_latch = hc.HazardLatch()
+
+
+def collect_motorcycle_observations(
+    motorcycle_boxes: "np.ndarray",
+    water_mask: "np.ndarray",
+    target_img_size: Tuple[int, int] = (416, 416),
+) -> List[MotorcycleObservation]:
+    """Per-motorcycle ``(box_bottom_y, delta_sub)`` in target-image pixels (§2.4).
+
+    ``calculate_motorcycle_submersion`` collapses every bike into one aggregate,
+    which is enough for the legacy severity ladder but not for the avoidance rule:
+    ``through_traffic`` needs to know whether *any* rider crossed the pool, and
+    ``upstream_stop`` needs to know whether a rider stopped *before* it. This
+    function keeps the geometry the aggregate throws away, using the same
+    waterline convention so the two signals never disagree.
+    """
+    if motorcycle_boxes is None or len(motorcycle_boxes) == 0 or water_mask is None or water_mask.size == 0:
+        return []
+
+    h_grid, w_grid = water_mask.shape
+    h_img, w_img = target_img_size
+    if h_img <= 0 or w_img <= 0:
+        return []
+    scale_x = w_grid / float(w_img)
+    scale_y = h_grid / float(h_img)
+
+    observations: List[MotorcycleObservation] = []
+    for b in motorcycle_boxes:
+        if len(b) != 4:
+            continue
+        cx, cy, w, h = b[0], b[1], b[2], b[3]
+        if w <= 0 or h <= 0:
+            continue
+        xmin = max(0.0, cx - w / 2.0)
+        ymin = max(0.0, cy - h / 2.0)
+        xmax = min(float(w_img), cx + w / 2.0)
+        ymax = min(float(h_img), cy + h / 2.0)
+        box_h = ymax - ymin
+        if box_h <= 0:
+            continue
+
+        gx1 = max(0, min(w_grid - 1, int(round(xmin * scale_x))))
+        gx2 = max(gx1 + 1, min(w_grid, int(round(xmax * scale_x))))
+        gy1 = max(0, min(h_grid - 1, int(round(ymin * scale_y))))
+        gy2 = max(gy1 + 1, min(h_grid, int(round(ymax * scale_y))))
+        sub_region = water_mask[gy1:gy2, gx1:gx2]
+
+        if not np.any(sub_region):
+            # A bike clear of the water is still an observation: it may be stopped
+            # upstream of the pool, which is exactly the hazard evidence (#401).
+            observations.append(MotorcycleObservation(box_bottom_y=ymax, delta_sub=0.0))
+            continue
+
+        water_rows, _ = np.where(sub_region)
+        waterline_y = float(np.min(water_rows) + gy1) / scale_y
+        delta_sub = hc.compute_delta_sub(ymax, waterline_y, box_h)
+        observations.append(MotorcycleObservation(box_bottom_y=ymax, delta_sub=delta_sub))
+
+    return observations
+
+
+def measure_water_pool(
+    water_mask: "np.ndarray",
+    target_img_size: Tuple[int, int] = (416, 416),
+) -> Tuple[float, Optional[float]]:
+    """Return ``(pool_area_px, pool_top_y)`` in target-image space (§2.4).
+
+    The 400 px area floor is expressed in target-image pixels (~4 m² at 416 px
+    over a ~20 m field of view), so the segmentation grid must be projected back
+    before comparison. ``pool_top_y`` is the uppermost waterline row.
+    """
+    if water_mask is None or water_mask.size == 0:
+        return 0.0, None
+
+    h_grid, w_grid = water_mask.shape
+    h_img, w_img = target_img_size
+    if h_grid <= 0 or w_grid <= 0 or h_img <= 0 or w_img <= 0:
+        return 0.0, None
+
+    area_px = float(np.sum(water_mask)) * (w_img / float(w_grid)) * (h_img / float(h_grid))
+    rows = np.where(np.any(water_mask, axis=1))[0]
+    if rows.size == 0:
+        return 0.0, None
+    pool_top_y = float(rows[0]) * (h_img / float(h_grid))
+    return area_px, pool_top_y
+
 
 def triangulate_flood_verdict(
     water_ratio: float,
@@ -534,13 +628,33 @@ def triangulate_flood_verdict(
     depth_estimated_cm: float,
     motorcycles_observed: int = 0,
     rain_event: bool = False,
+    *,
+    pool_area_px: float = 0.0,
+    observations: Sequence[MotorcycleObservation] = (),
+    pool_top_y: Optional[float] = None,
 ) -> Tuple[str, float]:
     """
-    Dual-Layer Physical Triangulation Decision Engine (ADR-009 §5).
+    Dual-Layer Physical Triangulation Decision Engine (ADR-009 §5, Issue #401 §2.4).
     Layer 1: Road water ratio >= 0.15 activates Layer 2.
     Layer 2: delta_sub >= WHEEL_SUBMERSION_DELTA (depth >= 20cm) triggers FLOODED_DEEP.
+
+    Avoidance escalation replaces the deleted static fallback: a pool that covers
+    at least 30 % of the lane with a credible area, and that no rider is crossing,
+    is FLOODED_DEEP whether the lane is empty or traffic stopped upstream of it.
     Returns (verdict_str, confidence_float).
     """
+    if hc.should_escalate(
+        water_ratio=water_ratio,
+        pool_area_px=pool_area_px,
+        motorcycles_observed=motorcycles_observed,
+        observations=observations,
+        pool_top_y=pool_top_y,
+    ):
+        # §2.4: an inferred blockage is real evidence but weaker than a measured
+        # wheel depth, so its confidence is capped rather than borrowed from the
+        # legacy area branch (which claimed 0.82 for an empty lane).
+        return "FLOODED_DEEP", hc.AVOIDANCE_CONFIDENCE_CAP
+
     if water_ratio >= 0.15 and (
         max_delta_sub >= WHEEL_SUBMERSION_DELTA or depth_estimated_cm >= FLOOD_DEPTH_CM
     ):
@@ -550,9 +664,6 @@ def triangulate_flood_verdict(
     if water_ratio >= 0.15:
         conf = min(0.92, 0.80 + (water_ratio * 0.2))
         return "FLOODED_SHALLOW", round(conf, 2)
-
-    if motorcycles_observed == 0 and water_ratio >= 0.35:
-        return "FLOODED_SHALLOW", 0.82
 
     if water_ratio >= 0.05:
         return "WET", 0.80
@@ -571,6 +682,8 @@ def build_flood_assessment(
     motorcycles_observed: int,
     motorcycles_submerged: int,
     puddle_polygon_count: int,
+    *,
+    hazard: Optional[HazardAssessment] = None,
 ) -> Dict[str, Any]:
     """
     Builds the `flood_assessment` block of the /predict payload.
@@ -578,6 +691,10 @@ def build_flood_assessment(
     Extracted from the request handler so the wire contract can be asserted against
     production code. The previous inline dict had a test that rebuilt the same
     dict and asserted on its own copy, which passes even when this contract changes.
+
+    The four hazard keys are always present (§5.1): a client must never have to
+    guess whether a missing key means "unmeasured" or "old build". They default to
+    the honest unknown — no level, no basis, unmeasured — never to Level 1.
     """
     return {
         "status": verdict,
@@ -587,6 +704,16 @@ def build_flood_assessment(
         "motorcycles_observed": motorcycles_observed,
         "motorcycles_submerged": motorcycles_submerged,
         "puddle_polygon_count": puddle_polygon_count,
+        "hazard_level": hazard.level if hazard is not None else None,
+        "hazard_basis": hazard.basis if hazard is not None else hc.BASIS_NONE,
+        "depth_confidence": (
+            hazard.depth_confidence
+            if hazard is not None
+            else hc.CONFIDENCE_UNMEASURED
+        ),
+        "calibration_ref": (
+            hazard.calibration_ref if hazard is not None else hc.CALIBRATION_REF_NONE
+        ),
     }
 
 
@@ -669,6 +796,11 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                 logger.warning("Client disconnected while reading request body: %s", exc)
                 return
             start_t = time.perf_counter()
+
+            # §2.2: re-validate the operator calibration when the file's mtime moved.
+            # The loader never raises, so a bad file cannot take the endpoint down.
+            calibration_registry.reload_if_changed()
+            camera_id = (self.headers.get("X-Camera-ID") or "").strip()
 
             content_type = self.headers.get("Content-Type", "")
             regions: List[Dict[str, Any]] = []
@@ -920,6 +1052,48 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                     else:
                         vehicles = 0
 
+                    # §2.1/§2.4 frame geometry: per-bike observations, the pool's
+                    # projected area and its top edge, and the measured depth through
+                    # whatever reference the frame actually contains.
+                    motorcycle_boxes = (
+                        np.array(kept_motorcycles) if len(kept_motorcycles) > 0 else None
+                    )
+                    motorcycle_observations = collect_motorcycle_observations(
+                        motorcycle_boxes, water_mask, target_img_size=(actual_w, actual_h)
+                    )
+                    pool_area_px, pool_top_y = measure_water_pool(
+                        water_mask, target_img_size=(actual_w, actual_h)
+                    )
+                    # A motorcycle box is only a ruler when the segmentation head
+                    # produced a water mask to measure against it. A detection-only
+                    # model (or a frame with no water proto) has `water_mask is None`,
+                    # and treating its bikes as a reference would publish a
+                    # "0.0 cm, MEASURED, MOTORCYCLE_110CM" reading that was never
+                    # measured (AC10/AC13).
+                    has_motorcycle_reference = (
+                        motorcycle_boxes is not None
+                        and water_mask is not None
+                        and getattr(water_mask, "size", 0) > 0
+                    )
+                    scale_multiplier = (
+                        calibration_registry.multiplier_for(camera_id) if camera_id else 1.0
+                    )
+                    has_camera_override = (
+                        has_motorcycle_reference and scale_multiplier != 1.0
+                    )
+                    hazard_calibration_ref = hc.resolve_calibration_ref(
+                        has_motorcycle_reference=has_motorcycle_reference,
+                        # Curb segments are not segmented yet; the ladder keeps the
+                        # source resolvable so the loader can switch it on later.
+                        has_curb_reference=False,
+                        has_camera_override=has_camera_override,
+                    )
+                    hazard_depth_cm: Optional[float] = (
+                        hc.estimate_depth_cm(max_delta_sub, scale_multiplier)
+                        if has_motorcycle_reference
+                        else None
+                    )
+
                     traffic_severity = "CLEAR"
                     if vehicles > 35:
                         traffic_severity = "CONGESTED"
@@ -933,7 +1107,33 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                         max_delta_sub=max_delta_sub,
                         depth_estimated_cm=depth_estimated_cm,
                         motorcycles_observed=vehicle_counts["motorcycle"],
+                        pool_area_px=pool_area_px,
+                        observations=motorcycle_observations,
+                        pool_top_y=pool_top_y,
                     )
+
+                    # Physical hazard layer (§2.1-§2.5). Depth is measured only when a
+                    # reference object is in the frame; otherwise it stays None and the
+                    # level can only come from avoidance. The latch holds a drop for one
+                    # frame so a single passing vehicle cannot erase a pool.
+                    hazard_assessment = hc.assess_hazard(
+                        depth_cm=hazard_depth_cm,
+                        calibration_ref=hazard_calibration_ref,
+                        water_ratio=water_ratio,
+                        pool_area_px=pool_area_px,
+                        motorcycles_observed=vehicle_counts["motorcycle"],
+                        observations=motorcycle_observations,
+                        pool_top_y=pool_top_y,
+                        logger=logger,
+                    )
+                    published_assessment = hazard_assessment
+                    if camera_id:
+                        # §2.5: latch state is per camera. A headerless caller has no
+                        # identity to key on, so it must not share one bucket. The latch
+                        # returns the *held* assessment when a drop is suppressed, so the
+                        # published level keeps its own basis, depth, confidence and
+                        # calibration reference instead of the drop frame's.
+                        published_assessment = hazard_latch.apply(camera_id, hazard_assessment)
 
                     # Directional polygon assignment & water reconciliation (ADR-012 D1)
                     region_results: List[Dict[str, Any]] = []
@@ -989,6 +1189,17 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                         "flood_severity": flood_verdict,
                         "water_ratio": round(water_ratio, 4),
                         "depth_estimated_cm": round(depth_estimated_cm, 1),
+                        # §5.1 additive hazard contract. An unmeasured depth is null,
+                        # never 0.0: 0 means "dry, verified" (AC13).
+                        "flood_depth_cm": (
+                            None
+                            if published_assessment.depth_cm is None
+                            else round(published_assessment.depth_cm, 1)
+                        ),
+                        "flood_hazard_level": published_assessment.level,
+                        "flood_hazard_basis": published_assessment.basis,
+                        "flood_depth_confidence": published_assessment.depth_confidence,
+                        "calibration_ref": published_assessment.calibration_ref,
                         "confidence": round(float(flood_conf if flood_verdict != "CLEAR" else 0.88), 2),
                         "latency_ms": round(latency, 2),
                         "model": model_tag,
@@ -1001,6 +1212,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                             motorcycles_observed=vehicle_counts["motorcycle"],
                             motorcycles_submerged=submerged_mc,
                             puddle_polygon_count=puddle_count,
+                            hazard=published_assessment,
                         ),
                     }
                     if region_results:

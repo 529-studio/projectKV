@@ -2,7 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera } from '../hooks/useCameras';
 import { TrafficVerdict } from '../hooks/useTraffic';
 import ForecastTimeline from './ForecastTimeline';
-import { API_ENDPOINTS, FLOOD_REPORT_I18N, FLOOD_VERIFY_I18N, FUNCTIONAL_COLORS, getApiUrl, USER_FLOOD_REPORT_I18N, VERDICT_I18N } from '../config/constants';
+import { API_ENDPOINTS, FLOOD_REPORT_I18N, FLOOD_VERIFY_I18N, FUNCTIONAL_COLORS, HAZARD_I18N, getApiUrl, USER_FLOOD_REPORT_I18N, VERDICT_I18N } from '../config/constants';
+import {
+  HAZARD_METER_MAX_CM,
+  formatDepthCm,
+  getHazardBadgeStyle,
+  levelFromDepthCm,
+  resolveHazard,
+} from '../utils/hazardUtils';
 import {
   FLOOD_MODAL_I18N,
   isDryRoadSeverity,
@@ -32,6 +39,7 @@ interface CameraModalProps {
   isPinned: boolean;
   onTogglePin: () => void;
   lang?: 'vi' | 'en';
+  onLangChange?: (lang: 'vi' | 'en') => void;
   appEnv?: string;
   analysisEnabled?: boolean;
   pinCapReached?: boolean;
@@ -51,6 +59,7 @@ export default function CameraModal({
   isPinned,
   onTogglePin,
   lang = 'vi',
+  onLangChange,
   appEnv = 'production',
   analysisEnabled = false,
   pinCapReached = false,
@@ -87,6 +96,21 @@ export default function CameraModal({
   const mountTimeRef = useRef<number>(Date.now());
   // Camera id whose ghost probe is currently in flight (prevents duplicate probes).
   const probeInFlightRef = useRef<string | null>(null);
+
+  // Language rendered inside the modal (AC16 / M10). The modal can switch its own
+  // copy — labels, advice and the decimal separator — with no refetch, and reports
+  // the switch so the parent list stays in sync.
+  const [currentLang, setCurrentLang] = useState<'vi' | 'en'>(lang);
+
+  useEffect(() => {
+    setCurrentLang(lang);
+  }, [lang]);
+
+  const handleToggleLang = useCallback(() => {
+    const next: 'vi' | 'en' = currentLang === 'vi' ? 'en' : 'vi';
+    setCurrentLang(next);
+    onLangChange?.(next);
+  }, [currentLang, onLangChange]);
 
   // Active 1-second interval countdown when cooldown is active
   useEffect(() => {
@@ -166,9 +190,9 @@ export default function CameraModal({
       const res = await fetch(url, { method: 'POST' });
       if (!res.ok) {
         if (res.status === 429) {
-          setFloodVerifyError(lang === 'vi' ? FLOOD_VERIFY_I18N.RATE_LIMITED.vi : FLOOD_VERIFY_I18N.RATE_LIMITED.en);
+          setFloodVerifyError(currentLang === 'vi' ? FLOOD_VERIFY_I18N.RATE_LIMITED.vi : FLOOD_VERIFY_I18N.RATE_LIMITED.en);
         } else {
-          setFloodVerifyError(lang === 'vi' ? FLOOD_VERIFY_I18N.ERROR_GENERIC.vi : FLOOD_VERIFY_I18N.ERROR_GENERIC.en);
+          setFloodVerifyError(currentLang === 'vi' ? FLOOD_VERIFY_I18N.ERROR_GENERIC.vi : FLOOD_VERIFY_I18N.ERROR_GENERIC.en);
         }
         res.json().then(errJson => {
           if (errJson?.error && typeof window !== 'undefined') {
@@ -183,11 +207,11 @@ export default function CameraModal({
       if (typeof window !== 'undefined') {
         console.warn('[flood-verify] network error:', err);
       }
-      setFloodVerifyError(lang === 'vi' ? FLOOD_VERIFY_I18N.ERROR_GENERIC.vi : FLOOD_VERIFY_I18N.ERROR_GENERIC.en);
+      setFloodVerifyError(currentLang === 'vi' ? FLOOD_VERIFY_I18N.ERROR_GENERIC.vi : FLOOD_VERIFY_I18N.ERROR_GENERIC.en);
     } finally {
       setIsVerifyingFlood(false);
     }
-  }, [camera?.id, isVerifyingFlood, cooldownRemaining, lang]);
+  }, [camera?.id, isVerifyingFlood, cooldownRemaining, currentLang]);
 
   const handleReportFlood = useCallback(async () => {
     if (!camera?.id || isReportingFlood || reportCooldownRemaining > 0) return;
@@ -201,17 +225,17 @@ export default function CameraModal({
       const res = await fetch(url, { method: 'POST' });
       if (res.ok || res.status === 200 || res.status === 201) {
         setFloodReportFeedback({
-          text: lang === 'vi' ? FLOOD_REPORT_I18N.SUCCESS_CHIP.vi : FLOOD_REPORT_I18N.SUCCESS_CHIP.en,
+          text: currentLang === 'vi' ? FLOOD_REPORT_I18N.SUCCESS_CHIP.vi : FLOOD_REPORT_I18N.SUCCESS_CHIP.en,
           isError: false,
         });
       } else if (res.status === 429) {
         setFloodReportFeedback({
-          text: lang === 'vi' ? FLOOD_REPORT_I18N.RATE_LIMITED.vi : FLOOD_REPORT_I18N.RATE_LIMITED.en,
+          text: currentLang === 'vi' ? FLOOD_REPORT_I18N.RATE_LIMITED.vi : FLOOD_REPORT_I18N.RATE_LIMITED.en,
           isError: false,
         });
       } else {
         setFloodReportFeedback({
-          text: lang === 'vi' ? FLOOD_REPORT_I18N.ERROR_GENERIC.vi : FLOOD_REPORT_I18N.ERROR_GENERIC.en,
+          text: currentLang === 'vi' ? FLOOD_REPORT_I18N.ERROR_GENERIC.vi : FLOOD_REPORT_I18N.ERROR_GENERIC.en,
           isError: true,
         });
       }
@@ -220,13 +244,13 @@ export default function CameraModal({
         console.warn('[report-flood] network error:', err);
       }
       setFloodReportFeedback({
-        text: lang === 'vi' ? FLOOD_REPORT_I18N.ERROR_GENERIC.vi : FLOOD_REPORT_I18N.ERROR_GENERIC.en,
+        text: currentLang === 'vi' ? FLOOD_REPORT_I18N.ERROR_GENERIC.vi : FLOOD_REPORT_I18N.ERROR_GENERIC.en,
         isError: true,
       });
     } finally {
       setIsReportingFlood(false);
     }
-  }, [camera?.id, isReportingFlood, reportCooldownRemaining, lang]);
+  }, [camera?.id, isReportingFlood, reportCooldownRemaining, currentLang]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target !== e.currentTarget) return;
@@ -325,18 +349,68 @@ export default function CameraModal({
 
   const hasRealVerdict = Boolean(verdict && verdict.severity);
   const severity = hasRealVerdict ? verdict!.severity : 'UNKNOWN';
-  let severityLabel = lang === 'vi' ? 'BÌNH THƯỜNG' : 'CLEAR';
+  let severityLabel = currentLang === 'vi' ? 'BÌNH THƯỜNG' : 'CLEAR';
   let severityColor: string = FUNCTIONAL_COLORS.CLEAR;
   
   if (severity === 'MODERATE') {
-    severityLabel = lang === 'vi' ? 'ĐÔNG XE' : 'MODERATE';
+    severityLabel = currentLang === 'vi' ? 'ĐÔNG XE' : 'MODERATE';
     severityColor = FUNCTIONAL_COLORS.MODERATE;
   } else if (severity === 'HEAVY' || severity === 'CONGESTED') {
-    severityLabel = lang === 'vi' ? 'ÙN TẮC' : 'CONGESTED';
+    severityLabel = currentLang === 'vi' ? 'ÙN TẮC' : 'CONGESTED';
     severityColor = FUNCTIONAL_COLORS.CONGESTED;
   }
 
   const isActuallyAvailable = camera.isOnline && !camera.isGhost && !imgError;
+
+  // Physical hazard block (Issue #401, spec §6.2). `resolveHazard` returns null for a
+  // pre-contract or pre-migration verdict, in which case the legacy flood badge keeps
+  // rendering untouched (AC14). It never invents Level 1 for missing data.
+  const hazard = resolveHazard(verdict);
+  const hazardLevel = hazard?.level ?? null;
+  const hazardStyle = getHazardBadgeStyle(hazardLevel);
+  const hazardLabel = hazardLevel
+    ? HAZARD_I18N[`LEVEL_${hazardLevel}` as 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3'][currentLang]
+    : null;
+  const hazardDepthText = formatDepthCm(hazard?.depthCm, currentLang);
+  const hazardRefText = (() => {
+    switch (verdict?.flood_calibration_ref) {
+      case 'MOTORCYCLE_110CM':
+        return HAZARD_I18N.REF_MOTORCYCLE[currentLang];
+      case 'CURB_15CM':
+        return HAZARD_I18N.REF_CURB[currentLang];
+      case 'CAMERA_OVERRIDE':
+        return HAZARD_I18N.REF_OVERRIDE[currentLang];
+      default:
+        return null;
+    }
+  })();
+  // Advice must describe the level, not just the number: a measured 8 cm pool that
+  // traffic is avoiding is Level 3, and quoting the "over 20 cm" sentence would be a
+  // fabricated measurement. Avoidance wording never states a centimetre value (AC10).
+  const hazardDepthLevel =
+    hazard?.depthCm !== null && hazard?.depthCm !== undefined
+      ? levelFromDepthCm(hazard.depthCm)
+      : null;
+  const hazardIsAvoidanceDriven =
+    hazard?.basis === 'AVOIDANCE_INFERRED' ||
+    (hazardLevel !== null && hazardDepthLevel !== null && hazardLevel > hazardDepthLevel);
+  const hazardAdvice = hazardLevel
+    ? hazardIsAvoidanceDriven
+      ? HAZARD_I18N.AVOIDANCE_ADVICE[currentLang]
+      : hazard?.depthCm !== null && hazard?.depthCm !== undefined
+        ? HAZARD_I18N[
+            `LEVEL_${hazardLevel}_ADVICE` as 'LEVEL_1_ADVICE' | 'LEVEL_2_ADVICE' | 'LEVEL_3_ADVICE'
+          ][currentLang]
+        : // A band sentence quotes its band; without a measured depth it would be a
+          // claim we cannot support, so the block shows only the label and the
+          // "depth not measurable" line.
+          null
+    : null;
+  const hazardMeterPercent =
+    hazard?.depthCm !== null && hazard?.depthCm !== undefined
+      ? Math.min(100, Math.max(0, (hazard.depthCm / HAZARD_METER_MAX_CM) * 100))
+      : 0;
+  const hazardIsStale = Boolean(verdict?.stale);
 
   return (
     <div 
@@ -356,7 +430,7 @@ export default function CameraModal({
               {sequenceLabel && (
                 <span
                   className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold tracking-wide shrink-0"
-                  title={lang === 'vi' ? 'Vị trí trong danh sách camera' : 'Camera sequence position'}
+                  title={currentLang === 'vi' ? 'Vị trí trong danh sách camera' : 'Camera sequence position'}
                 >
                   [{sequenceLabel}]
                 </span>
@@ -366,7 +440,7 @@ export default function CameraModal({
               {osdTime ? (
                 <>
                   <span className="text-emerald-400 font-bold tracking-wide">
-                    {lang === 'vi' ? 'THỰC ĐỊA:' : 'LIVE OSD:'} {osdTime}
+                    {currentLang === 'vi' ? 'THỰC ĐỊA:' : 'LIVE OSD:'} {osdTime}
                   </span>
                   <span className="text-zinc-600">•</span>
                 </>
@@ -374,46 +448,46 @@ export default function CameraModal({
               {verdict?.observed_at ? (
                 <>
                   <span className="text-zinc-400">
-                    {lang === 'vi' ? 'QUAN SÁT:' : 'OBSERVED:'}{' '}
-                    {new Date(verdict.observed_at).toLocaleTimeString(lang === 'vi' ? 'vi-VN' : 'en-US')}
+                    {currentLang === 'vi' ? 'QUAN SÁT:' : 'OBSERVED:'}{' '}
+                    {new Date(verdict.observed_at).toLocaleTimeString(currentLang === 'vi' ? 'vi-VN' : 'en-US')}
                   </span>
                   <span className="text-zinc-600">•</span>
                 </>
               ) : null}
               <span>
-                {lang === 'vi' ? 'TẢI VỀ:' : 'FETCHED:'}{' '}
-                {new Date(fetchTimestamp).toLocaleTimeString(lang === 'vi' ? 'vi-VN' : 'en-US')}
+                {currentLang === 'vi' ? 'TẢI VỀ:' : 'FETCHED:'}{' '}
+                {new Date(fetchTimestamp).toLocaleTimeString(currentLang === 'vi' ? 'vi-VN' : 'en-US')}
               </span>
               <span className="text-zinc-600">•</span>
               <span>
                 {elapsedSeconds === 0
-                  ? lang === 'vi'
+                  ? currentLang === 'vi'
                     ? 'vừa xong'
                     : 'just now'
-                  : `${elapsedSeconds}s ${lang === 'vi' ? 'trước' : 'ago'}`}
+                  : `${elapsedSeconds}s ${currentLang === 'vi' ? 'trước' : 'ago'}`}
               </span>
               {(camera.isOnline && !camera.isGhost) && (
                 <button
                   onClick={handleRefresh}
                   className="text-zinc-400 hover:text-white underline text-[11px] ml-1"
-                  title={lang === 'vi' ? 'Tải lại khung hình mới nhất' : 'Reload latest frame'}
+                  title={currentLang === 'vi' ? 'Tải lại khung hình mới nhất' : 'Reload latest frame'}
                 >
-                  [{lang === 'vi' ? '↻ LÀM MỚI' : '↻ REFRESH'}]
+                  [{currentLang === 'vi' ? '↻ LÀM MỚI' : '↻ REFRESH'}]
                 </button>
               )}
             </div>
             <div className="flex flex-wrap gap-2 mt-2 text-xs font-bold items-center">
               {camera.isGhost ? (
                 <span className="px-2 py-0.5 rounded border bg-amber-950/70 border-amber-800 text-amber-400">
-                  {lang === 'vi' ? '[MẤT TÍN HIỆU THỰC ĐỊA]' : '[NO FIELD SIGNAL]'}
+                  {currentLang === 'vi' ? '[MẤT TÍN HIỆU THỰC ĐỊA]' : '[NO FIELD SIGNAL]'}
                 </span>
               ) : isActuallyAvailable ? (
                 <span className="px-2 py-0.5 rounded border bg-zinc-800 border-zinc-600 text-white">
-                  {lang === 'vi' ? '[HOẠT ĐỘNG]' : '[ONLINE]'}
+                  {currentLang === 'vi' ? '[HOẠT ĐỘNG]' : '[ONLINE]'}
                 </span>
               ) : (
                 <span className="px-2 py-0.5 rounded border bg-red-950/70 border-red-800 text-red-400">
-                  {lang === 'vi' ? '[MẤT KẾT NỐI]' : '[OFFLINE]'}
+                  {currentLang === 'vi' ? '[MẤT KẾT NỐI]' : '[OFFLINE]'}
                 </span>
               )}
 
@@ -421,12 +495,12 @@ export default function CameraModal({
                 <span
                   className="px-2 py-0.5 rounded border bg-zinc-900 border-zinc-700 text-zinc-400 text-[11px]"
                   title={
-                    lang === 'vi'
+                    currentLang === 'vi'
                       ? `Trùng nguồn video với camera ID: ${camera.duplicateOf}`
                       : `Duplicate video feed with camera ID: ${camera.duplicateOf}`
                   }
                 >
-                  {lang === 'vi'
+                  {currentLang === 'vi'
                     ? `[TRÙNG NGUỒN VỚI: ${camera.duplicateOf.slice(0, 8)}...]`
                     : `[DUPLICATE OF: ${camera.duplicateOf.slice(0, 8)}...]`}
                 </span>
@@ -436,14 +510,14 @@ export default function CameraModal({
               {userFloodReport && isUserReportActive(userFloodReport) && (
                 <span
                   className="px-2 py-0.5 rounded border border-amber-500/80 bg-amber-950/40 text-amber-300 text-xs font-bold inline-flex items-center gap-1.5"
-                  title={userFloodReport.escalated ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED[lang] : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE[lang]}
+                  title={userFloodReport.escalated ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED[currentLang] : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE[currentLang]}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full bg-amber-400 ${userFloodReport.escalated ? 'animate-ping' : ''}`} />
                   <span>
                     {userFloodReport.escalated
-                      ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED[lang]
-                      : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE[lang]}
-                    {' '}{USER_FLOOD_REPORT_I18N.REMAINING_MINUTES[lang](getUserReportRemainingMinutes(userFloodReport))}
+                      ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED[currentLang]
+                      : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE[currentLang]}
+                    {' '}{USER_FLOOD_REPORT_I18N.REMAINING_MINUTES[currentLang](getUserReportRemainingMinutes(userFloodReport))}
                   </span>
                 </span>
               )}
@@ -456,7 +530,7 @@ export default function CameraModal({
                   {verdict?.stale && (
                     <span
                       className="px-2 py-0.5 rounded border border-zinc-600 bg-zinc-900 text-zinc-400 text-xs font-bold inline-flex items-center gap-1.5"
-                      title={lang === 'vi' ? 'Dữ liệu phân tích đã cũ (>3 phút hoặc mất cập nhật)' : 'Analysis verdict is stale (>3 min or frame frozen)'}
+                      title={currentLang === 'vi' ? 'Dữ liệu phân tích đã cũ (>3 phút hoặc mất cập nhật)' : 'Analysis verdict is stale (>3 min or frame frozen)'}
                     >
                       <svg
                         className="w-3 h-3 shrink-0 text-zinc-400"
@@ -473,23 +547,23 @@ export default function CameraModal({
                         <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" />
                         <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />
                       </svg>
-                      <span>{lang === 'vi' ? VERDICT_I18N.STALE_BADGE.vi : VERDICT_I18N.STALE_BADGE.en}</span>
+                      <span>{currentLang === 'vi' ? VERDICT_I18N.STALE_BADGE.vi : VERDICT_I18N.STALE_BADGE.en}</span>
                     </span>
                   )}
                   {verdict?.source === 'mock' && appEnv === 'dev' && (
                     <span
                       className="px-2 py-0.5 rounded border border-yellow-500/80 bg-yellow-500/10 text-yellow-400 text-xs font-bold tracking-wider"
-                      title={lang === 'vi' ? 'Dữ liệu giả lập chạy trong môi trường dev' : 'Simulated verdict in dev mode'}
+                      title={currentLang === 'vi' ? 'Dữ liệu giả lập chạy trong môi trường dev' : 'Simulated verdict in dev mode'}
                     >
-                      [{lang === 'vi' ? VERDICT_I18N.DEMO_BADGE.vi : VERDICT_I18N.DEMO_BADGE.en}]
+                      [{currentLang === 'vi' ? VERDICT_I18N.DEMO_BADGE.vi : VERDICT_I18N.DEMO_BADGE.en}]
                     </span>
                   )}
-                  {verdict?.flood_severity && verdict.flood_severity.toUpperCase().trim() !== 'UNKNOWN' && (
+                  {!hazard && verdict?.flood_severity && verdict.flood_severity.toUpperCase().trim() !== 'UNKNOWN' && (
                     <>
                       {isDryRoadSeverity(verdict.flood_severity) && (
                         <span
                           className="px-2 py-0.5 rounded border border-emerald-600/70 bg-emerald-950/20 text-emerald-400 text-xs font-bold inline-flex items-center gap-1.5"
-                          title={FLOOD_MODAL_I18N.DRY.title[lang]}
+                          title={FLOOD_MODAL_I18N.DRY.title[currentLang]}
                         >
                           <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <circle cx="12" cy="12" r="4" />
@@ -502,13 +576,13 @@ export default function CameraModal({
                             <path d="m6.34 17.66-1.41 1.41" />
                             <path d="m19.07 4.93-1.41 1.41" />
                           </svg>
-                          <span>{FLOOD_MODAL_I18N.DRY[lang]}</span>
+                          <span>{FLOOD_MODAL_I18N.DRY[currentLang]}</span>
                         </span>
                       )}
                       {isWetRoadSeverity(verdict.flood_severity) && (
                         <span
                           className="px-2 py-0.5 rounded border border-sky-500/80 bg-sky-950/30 text-sky-300 text-xs font-bold inline-flex items-center gap-1.5"
-                          title={FLOOD_MODAL_I18N.WET.title[lang]}
+                          title={FLOOD_MODAL_I18N.WET.title[currentLang]}
                         >
                           <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
@@ -516,32 +590,32 @@ export default function CameraModal({
                             <path d="M8 14v6" />
                             <path d="M12 16v6" />
                           </svg>
-                          <span>{FLOOD_MODAL_I18N.WET[lang]}</span>
+                          <span>{FLOOD_MODAL_I18N.WET[currentLang]}</span>
                         </span>
                       )}
                       {verdict.flood_severity.toUpperCase().trim() === 'FLOODED_SHALLOW' && (
                         <span
                           className="px-2 py-0.5 rounded border border-amber-500/80 bg-amber-950/60 text-amber-300 text-xs font-bold inline-flex items-center gap-1.5"
-                          title={FLOOD_MODAL_I18N.FLOODED_SHALLOW.title[lang]}
+                          title={FLOOD_MODAL_I18N.FLOODED_SHALLOW.title[currentLang]}
                         >
                           <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M2 12c1.5 0 3-1 4.5-1s3 1 4.5 1 3-1 4.5-1 3 1 4.5 1 3-1 4.5-1" />
                             <path d="M2 18c1.5 0 3-1 4.5-1s3 1 4.5 1 3-1 4.5-1 3 1 4.5 1 3-1 4.5-1" />
                           </svg>
-                          <span>{FLOOD_MODAL_I18N.FLOODED_SHALLOW[lang]}</span>
+                          <span>{FLOOD_MODAL_I18N.FLOODED_SHALLOW[currentLang]}</span>
                         </span>
                       )}
                       {verdict.flood_severity.toUpperCase().trim() === 'FLOODED_DEEP' && (
                         <span
                           className="px-2 py-0.5 rounded border border-rose-500/80 bg-rose-950/60 text-rose-300 text-xs font-bold inline-flex items-center gap-1.5"
-                          title={FLOOD_MODAL_I18N.FLOODED_DEEP.title[lang]}
+                          title={FLOOD_MODAL_I18N.FLOODED_DEEP.title[currentLang]}
                         >
                           <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
                             <line x1="12" y1="9" x2="12" y2="13" />
                             <line x1="12" y1="17" x2="12.01" y2="17" />
                           </svg>
-                          <span>{FLOOD_MODAL_I18N.FLOODED_DEEP[lang]}</span>
+                          <span>{FLOOD_MODAL_I18N.FLOODED_DEEP[currentLang]}</span>
                         </span>
                       )}
                     </>
@@ -553,12 +627,12 @@ export default function CameraModal({
                 <span
                   className="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-900/90 text-zinc-400 text-xs font-mono"
                   title={
-                    lang === 'vi'
+                    currentLang === 'vi'
                       ? 'Camera hoạt động bình thường, đang chờ kết quả phân tích AI'
                       : 'Camera is online, awaiting AI traffic analysis'
                   }
                 >
-                  [{lang === 'vi' ? 'Chờ phân tích AI' : 'Awaiting AI analysis'}]
+                  [{currentLang === 'vi' ? 'Chờ phân tích AI' : 'Awaiting AI analysis'}]
                 </span>
               )}
             </div>
@@ -578,10 +652,10 @@ export default function CameraModal({
                   }`}
                   title={
                     cooldownRemaining > 0
-                      ? (lang === 'vi'
+                      ? (currentLang === 'vi'
                           ? `Vui lòng đợi ${cooldownRemaining}s trước khi xác minh lại`
                           : `Please wait ${cooldownRemaining}s before verifying again`)
-                      : (lang === 'vi'
+                      : (currentLang === 'vi'
                           ? 'Xác minh tình trạng ngập nước thực địa qua mô hình VLM'
                           : 'Verify real-time flood status via VLM model')
                   }
@@ -607,7 +681,7 @@ export default function CameraModal({
                   <span>
                     {getFloodVerifyButtonText(
                       { isVerifying: isVerifyingFlood, cooldownRemaining },
-                      lang
+                      currentLang
                     )}
                   </span>
                 </button>
@@ -624,10 +698,10 @@ export default function CameraModal({
                   }`}
                   title={
                     reportCooldownRemaining > 0
-                      ? (lang === 'vi'
+                      ? (currentLang === 'vi'
                           ? `Đã ghi nhận báo cáo. Vui lòng đợi ${reportCooldownRemaining}s trước khi gửi lại`
                           : `Report recorded. Please wait ${reportCooldownRemaining}s before reporting again`)
-                      : (lang === 'vi'
+                      : (currentLang === 'vi'
                           ? 'Báo cáo thực địa ngập nước tại vị trí camera này'
                           : 'Report local street flooding at this camera location')
                   }
@@ -649,7 +723,7 @@ export default function CameraModal({
                   <span>
                     {getFloodReportButtonText(
                       { isReporting: isReportingFlood, cooldownRemaining: reportCooldownRemaining },
-                      lang
+                      currentLang
                     )}
                   </span>
                 </button>
@@ -667,9 +741,9 @@ export default function CameraModal({
                     <span className={`w-1.5 h-1.5 rounded-full bg-amber-400 ${userFloodReport.escalated ? 'animate-ping' : ''}`} />
                     <span>
                       {userFloodReport.escalated
-                        ? (lang === 'vi' ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED.vi : USER_FLOOD_REPORT_I18N.BADGE_ESCALATED.en)
-                        : (lang === 'vi' ? USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE.vi : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE.en)}
-                      {' '}{USER_FLOOD_REPORT_I18N.REMAINING_MINUTES[lang](getUserReportRemainingMinutes(userFloodReport))}
+                        ? (currentLang === 'vi' ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED.vi : USER_FLOOD_REPORT_I18N.BADGE_ESCALATED.en)
+                        : (currentLang === 'vi' ? USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE.vi : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE.en)}
+                      {' '}{USER_FLOOD_REPORT_I18N.REMAINING_MINUTES[currentLang](getUserReportRemainingMinutes(userFloodReport))}
                     </span>
                   </span>
                 )}
@@ -695,8 +769,8 @@ export default function CameraModal({
                     }
                   >
                     <span>
-                      [{lang === 'vi' ? FLOOD_VERIFY_I18N.BADGE_PREFIX.vi : FLOOD_VERIFY_I18N.BADGE_PREFIX.en}:{' '}
-                      {FLOOD_VERIFY_I18N.SEVERITY[floodVerifyResult.flood_severity as keyof typeof FLOOD_VERIFY_I18N.SEVERITY]?.[lang] ||
+                      [{currentLang === 'vi' ? FLOOD_VERIFY_I18N.BADGE_PREFIX.vi : FLOOD_VERIFY_I18N.BADGE_PREFIX.en}:{' '}
+                      {FLOOD_VERIFY_I18N.SEVERITY[floodVerifyResult.flood_severity as keyof typeof FLOOD_VERIFY_I18N.SEVERITY]?.[currentLang] ||
                         floodVerifyResult.flood_severity}]
                     </span>
                     {floodVerifyResult.confidence > 0 && (
@@ -720,11 +794,109 @@ export default function CameraModal({
                 &ldquo;{floodVerifyResult.description}&rdquo;
               </div>
             )}
+
+            {/* PHYSICAL HAZARD BLOCK (Issue #401, spec §6.2) — visible without
+                scrolling, above the snapshot. Monochrome zinc, level in text + glyph
+                + 3-segment meter, never colour alone. Replaces the legacy flood chip
+                whenever a hazard resolves, so the two cannot contradict each other. */}
+            {hazard && hazardLevel && hazardLabel && (
+              <div
+                role="status"
+                aria-live="polite"
+                data-hazard-level={hazardLevel}
+                className={`mt-2 rounded-lg border px-3 py-2.5 select-none ${hazardStyle.container} ${
+                  hazardIsStale ? 'opacity-60' : ''
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <svg
+                      className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      {hazardLevel === 3 ? (
+                        <>
+                          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                          <line x1="12" y1="9" x2="12" y2="13" />
+                          <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M2 12c1.5 0 3-1 4.5-1s3 1 4.5 1 3-1 4.5-1 3 1 4.5 1 3-1 4.5-1" />
+                          {hazardLevel === 2 && (
+                            <path d="M2 18c1.5 0 3-1 4.5-1s3 1 4.5 1 3-1 4.5-1 3 1 4.5 1 3-1 4.5-1" />
+                          )}
+                        </>
+                      )}
+                    </svg>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold leading-snug break-words">{hazardLabel}</h3>
+                      {hazardAdvice && (
+                        <p className="mt-0.5 text-xs leading-snug break-words">{hazardAdvice}</p>
+                      )}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+                        {hazardDepthText ? (
+                          <>
+                            <span className="font-semibold tabular-nums">{hazardDepthText}</span>
+                            {hazardRefText && <span className="opacity-80">· {hazardRefText}</span>}
+                            <span
+                              role="img"
+                              aria-label={HAZARD_I18N.METER_ARIA[currentLang](hazardDepthText)}
+                              className="relative inline-block h-1.5 w-20 overflow-hidden rounded-sm border border-current"
+                              title={hazardDepthText}
+                            >
+                              <span
+                                className="absolute inset-y-0 left-0 bg-current"
+                                style={{ width: `${hazardMeterPercent}%` }}
+                              />
+                            </span>
+                          </>
+                        ) : (
+                          <span className="opacity-90">{HAZARD_I18N.DEPTH_UNMEASURED[currentLang]}</span>
+                        )}
+                        {hazardIsStale && (
+                          <span className="rounded border border-current px-1 opacity-80">
+                            {HAZARD_I18N.STALE[currentLang]}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="sr-only">{HAZARD_I18N.LEVEL_ARIA[currentLang](hazardLevel)}</span>
+                  <span className="flex shrink-0 items-center gap-1" aria-hidden="true">
+                    {[1, 2, 3].map((segment) => (
+                      <span
+                        key={segment}
+                        className={`h-1.5 w-5 rounded-sm ${
+                          segment <= hazardLevel ? 'bg-current' : 'border border-current opacity-40'
+                        }`}
+                      />
+                    ))}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
+          <button
+            type="button"
+            onClick={handleToggleLang}
+            className="mt-0.5 flex h-7 min-w-[2rem] shrink-0 items-center justify-center rounded border border-zinc-800 bg-zinc-900 px-2 font-mono text-[11px] font-semibold text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+            aria-label={currentLang === 'vi' ? 'Chuyển sang tiếng Anh' : 'Switch to Vietnamese'}
+            title={currentLang === 'vi' ? 'Chuyển sang tiếng Anh' : 'Switch to Vietnamese'}
+            data-active-lang={currentLang}
+          >
+            {currentLang === 'vi' ? 'EN' : 'VI'}
+          </button>
           <button
             onClick={onClose}
             className="text-zinc-500 hover:text-white font-bold text-xl px-2"
-            aria-label={lang === 'vi' ? 'Đóng' : 'Close'}
+            aria-label={currentLang === 'vi' ? 'Đóng' : 'Close'}
           >
             ×
           </button>
@@ -750,8 +922,8 @@ export default function CameraModal({
                     ? 'opacity-20 pointer-events-none'
                     : 'opacity-85 hover:opacity-100 hover:border-zinc-400 cursor-pointer'
                 }`}
-                aria-label={lang === 'vi' ? 'Camera trước (Mũi tên trái)' : 'Previous camera (Left arrow)'}
-                title={lang === 'vi' ? 'Camera trước (Mũi tên trái)' : 'Previous camera (Left arrow)'}
+                aria-label={currentLang === 'vi' ? 'Camera trước (Mũi tên trái)' : 'Previous camera (Left arrow)'}
+                title={currentLang === 'vi' ? 'Camera trước (Mũi tên trái)' : 'Previous camera (Left arrow)'}
               >
                 <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -771,8 +943,8 @@ export default function CameraModal({
                     ? 'opacity-20 pointer-events-none'
                     : 'opacity-85 hover:opacity-100 hover:border-zinc-400 cursor-pointer'
                 }`}
-                aria-label={lang === 'vi' ? 'Camera kế tiếp (Mũi tên phải)' : 'Next camera (Right arrow)'}
-                title={lang === 'vi' ? 'Camera kế tiếp (Mũi tên phải)' : 'Next camera (Right arrow)'}
+                aria-label={currentLang === 'vi' ? 'Camera kế tiếp (Mũi tên phải)' : 'Next camera (Right arrow)'}
+                title={currentLang === 'vi' ? 'Camera kế tiếp (Mũi tên phải)' : 'Next camera (Right arrow)'}
               >
                 <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -783,10 +955,10 @@ export default function CameraModal({
           {camera.isGhost ? (
             <div className="text-center p-6 space-y-2">
               <div className="text-amber-400 font-bold text-sm">
-                {lang === 'vi' ? 'MẤT TÍN HIỆU CAMERA THỰC ĐỊA' : 'FIELD CAMERA SIGNAL LOST'}
+                {currentLang === 'vi' ? 'MẤT TÍN HIỆU CAMERA THỰC ĐỊA' : 'FIELD CAMERA SIGNAL LOST'}
               </div>
               <div className="text-zinc-500 text-xs max-w-md">
-                {lang === 'vi'
+                {currentLang === 'vi'
                   ? 'Cổng thông tin trả về ảnh giữ chỗ (Image Not Available). Máy chủ đã tự động đánh dấu để tránh tải dữ liệu vô ích.'
                   : 'Upstream portal returned a placeholder image (Image Not Available). The server has marked this camera to avoid wasteful requests.'}
               </div>
@@ -794,10 +966,10 @@ export default function CameraModal({
           ) : !camera.isOnline ? (
             <div className="text-center p-6 space-y-2">
               <div className="text-zinc-400 font-bold text-sm">
-                {lang === 'vi' ? 'CAMERA ĐANG BẢO TRÌ HOẶC MẤT KẾT NỐI' : 'CAMERA MAINTENANCE OR OFFLINE'}
+                {currentLang === 'vi' ? 'CAMERA ĐANG BẢO TRÌ HOẶC MẤT KẾT NỐI' : 'CAMERA MAINTENANCE OR OFFLINE'}
               </div>
               <div className="text-zinc-600 text-xs">
-                {lang === 'vi'
+                {currentLang === 'vi'
                   ? 'Không thể kết nối đến camera tại vị trí này.'
                   : 'Cannot connect to the camera at this location.'}
               </div>
@@ -805,10 +977,10 @@ export default function CameraModal({
           ) : imgError ? (
             <div className="text-center p-6 space-y-3">
               <div className="text-red-400 font-bold text-sm">
-                {lang === 'vi' ? 'KHÔNG THỂ TẢI HÌNH ẢNH SNAPSHOT' : 'UNABLE TO LOAD SNAPSHOT IMAGE'}
+                {currentLang === 'vi' ? 'KHÔNG THỂ TẢI HÌNH ẢNH SNAPSHOT' : 'UNABLE TO LOAD SNAPSHOT IMAGE'}
               </div>
               <div className="text-zinc-500 text-xs max-w-md">
-                {lang === 'vi'
+                {currentLang === 'vi'
                   ? 'Máy chủ proxy báo lỗi 502/503 hoặc mất kết nối tạm thời tới camera.'
                   : 'Proxy server reported 502/503 error or temporary connection timeout to camera.'}
               </div>
@@ -817,7 +989,7 @@ export default function CameraModal({
                   onClick={handleRefresh}
                   className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-500 rounded text-xs font-mono transition-colors"
                 >
-                  {lang === 'vi' ? '↻ THỬ LẠI KẾT NỐI' : '↻ RETRY CONNECTION'}
+                  {currentLang === 'vi' ? '↻ THỬ LẠI KẾT NỐI' : '↻ RETRY CONNECTION'}
                 </button>
               </div>
             </div>
@@ -837,7 +1009,7 @@ export default function CameraModal({
           <div className="p-3 sm:p-4 bg-zinc-950 border-t border-zinc-850">
             <ForecastTimeline
               cameraId={camera.id}
-              lang={lang}
+              lang={currentLang}
               isVisible={true}
             />
           </div>
@@ -848,17 +1020,17 @@ export default function CameraModal({
         <div className="px-4 py-3 bg-zinc-900 border-t border-zinc-800 flex justify-between items-center text-xs">
           <div className="flex items-center gap-3 text-zinc-500">
             <span>
-              {lang === 'vi' ? 'TỌA ĐỘ:' : 'COORDINATES:'} {camera.latitude?.toFixed(5)}, {camera.longitude?.toFixed(5)}
+              {currentLang === 'vi' ? 'TỌA ĐỘ:' : 'COORDINATES:'} {camera.latitude?.toFixed(5)}, {camera.longitude?.toFixed(5)}
             </span>
             {isActuallyAvailable && (
               <span className="hidden sm:inline text-zinc-500">
-                • {lang === 'vi' ? 'TỰ ĐỘNG LÀM MỚI:' : 'AUTO REFRESH:'} {15 - elapsedSeconds}s
+                • {currentLang === 'vi' ? 'TỰ ĐỘNG LÀM MỚI:' : 'AUTO REFRESH:'} {15 - elapsedSeconds}s
               </span>
             )}
           </div>
           <button 
             onClick={onTogglePin}
-            title={!isPinned && pinCapReached ? (lang === 'vi' ? 'Đã đạt giới hạn ghim (tối đa 12 camera)' : 'Pin limit reached (maximum 12 cameras)') : undefined}
+            title={!isPinned && pinCapReached ? (currentLang === 'vi' ? 'Đã đạt giới hạn ghim (tối đa 12 camera)' : 'Pin limit reached (maximum 12 cameras)') : undefined}
             className={`px-3 py-1.5 border rounded transition ${
               isPinned
                 ? 'bg-zinc-200 text-black border-white hover:bg-white'
@@ -868,14 +1040,14 @@ export default function CameraModal({
             }`}
           >
             {isPinned
-              ? lang === 'vi'
+              ? currentLang === 'vi'
                 ? '[- BỎ GHIM]'
                 : '[- UNPIN]'
               : pinCapReached
-              ? lang === 'vi'
+              ? currentLang === 'vi'
                 ? '[12/12 ĐẦY]'
                 : '[12/12 FULL]'
-              : lang === 'vi'
+              : currentLang === 'vi'
               ? '[+ GHIM THEO DÕI]'
               : '[+ PIN TO DOCK]'}
           </button>

@@ -78,7 +78,7 @@ is the only part an agent should read by default.
 | 72 | Schema Assertions & Non-Blocking Batch Retention | Assert migration readiness at boot; 10m bin coverage observability; chunked rowid retention (LIMIT 5000). | [L72](L72-fail-fast-schema-assertions-and-nonblocking-batch-retention.md) |
 | 73 | As-Of Weather Feature Store & Ablation Gating | Append-only weather observations (0009); as-of join with 30m cutoff (no forward fill); 3-way ablation gate. | [L73](L73-asof-weather-feature-store-and-ablation-gating.md) |
 | 74 | Frontend Forecast Contract Gating & Uncertainty Visualization | Fail-closed checks (ok/stale/insufficient/unvalidated), 95% CI band, 50% stale dimming, 4-file pattern. | [L74](L74-frontend-forecast-contract-gating-and-uncertainty-visualization.md) |
-| 75 | Segmentation Dataset v2 Group Splitting & Retraining Gate | Group split by camera/date (0 leakage); 550 frames; IoU >= 0.612, mAP50-95 >= 0.496, p95 <= 25ms, rollback test. | [L75](L75-segmentation-dataset-v2-group-splitting-and-retraining-gates.md) |
+| 75 | Segmentation Dataset v2 Group Splitting & Retraining Gate | Group split by camera/date; 550 frames; IoU >= 0.612, mAP50-95 >= 0.496, p95 <= 25ms. | [L75](L75-segmentation-dataset-v2-group-splitting-and-retraining-gates.md) |
 | 76 | Inference Worker Co-Tenancy & Adaptive Load-Shedding | Recompute cgroup invariants; tag profiles; cron gate exits 1; assert tensor input; clamp anchors. | [L76](L76-inference-worker-cotenancy-and-adaptive-loadshedding.md) |
 | 77 | Evidence Integrity CI Gate & Synthetic Prohibition | No synthetic fixtures; non-future soak timestamps; model entropy >= 3.0; baseline ratchet. | [L77](L77-evidence-integrity-gate-and-synthetic-prohibition.md) |
 | 78 | Unattended Staging Soak & Proof Archive Ingestion | 24/7 harvester; WAL; 11,905 real-frame replay; process-anchored soak telemetry. | [L78](L78-unattended-soak-and-proof-archive-ingestion.md) |
@@ -87,11 +87,11 @@ is the only part an agent should read by default.
 | 81 | Temporal Baseline Ratchet Expiry & Manual Approval Gate Concurrency | No clock-dependent baselines; SUPERSEDED lifecycle; deployment concurrency. | [L81](L81-temporal-baseline-ratchet-and-approval-gate-concurrency.md) |
 | 82 | Authentic Model Artifacts & Untrained Heads | Real export only; no dry-run IR; refuse untrained heads; execute every resolution. | [L82](L82-authentic-model-artifacts-and-untrained-head-guard.md) |
 | 83 | Native GitHub Protection & CI Gate Consolidation | Verify native controls; migrate checks before delete; public gate; no bypasses. | [L83](L83-native-github-protection-and-ci-gate-consolidation.md) |
-| 84 | Forecast Refit Daemon & Single-Flight Locking | Daemon, non-unlinked fcntl.flock, state quarantine, row-delta gating, Compose/systemd/k8s. | [L84](L84-forecast-refit-daemon-and-singleflight-locking.md) |
-| 85 | Commuter Geolocation, Multi-Tier Banded Sorting & Kiosk Ergonomics | 250m bands; clock-free comparator; zero coordinate exfiltration; >=48px wet targets. | [L85](L85-commuter-geolocation-banded-sorting.md) |
-| 86 | RFC3339Nano 9-Digit Timestamps & Python Microsecond Pre-normalization | Fixed 9-digit layout; regex microsecond truncation; cross-runtime UTC invariants. | [L86](L86-rfc3339nano-9digit-timestamps-microsecond-truncation.md) |
+| 84 | Forecast Refit Daemon & Single-Flight Locking | Daemon, non-unlinked fcntl.flock, state quarantine, row-delta gating. | [L84](L84-forecast-refit-daemon-and-singleflight-locking.md) |
+| 85 | Commuter Geolocation, Multi-Tier Banded Sorting & Kiosk Ergonomics | 250m bands; clock-free comparator; zero coordinate exfiltration; >=48px. | [L85](L85-commuter-geolocation-banded-sorting.md) |
+| 86 | RFC3339Nano 9-Digit Timestamps & Microsecond Truncation | Fixed 9-digit layout; regex microsecond truncation; cross-runtime UTC invariants. | [L86](L86-rfc3339nano-9digit-timestamps-microsecond-truncation.md) |
 | 87 | Cryptographic JWT & CORS Whitelisting | Never trust plain headers; verify RS256 & aud via JWKS; whitelist CORS credentials. | [L87](L87-cryptographic-jwt-verification-and-cors-origin-whitelisting.md) |
-| 88 | Proxy OOM Bounds & Compression Middleware Ordering | Cap upstream reads via io.LimitReader; order gzip outer of buffering/sanitizing middleware. | [L88](L88-proxy-oom-bounds-and-compression-middleware-ordering.md) |
-| 89 | Unified SSE Stream, Canvas Rendering & Visibility Throttling | Single EventSource; ref mirror breaks reconnect loop; preferCanvas: true; visibility pause. | [L89](L89-unified-sse-stream-provider-canvas-rendering-and-visibility-throttling.md) |
-
+| 88 | Proxy OOM Bounds & Compression Middleware Ordering | Cap upstream reads via io.LimitReader; order gzip outer of sanitizing middleware. | [L88](L88-proxy-oom-bounds-and-compression-middleware-ordering.md) |
+| 89 | Unified SSE Stream, Canvas Rendering & Visibility Throttling | Single EventSource; ref mirror breaks reconnect loop; preferCanvas; visibility pause. | [L89](L89-unified-sse-stream-provider-canvas-rendering-and-visibility-throttling.md) |
+| 90 | Physical Depth Hazard Classification | Avoidance is hazard; physical cm depth; latch drops; no fake levels. | [L90](L90-physical-depth-hazard-classification.md) |
 > Numbering note: Lesson 54 does not exist; numbers are preserved as cited.

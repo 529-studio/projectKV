@@ -762,6 +762,7 @@ export default function Home() {
         isPinned={selectedCamera ? pinnedCameraIds.includes(selectedCamera.id) : false}
         onTogglePin={() => selectedCamera && togglePin(selectedCamera.id)}
         lang={lang}
+        onLangChange={setLang}
         appEnv={appEnv}
         analysisEnabled={analysisEnabled}
         pinCapReached={pinnedCameraIds.length >= PINNED_DOCK_CAP}

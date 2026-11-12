@@ -91,6 +91,18 @@ type Verdict struct {
 	SaturationIndex float64              `json:"saturation_index"`
 	PCUTotal        float64              `json:"pcu_total"`
 	Directions      []DirectionalVerdict `json:"directions,omitempty"`
+
+	// Physical hazard layer (Issue #401, ADR-013 D6).
+	//
+	// Pointers are mandatory: `omitempty` on a bare float64 would erase a measured
+	// 0.0 and make "dry, verified" indistinguishable from "never measured". Because
+	// TrafficStatusResponse, FloodStatusResponse and HotsetStatusResponse all marshal
+	// this struct, these five tags carry the fields to every endpoint at once.
+	FloodDepthCm         *float64 `json:"flood_depth_cm,omitempty"`     // nil unmeasured; 0.0 measured dry
+	FloodHazardLevel     *int     `json:"flood_hazard_level,omitempty"` // 1|2|3; nil unknown
+	FloodHazardBasis     string   `json:"flood_hazard_basis,omitempty"`
+	FloodDepthConfidence string   `json:"flood_depth_confidence,omitempty"`
+	FloodCalibrationRef  string   `json:"flood_calibration_ref,omitempty"`
 }
 
 // SeverityRank maps severity strings to a numerical rank for worst-direction pinning (ADR-012 D1).

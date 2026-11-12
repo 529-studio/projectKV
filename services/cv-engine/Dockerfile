@@ -10,7 +10,11 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 COPY services/cv-engine/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY services/cv-engine/server.py /app/server.py
+# `server.py` imports its sibling `hazard_classifier` at module load, so both files
+# must be in the image; copying only server.py makes the container die on import.
+# `calibration.json` (§2.2) ships as the committed empty template so the loader always
+# finds a parseable file at its default path; operators override it with a bind mount.
+COPY services/cv-engine/server.py services/cv-engine/hazard_classifier.py services/cv-engine/calibration.json /app/
 
 ENV PORT=8000 \
     MODEL_DIR=/app/models/yolov8n_openvino_320 \

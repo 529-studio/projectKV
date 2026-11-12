@@ -2414,6 +2414,23 @@ const docTemplate = `{
                         "$ref": "#/definitions/hotset.DirectionalVerdict"
                     }
                 },
+                "flood_calibration_ref": {
+                    "type": "string"
+                },
+                "flood_depth_cm": {
+                    "description": "Physical hazard layer (Issue #401, ADR-013 D6).\n\nPointers are mandatory: ` + "`" + `omitempty` + "`" + ` on a bare float64 would erase a measured\n0.0 and make \"dry, verified\" indistinguishable from \"never measured\". Because\nTrafficStatusResponse, FloodStatusResponse and HotsetStatusResponse all marshal\nthis struct, these five tags carry the fields to every endpoint at once.",
+                    "type": "number"
+                },
+                "flood_depth_confidence": {
+                    "type": "string"
+                },
+                "flood_hazard_basis": {
+                    "type": "string"
+                },
+                "flood_hazard_level": {
+                    "description": "1|2|3; nil unknown",
+                    "type": "integer"
+                },
                 "flood_severity": {
                     "description": "Flood severity: \"DRY\" | \"WET\" | \"FLOODED_SHALLOW\" | \"FLOODED_DEEP\" | \"UNKNOWN\"",
                     "type": "string"

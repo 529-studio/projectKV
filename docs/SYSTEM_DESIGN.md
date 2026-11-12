@@ -115,6 +115,40 @@ To prevent system crashes when user traffic spikes, computation is completely de
 
 *   **Benefit**: The Web Frontend (`apps/web`) and API contracts remain completely unchanged as the underlying analysis backend evolves.
 
+### 4.4. Physical Flood Hazard Layer (Issue #401)
+
+An area ratio cannot be acted on: `water_ratio: 0.25` across a 12 m arterial and in a
+3 m alley are different dangers, and neither says whether the water reaches the
+exhaust outlet. The classifier in `services/cv-engine/hazard_classifier.py` therefore
+puts the ruler in the frame — the 110 cm motorcycle box, admitted only when the same
+frame produced a water mask to measure against, or an operator scale multiplier bounded
+to `1.0 ± 0.25` and audited by `measured_by` and `frame_ref` — measures depth in
+centimetres, and publishes three bands: splash (`< 10 cm`), low-clearance caution
+(`10–20 cm`) and stall risk (`≥ 20 cm`, inclusive because the exhaust pipe sits at the
+waterline). The 15 cm curb source is implemented and unit-tested but remains disabled
+(`has_curb_reference=False`) until a curb segmentation model lands, so every measured
+depth in this release is motorcycle-anchored; a detection-only model publishes
+`calibration_ref: NONE` and a null depth rather than a fabricated `0.0 cm`.
+
+Two decisions define the feature:
+
+1. **Upstream avoidance is evidence of hazard.** The old rule inferred clearance from
+   emptiness: `motorcycles_observed == 0 and water_ratio >= 0.35 → FLOODED_SHALLOW`.
+   But a rider stopping *upstream* of a large pool behaves exactly as a rider facing an
+   impassable one. A pool covering at least 30 % of the lane, with no rider crossing it
+   (`delta_sub >= 0.09` suppresses escalation), is now `FLOODED_DEEP` with
+   `AVOIDANCE_INFERRED` — a level and no centimetre figure.
+2. **A warning system publishes a level without inventing the number behind it.**
+   Unmeasured serialises as `null`, never `0.0`; missing data never becomes Level 1; a
+   drop in level needs two consecutive agreeing observations while escalation is
+   immediate. The Go layer carries the fields verbatim, applies the rolling-deploy
+   depth fallback only when the entire hazard block is absent, and never derives a level
+   from `water_ratio`.
+
+Legacy severity keys, the `NONE`/`SHALLOW`/`DEEP` enum and pre-migration rows are
+unchanged: clients that ignore the new fields see no behavioural difference.
+
+
 ---
 
 ## 5. Current Implementation Status

@@ -1,0 +1,46 @@
+{
+  "per_endpoint": {
+    "/api/traffic-status": {
+      "http_status": 200,
+      "verdicts": 193,
+      "verdicts_with_hazard_level": 0,
+      "present_keys": [
+        "flood_hazard_basis",
+        "flood_depth_confidence",
+        "flood_calibration_ref"
+      ]
+    },
+    "/api/flood-status": {
+      "http_status": 200,
+      "verdicts": 43,
+      "verdicts_with_hazard_level": 0,
+      "present_keys": [
+        "flood_hazard_basis",
+        "flood_depth_confidence",
+        "flood_calibration_ref"
+      ]
+    },
+    "/api/v1/cameras/hotset/status": {
+      "http_status": 200,
+      "verdicts": 193,
+      "verdicts_with_hazard_level": 0,
+      "present_keys": [
+        "flood_hazard_basis",
+        "flood_depth_confidence",
+        "flood_calibration_ref"
+      ]
+    },
+    "/api/cameras/hotset/status": {
+      "http_status": 200,
+      "verdicts": 193,
+      "verdicts_with_hazard_level": 0,
+      "present_keys": [
+        "flood_hazard_basis",
+        "flood_depth_confidence",
+        "flood_calibration_ref"
+      ]
+    }
+  },
+  "shared_cameras": 193,
+  "identical_cameras": 193
+}

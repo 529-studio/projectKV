@@ -192,6 +192,48 @@ CREATE TABLE IF NOT EXISTS camera_verdicts (
 
 `HasRecentAlert` (required by `notify.SubscriptionStore`) queries `alert_history` for a matching row within a configurable cooldown window (`DEDUPE_COOLDOWN_MINUTES`, see §6). `RecordAlert` inserts a row.
 
+### 5.1. Physical hazard columns — `migrations/0011_add_flood_hazard.sql`, `0012_add_flood_calibration_ref.sql`
+
+Issue #401 adds five columns to `camera_verdicts`; `hotset_verdict_history`
+is deliberately untouched (the level is derivable from depth and avoidance is too
+volatile to be a training label):
+
+```sql
+-- 0011
+ALTER TABLE camera_verdicts ADD COLUMN flood_depth_cm REAL;                -- NULL unmeasured, 0.0 measured dry
+ALTER TABLE camera_verdicts ADD COLUMN flood_hazard_level INTEGER;         -- 1|2|3, NULL unknown
+ALTER TABLE camera_verdicts ADD COLUMN flood_hazard_basis TEXT NOT NULL DEFAULT '';
+ALTER TABLE camera_verdicts ADD COLUMN flood_depth_confidence TEXT NOT NULL DEFAULT '';
+
+-- 0012 (its own version: runMigrations skips an already-recorded version)
+ALTER TABLE camera_verdicts ADD COLUMN flood_calibration_ref TEXT NOT NULL DEFAULT '';
+```
+
+The repository writes them in `Save` and scans them with `sql.NullFloat64` /
+`sql.NullInt64`, projecting to pointers so "never measured" stays distinct from
+"measured 0.0". Pre-0011 rows read back NULL and empty, with no backfill. The
+calibration reference is stored verbatim so a restart rehydrates the same ladder
+string the engine published with the level.
+
+`hotset.Verdict` carries the same values to every marshalling endpoint; because
+`TrafficStatusResponse`, `FloodStatusResponse` and `HotsetStatusResponse` embed the
+struct, one tag change serves `/api/traffic-status`, `/api/flood-status` and
+`/api/v1/cameras/hotset/status` (plus its alias):
+
+| Field | Type | JSON | Notes |
+|---|---|---|---|
+| `FloodDepthCm` | `*float64` | `flood_depth_cm,omitempty` | `nil` unmeasured; `0.0` measured dry |
+| `FloodHazardLevel` | `*int` | `flood_hazard_level,omitempty` | 1, 2 or 3; `nil` unknown |
+| `FloodHazardBasis` | `string` | `flood_hazard_basis,omitempty` | `DEPTH_MEASURED`, `AVOIDANCE_INFERRED`, `DEPTH_AND_AVOIDANCE`, `NONE` |
+| `FloodDepthConfidence` | `string` | `flood_depth_confidence,omitempty` | `MEASURED`, `INFERRED`, `UNMEASURED` |
+| `FloodCalibrationRef` | `string` | `flood_calibration_ref,omitempty` | `MOTORCYCLE_110CM`, `CURB_15CM`, `CAMERA_OVERRIDE`, `NONE` |
+
+`internal/cvclient/cvengine.go` decodes cv-engine's `calibration_ref` and re-keys it
+to `flood_calibration_ref`. The rolling-deploy fallback derives a level from
+`depth_estimated_cm` (labelled `INFERRED`) when the hazard block is absent; it never
+derives one from `water_ratio`, which is an area ratio, not a depth.
+
+
 ---
 
 ## 6. Configuration — `internal/config/config.go`
