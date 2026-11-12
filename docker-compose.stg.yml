@@ -67,8 +67,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=${DOCKER_NETWORK:-core-network}"
       - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.rule=Host(`${DOMAIN_NAME:-warded-stg.529studio.site}`) && (PathPrefix(`/api`) || PathPrefix(`/ws`) || PathPrefix(`/health`) || PathPrefix(`/swagger`))"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cloudflare}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.entrypoints=${TRAEFIK_ENTRYPOINT:-web}"
       - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.priority=100"
       - "traefik.http.services.${ROUTER_NAME:-warded-stg}-be.loadbalancer.server.port=${BE_PORT:-3000}"
 
@@ -88,8 +87,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=${DOCKER_NETWORK:-core-network}"
       - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.rule=Host(`${DOMAIN_NAME:-warded-stg.529studio.site}`)"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cloudflare}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.entrypoints=${TRAEFIK_ENTRYPOINT:-web}"
       - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.priority=1"
       - "traefik.http.services.${ROUTER_NAME:-warded-stg}-fe.loadbalancer.server.port=80"
 
