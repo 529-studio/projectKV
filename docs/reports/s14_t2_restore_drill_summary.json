@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "task": "S14-T2",
+  "issue": 442,
+  "generated_at": "2026-11-13T01:48:24.037493Z",
+  "mode": "live",
+  "verdict": "pass",
+  "duration_seconds": 0.261,
+  "metrics": {
+    "rto_seconds": 0.151,
+    "rto_budget_seconds": 60.0,
+    "rpo_seconds": 0.0,
+    "rpo_budget_seconds": 10.0,
+    "rpo_method": "reference_newest_minus_restored_newest",
+    "restored_newest_record_at": "2026-11-13T01:48:23.030275Z",
+    "reference_newest_record_at": "2026-11-13T01:48:23.030275Z"
+  },
+  "restore": {
+    "transport": "litestream-s3",
+    "replica_url": "s3://warded-drill/db-replicas/camera-view.db",
+    "duration_seconds": 0.151,
+    "detail": {
+      "command": "/Users/thanhdatvu/repos/projectKV/var/bin/litestream restore -o var/restore-drill/s3-restore/restore/camera-view.db -config /Users/thanhdatvu/repos/projectKV/deploy/litestream/litestream.yml /app/data/camera-view.db",
+      "replica_url": "s3://warded-drill/db-replicas/camera-view.db",
+      "stdout_tail": [
+        "time=2026-11-13T08:48:23.932+07:00 level=INFO msg=\"downloaded wal\" db=/app/data/camera-view.db replica=r2 generation=fe5d904499f543f7 index=0 elapsed=23.368125ms",
+        "time=2026-11-13T08:48:23.933+07:00 level=INFO msg=\"applied wal\" db=/app/data/camera-view.db replica=r2 generation=fe5d904499f543f7 index=0 elapsed=999.5\u00b5s",
+        "time=2026-11-13T08:48:23.933+07:00 level=INFO msg=\"renaming database from temporary location\" db=/app/data/camera-view.db replica=r2"
+      ]
+    }
+  },
+  "replica": {
+    "mode": "live",
+    "config": "/Users/thanhdatvu/repos/projectKV/deploy/litestream/litestream.yml",
+    "transport": "s3",
+    "bucket": "warded-drill",
+    "endpoint": "http://127.0.0.1:19000",
+    "object_prefix": "db-replicas/camera-view.db",
+    "sync_interval": "1s",
+    "credentials": "environment"
+  },
+  "counts": {
+    "verdicts": {
+      "table": "camera_verdicts",
+      "exists": true,
+      "count": 195,
+      "newest_record_at": "2026-11-13T01:48:23.030275Z",
+      "error": null,
+      "committed_before_restore": 195,
+      "total_after_restore": 195
+    },
+    "verdict_history": {
+      "table": "hotset_verdict_history",
+      "exists": true,
+      "count": 53227,
+      "newest_record_at": "2026-11-13T01:48:23.030275Z",
+      "error": null,
+      "committed_before_restore": 53227,
+      "total_after_restore": 53227
+    },
+    "subscriptions": {
+      "table": "flood_subscriptions",
+      "exists": true,
+      "count": 0,
+      "newest_record_at": null,
+      "error": null,
+      "committed_before_restore": 0,
+      "total_after_restore": 0
+    }
+  },
+  "checks": [
+    {
+      "name": "integrity_check",
+      "status": "pass",
+      "detail": "ok"
+    },
+    {
+      "name": "quick_check",
+      "status": "pass",
+      "detail": "ok"
+    },
+    {
+      "name": "foreign_key_check",
+      "status": "pass",
+      "detail": "no foreign key violations"
+    },
+    {
+      "name": "schema",
+      "status": "pass",
+      "detail": "3 business tables present (12 total)"
+    },
+    {
+      "name": "record_counts",
+      "status": "pass",
+      "detail": "verdicts=195, verdict_history=53227, subscriptions=0"
+    },
+    {
+      "name": "record_freshness",
+      "status": "pass",
+      "detail": "newest record 2026-11-13T01:48:23.030275Z is 1.0s old"
+    },
+    {
+      "name": "rto",
+      "status": "pass",
+      "detail": "restore took 0.15s <= 60s budget"
+    },
+    {
+      "name": "rpo",
+      "status": "pass",
+      "detail": "recovery point lag 0.0s <= 10s budget"
+    }
+  ],
+  "failures": [],
+  "litestream": {
+    "available": true,
+    "binary": "/Users/thanhdatvu/repos/projectKV/var/bin/litestream",
+    "version": "v0.3.13"
+  },
+  "notes": [
+    "explicitly requested"
+  ],
+  "sandbox": {
+    "path": "var/restore-drill/s3-restore",
+    "retained": true
+  }
+}
