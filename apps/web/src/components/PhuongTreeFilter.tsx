@@ -12,10 +12,14 @@ import { FLOOD_I18N } from '../utils/floodUtils';
 import { useCorridor } from '../hooks/useCorridor';
 import { formatObservationAge, getCorridorWorstVerdict } from '../utils/corridorUtils';
 import { CORRIDOR_I18N } from '../config/constants';
+import type { VerdictLike } from '../utils/hazardUtils';
+import HazardDepthChip from './HazardDepthChip';
 
 export interface PhuongTreeFilterProps {
   cameras: Camera[];
   verdicts?: Map<string, TrafficVerdictLike>;
+  /** S14-T3 / Issue #443: hazard depth per camera, rendered on every camera row. */
+  floodVerdicts?: Map<string, VerdictLike>;
   floodedCameraIds?: Set<string>;
   wetCameraIds?: Set<string>;
   wetCameraCount?: number;
@@ -113,6 +117,7 @@ function CorridorDetailHeader({ roadKey, lang }: { roadKey?: string | null; lang
 export default function PhuongTreeFilter({
   cameras,
   verdicts,
+  floodVerdicts,
   floodedCameraIds,
   wetCameraIds,
   wetCameraCount = 0,
@@ -984,7 +989,7 @@ export default function PhuongTreeFilter({
                                 e.stopPropagation();
                                 onCameraClick(cam as Camera);
                               }}
-                              className="flex items-center justify-between px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800/70 active:bg-zinc-700 cursor-pointer rounded transition-colors group"
+                              className="flex min-h-[48px] items-center justify-between gap-2 px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800/70 active:bg-zinc-700 cursor-pointer rounded transition-colors group"
                               title={cam.displayName || cam.title}
                             >
                               <div className="flex items-center gap-2 truncate flex-1 min-w-0">
@@ -997,11 +1002,18 @@ export default function PhuongTreeFilter({
                                   {cam.displayName || cam.title}
                                 </span>
                               </div>
-                              {(cam as Camera).isGhost && (
-                                <span className="text-[9px] text-amber-500 shrink-0 ml-1 font-bold">
-                                  [GHOST]
-                                </span>
-                              )}
+                              <div className="flex shrink-0 items-center gap-1">
+                                <HazardDepthChip
+                                  verdict={floodVerdicts?.get(cam.id)}
+                                  lang={lang}
+                                  stale={Boolean(floodVerdicts?.get(cam.id)?.stale)}
+                                />
+                                {(cam as Camera).isGhost && (
+                                  <span className="text-[9px] text-amber-500 ml-1 font-bold">
+                                    [GHOST]
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1155,7 +1167,7 @@ export default function PhuongTreeFilter({
                                         <div
                                           key={cam.id}
                                           onClick={() => onCameraClick(cam)}
-                                          className="flex items-center justify-between px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800/70 active:bg-zinc-700 cursor-pointer rounded transition-colors group"
+                                          className="flex min-h-[48px] items-center justify-between gap-2 px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800/70 active:bg-zinc-700 cursor-pointer rounded transition-colors group"
                                           title={cam.displayName || cam.title}
                                         >
                                           <div className="flex items-center gap-2 truncate flex-1 min-w-0">
@@ -1168,11 +1180,18 @@ export default function PhuongTreeFilter({
                                               {cam.displayName || cam.title}
                                             </span>
                                           </div>
-                                          {cam.isGhost && (
-                                            <span className="text-[9px] text-amber-500 shrink-0 ml-1 font-bold">
-                                              [GHOST]
-                                            </span>
-                                          )}
+                                          <div className="flex shrink-0 items-center gap-1">
+                                            <HazardDepthChip
+                                              verdict={floodVerdicts?.get(cam.id)}
+                                              lang={lang}
+                                              stale={Boolean(floodVerdicts?.get(cam.id)?.stale)}
+                                            />
+                                            {cam.isGhost && (
+                                              <span className="text-[9px] text-amber-500 ml-1 font-bold">
+                                                [GHOST]
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
                                       ))}
                                     </motion.div>

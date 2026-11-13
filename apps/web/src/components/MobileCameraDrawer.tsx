@@ -3,10 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Camera } from '../hooks/useCameras';
 import PhuongTreeFilter, { type TrafficVerdictLike } from './PhuongTreeFilter';
 import { MOBILE_SEARCH_I18N } from '../config/constants';
+import type { VerdictLike } from '../utils/hazardUtils';
 
 interface MobileCameraDrawerProps {
   cameras: Camera[];
   verdicts?: Map<string, TrafficVerdictLike>;
+  /** S14-T3 / Issue #443: hazard depth per camera, rendered on every camera tile. */
+  floodVerdicts?: Map<string, VerdictLike>;
   floodedCameraIds?: Set<string>;
   wetCameraIds?: Set<string>;
   wetCameraCount?: number;
@@ -31,6 +34,7 @@ interface MobileCameraDrawerProps {
 export default function MobileCameraDrawer({
   cameras,
   verdicts,
+  floodVerdicts,
   floodedCameraIds,
   wetCameraIds,
   wetCameraCount,
@@ -81,20 +85,20 @@ export default function MobileCameraDrawer({
             className="fixed bottom-0 left-0 right-0 z-[860] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden max-h-[85vh] h-[80vh]"
           >
             {/* Drag handle and close header */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 shrink-0">
-              <span className="text-xs font-mono font-bold text-white tracking-wider uppercase">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-zinc-800 shrink-0 min-h-[56px]">
+              <span className="text-xs font-mono font-bold text-white tracking-wider uppercase truncate">
                 {MOBILE_SEARCH_I18N.DRAWER_TITLE[lang]}
               </span>
-              <div className="w-10 h-1 rounded-full bg-zinc-600" />
+              <div className="w-10 h-1 rounded-full bg-zinc-600 shrink-0" aria-hidden="true" />
               <button
                 onClick={onClose}
-                className="text-zinc-400 hover:text-white font-bold text-base leading-none p-1 transition-colors flex items-center gap-1 cursor-pointer"
+                className="flex min-h-[48px] min-w-[48px] items-center justify-center gap-1 rounded-sm px-2 text-zinc-400 hover:text-white font-bold text-base leading-none transition-colors cursor-pointer"
                 aria-label={lang === 'vi' ? 'Đóng và xem bản đồ' : 'Close and view map'}
               >
-                <span className="text-[11px] font-mono font-normal text-zinc-400 hover:text-white mr-0.5">
+                <span className="text-[11px] font-mono font-normal text-zinc-400">
                   {MOBILE_SEARCH_I18N.CLOSE_LABEL[lang]}
                 </span>
-                ✕
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
 
@@ -103,6 +107,7 @@ export default function MobileCameraDrawer({
               <PhuongTreeFilter
                 cameras={cameras}
                 verdicts={verdicts}
+                floodVerdicts={floodVerdicts}
                 floodedCameraIds={floodedCameraIds}
                 wetCameraIds={wetCameraIds}
                 wetCameraCount={wetCameraCount}

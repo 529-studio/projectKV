@@ -45,6 +45,11 @@ services:
       - SNAPSHOT_CACHE_TTL_SECONDS=${SNAPSHOT_CACHE_TTL_SECONDS:-10}
       - HOTSET_INTERVAL_SECONDS=${HOTSET_INTERVAL_SECONDS:-30}
       - HOTSET_ACTIVE_TTL_SECONDS=${HOTSET_ACTIVE_TTL_SECONDS:-120}
+      # Basemap provider for the tile proxy (Issue #443 / S14-T3). The keyless OSM
+      # upstream is darkened server-side before caching; CARTO is opt-in with a key.
+      - MAP_TILE_UPSTREAM_URL=${MAP_TILE_UPSTREAM_URL:-https://tile.openstreetmap.org}
+      - MAP_TILE_API_KEY=${MAP_TILE_API_KEY:-}
+      - MAP_TILE_DARKEN=${MAP_TILE_DARKEN:-1}
       - TZ=${TZ:-Asia/Ho_Chi_Minh}
       - ANALYZER=${ANALYZER:-onnx}
       - ANALYZER_DAILY_BUDGET=${ANALYZER_DAILY_BUDGET:-500000}

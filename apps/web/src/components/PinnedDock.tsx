@@ -14,6 +14,8 @@ import {
   getDockSeverityLabel,
   getDockSeverityVisual,
 } from '../utils/pinnedDock';
+import type { VerdictLike } from '../utils/hazardUtils';
+import HazardDepthChip from './HazardDepthChip';
 
 export type DockSizePreset = 'S' | 'M' | 'L';
 export type DockViewMode = 'strip' | 'grid';
@@ -27,6 +29,8 @@ export interface PinnedDockProps {
   lang?: 'vi' | 'en';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   verdicts?: Map<string, any>;
+  /** S14-T3 / Issue #443: physical flood depth per camera, rendered on each tile. */
+  floodVerdicts?: Map<string, VerdictLike>;
   pinNotice?: string | null;
   appEnv?: string;
 }
@@ -44,6 +48,7 @@ export default function PinnedDock({
   onCameraClick,
   lang = 'vi',
   verdicts,
+  floodVerdicts,
   pinNotice,
   appEnv,
 }: PinnedDockProps) {
@@ -464,7 +469,6 @@ export default function PinnedDock({
             : 'h-full min-w-[135px] max-w-[145px] shrink-0',
           titleSize: 'text-[9px]',
           badgeSize: 'text-[8px]',
-          controlBtnSize: 'w-4 h-4 text-[9px]',
         };
       case 'L':
         return {
@@ -474,7 +478,6 @@ export default function PinnedDock({
             : 'h-full min-w-[230px] max-w-[250px] shrink-0',
           titleSize: 'text-[11px]',
           badgeSize: 'text-[9.5px]',
-          controlBtnSize: 'w-5 h-5 text-[11px]',
         };
       case 'M':
       default:
@@ -485,7 +488,6 @@ export default function PinnedDock({
             : 'h-full min-w-[180px] max-w-[195px] shrink-0',
           titleSize: 'text-[10px]',
           badgeSize: 'text-[9px]',
-          controlBtnSize: 'w-4 h-4 text-[10px]',
         };
     }
   };
@@ -503,6 +505,10 @@ export default function PinnedDock({
     const dockSeverity = getDockSeverity(verdict, appEnv);
     const severityLabel = getDockSeverityLabel(dockSeverity, lang);
     const severityVisual = getDockSeverityVisual(dockSeverity);
+    // S14-T3 / Issue #443: the pinned tile carries the physical flood depth, not
+    // only the traffic verdict, so a pinned commuter route answers "how deep?"
+    // without opening the modal.
+    const floodVerdict = floodVerdicts?.get(cam.id);
 
     return (
       <div
@@ -598,6 +604,16 @@ export default function PinnedDock({
 
         {/* Bottom Title Bar */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-1.5 pointer-events-none">
+          {floodVerdict && (
+            <div className="mb-1 flex items-center">
+              <HazardDepthChip
+                verdict={floodVerdict}
+                lang={lang}
+                stale={Boolean(floodVerdict.stale)}
+                className="max-w-full truncate"
+              />
+            </div>
+          )}
           <div
             className={`font-mono text-white truncate font-medium ${presetStyle.titleSize}`}
             title={cam.displayName || cam.title}
@@ -608,22 +624,25 @@ export default function PinnedDock({
 
         {/* Action Controls Overlay (Unpin button & Reorder Left/Right buttons) */}
         <div className="absolute inset-0 pointer-events-none">
-          {/* Unpin button (Top-Right) */}
+          {/* Unpin (Top-Right). The button is a true 48 px touch target; the visual
+              glyph stays a 20 px chip so it does not cover the snapshot. */}
           <button
             type="button"
             onClick={(e) => handleUnpin(e, cam.id)}
             onPointerDown={(e) => e.stopPropagation()}
             onPointerUp={(e) => e.stopPropagation()}
-            className="pointer-events-auto absolute top-1 right-1 w-5 h-5 bg-zinc-900/90 hover:bg-red-600 border border-zinc-700 hover:border-red-500 text-zinc-300 hover:text-white rounded-sm flex items-center justify-center transition-colors cursor-pointer text-xs z-10"
+            className="pointer-events-auto group/unpin absolute top-0 right-0 flex h-12 w-12 min-h-[48px] min-w-[48px] items-start justify-end border-0 bg-transparent p-1 cursor-pointer z-10"
             title={PINNED_DOCK_I18N.UNPIN[lang]}
             aria-label={`${PINNED_DOCK_I18N.UNPIN[lang]}: ${cam.displayName || cam.title}`}
           >
-            ×
+            <span className="flex h-5 w-5 items-center justify-center rounded-sm border border-zinc-700 bg-zinc-900/90 text-xs text-zinc-300 transition-colors group-hover/unpin:border-red-500 group-hover/unpin:bg-red-600 group-hover/unpin:text-white">
+              ×
+            </span>
           </button>
 
-          {/* Adjacent Camera Navigation Buttons (◀ ▶) */}
+          {/* Adjacent Camera Navigation Buttons (◀ ▶) — 48 px hit areas. */}
           <div
-            className={`pointer-events-auto absolute bottom-1 right-1 flex items-center gap-1 z-10 transition-opacity ${
+            className={`pointer-events-auto absolute bottom-0 right-0 flex items-center z-10 transition-opacity ${
               isMobile ? 'opacity-90' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
             }`}
           >
@@ -638,11 +657,13 @@ export default function PinnedDock({
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onPointerUp={(e) => e.stopPropagation()}
-                className={`${presetStyle.controlBtnSize} bg-zinc-950/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white rounded-sm flex items-center justify-center cursor-pointer transition`}
+                className="flex h-12 w-12 min-h-[48px] min-w-[48px] items-end justify-end border-0 bg-transparent p-1 cursor-pointer"
                 title={lang === 'vi' ? 'Xem camera trước' : 'View previous camera'}
                 aria-label={`${lang === 'vi' ? 'Xem camera trước' : 'View previous camera'}: ${pinnedCameras[index - 1].displayName || pinnedCameras[index - 1].title}`}
               >
-                ◀
+                <span className="flex h-5 w-5 items-center justify-center rounded-sm border border-zinc-700 bg-zinc-950/90 text-[10px] text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white">
+                  ◀
+                </span>
               </button>
             )}
             {index < pinnedCameras.length - 1 && (
@@ -656,11 +677,13 @@ export default function PinnedDock({
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onPointerUp={(e) => e.stopPropagation()}
-                className={`${presetStyle.controlBtnSize} bg-zinc-950/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white rounded-sm flex items-center justify-center cursor-pointer transition`}
+                className="flex h-12 w-12 min-h-[48px] min-w-[48px] items-end justify-end border-0 bg-transparent p-1 cursor-pointer"
                 title={lang === 'vi' ? 'Xem camera sau' : 'View next camera'}
                 aria-label={`${lang === 'vi' ? 'Xem camera sau' : 'View next camera'}: ${pinnedCameras[index + 1].displayName || pinnedCameras[index + 1].title}`}
               >
-                ▶
+                <span className="flex h-5 w-5 items-center justify-center rounded-sm border border-zinc-700 bg-zinc-950/90 text-[10px] text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white">
+                  ▶
+                </span>
               </button>
             )}
           </div>
@@ -726,7 +749,7 @@ export default function PinnedDock({
                   key={size}
                   type="button"
                   onClick={() => handleSizeChange(size)}
-                  className={`px-1.5 py-0.5 rounded-sm transition cursor-pointer font-bold ${
+                  className={`min-h-[48px] min-w-[48px] px-2 py-0.5 rounded-sm transition cursor-pointer font-bold ${
                     sizePreset === size
                       ? 'bg-zinc-800 text-white shadow-sm'
                       : 'text-zinc-400 hover:text-zinc-200'
@@ -744,7 +767,7 @@ export default function PinnedDock({
               <button
                 type="button"
                 onClick={() => handleViewModeChange('strip')}
-                className={`px-2 py-0.5 rounded-sm transition cursor-pointer flex items-center gap-1 ${
+                className={`min-h-[48px] min-w-[48px] px-3 py-0.5 rounded-sm transition cursor-pointer flex items-center gap-1 ${
                   viewMode === 'strip'
                     ? 'bg-zinc-800 text-white'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -758,7 +781,7 @@ export default function PinnedDock({
               <button
                 type="button"
                 onClick={() => handleViewModeChange('grid')}
-                className={`px-2 py-0.5 rounded-sm transition cursor-pointer flex items-center gap-1 ${
+                className={`min-h-[48px] min-w-[48px] px-3 py-0.5 rounded-sm transition cursor-pointer flex items-center gap-1 ${
                   viewMode === 'grid'
                     ? 'bg-zinc-800 text-white'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -775,7 +798,7 @@ export default function PinnedDock({
             <button
               type="button"
               onClick={onClear}
-              className="px-2 py-0.5 bg-zinc-950 border border-zinc-700 hover:border-red-500 text-zinc-400 hover:text-red-400 rounded transition cursor-pointer text-[10.5px]"
+              className="min-h-[48px] min-w-[48px] px-3 py-0.5 bg-zinc-950 border border-zinc-700 hover:border-red-500 text-zinc-400 hover:text-red-400 rounded transition cursor-pointer text-[10.5px]"
             >
               {PINNED_DOCK_I18N.CLEAR_ALL[lang]}
             </button>
@@ -784,7 +807,7 @@ export default function PinnedDock({
             <button
               type="button"
               onClick={() => setIsDesktopCollapsed((prev) => !prev)}
-              className="px-1.5 py-0.5 text-zinc-400 hover:text-white transition cursor-pointer text-xs"
+              className="min-h-[48px] min-w-[48px] px-2 py-0.5 text-zinc-400 hover:text-white transition cursor-pointer text-xs"
               title={
                 isDesktopCollapsed
                   ? PINNED_DOCK_I18N.EXPAND[lang]
@@ -836,7 +859,7 @@ export default function PinnedDock({
             <button
               type="button"
               onClick={() => setIsMobileExpanded(true)}
-              className={`px-3.5 py-1.5 rounded-full bg-zinc-950/95 border text-zinc-200 font-mono text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all whitespace-nowrap ${
+              className={`min-h-[48px] min-w-[48px] px-3.5 py-1.5 rounded-full bg-zinc-950/95 border text-zinc-200 font-mono text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all whitespace-nowrap ${
                 isCapReached ? 'border-amber-600' : 'border-zinc-700 hover:border-zinc-500'
               }`}
               aria-label={PINNED_DOCK_I18N.COLLAPSED_PILL[lang](pinnedCameras.length)}
@@ -908,14 +931,14 @@ export default function PinnedDock({
                       <button
                         type="button"
                         onClick={onClear}
-                        className="px-2 py-0.5 bg-zinc-900 border border-zinc-700 hover:border-zinc-400 text-zinc-400 hover:text-white rounded text-[10.5px] transition cursor-pointer"
+                        className="min-h-[48px] min-w-[48px] px-3 py-0.5 bg-zinc-900 border border-zinc-700 hover:border-zinc-400 text-zinc-400 hover:text-white rounded text-[10.5px] transition cursor-pointer"
                       >
                         {PINNED_DOCK_I18N.CLEAR_ALL[lang]}
                       </button>
                       <button
                         type="button"
                         onClick={() => setIsMobileExpanded(false)}
-                        className="text-zinc-400 hover:text-white font-bold text-base leading-none p-1 transition-colors flex items-center gap-1 cursor-pointer"
+                        className="min-h-[48px] min-w-[48px] justify-center text-zinc-400 hover:text-white font-bold text-base leading-none p-1 transition-colors flex items-center gap-1 cursor-pointer"
                         aria-label={PINNED_DOCK_I18N.COLLAPSE[lang]}
                       >
                         <span className="text-[11px] font-normal text-zinc-400 mr-0.5">
@@ -934,7 +957,7 @@ export default function PinnedDock({
                           key={size}
                           type="button"
                           onClick={() => handleSizeChange(size)}
-                          className={`px-2 py-0.5 rounded-sm transition cursor-pointer font-bold ${
+                          className={`min-h-[48px] min-w-[48px] px-2 py-0.5 rounded-sm transition cursor-pointer font-bold ${
                             sizePreset === size
                               ? 'bg-zinc-800 text-white'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -949,7 +972,7 @@ export default function PinnedDock({
                       <button
                         type="button"
                         onClick={() => handleViewModeChange('strip')}
-                        className={`px-2 py-0.5 rounded-sm transition cursor-pointer ${
+                        className={`min-h-[48px] min-w-[48px] px-3 py-0.5 rounded-sm transition cursor-pointer ${
                           viewMode === 'strip' ? 'bg-zinc-800 text-white' : 'text-zinc-400'
                         }`}
                       >
@@ -958,7 +981,7 @@ export default function PinnedDock({
                       <button
                         type="button"
                         onClick={() => handleViewModeChange('grid')}
-                        className={`px-2 py-0.5 rounded-sm transition cursor-pointer ${
+                        className={`min-h-[48px] min-w-[48px] px-3 py-0.5 rounded-sm transition cursor-pointer ${
                           viewMode === 'grid' ? 'bg-zinc-800 text-white' : 'text-zinc-400'
                         }`}
                       >

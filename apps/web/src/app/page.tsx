@@ -478,6 +478,7 @@ export default function Home() {
           <PhuongTreeFilter
             cameras={cameras}
             verdicts={verdicts}
+            floodVerdicts={floodVerdicts}
             floodedCameraIds={floodedCameraIds}
             wetCameraIds={wetCameraIds}
             wetCameraCount={wetCameraCount}
@@ -626,6 +627,7 @@ export default function Home() {
           onCameraClick={handleSelectCamera}
           lang={lang}
           verdicts={verdicts}
+          floodVerdicts={floodVerdicts}
           pinNotice={pinNotice}
           appEnv={appEnv}
         />
@@ -645,7 +647,7 @@ export default function Home() {
               setShouldFocusSearch(true);
               setMobileDrawerOpen(true);
             }}
-            className="flex-1 min-w-0 flex items-center justify-between gap-2 px-3 py-2 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-500 rounded-lg text-left shadow-2xl backdrop-blur-md transition-all cursor-pointer group active:scale-[0.99]"
+            className="flex-1 min-w-0 min-h-[48px] flex items-center justify-between gap-2 px-3 py-2 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-500 rounded-lg text-left shadow-2xl backdrop-blur-md transition-all cursor-pointer group active:scale-[0.99]"
             aria-label={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
           >
             <div className="flex items-center gap-2 min-w-0">
@@ -714,7 +716,7 @@ export default function Home() {
             setShouldFocusSearch(true);
             setMobileDrawerOpen(true);
           }}
-          className={`md:hidden absolute right-3 z-[830] w-11 h-11 bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
+          className={`md:hidden absolute right-3 z-[830] w-12 h-12 min-w-[48px] min-h-[48px] bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
             pinnedCameras.length > 0 ? 'bottom-[4.5rem]' : 'bottom-3.5'
           }`}
           aria-label={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
@@ -768,6 +770,7 @@ export default function Home() {
         <MobileCameraDrawer
           cameras={cameras}
           verdicts={verdicts}
+          floodVerdicts={floodVerdicts}
           floodedCameraIds={floodedCameraIds}
           wetCameraIds={wetCameraIds}
           wetCameraCount={wetCameraCount}
