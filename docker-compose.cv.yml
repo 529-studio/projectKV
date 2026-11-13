@@ -13,7 +13,11 @@ services:
       - PORT=8000
       - MODEL_DIR=/app/models/yolov8n_openvino_320
       - PYTHONUNBUFFERED=1
-      - CV_INPUT_RESOLUTION=${CV_INPUT_RESOLUTION:-}
+      # The IR at MODEL_DIR is baked at 320x320. Without this pin the service falls
+      # back to its 416 px default whenever the compiled input shape is unreadable,
+      # and the CPU plugin then rejects every inference with a PowerStatic Eltwise
+      # shape mismatch. Keep the default equal to the model directory's resolution.
+      - CV_INPUT_RESOLUTION=${CV_INPUT_RESOLUTION:-320}
     volumes:
       - /home/ubuntu/cv-engine/models:/app/models:ro
     deploy:
