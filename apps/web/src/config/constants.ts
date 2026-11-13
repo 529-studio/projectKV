@@ -98,6 +98,19 @@ export const FUNCTIONAL_COLORS = Object.freeze({
   AMBER_ESCALATED: '#d97706',
 });
 
+const DEFAULT_MAP_TILE_URL = getApiUrl('/api/tiles/{z}/{x}/{y}.png');
+// The proxy serves tiles with `Cache-Control: immutable` for 30 days, which is
+// correct for pixels but wrong across a basemap theme change: a browser that has
+// the light theme cached would keep showing it under the new renderer forever.
+// Bump this token whenever the served cartography changes. The proxy ignores the
+// query string; it exists only to give the browser a new cache key.
+const MAP_TILE_THEME_VERSION = 'osm-dark-2';
+const withThemeVersion = (url: string): string =>
+  `${url}${url.includes('?') ? '&' : '?'}v=${MAP_TILE_THEME_VERSION}`;
+const RESOLVED_MAP_TILE_URL = withThemeVersion(
+  process.env.NEXT_PUBLIC_MAP_TILE_URL || DEFAULT_MAP_TILE_URL,
+);
+
 export const MAP_CONFIG = Object.freeze({
   PREFER_CANVAS: true,
   DEFAULT_CENTER: [10.7769, 106.7009],
@@ -109,10 +122,107 @@ export const MAP_CONFIG = Object.freeze({
     [11.35, 107.45],
   ],
   MAX_BOUNDS_VISCOSITY: 0.75,
-  TILE_URL: getApiUrl('/api/tiles/{z}/{x}/{y}.png'),
-  TILE_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  // The basemap is served through the Go tile proxy, never a third-party CDN the
+  // browser talks to directly (Issue #443, ADR: tile licensing). The proxy's
+  // upstream is MAP_TILE_UPSTREAM_URL; setting NEXT_PUBLIC_MAP_TILE_URL bypasses
+  // the proxy, e.g. for a licensed CARTO Dark Matter deployment.
+  TILE_URL: RESOLVED_MAP_TILE_URL,
+  TILE_ATTRIBUTION:
+    process.env.NEXT_PUBLIC_MAP_TILE_ATTRIBUTION ||
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  // The keyless default upstream is OpenStreetMap raster cartography; the Go
+  // proxy re-renders each tile as high-contrast dark cartography before caching
+  // it (internal/tilecache/darken.go), so the bytes on the wire are already dark.
+  // A licensed native dark provider (CARTO) is opt-in through the two
+  // NEXT_PUBLIC_MAP_TILE_* variables documented on CARTO_DARK_MATTER.
+  // Cameras collapse into count badges below this zoom; at and above it every
+  // camera is an individual marker (Issue #443).
+  CLUSTER_ZOOM_THRESHOLD: 14,
+  // Grid cell width in CSS pixels at the current zoom. A cluster is therefore
+  // roughly one thumb-width across, which is what makes it tappable.
+  CLUSTER_GRID_PX: 64,
   REFRESH_INTERVAL_SECONDS: 10,
 });
+
+/**
+ * The licensed provider template, kept here so an operator can switch in one
+ * environment variable and compare the response pixel-for-pixel.
+ *
+ * CARTO now serves an "API KEY REQUIRED" placeholder for keyless requests on
+ * every style, so this is opt-in: set MAP_TILE_UPSTREAM_URL to
+ * `https://basemaps.cartocdn.com/dark_all` plus MAP_TILE_API_KEY on the backend,
+ * set NEXT_PUBLIC_MAP_TILE_URL to this template (native dark, no filter) and
+ * NEXT_PUBLIC_MAP_TILE_ATTRIBUTION to this attribution.
+ */
+export const CARTO_DARK_MATTER = Object.freeze({
+  TILE_URL: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  SUBDOMAINS: 'abcd',
+  ATTRIBUTION:
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+});
+
+// =======================================================
+// MARKER CLUSTERING (S14-T3 / Issue #443)
+// =======================================================
+// A cluster badge must answer "how many cameras" and "is any of them a Level 3
+// flood" without the rider opening anything. Copy is VI (default, full
+// diacritics) plus EN, zero emoji.
+export const MAP_CLUSTER_I18N = Object.freeze({
+  COUNT: {
+    vi: (n: number) => `${n} camera giám sát`,
+    en: (n: number) => `${n} ${n === 1 ? 'camera' : 'cameras'}`,
+  },
+  BADGE_ARIA: {
+    vi: (n: number, hazard: string) => `Cụm ${n} camera. ${hazard}. Bấm để phóng to.`,
+    en: (n: number, hazard: string) => `Cluster of ${n} cameras. ${hazard}. Tap to zoom in.`,
+  },
+  WORST_HAZARD: {
+    vi: (label: string) => `Ngập nặng nhất: ${label}`,
+    en: (label: string) => `Worst flood: ${label}`,
+  },
+  NO_HAZARD: {
+    vi: 'Chưa có dữ liệu ngập',
+    en: 'No flood data',
+  },
+  LEVEL_PREFIX: {
+    vi: (level: number) => `Mức ${level}`,
+    en: (level: number) => `Level ${level}`,
+  },
+  ZOOM_HINT: {
+    vi: 'Bấm để phóng to cụm camera',
+    en: 'Tap to zoom into this camera cluster',
+  },
+});
+
+// =======================================================
+// MAP MARKER TOOLTIP (S14-T3 / Issue #443)
+// =======================================================
+// The tooltip used to hardcode Vietnamese for ghost and duplicate cameras even
+// in the English UI. Every rider-facing line now comes from this catalogue.
+export const MAP_TOOLTIP_I18N = Object.freeze({
+  CAMERA_CONFIRMED_DEEP: {
+    vi: 'Camera xác nhận ngập sâu',
+    en: 'Camera-verified deep flood',
+  },
+  CAMERA_CONFIRMED_SHALLOW: {
+    vi: 'Camera xác nhận ngập nông mép đường',
+    en: 'Camera-verified shallow flood',
+  },
+  CAMERA_OBSERVED_WET: {
+    vi: 'Camera ghi nhận đường ướt do mưa',
+    en: 'Camera-observed wet road',
+  },
+  GHOST: {
+    vi: 'MẤT TÍN HIỆU THỰC ĐỊA',
+    en: 'LOST LIVE SIGNAL',
+  },
+  DUPLICATE_SOURCE: {
+    vi: 'TRÙNG NGUỒN',
+    en: 'DUPLICATE SOURCE',
+  },
+});
+
+
 
 export const VERDICT_I18N = Object.freeze({
   STALE_BADGE: {
@@ -697,6 +807,10 @@ export const HAZARD_I18N = Object.freeze({
     en: 'Water covers most of the roadway and traffic is stopping upstream. Do not enter.',
   },
   DEPTH_UNMEASURED: { vi: 'Chưa đo được độ sâu', en: 'Depth not measurable' },
+  DEPTH_VALUE: {
+    vi: (cm: string) => `Độ sâu: ${cm}`,
+    en: (cm: string) => `Depth: ${cm}`,
+  },
   REF_MOTORCYCLE: { vi: 'đo theo chiều cao xe máy 110 cm', en: 'measured against the 110 cm motorcycle height' },
   REF_CURB: { vi: 'đo theo lề đường 15 cm', en: 'measured against the 15 cm curb' },
   REF_OVERRIDE: { vi: 'đo theo hiệu chuẩn riêng của camera', en: 'measured with this camera’s own calibration' },

@@ -254,16 +254,16 @@ tensors (`--allow-untrained-head` stays `UNVERIFIED`). Evidence:
 
 *   **Monochromatic & Intuitive Interface**: Minimalist high-contrast design using black, dark gray, and white tones.
 *   **Bilingual i18n Support**: Instant switching between Vietnamese (`vi`, default) and English (`en`), persisted across sessions.
-*   **Clean Standard OSM Basemap**: OpenStreetMap tiles, no watermark, geographically constrained to Southeastern Vietnam (`maxBounds`).
-*   **Map Clutter Hygiene & Offline Camera Filtering**: Hides 135 offline or no-signal cameras (`status === 'NOT_IMAGE'` / `'NO_SIGNAL'`) by default, with a header counter and a toggle.
+*   **Dark Basemap & Hazard Clusters**: The tile proxy darkens cached OSM tiles; below zoom 14 cameras collapse into count badges that bubble up the worst flood hazard, and every marker, dock tile and mobile row shows the depth.
+*   **Map Clutter Hygiene & Offline Camera Filtering**: Hides offline or no-signal cameras by default, with a header counter and a toggle.
 *   **Chained Deep Filter**: Multi-tier faceted filtering — *Zone* ➔ *Road / Corridor* ➔ *Intersection / Node*.
-*   **Real-Time Arterial Marker Saturation Coloring**: Styles Hot Set markers from 30s ONNX PCU saturation: Clear (`#10b981`, $SI < 0.30$), Moderate (`#f59e0b`, $0.30 \le SI < 0.60$), Congested (`#ef4444`, $SI \ge 0.60$), with legend and tooltip metrics.
-*   **Calibrated Doppler Rain Radar (S8-T1)**: RainViewer tiles at Zoom 8 with meteorological RGB reflectivity decoding (18–29 dBZ light, 30–39 moderate, $\ge 40$ heavy), hexagon quorum, and ground-camera cross-validation.
+*   **Real-Time Arterial Marker Saturation Coloring**: Styles Hot Set markers from 30s ONNX PCU saturation (clear, moderate, congested) with legend and tooltip metrics.
+*   **Calibrated Doppler Rain Radar (S8-T1)**: RainViewer reflectivity at Zoom 8, hexagon quorum, and ground-camera cross-validation.
 *   **Multi-Camera Corridor Tracking Dock**: Pin cameras into the bottom tracking dock with synchronized snapshot refresh.
-*   **Human-in-the-Loop Flood Reporting (S8-T7)**: Commuter flood reports bridge to SSE map streams and hex aggregators, with amber markers, 15m TTL, and multi-reporter escalation.
+*   **Human-in-the-Loop Flood Reporting (S8-T7)**: Commuter flood reports stream to the map and hex aggregators with amber markers, 15m TTL and multi-reporter escalation.
 *   **Directional Multi-Lane Taxonomy & Physical Flood Markers**: Classifies traffic density by direction (A approaching, B receding) for asymmetric boulevards, and anchors flood severity to wheel-depth markers.
-*   **Physical Flood Hazard Levels (cm)**: Depth anchored to the in-frame 110 cm motorcycle reference (per-camera overrides ±25%); the 15 cm curb reference is deferred until a curb segmenter lands. Three stall-risk bands plus an avoidance-inferred Level 3 for upstream-stopped traffic — never a fabricated depth.
-*   **Responsive Layout (100dvh)**: Desktop, tablet, and smartphone friendly with collapsible legend and mobile bottom-sheet drawer.
+*   **Physical Flood Hazard Levels (cm)**: Depth anchored to the in-frame 110 cm motorcycle reference (per-camera overrides ±25%). Three stall-risk bands plus an avoidance-inferred Level 3 for upstream-stopped traffic — never a fabricated depth.
+*   **Responsive Layout (100dvh)**: Desktop, tablet and mobile, with collapsible legend and bottom-sheet drawer.
 *   **Go Backend**: Single static binary, no runtime dependency install, in-memory + SQLite state, goroutine-based Hot Set scheduler.
 *   **Cloudflare R2 Object Storage**: S3-compatible storage (`warded-proofs`) for snapshot proofs, distributed via edge CDN for team labeling workflows.
 
@@ -304,6 +304,9 @@ tensors (`--allow-untrained-head` stays `UNVERIFIED`). Evidence:
 | `CV_ENGINE_URL` | `http://localhost:8000` | URL of self-hosted CV inference worker |
 | `ANALYZER` | `none` | Traffic analyzer (`none`, `mock`, `vlm`, `onnx`) |
 | `SNAPSHOT_UPSTREAM_BASE_URL` | *(required)* | DOT upstream image snapshot endpoint |
+| `MAP_TILE_UPSTREAM_URL` | `https://tile.openstreetmap.org` | Proxy upstream (`{s}`/`{r}` expanded); CARTO opt-in |
+| `MAP_TILE_API_KEY` | `""` | Optional upstream key; never commit |
+| `MAP_TILE_DARKEN` | `1` | Server-side dark render before caching |
 | `TELEGRAM_BOT_TOKEN` | `""` | Bot API token; empty keeps dispatch in simulation mode |
 | `TELEGRAM_BOT_USERNAME` | `""` | Public bot handle for deep links; empty disables the webhook |
 | `TELEGRAM_WEBHOOK_SECRET` | `""` | Webhook secret (`openssl rand -hex 32`); empty disables the webhook |

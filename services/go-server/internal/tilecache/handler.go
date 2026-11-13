@@ -30,7 +30,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 
 // GetTile godoc
 // @Summary Get map tile (cached proxy)
-// @Description Serves OpenStreetMap raster tiles (PNG) cached on local disk with 30-day immutable HTTP cache headers.
+// @Description Serves high-contrast dark raster tiles (PNG) cached on local disk with 30-day immutable HTTP cache headers. The upstream is configurable through MAP_TILE_UPSTREAM_URL (CARTO Dark Matter is opt-in with MAP_TILE_API_KEY); light upstreams are darkened server-side unless MAP_TILE_DARKEN=0.
 // @Tags Map
 // @Produce image/png
 // @Param z path int true "Zoom level (0-19)"

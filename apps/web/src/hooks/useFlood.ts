@@ -158,7 +158,6 @@ export function useFlood(): UseFloodReturn {
     let isCancelled = false;
 
     async function fetchInitial() {
-      const startTime = Date.now();
       try {
         // 1. Fetch initial flood status
         const statusPromise = fetch(getApiUrl(API_ENDPOINTS.FLOOD_STATUS))
@@ -259,13 +258,9 @@ export function useFlood(): UseFloodReturn {
           setUserFloodReports(initialUserReports);
         }
       } finally {
-        const elapsed = Date.now() - startTime;
-        const minDelay = 700;
-        if (elapsed < minDelay) {
-          const { promise, resolve } = Promise.withResolvers<void>();
-          setTimeout(resolve, minDelay - elapsed);
-          await promise;
-        }
+        // S14-T3 / Issue #443: the artificial 700 ms floor was removed. The map
+        // must paint the first flood state as soon as the three requests settle;
+        // a deliberate delay on an emergency surface is a defect, not polish.
         if (!isCancelled) {
           setLoading(false);
         }

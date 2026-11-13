@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Camera } from '../hooks/useCameras';
@@ -13,9 +13,13 @@ import {
 } from '../utils/hotsetUtils';
 import {
   MAP_CONFIG,
+  MAP_CLUSTER_I18N,
+  MAP_TOOLTIP_I18N,
   FUNCTIONAL_COLORS,
   TRAFFIC_SEVERITY,
   VERDICT_I18N,
+  HAZARD_I18N,
+  USER_FLOOD_REPORT_I18N,
 } from '../config/constants';
 import { isHexVisibleAtZoom } from '../utils/hexUtils';
 import { NEAR_ME_RADIUS_METERS } from '../utils/geoDistance';
@@ -25,6 +29,15 @@ import {
   isUserReportActive,
   getUserReportRemainingMinutes,
 } from '../utils/floodUtils';
+import { resolveHazard } from '../utils/hazardUtils';
+import {
+  buildCameraClusters,
+  getClusterDiameter,
+  getClusterHazardVisual,
+  shouldClusterMarkers,
+  type CameraCluster,
+} from '../utils/mapClustering';
+import { buildHazardDepthView, buildHazardDepthHtml, escapeHtml } from '../utils/hazardDisplay';
 import type { ActiveLensMode } from './HexOverlay';
 
 interface CustomCircleMarker extends L.CircleMarker {
@@ -96,9 +109,15 @@ export default function MapComponent({
   const nearMeLayerMapRef = useRef<L.Map | null>(null);
   const prevFilteredRef = useRef(false);
   const hexOverlayEnabledRef = useRef(hexOverlayEnabled);
+  const isFilteredRef = useRef(isFiltered);
   const activeTooltipMarkerRef = useRef<L.CircleMarker | null>(null);
   const markersMapRef = useRef<Map<string, CustomCircleMarker>>(new Map());
   const verdictsRef = useRef(verdicts);
+  // S14-T3 / Issue #443: cluster badges are rebuilt only when the clustering
+  // regime flips (crossing zoom 14 or switching lens). Incrementing this counter
+  // re-runs the marker effect instead of waiting for the next SSE tick.
+  const [markerEpoch, setMarkerEpoch] = useState(0);
+  const clusteredRef = useRef<boolean | null>(null);
 
   const internalHotset = useHotsetStatus({ enabled: !propHotsetStatus });
   const hotsetStatus = propHotsetStatus ?? internalHotset.hotsetStatus;
@@ -110,6 +129,10 @@ export default function MapComponent({
   useEffect(() => {
     hexOverlayEnabledRef.current = hexOverlayEnabled;
   }, [hexOverlayEnabled]);
+
+  useEffect(() => {
+    isFilteredRef.current = isFiltered;
+  }, [isFiltered]);
 
   useEffect(() => {
     verdictsRef.current = verdicts;
@@ -181,27 +204,30 @@ export default function MapComponent({
     let trafficInfo = '';
     if (userReport && isUserReportActive(userReport)) {
       const remainingMinutes = getUserReportRemainingMinutes(userReport);
-      const remainingText = lang === 'vi' ? `(còn ${remainingMinutes} phút)` : `(${remainingMinutes}m remaining)`;
-      if (userReport.escalated) {
-        const label = lang === 'vi' ? 'Báo cáo từ người dân: Có ngập (Nhiều nguồn xác nhận)' : 'Crowdsourced: Flooding reported (Multiple confirmations)';
-        trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">[${label}] ${remainingText}</span>`;
-      } else {
-        const label = lang === 'vi' ? 'Báo cáo từ người dân: Có ngập' : 'Crowdsourced: Flooding reported';
-        trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">[${label}] ${remainingText}</span>`;
-      }
+      const remainingText = USER_FLOOD_REPORT_I18N.REMAINING_MINUTES[lang](remainingMinutes);
+      const label = userReport.escalated
+        ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED[lang]
+        : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE[lang];
+      trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">${label} ${remainingText}</span>`;
     }
     if (floodVerdict && !isFloodVerdictStale(floodVerdict)) {
       const s = (floodVerdict.flood_severity || '').toUpperCase().trim();
       if (s === 'FLOODED_DEEP') {
-        const label = lang === 'vi' ? 'Camera xác nhận ngập sâu' : 'Camera-verified deep flood';
-        trafficInfo += `<br><span style="color:#ef4444; font-weight:bold;">[${label}]</span>`;
+        trafficInfo += `<br><span style="color:#ef4444; font-weight:bold;">[${MAP_TOOLTIP_I18N.CAMERA_CONFIRMED_DEEP[lang]}]</span>`;
       } else if (s === 'FLOODED_SHALLOW') {
-        const label = lang === 'vi' ? 'Camera xác nhận ngập nông mép đường' : 'Camera-verified shallow flood';
-        trafficInfo += `<br><span style="color:#0284c7; font-weight:bold;">[${label}]</span>`;
+        trafficInfo += `<br><span style="color:#0284c7; font-weight:bold;">[${MAP_TOOLTIP_I18N.CAMERA_CONFIRMED_SHALLOW[lang]}]</span>`;
       } else if (s === 'WET') {
-        const label = lang === 'vi' ? 'Camera ghi nhận đường ướt do mưa' : 'Camera-observed wet road';
-        trafficInfo += `<br><span style="color:#38bdf8; font-weight:bold;">[${label}]</span>`;
+        trafficInfo += `<br><span style="color:#38bdf8; font-weight:bold;">[${MAP_TOOLTIP_I18N.CAMERA_OBSERVED_WET[lang]}]</span>`;
       }
+    }
+    // S14-T3 / Issue #443: the physical depth is part of the map tooltip, not only
+    // the detail modal. A stale verdict still renders its level but carries the
+    // stale chip, because a two-hour-old depth must never read as a live one.
+    if (floodVerdict) {
+      const hazardView = buildHazardDepthView(floodVerdict, lang, {
+        stale: isFloodVerdictStale(floodVerdict),
+      });
+      trafficInfo += buildHazardDepthHtml(hazardView, lang);
     }
     if (hotset) {
       const prefix = lang === 'vi' ? VERDICT_I18N.TRAFFIC_PREFIX.vi : VERDICT_I18N.TRAFFIC_PREFIX.en;
@@ -209,11 +235,9 @@ export default function MapComponent({
       const isUnknown = !hotset.severity || hotset.severity.toUpperCase() === 'UNKNOWN';
 
       if (isStale) {
-        const staleText = lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data';
-        trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${staleText}</span>`;
+        trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${HAZARD_I18N.STALE[lang]}</span>`;
       } else if (isUnknown) {
-        const unknownText = lang === 'vi' ? 'Chưa xác định' : 'Unknown';
-        trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${unknownText}</span>`;
+        trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${VERDICT_I18N.SEVERITY.UNKNOWN[lang]}</span>`;
       } else {
         const sevLabel = getSeverityLabel(hotset.severity, lang);
         trafficInfo = `<br><span style="color:${fillColor}; font-weight:bold;">${prefix}: ${sevLabel}</span>`;
@@ -222,8 +246,7 @@ export default function MapComponent({
     } else if (isVerdictValid(verdict)) {
       const prefix = lang === 'vi' ? VERDICT_I18N.TRAFFIC_PREFIX.vi : VERDICT_I18N.TRAFFIC_PREFIX.en;
       if (verdict.stale) {
-        const staleText = lang === 'vi' ? 'Dữ liệu cũ' : 'Stale data';
-        trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${staleText}</span>`;
+        trafficInfo = `<br><span style="color:#a1a1aa; font-weight:bold;">${prefix}: ${HAZARD_I18N.STALE[lang]}</span>`;
       } else if (verdict.source !== 'mock' || appEnv === 'dev') {
         const isUnknown = !verdict.severity || verdict.severity.toUpperCase() === 'UNKNOWN';
         const textColor = isUnknown ? '#a1a1aa' : fillColor;
@@ -232,9 +255,9 @@ export default function MapComponent({
       }
     }
     if (cam.isGhost) {
-      trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">[MẤT TÍN HIỆU THỰC ĐỊA]</span>`;
+      trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">[${MAP_TOOLTIP_I18N.GHOST[lang]}]</span>`;
     } else if (cam.duplicateOf) {
-      trafficInfo += `<br><span style="color:#a1a1aa;">[TRÙNG NGUỒN]</span>`;
+      trafficInfo += `<br><span style="color:#a1a1aa;">[${MAP_TOOLTIP_I18N.DUPLICATE_SOURCE[lang]}]</span>`;
     }
 
     return `<b>${cam.displayName || cam.title}</b><br><span style="color:#a1a1aa;">${cam.zone}</span>${trafficInfo}`;
@@ -305,8 +328,19 @@ export default function MapComponent({
 
       // Dynamically scale marker sizes and macro dimming on zoomend
       map.on('zoomend', () => {
-        if (!markersLayerRef.current) return;
         const currentZoom = map.getZoom();
+
+        // Crossing the clustering threshold changes the marker vocabulary, which a
+        // radius tweak cannot express: rebuild the layer once (S14-T3).
+        const nextClustered =
+          shouldClusterMarkers(currentZoom, activeLensRef.current === 'flood') &&
+          !isFilteredRef.current;
+        if (clusteredRef.current !== nextClustered) {
+          clusteredRef.current = nextClustered;
+          setMarkerEpoch((epoch) => epoch + 1);
+        }
+
+        if (!markersLayerRef.current) return;
         const r = getRadius(currentZoom);
         const w = currentZoom >= 14 ? 2 : 1.5;
         const isMacro = Boolean(hexOverlayEnabledRef.current && isHexVisibleAtZoom(currentZoom));
@@ -500,6 +534,41 @@ export default function MapComponent({
       return isUserReportActive(rep) ? rep : null;
     };
 
+    // S14-T3 / Issue #443: below zoom 14 cameras collapse into count badges whose
+    // hazard level is the worst level inside the cluster, so a Level 3 flood can
+    // never disappear behind an aggregation. A camera with an active crowdsourced
+    // flood report stays individual at every zoom: that amber ring is a live
+    // safety signal, not decoration.
+    // A ward/corridor filter is an explicit request to inspect a named subset, and
+    // its dimming is the answer: clustering would erase that distinction.
+    const clusterEnabled = shouldClusterMarkers(zoom, isFloodLens) && !isFiltered;
+    clusteredRef.current = clusterEnabled;
+    const forcedIndividualIds = new Set<string>();
+    currentUserReports.forEach((report, id) => {
+      if (isUserReportActive(report)) forcedIndividualIds.add(id);
+    });
+    const clusterResult = buildCameraClusters(
+      cameras.map((cam) => ({
+        id: cam.id,
+        latitude: typeof cam.latitude === 'number' ? cam.latitude : Number.NaN,
+        longitude: typeof cam.longitude === 'number' ? cam.longitude : Number.NaN,
+      })),
+      {
+        zoom,
+        gridPx: MAP_CONFIG.CLUSTER_GRID_PX,
+        thresholdZoom: MAP_CONFIG.CLUSTER_ZOOM_THRESHOLD,
+        enabled: clusterEnabled,
+        levelFor: (camId) => resolveHazard(currentFloodVerdicts.get(camId))?.level ?? null,
+        forceIndividualIds: forcedIndividualIds,
+      },
+    );
+    const clusterByCameraId = new Map<string, CameraCluster>();
+    for (const cluster of clusterResult.clusters) {
+      if (cluster.count > 1) {
+        for (const camId of cluster.cameraIds) clusterByCameraId.set(camId, cluster);
+      }
+    }
+
     // Render dimmed markers first, then matching/active markers so matching markers appear on top
     const sortedCameras = [...cameras].sort((a, b) => {
       const aUser = getCameraUserReport(a.id) !== null;
@@ -528,6 +597,9 @@ export default function MapComponent({
 
     sortedCameras.forEach(cam => {
       if (!cam.latitude || !cam.longitude) return;
+      // Rendered as part of a cluster badge below; adding an individual dot here
+      // would defeat the aggregation and re-create the unreadable smear.
+      if (clusterByCameraId.has(cam.id)) return;
 
       const verdict = currentVerdicts.get(cam.id);
       const hotset = currentHotset.get(cam.id);
@@ -647,7 +719,7 @@ export default function MapComponent({
       customMarker.camId = cam.id;
       markersMapRef.current.set(cam.id, customMarker);
 
-      marker.bindTooltip(buildTooltipHtml(cam, verdict, hotset, fillColor, floodInfo?.verdict, userReport ?? undefined), {
+      marker.bindTooltip(buildTooltipHtml(cam, verdict, hotset, fillColor, currentFloodVerdicts.get(cam.id), userReport ?? undefined), {
         direction: 'top',
         offset: [0, -4]
       });
@@ -748,7 +820,73 @@ export default function MapComponent({
 
       markersLayerRef.current?.addLayer(marker);
     });
-  }, [cameras, getCameraMarkerVisual, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled, activeLens, floodVerdicts, userFloodReports, buildTooltipHtml]);
+
+    // --- Cluster badges (S14-T3 / Issue #443) ---------------------------------
+    // Rendered after the individual markers so a badge always sits above the
+    // sparse outliers, and only when aggregation is actually active.
+    if (clusterResult.clustered) {
+      for (const cluster of clusterResult.clusters) {
+        if (cluster.count < 2) continue;
+
+        const hazardVisual = getClusterHazardVisual(cluster.hazardLevel);
+        const hazardLabel = cluster.hazardLevel
+          ? `${MAP_CLUSTER_I18N.LEVEL_PREFIX[lang](cluster.hazardLevel)} — ${
+              HAZARD_I18N[`LEVEL_${cluster.hazardLevel}` as 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3'][lang]
+            }`
+          : MAP_CLUSTER_I18N.NO_HAZARD[lang];
+        const hazardSentence = cluster.hazardLevel
+          ? MAP_CLUSTER_I18N.WORST_HAZARD[lang](hazardLabel)
+          : MAP_CLUSTER_I18N.NO_HAZARD[lang];
+        const ariaLabel = MAP_CLUSTER_I18N.BADGE_ARIA[lang](cluster.count, hazardSentence);
+        const diameter = getClusterDiameter(cluster.count);
+        const tooltipColor =
+          cluster.hazardLevel === 3 ? '#ef4444' : cluster.hazardLevel === 2 ? '#f59e0b' : '#a1a1aa';
+
+        const icon = L.divIcon({
+          className: 'warded-cluster',
+          html:
+            `<div aria-hidden="true" class="relative flex items-center justify-center rounded-full border-2 ${hazardVisual.ringClass} ${hazardVisual.surfaceClass} font-mono font-bold tabular-nums leading-none shadow-2xl select-none" ` +
+            `style="width:${diameter}px;height:${diameter}px;font-size:${diameter >= 60 ? 15 : 13}px;">` +
+            `<span aria-hidden="true">${cluster.count}</span>` +
+            (hazardVisual.level !== null
+              ? `<span aria-hidden="true" class="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-zinc-950 ${hazardVisual.indicatorClass}"></span>`
+              : '') +
+            `</div>`,
+          iconSize: [diameter, diameter],
+          iconAnchor: [diameter / 2, diameter / 2],
+        });
+
+        const clusterMarker = L.marker([cluster.latitude, cluster.longitude], {
+          icon,
+          keyboard: true,
+          title: ariaLabel,
+          alt: ariaLabel,
+          pane: 'cameraMarkersPane',
+          riseOnHover: true,
+        });
+
+        clusterMarker.bindTooltip(
+          `<b>${escapeHtml(MAP_CLUSTER_I18N.COUNT[lang](cluster.count))}</b>` +
+            `<br><span style="color:${tooltipColor}; font-weight:bold;">${escapeHtml(hazardSentence)}</span>` +
+            `<br><span style="color:#a1a1aa; font-size:10px;">${escapeHtml(MAP_CLUSTER_I18N.ZOOM_HINT[lang])}</span>`,
+          { direction: 'top', offset: [0, -diameter / 2] },
+        );
+
+        clusterMarker.on('click', () => {
+          const currentMap = mapRef.current;
+          if (!currentMap) return;
+          const { south, west, north, east } = cluster.bounds;
+          currentMap.flyToBounds(L.latLngBounds([south, west], [north, east]), {
+            padding: [48, 48],
+            maxZoom: MAP_CONFIG.CLUSTER_ZOOM_THRESHOLD + 2,
+            duration: 0.6,
+          });
+        });
+
+        markersLayerRef.current?.addLayer(clusterMarker);
+      }
+    }
+  }, [cameras, getCameraMarkerVisual, onCameraClick, isFiltered, filteredCameraIds, onFilterClear, appEnv, lang, hexOverlayEnabled, activeLens, floodVerdicts, userFloodReports, buildTooltipHtml, markerEpoch]);
 
   // In-place marker style and tooltip updates on SSE live verdict streams or Hot Set status updates without tearing down DOM layers
   useEffect(() => {
@@ -793,9 +931,18 @@ export default function MapComponent({
         }
       }
 
-      marker.setTooltipContent(buildTooltipHtml(cam, verdict, hotset, visual.fillColor));
+      marker.setTooltipContent(
+        buildTooltipHtml(
+          cam,
+          verdict,
+          hotset,
+          visual.fillColor,
+          floodVerdicts.get(cam.id),
+          userFloodReportsRef.current.get(cam.id),
+        ),
+      );
     });
-  }, [verdicts, hotsetStatus, cameras, getCameraMarkerVisual, buildTooltipHtml]);
+  }, [verdicts, hotsetStatus, cameras, getCameraMarkerVisual, buildTooltipHtml, floodVerdicts]);
 
   return (
     <div className="relative w-full h-full overflow-hidden">
