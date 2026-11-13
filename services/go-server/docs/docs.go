@@ -1560,9 +1560,6 @@ const docTemplate = `{
                 "key": {
                     "type": "string"
                 },
-                "public_url": {
-                    "type": "string"
-                },
                 "raw_url": {
                     "type": "string"
                 },

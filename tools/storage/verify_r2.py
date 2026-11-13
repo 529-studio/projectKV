@@ -39,7 +39,6 @@ ENDPOINT = os.getenv("R2_ENDPOINT", "https://REDACTED_R2_ACCOUNT_ID.r2.cloudflar
 BUCKET = os.getenv("R2_BUCKET_NAME", "warded-proofs")
 ACCESS_KEY = os.getenv("R2_ACCESS_KEY_ID", "")
 SECRET_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "")
-PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "https://file.529studio.site")
 
 if not ACCESS_KEY or not SECRET_KEY:
     print("[ERROR] R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be set in environment or .env file.")
@@ -60,7 +59,7 @@ def main():
     test_key = f"test-connectivity/{test_ts}_python_verify.jpg"
     test_data = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C\x00\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xbf\x00\xff\xd9"
 
-    print(f"[TEST 1/4] Uploading test object to {test_key}...")
+    print(f"[TEST 1/3] Uploading test object to {test_key}...")
     s3_client.put_object(
         Bucket=BUCKET,
         Key=test_key,
@@ -69,14 +68,12 @@ def main():
     )
     print("[PASS] Object uploaded successfully.")
 
-    print("[TEST 2/4] HeadObject verification...")
+    print("[TEST 2/3] HeadObject verification...")
     head = s3_client.head_object(Bucket=BUCKET, Key=test_key)
     assert head["ContentLength"] == len(test_data), "ContentLength mismatch"
     print(f"[PASS] Object verified, length={head['ContentLength']} bytes.")
 
-    print(f"[TEST 3/4] Public URL: {PUBLIC_URL}/{test_key}")
-
-    print("[TEST 4/4] Deleting test object...")
+    print("[TEST 3/3] Deleting test object...")
     s3_client.delete_object(Bucket=BUCKET, Key=test_key)
     print("[PASS] Cleanup completed.")
 

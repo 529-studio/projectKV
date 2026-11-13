@@ -862,15 +862,14 @@ func initStorageDriver(cfg *config.ServerConfig) (storage.Storage, string) {
 			Region:          cfg.R2Region,
 			AccessKeyID:     cfg.R2AccessKeyID,
 			SecretAccessKey: cfg.R2SecretAccessKey,
-			PublicBaseURL:   cfg.R2PublicURL,
 		})
 		if err != nil {
 			log.Fatalf("[FATAL] Refusing to start: failed to initialize Cloudflare R2 storage driver: %v", err)
 		}
 		storeDriver = r2Store
 		retentionRootDir = ""
-		log.Printf("[INIT] Cloudflare R2 storage driver initialized (bucket=%s, endpoint=%s, publicURL=%s)",
-			cfg.R2BucketName, cfg.R2Endpoint, cfg.R2PublicURL)
+		log.Printf("[INIT] Cloudflare R2 storage driver initialized (bucket=%s, endpoint=%s)",
+			cfg.R2BucketName, cfg.R2Endpoint)
 	case "local":
 		fallthrough
 	default:

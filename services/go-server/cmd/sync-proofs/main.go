@@ -57,7 +57,6 @@ func main() {
 		Region:          cfg.R2Region,
 		AccessKeyID:     cfg.R2AccessKeyID,
 		SecretAccessKey: cfg.R2SecretAccessKey,
-		PublicBaseURL:   cfg.R2PublicURL,
 	})
 	if err != nil {
 		log.Fatalf("[FATAL] Failed to initialize R2 storage: %v", err)

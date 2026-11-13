@@ -142,7 +142,6 @@ type SnapshotItem struct {
 	Reason     string `json:"reason"`
 	Size       int64  `json:"size"`
 	RawURL     string `json:"raw_url"`
-	PublicURL  string `json:"public_url,omitempty"`
 }
 
 // SnapshotListResponse represents the paginated list of archived snapshots.
@@ -379,13 +378,6 @@ func (h *Handler) ListSnapshots(c *gin.Context) {
 			}
 
 			rawURL := "/api/archiver/snapshots/raw?key=" + url.QueryEscape(it.Key)
-			var publicURL string
-			type publicURLProvider interface {
-				PublicURL(relPath string) string
-			}
-			if p, ok := h.store.(publicURLProvider); ok {
-				publicURL = p.PublicURL(it.Key)
-			}
 
 			snapshots = append(snapshots, SnapshotItem{
 				Key:        it.Key,
@@ -395,7 +387,6 @@ func (h *Handler) ListSnapshots(c *gin.Context) {
 				Reason:     reason,
 				Size:       it.Size,
 				RawURL:     rawURL,
-				PublicURL:  publicURL,
 			})
 		}
 

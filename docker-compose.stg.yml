@@ -34,6 +34,8 @@ services:
     dns:
       - 1.1.1.1
       - 8.8.8.8
+    security_opt:
+      - no-new-privileges:true
     environment:
       - PORT=${BE_PORT:-3000}
       - GIN_MODE=${GIN_MODE:-release}
@@ -70,7 +72,6 @@ services:
       - R2_REGION=${R2_REGION:-auto}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
       - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
-      - R2_PUBLIC_URL=${R2_PUBLIC_URL:-https://file.529studio.site}
       - ARCHIVE_SAMPLE_INTERVAL_SECONDS=${ARCHIVE_SAMPLE_INTERVAL_SECONDS:-300}
       - ARCHIVE_RETENTION_DAYS=${ARCHIVE_RETENTION_DAYS:-7}
       - HARVESTER_ENABLED=${HARVESTER_ENABLED:-true}
@@ -108,6 +109,8 @@ services:
     pull_policy: always
     networks:
       - core-network
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         limits:
@@ -239,8 +242,33 @@ services:
         condition: service_completed_successfully
     volumes:
       - warded-stg-data:/app/data
-      - ./deploy/litestream/litestream.yml:/etc/litestream.yml:ro
-    command: ["replicate", "-config", "/etc/litestream.yml"]
+    # The Portainer stack directory holds only this compose file, so a relative
+    # host path like ./deploy/litestream/litestream.yml does not exist there and
+    # Docker silently creates it as a directory, which makes Litestream fail
+    # every start with "read /etc/litestream.yml: is a directory". The config is
+    # therefore rendered into the /tmp tmpfs at startup from the same
+    # environment; deploy/litestream/litestream.yml stays the canonical
+    # reference for CLI restores and the restore drill.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        cat > /tmp/litestream.yml <<'LITESTREAM_CONFIG'
+        dbs:
+          - path: /app/data/camera-view.db
+            replicas:
+              - type: s3
+                name: r2
+                bucket: ${R2_BUCKET_NAME}
+                path: db-replicas/camera-view.db
+                endpoint: ${R2_ENDPOINT}
+                region: ${R2_REGION}
+                access-key-id: $${LITESTREAM_ACCESS_KEY_ID}
+                secret-access-key: $${LITESTREAM_SECRET_ACCESS_KEY}
+                sync-interval: 1s
+                snapshot-interval: 24h
+                retention: 168h
+        LITESTREAM_CONFIG
+        exec litestream replicate -config /tmp/litestream.yml
     environment:
       - TZ=${TZ:-Asia/Ho_Chi_Minh}
       - HOME=/tmp

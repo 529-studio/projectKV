@@ -253,7 +253,6 @@ jobs:
           EP_EDGE_ID: ${{ secrets.PORTAINER_ENDPOINT_HOMESRV }}
           EP_WORKER_ID: ${{ secrets.PORTAINER_ENDPOINT_DEVBOX }}
           CV_CONTAINER_NAME: ${{ secrets.PORTAINER_CV_CONTAINER_NAME }}
-          CV_ENGINE_URL: ${{ secrets.CV_ENGINE_URL }}
         run: |
           if [ -z "${PORTAINER_KEY}" ] || [ -z "${PORTAINER_URL}" ]; then
             echo "PORTAINER_URL / PORTAINER_API_KEY not configured — skipping deploy trigger."
@@ -342,28 +341,48 @@ jobs:
               -H "User-Agent: Mozilla/5.0")
 
             STACK_FILE=$(cat docker-compose.stg.yml)
-            if [ -z "${CV_ENGINE_URL}" ]; then
-              echo "CV_ENGINE_URL is not configured — refusing to redeploy the application stack."
+
+            # The stack environment in Portainer is the single source of truth for
+            # runtime configuration. Never rewrite it from GitHub secrets: a stale
+            # secret silently re-broke CV_ENGINE_URL on every deploy. Validate that
+            # the required values are present and deploy the environment unchanged.
+            REQUIRED_ENV="CV_ENGINE_URL R2_ENDPOINT R2_BUCKET_NAME R2_REGION R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY"
+            MISSING_ENV=""
+            for name in ${REQUIRED_ENV}; do
+              value=$(echo "$STACK_RES" | jq -r --arg n "$name" '(.Env // [])[] | select(.name == $n) | .value' | head -n1)
+              if [ -z "$value" ]; then
+                MISSING_ENV="${MISSING_ENV} ${name}"
+              fi
+            done
+            if [ -n "$MISSING_ENV" ]; then
+              echo "Missing required stack environment values:${MISSING_ENV}"
+              echo "Set them in the Portainer stack environment and re-run; refusing to deploy."
               exit 1
             fi
-            ENV_JSON=$(echo "$STACK_RES" | jq --arg url "${CV_ENGINE_URL}" '
-              (.Env // []) | map(select(.name != "CV_ENGINE_URL")) + [{"name": "CV_ENGINE_URL", "value": $url}]
-            ')
+
+            ENV_JSON=$(echo "$STACK_RES" | jq '(.Env // [])')
 
             PAYLOAD=$(jq -n \
               --arg file "$STACK_FILE" \
               --argjson env "$ENV_JSON" \
               '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
 
-            curl -sS -f -o /dev/null -X PUT "${PORTAINER_URL}/api/stacks/${STACK_APP_ID}?endpointId=${EP_EDGE_ID}" \
+            DEPLOY_RESPONSE=$(curl -sS -X PUT "${PORTAINER_URL}/api/stacks/${STACK_APP_ID}?endpointId=${EP_EDGE_ID}" \
               -H "X-API-Key: ${PORTAINER_KEY}" \
               -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
               -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
               -H "Content-Type: application/json" \
               -H "User-Agent: Mozilla/5.0" \
-              -d "$PAYLOAD"
+              -w '\n%{http_code}' \
+              -d "$PAYLOAD")
 
-            echo "Application stack redeployed successfully."
+            PUT_CODE=$(echo "$DEPLOY_RESPONSE" | tail -n1)
+            if [ "$PUT_CODE" != "200" ]; then
+              echo "Portainer stack update failed with HTTP ${PUT_CODE}."
+              exit 1
+            fi
+
+            echo "Application stack update accepted (HTTP ${PUT_CODE})."
           fi
 
       - name: Verify Post-Deploy Health
@@ -373,18 +392,76 @@ jobs:
           PORTAINER_KEY: ${{ secrets.PORTAINER_API_KEY }}
           CF_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          STACK_APP_ID: ${{ secrets.PORTAINER_STACK_APP }}
+          EP_EDGE_ID: ${{ secrets.PORTAINER_ENDPOINT_HOMESRV }}
           EP_WORKER_ID: ${{ secrets.PORTAINER_ENDPOINT_DEVBOX }}
           CV_CONTAINER_NAME: ${{ secrets.PORTAINER_CV_CONTAINER_NAME }}
         run: |
           echo "Verifying health after redeployment..."
-          sleep 10
-          if [ -z "${STG_HEALTH_URL}" ]; then
-            echo "[WARN] STG_HEALTH_URL is not configured — skipping the staging health probe."
-          else
-            curl -sS -f -m 15 "${STG_HEALTH_URL}" || {
-              echo "Staging backend health check failed!"
+
+          # Container state first: a stack that failed to come up reports success on
+          # the PUT but leaves no running containers behind. An HTTP probe alone
+          # cannot tell the difference between that and a responsive edge.
+          if [ -n "${PORTAINER_KEY}" ] && [ -n "${STACK_APP_ID}" ]; then
+            echo "Waiting for warded-backend and warded-frontend to be running..."
+            DEPLOY_HEALTHY=0
+            for attempt in $(seq 1 12); do
+              CONTAINERS=$(curl -sS -m 15 "${PORTAINER_URL}/api/endpoints/${EP_EDGE_ID}/docker/containers/json" \
+                -H "X-API-Key: ${PORTAINER_KEY}" \
+                -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+                -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+                -H "User-Agent: Mozilla/5.0" 2>/dev/null || true)
+              if ! echo "$CONTAINERS" | jq -e 'type == "array"' >/dev/null 2>&1; then
+                CONTAINERS="[]"
+              fi
+
+              SUMMARY=$(echo "$CONTAINERS" | jq -r '
+                [ .[]
+                  | select((.Names // []) | any(. == "/warded-backend" or . == "/warded-frontend"))
+                  | "\(.Names[0])=\(.State)\(if (.Status // "") | test("unhealthy") then "/unhealthy" else "" end)"
+                ] | join(" ")')
+
+              echo "attempt ${attempt}/12: ${SUMMARY:-no staging containers found}"
+              RUNNING=$(echo "$CONTAINERS" | jq -r '
+                [ .[] | select((.Names // []) | any(. == "/warded-backend" or . == "/warded-frontend")) | select(.State == "running") ] | length')
+              UNHEALTHY=$(echo "$CONTAINERS" | jq -r '
+                [ .[] | select((.Names // []) | any(. == "/warded-backend" or . == "/warded-frontend")) | select((.Status // "") | test("unhealthy")) ] | length')
+
+              if [ "$RUNNING" = "2" ] && [ "$UNHEALTHY" = "0" ]; then
+                DEPLOY_HEALTHY=1
+                break
+              fi
+              sleep 15
+            done
+
+            if [ "$DEPLOY_HEALTHY" != "1" ]; then
+              echo "Staging deployment did not reach a healthy state: warded-backend and warded-frontend must both be running and not unhealthy."
+              echo "Inspect the stack status in Portainer; the deployment may have failed on the compose file or a missing environment value."
               exit 1
-            }
+            fi
+            echo "Both staging containers are running."
+          else
+            echo "[WARN] Portainer credentials or the stack id are not configured — skipping container verification."
+          fi
+
+          if [ -z "${STG_HEALTH_URL}" ]; then
+            echo "[WARN] STG_HEALTH_URL is not configured — skipping the staging HTTP probe."
+          else
+            HTTP_CODE=""
+            for attempt in $(seq 1 6); do
+              HTTP_CODE=$(curl -sS -o /dev/null -m 15 -w '%{http_code}' \
+                -H "User-Agent: projectkv-ci/1.0" "${STG_HEALTH_URL}" || echo "000")
+              echo "health probe attempt ${attempt}/6: HTTP ${HTTP_CODE}"
+              if [ "$HTTP_CODE" = "200" ]; then
+                break
+              fi
+              sleep 10
+            done
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "Staging health endpoint returned HTTP ${HTTP_CODE}; expected 200."
+              echo "Redirects and Access challenges are failures here: they mean the request never reached the backend."
+              exit 1
+            fi
             echo "Staging backend health check passed."
           fi
 

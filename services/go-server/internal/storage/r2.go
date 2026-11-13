@@ -37,14 +37,12 @@ type R2Config struct {
 	Region          string
 	AccessKeyID     string
 	SecretAccessKey string
-	PublicBaseURL   string
 }
 
 // R2Storage implements the Storage interface for Cloudflare R2 / S3-compatible storage.
 type R2Storage struct {
-	client        S3API
-	bucketName    string
-	publicBaseURL string
+	client     S3API
+	bucketName string
 }
 
 // NewR2Storage creates a new R2Storage instance connected to Cloudflare R2 via AWS SDK v2.
@@ -68,11 +66,6 @@ func NewR2Storage(ctx context.Context, cfg R2Config) (*R2Storage, error) {
 		region = "auto"
 	}
 
-	publicURL := strings.TrimRight(strings.TrimSpace(cfg.PublicBaseURL), "/")
-	if publicURL == "" {
-		publicURL = "https://file.529studio.site"
-	}
-
 	awsCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
@@ -90,15 +83,14 @@ func NewR2Storage(ctx context.Context, cfg R2Config) (*R2Storage, error) {
 		o.UsePathStyle = true // Mandatory for Cloudflare R2
 	})
 
-	return NewR2StorageWithClient(s3Client, cfg.BucketName, publicURL), nil
+	return NewR2StorageWithClient(s3Client, cfg.BucketName), nil
 }
 
 // NewR2StorageWithClient creates an R2Storage with a custom or mocked S3 client.
-func NewR2StorageWithClient(client S3API, bucketName, publicBaseURL string) *R2Storage {
+func NewR2StorageWithClient(client S3API, bucketName string) *R2Storage {
 	return &R2Storage{
-		client:        client,
-		bucketName:    strings.TrimSpace(bucketName),
-		publicBaseURL: strings.TrimRight(strings.TrimSpace(publicBaseURL), "/"),
+		client:     client,
+		bucketName: strings.TrimSpace(bucketName),
 	}
 }
 
@@ -275,19 +267,6 @@ func (s *R2Storage) Exists(ctx context.Context, relPath string) (bool, error) {
 		return false, nil
 	}
 	return false, fmt.Errorf("storage: R2 HeadObject failed: %w", err)
-}
-
-// PublicURL returns the public edge CDN URL for the given object key.
-func (s *R2Storage) PublicURL(relPath string) string {
-	cleaned, err := s.resolveKey(relPath)
-	if err != nil {
-		trimmed := strings.TrimLeft(strings.TrimSpace(relPath), "/")
-		cleaned = path.Clean(trimmed)
-	}
-	if s.publicBaseURL == "" {
-		return "/" + cleaned
-	}
-	return fmt.Sprintf("%s/%s", s.publicBaseURL, cleaned)
 }
 
 // List returns all stored items matching prefix from Cloudflare R2.
