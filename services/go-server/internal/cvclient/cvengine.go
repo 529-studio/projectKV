@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
@@ -205,6 +206,127 @@ func NewCVEngineAnalyzer(url string, client *http.Client, opts ...CVEngineOption
 	return a
 }
 
+// Health statuses reported by CVEngineAnalyzer.ProbeHealth. They describe the
+// cv-engine process itself, never a camera feed (see FeedError for that).
+const (
+	// CVEngineStatusHealthy means the engine answered 200 and has an OpenVINO
+	// model loaded, so POST /predict can serve real inference.
+	CVEngineStatusHealthy = "healthy"
+	// CVEngineStatusDegraded means the engine answered 200 but reports
+	// model_loaded=false: it is up in standby mode and cannot serve inference.
+	CVEngineStatusDegraded = "degraded"
+	// CVEngineStatusUnhealthy means the engine could not be probed at all
+	// (network failure, non-200 status, or an unparseable payload).
+	CVEngineStatusUnhealthy = "unhealthy"
+
+	// defaultCVEngineServiceName is reported when /health omits the service
+	// name; the analyzer already knows which service it is talking to.
+	defaultCVEngineServiceName = "cv-engine"
+
+	// snapshotUserAgent identifies the proxy on camera snapshot fetches and on
+	// health probes. Cameras and WAFs in front of them drop requests without a
+	// browser-like User-Agent.
+	snapshotUserAgent = "Mozilla/5.0 (compatible; CameraViewProxy/1.0)"
+)
+
+// CVEngineHealth is a point-in-time health report for the cv-engine service,
+// as returned by CVEngineAnalyzer.ProbeHealth.
+type CVEngineHealth struct {
+	// Status is one of CVEngineStatusHealthy, CVEngineStatusDegraded or
+	// CVEngineStatusUnhealthy. It is derived from ModelLoaded, never copied
+	// verbatim from the /health payload, so a standby engine can never be
+	// reported as healthy.
+	Status string `json:"status"`
+	// Service is the service name reported by /health, defaulting to
+	// "cv-engine" when the payload omits it.
+	Service string `json:"service"`
+	// OpenVINOAvailable reports whether the engine can access its OpenVINO
+	// runtime.
+	OpenVINOAvailable bool `json:"openvino_available"`
+	// ModelLoaded reports whether an inference model is loaded. False means
+	// the engine is running in standby.
+	ModelLoaded bool `json:"model_loaded"`
+	// LatencyMs is the round-trip duration of the health probe itself,
+	// measured in milliseconds.
+	LatencyMs float64 `json:"latency_ms"`
+	// Error carries the failure reason when Status is unhealthy (or the reason
+	// the engine gave for being degraded). Empty on a healthy engine.
+	Error string `json:"error,omitempty"`
+	// CheckedAt is when the probe started.
+	CheckedAt time.Time `json:"checked_at"`
+}
+
+// cvHealthResponse is the subset of the cv-engine GET /health payload the API
+// consumes. Unknown keys are ignored so the engine may add diagnostics freely.
+type cvHealthResponse struct {
+	Service           string `json:"service"`
+	OpenVINOAvailable bool   `json:"openvino_available"`
+	ModelLoaded       bool   `json:"model_loaded"`
+	Error             string `json:"error,omitempty"`
+}
+
+// ProbeHealth performs GET url+"/health" and maps the response onto
+// CVEngineHealth.
+//
+// Status derivation follows the payload, not the engine's own opinion:
+// model_loaded=true is healthy, model_loaded=false is degraded. A transport
+// failure, a non-200 status, or a payload that cannot be decoded is unhealthy
+// and the CVEngineHealth is returned populated (Status, Error, CheckedAt,
+// LatencyMs) together with a non-nil error, so callers may either log the
+// structured report or short-circuit on err.
+func (a *CVEngineAnalyzer) ProbeHealth(ctx context.Context) (CVEngineHealth, error) {
+	healthURL := strings.TrimSuffix(a.url, "/") + "/health"
+	health := CVEngineHealth{
+		Service:   defaultCVEngineServiceName,
+		CheckedAt: time.Now(),
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
+	if err != nil {
+		return unhealthyHealth(health, fmt.Errorf("cv-engine health: build request for %s: %w", healthURL, err))
+	}
+	req.Header.Set("User-Agent", snapshotUserAgent)
+
+	start := time.Now()
+	resp, err := a.client.Do(req)
+	health.LatencyMs = float64(time.Since(start).Microseconds()) / 1000.0
+	if err != nil {
+		return unhealthyHealth(health, fmt.Errorf("cv-engine health: GET %s: %w", healthURL, err))
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return unhealthyHealth(health, fmt.Errorf("cv-engine health: GET %s returned status %d", healthURL, resp.StatusCode))
+	}
+
+	var payload cvHealthResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return unhealthyHealth(health, fmt.Errorf("cv-engine health: decode response: %w", err))
+	}
+
+	if payload.Service != "" {
+		health.Service = payload.Service
+	}
+	health.OpenVINOAvailable = payload.OpenVINOAvailable
+	health.ModelLoaded = payload.ModelLoaded
+	health.Error = payload.Error
+
+	if payload.ModelLoaded {
+		health.Status = CVEngineStatusHealthy
+	} else {
+		health.Status = CVEngineStatusDegraded
+	}
+	return health, nil
+}
+
+// unhealthyHealth stamps base with the unhealthy status and the cause text,
+// returning it alongside cause so the caller gets both report and error.
+func unhealthyHealth(base CVEngineHealth, cause error) (CVEngineHealth, error) {
+	base.Status = CVEngineStatusUnhealthy
+	base.Error = cause.Error()
+	return base, cause
+}
+
 // unknownVerdict returns a zero-confidence UNKNOWN verdict for cam, used on
 // all error paths so callers always receive a typed value even on failure.
 func unknownVerdict(camID string) hotset.Verdict {
@@ -253,33 +375,91 @@ func buildMultipartBody(jpeg []byte, regions []hotset.RoadwayRegion) ([]byte, st
 	return b.Bytes(), w.FormDataContentType(), nil
 }
 
+// FeedError marks a failure that originated in the camera feed (fetching or
+// reading cam.SnapshotURL) rather than in the cv-engine service. Callers that
+// sample verdicts can therefore tell "this camera is unreachable" from "the
+// inference worker is down" without string matching, and park only the camera
+// that is actually broken.
+//
+// The value receivers keep both FeedError and *FeedError assignable to error;
+// Analyze wraps a *FeedError, so `var fe *FeedError; errors.As(err, &fe)` and
+// `var marker interface{ IsFeedError() bool }; errors.As(err, &marker)` both
+// succeed.
+type FeedError struct {
+	// CameraID is the camera whose snapshot could not be obtained.
+	CameraID string
+	// URL is the snapshot URL that failed.
+	URL string
+	// Err is the underlying cause.
+	Err error
+}
+
+// Error implements error.
+func (e FeedError) Error() string {
+	where := e.URL
+	if e.CameraID != "" {
+		where = fmt.Sprintf("%s (%s)", e.CameraID, e.URL)
+	}
+	switch {
+	case where == "":
+		return fmt.Sprintf("cv-engine: camera feed failure: %v", e.Err)
+	case e.Err == nil:
+		return fmt.Sprintf("cv-engine: camera feed failure: %s", where)
+	default:
+		return fmt.Sprintf("cv-engine: camera feed failure: %s: %v", where, e.Err)
+	}
+}
+
+// Unwrap exposes the underlying cause to errors.Is and errors.As.
+func (e FeedError) Unwrap() error { return e.Err }
+
+// IsFeedError marks the error as a camera feed failure. Consumers may assert
+// with errors.As against an interface{ IsFeedError() bool } target, which keeps
+// this package's callers decoupled from the concrete type.
+func (e FeedError) IsFeedError() bool { return true }
+
+// newFeedError wraps a snapshot-phase failure for cam.
+func newFeedError(camID, snapshotURL string, err error) *FeedError {
+	return &FeedError{CameraID: camID, URL: snapshotURL, Err: err}
+}
+
 // Analyze fetches the camera snapshot via cam.SnapshotURL, then POSTs the
 // frame bytes to the cv-engine /predict endpoint and maps the response to
 // a hotset.Verdict. When cam has registered directional regions, it forwards
 // them via multipart metadata and pins overall severity to the worst direction.
+//
+// Every failure while obtaining the frame is returned as a *FeedError; failures
+// from /predict are plain errors, so a caller can distinguish a broken camera
+// from a broken inference service.
 func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hotset.Verdict, error) {
-	// Step 1: fetch the cached snapshot frame.
+	// Step 1: fetch the cached snapshot frame. Every failure here belongs to the
+	// camera feed, so each one is wrapped in a *FeedError.
 	snapReq, err := http.NewRequestWithContext(ctx, http.MethodGet, cam.SnapshotURL, nil)
 	if err != nil {
-		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: build snapshot request: %w", err)
+		return unknownVerdict(cam.ID), newFeedError(cam.ID, cam.SnapshotURL,
+			fmt.Errorf("build snapshot request: %w", err))
 	}
-	snapReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CameraViewProxy/1.0)")
+	snapReq.Header.Set("User-Agent", snapshotUserAgent)
 	snapResp, err := a.client.Do(snapReq)
 	if err != nil {
-		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: fetch snapshot: %w", err)
+		return unknownVerdict(cam.ID), newFeedError(cam.ID, cam.SnapshotURL,
+			fmt.Errorf("fetch snapshot: %w", err))
 	}
 	defer snapResp.Body.Close()
 
 	if snapResp.StatusCode != http.StatusOK {
-		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: snapshot returned status %d", snapResp.StatusCode)
+		return unknownVerdict(cam.ID), newFeedError(cam.ID, cam.SnapshotURL,
+			fmt.Errorf("snapshot returned status %d", snapResp.StatusCode))
 	}
 
 	jpegBytes, err := io.ReadAll(snapResp.Body)
 	if err != nil {
-		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: read snapshot body: %w", err)
+		return unknownVerdict(cam.ID), newFeedError(cam.ID, cam.SnapshotURL,
+			fmt.Errorf("read snapshot body: %w", err))
 	}
 	if len(jpegBytes) == 0 {
-		return unknownVerdict(cam.ID), fmt.Errorf("cv-engine: snapshot body is empty")
+		return unknownVerdict(cam.ID), newFeedError(cam.ID, cam.SnapshotURL,
+			errors.New("snapshot body is empty"))
 	}
 
 	// Step 2: POST bytes to /predict. If cam carries directional regions, send

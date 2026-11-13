@@ -51,6 +51,7 @@ type routerConfig struct {
 	liveHub           *live.Hub
 	botHandler        *telegrambot.Handler
 	webhookEnabled    bool
+	healthHandler     *httpserver.HealthHandler
 }
 
 // setupRouter centralizes Gin router creation, middleware attachments, and route registrations.
@@ -64,10 +65,16 @@ func setupRouter(p routerConfig) *gin.Engine {
 	router.Use(middleware.SecretSanitizer())
 	router.Use(middleware.RateLimitMiddleware(cfg.RateLimitRPS, cfg.RateLimitBurst))
 
-	// Health check probes
-	router.GET("/health", httpserver.Healthz)
-	router.HEAD("/health", httpserver.Healthz)
-	router.GET("/healthz", httpserver.Healthz)
+	// Health check probes. The handler carries the optional cv-engine health
+	// checker so orchestrators see inference readiness, not just process
+	// liveness, on every alias.
+	health := p.healthHandler
+	if health == nil {
+		health = httpserver.NewHealthHandler(nil)
+	}
+	router.GET("/health", health.Healthz)
+	router.HEAD("/health", health.Healthz)
+	router.GET("/healthz", health.Healthz)
 
 	// WebSocket Live Broadcast (Issue #9: GET /ws/live) — kept until D1 FE migration verified.
 	if p.wsHub != nil {
@@ -114,6 +121,10 @@ func setupRouter(p routerConfig) *gin.Engine {
 	// API Group
 	api := router.Group("/api")
 	{
+		// Health alias under the API prefix used by the web client and load
+		// balancer health checks.
+		api.GET("/health", health.Healthz)
+
 		if p.camCatalogHandler != nil {
 			api.GET("/cameras", p.camCatalogHandler.GetCameras)
 			api.HEAD("/cameras", p.camCatalogHandler.GetCameras)

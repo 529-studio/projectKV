@@ -638,3 +638,51 @@ func stringContains(s, sub string) bool {
 	}
 	return false
 }
+
+// TestMeasureBinCoverage pins the shared coverage definition used by the
+// /api/v1/hotset/history/coverage endpoint and by the 24h verification harness
+// (Issue #441): 144 ten-minute bins in a 24h window, one observation per bin is
+// enough, and out-of-window timestamps are ignored.
+func TestMeasureBinCoverage(t *testing.T) {
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	window := 24 * time.Hour
+
+	// One timestamp in every third bin: 48 of 144 bins.
+	var sparse []time.Time
+	for i := 0; i < 144; i += 3 {
+		sparse = append(sparse, start.Add(time.Duration(i)*store.DefaultCoverageBinInterval))
+	}
+	cov := store.MeasureBinCoverage(sparse, start, window, store.DefaultCoverageBinInterval)
+	if cov.ExpectedBins != 144 {
+		t.Fatalf("expected 144 bins, got %d", cov.ExpectedBins)
+	}
+	if cov.ObservedBins != 48 {
+		t.Fatalf("expected 48 observed bins, got %d", cov.ObservedBins)
+	}
+	if got := cov.Ratio(); got < 0.33 || got > 0.34 {
+		t.Fatalf("expected ratio ~0.3333, got %f", got)
+	}
+
+	// Many observations inside one bin still count as one bin.
+	var dense []time.Time
+	for i := 0; i < 20; i++ {
+		dense = append(dense, start.Add(time.Duration(i)*30*time.Second))
+	}
+	cov = store.MeasureBinCoverage(dense, start, window, store.DefaultCoverageBinInterval)
+	if cov.ObservedBins != 1 {
+		t.Fatalf("expected 1 observed bin, got %d", cov.ObservedBins)
+	}
+
+	// Timestamps outside [since, since+window) are not counted.
+	outside := []time.Time{start.Add(-time.Minute), start.Add(window), start.Add(25 * time.Hour)}
+	cov = store.MeasureBinCoverage(outside, start, window, store.DefaultCoverageBinInterval)
+	if cov.ObservedBins != 0 {
+		t.Fatalf("expected 0 observed bins outside the window, got %d", cov.ObservedBins)
+	}
+
+	// Empty input yields zero coverage, never a division by zero.
+	cov = store.MeasureBinCoverage(nil, start, window, store.DefaultCoverageBinInterval)
+	if cov.Ratio() != 0 {
+		t.Fatalf("expected zero ratio for no observations, got %f", cov.Ratio())
+	}
+}

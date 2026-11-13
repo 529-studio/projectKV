@@ -485,6 +485,34 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/health": {
+            "get": {
+                "description": "Liveness and readiness probe reporting system, schema and cv-engine readiness",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/live/stream": {
             "get": {
                 "description": "Server-Sent Events (SSE) stream delivering real-time Hot Set verdict updates and H3 hex cell aggregations. Emits 'camera_update' and 'hex_update' events with JSON payloads and periodic heartbeat comments (: heartbeat).",
@@ -1345,7 +1373,7 @@ const docTemplate = `{
         },
         "/health": {
             "get": {
-                "description": "Liveness and readiness probe reporting system and schema readiness",
+                "description": "Liveness and readiness probe reporting system, schema and cv-engine readiness",
                 "produces": [
                     "application/json"
                 ],
@@ -1360,13 +1388,20 @@ const docTemplate = `{
                             "type": "object",
                             "additionalProperties": true
                         }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
                     }
                 }
             }
         },
         "/healthz": {
             "get": {
-                "description": "Liveness and readiness probe reporting system and schema readiness",
+                "description": "Liveness and readiness probe reporting system, schema and cv-engine readiness",
                 "produces": [
                     "application/json"
                 ],
@@ -1377,6 +1412,13 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -1495,7 +1537,8 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
@@ -1667,7 +1710,8 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
@@ -2489,7 +2533,8 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },

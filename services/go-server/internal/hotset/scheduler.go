@@ -8,6 +8,7 @@ package hotset
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -73,6 +74,27 @@ type Analyzer interface {
 	// Analyze fetches/receives the current snapshot for cam and returns a
 	// verdict. Implementations must respect ctx cancellation/deadline.
 	Analyze(ctx context.Context, cam Camera) (Verdict, error)
+}
+
+// feedErrorMarker is the optional interface an Analyzer error implements to
+// distinguish a broken camera feed (snapshot unreachable, HTTP error, empty
+// body) from an inference-engine outage. The scheduler must never open the
+// shared circuit breaker for a single camera's dead feed: doing so would park
+// every other camera in the Hot Set behind an OPEN breaker even though the
+// analyzer itself is healthy.
+type feedErrorMarker interface {
+	IsFeedError() bool
+}
+
+// isFeedError reports whether err (or any error it wraps) is a camera feed
+// failure. It uses errors.As so wrapped feed errors are still recognised
+// without importing the analyzer package that owns the concrete type.
+func isFeedError(err error) bool {
+	var marker feedErrorMarker
+	if errors.As(err, &marker) {
+		return marker.IsFeedError()
+	}
+	return false
 }
 
 // Verdict is intentionally generic so the same scheduler serves both traffic
@@ -203,6 +225,7 @@ type Scheduler struct {
 	budget      *AnalysisBudget
 	breaker     *CircuitBreaker
 	store       *Store
+	watchdog    *Watchdog
 	log         *slog.Logger
 }
 
@@ -248,6 +271,18 @@ func (s *Scheduler) Store() *Store {
 	return s.store
 }
 
+// SetWatchdog attaches an operational alert watchdog. The scheduler reports
+// per-camera feed outcomes to it so a feed that stops advancing can raise an
+// [OPS_ALERT] dropout after the configured five-minute window.
+func (s *Scheduler) SetWatchdog(w *Watchdog) {
+	s.watchdog = w
+}
+
+// Watchdog returns the attached operational alert watchdog, or nil.
+func (s *Scheduler) Watchdog() *Watchdog {
+	return s.watchdog
+}
+
 // Run blocks until ctx is cancelled. Intended to be started once from main
 // in its own goroutine: `go scheduler.Run(ctx)`.
 func (s *Scheduler) Run(ctx context.Context) {
@@ -269,10 +304,27 @@ func (s *Scheduler) Run(ctx context.Context) {
 	}
 }
 
+// Cycle executes exactly one analysis cycle across the current Hot Set and
+// returns after every scheduled camera has been processed. Run calls it on each
+// tick; it is exported so operational verification harnesses can drive the real
+// scheduler against a deterministic simulated clock instead of sleeping through
+// 24 hours of wall time.
+func (s *Scheduler) Cycle(ctx context.Context) {
+	s.runOnce(ctx)
+}
+
 func (s *Scheduler) runOnce(ctx context.Context) {
 	cameras := s.registry.Snapshot()
 	if len(cameras) == 0 {
 		return
+	}
+
+	if s.watchdog != nil {
+		ids := make([]string, 0, len(cameras))
+		for _, cam := range cameras {
+			ids = append(ids, cam.ID)
+		}
+		s.watchdog.SetHotSet(ids)
 	}
 
 	sem := make(chan struct{}, s.maxParallel)
@@ -335,10 +387,23 @@ func (s *Scheduler) runOnce(ctx context.Context) {
 
 			verdict, err := s.analyzer.Analyze(callCtx, cam)
 			if err != nil {
-				if s.breaker != nil {
+				// A dead camera feed must not poison the shared breaker: the
+				// analyzer never reached the inference engine, so other cameras
+				// in the Hot Set are still perfectly serviceable. Only genuine
+				// engine-class failures (timeouts, 5xx, standby) may advance
+				// the breaker.
+				feedErr := isFeedError(err)
+				if s.breaker != nil && !feedErr {
 					s.breaker.RecordFailure(err)
 				}
-				s.log.Warn("analysis failed, degrading to unknown", "camera", cam.ID, "error", err)
+				if feedErr {
+					if s.watchdog != nil {
+						s.watchdog.ObserveCameraFeedFailure(cam.ID)
+					}
+					s.log.Warn("feed unavailable, degrading camera to unknown", "camera", cam.ID, "error", err)
+				} else {
+					s.log.Warn("analysis failed, degrading to unknown", "camera", cam.ID, "error", err)
+				}
 				now := time.Now()
 				deg := Verdict{
 					CameraID:      cam.ID,
@@ -361,6 +426,9 @@ func (s *Scheduler) runOnce(ctx context.Context) {
 
 			if s.breaker != nil {
 				s.breaker.RecordSuccess()
+			}
+			if s.watchdog != nil {
+				s.watchdog.ObserveCameraSuccess(cam.ID)
 			}
 
 			if verdict.ObservedAt.IsZero() {

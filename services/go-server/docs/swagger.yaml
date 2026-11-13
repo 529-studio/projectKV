@@ -76,6 +76,7 @@ definitions:
         description: '[[x, y], ...] normalized to [0, 1]'
         items:
           items:
+            format: float64
             type: number
           type: array
         type: array
@@ -190,6 +191,7 @@ definitions:
         description: Normalized [[x, y], ...] in [0, 1] range
         items:
           items:
+            format: float64
             type: number
           type: array
         type: array
@@ -748,6 +750,7 @@ definitions:
         description: '[[lat,lng], ...] boundary for rendering'
         items:
           items:
+            format: float64
             type: number
           type: array
         type: array
@@ -1242,6 +1245,26 @@ paths:
       summary: Snapshot of all active crowdsourced user flood reports
       tags:
       - Flood
+  /api/health:
+    get:
+      description: Liveness and readiness probe reporting system, schema and cv-engine
+        readiness
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Health check
+      tags:
+      - System
   /api/live/stream:
     get:
       description: 'Server-Sent Events (SSE) stream delivering real-time Hot Set verdict
@@ -1840,7 +1863,8 @@ paths:
       - harvester
   /health:
     get:
-      description: Liveness and readiness probe reporting system and schema readiness
+      description: Liveness and readiness probe reporting system, schema and cv-engine
+        readiness
       produces:
       - application/json
       responses:
@@ -1849,17 +1873,28 @@ paths:
           schema:
             additionalProperties: true
             type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties: true
+            type: object
       summary: Health check
       tags:
       - System
   /healthz:
     get:
-      description: Liveness and readiness probe reporting system and schema readiness
+      description: Liveness and readiness probe reporting system, schema and cv-engine
+        readiness
       produces:
       - application/json
       responses:
         "200":
           description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: Service Unavailable
           schema:
             additionalProperties: true
             type: object

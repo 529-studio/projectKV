@@ -3,6 +3,7 @@ package config_test
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
 )
@@ -81,8 +82,8 @@ func TestLoadConfig_VerdictProvenanceDefaults(t *testing.T) {
 	if cfg.VerdictStaleTTLSeconds != 180 {
 		t.Errorf("expected default VerdictStaleTTLSeconds=180, got %d", cfg.VerdictStaleTTLSeconds)
 	}
-	if cfg.FrozenFrameThreshold != 3 {
-		t.Errorf("expected default FrozenFrameThreshold=3, got %d", cfg.FrozenFrameThreshold)
+	if cfg.FrozenFrameThreshold != 10 {
+		t.Errorf("expected default FrozenFrameThreshold=10, got %d", cfg.FrozenFrameThreshold)
 	}
 }
 
@@ -100,6 +101,45 @@ func TestLoadConfig_CustomVerdictProvenanceValues(t *testing.T) {
 	}
 	if cfg.FrozenFrameThreshold != 5 {
 		t.Errorf("expected FrozenFrameThreshold=5, got %d", cfg.FrozenFrameThreshold)
+	}
+}
+
+func TestLoadConfig_OpsAlertDefaults(t *testing.T) {
+	_ = os.Unsetenv("OPS_ALERT_FEED_DROPOUT_THRESHOLD")
+	_ = os.Unsetenv("OPS_ALERT_CV_ENGINE_FAILURE_THRESHOLD")
+	_ = os.Unsetenv("OPS_ALERT_EVALUATE_INTERVAL")
+
+	cfg := config.LoadConfig()
+	if cfg.OpsAlertFeedDropoutThreshold != 5*time.Minute {
+		t.Errorf("expected OpsAlertFeedDropoutThreshold=5m, got %s", cfg.OpsAlertFeedDropoutThreshold)
+	}
+	if cfg.OpsAlertCVEngineThreshold != 5*time.Minute {
+		t.Errorf("expected OpsAlertCVEngineThreshold=5m, got %s", cfg.OpsAlertCVEngineThreshold)
+	}
+	if cfg.OpsAlertEvaluateInterval != 30*time.Second {
+		t.Errorf("expected OpsAlertEvaluateInterval=30s, got %s", cfg.OpsAlertEvaluateInterval)
+	}
+}
+
+func TestLoadConfig_CustomOpsAlertValues(t *testing.T) {
+	_ = os.Setenv("OPS_ALERT_FEED_DROPOUT_THRESHOLD", "90s")
+	_ = os.Setenv("OPS_ALERT_CV_ENGINE_FAILURE_THRESHOLD", "2m")
+	_ = os.Setenv("OPS_ALERT_EVALUATE_INTERVAL", "10s")
+	defer func() {
+		_ = os.Unsetenv("OPS_ALERT_FEED_DROPOUT_THRESHOLD")
+		_ = os.Unsetenv("OPS_ALERT_CV_ENGINE_FAILURE_THRESHOLD")
+		_ = os.Unsetenv("OPS_ALERT_EVALUATE_INTERVAL")
+	}()
+
+	cfg := config.LoadConfig()
+	if cfg.OpsAlertFeedDropoutThreshold != 90*time.Second {
+		t.Errorf("expected OpsAlertFeedDropoutThreshold=90s, got %s", cfg.OpsAlertFeedDropoutThreshold)
+	}
+	if cfg.OpsAlertCVEngineThreshold != 2*time.Minute {
+		t.Errorf("expected OpsAlertCVEngineThreshold=2m, got %s", cfg.OpsAlertCVEngineThreshold)
+	}
+	if cfg.OpsAlertEvaluateInterval != 10*time.Second {
+		t.Errorf("expected OpsAlertEvaluateInterval=10s, got %s", cfg.OpsAlertEvaluateInterval)
 	}
 }
 

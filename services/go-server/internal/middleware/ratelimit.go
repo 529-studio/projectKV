@@ -108,7 +108,7 @@ func (l *ipLimiter) cleanupLoop() {
 // isExempt reports whether a request path should bypass rate limiting.
 func isExempt(p string) bool {
 	switch p {
-	case "/health", "/healthz":
+	case "/health", "/healthz", "/api/health":
 		return true
 	// The Telegram webhook is called from Telegram's shared egress IPs, so a
 	// single burst would exhaust a per-IP bucket and the bot would answer 429 to

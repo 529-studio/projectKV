@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -13,6 +14,11 @@ import (
 
 // Minimum JPEG size: 20 KB (20,480 bytes) per ADR-009 / Issue #262.
 const MinJPEGSizeBytes = 20480
+
+// DefaultSnapshotFetchTimeout bounds a single snapshot download. A dead or
+// hanging camera must fail fast instead of occupying one of the Pipeline's
+// concurrency slots for the whole harvest run and starving healthy cameras.
+const DefaultSnapshotFetchTimeout = 5 * time.Second
 
 // IsValidJPEG checks SOI magic bytes (0xFF, 0xD8) and minimum size constraint.
 func IsValidJPEG(data []byte) bool {
@@ -96,11 +102,12 @@ func DetermineTrafficSeverity(res *PredictionResult) (severity, queueReason stri
 
 // Pipeline executes concurrent frame ingestion, local inference, schema validation, and R2 streaming.
 type Pipeline struct {
-	fetcher     SnapshotFetcher
-	predictor   VisionPredictor
-	storage     StorageUploader
-	concurrency int
-	loc         *time.Location
+	fetcher         SnapshotFetcher
+	predictor       VisionPredictor
+	storage         StorageUploader
+	concurrency     int
+	loc             *time.Location
+	snapshotTimeout time.Duration
 }
 
 // NewPipeline constructs a new ingestion Pipeline.
@@ -112,20 +119,40 @@ func NewPipeline(fetcher SnapshotFetcher, predictor VisionPredictor, storage Sto
 		loc = time.FixedZone("ICT", 7*3600)
 	}
 	return &Pipeline{
-		fetcher:     fetcher,
-		predictor:   predictor,
-		storage:     storage,
-		concurrency: concurrency,
-		loc:         loc,
+		fetcher:         fetcher,
+		predictor:       predictor,
+		storage:         storage,
+		concurrency:     concurrency,
+		loc:             loc,
+		snapshotTimeout: DefaultSnapshotFetchTimeout,
 	}
+}
+
+// SetSnapshotFetchTimeout overrides the per-camera snapshot fetch budget.
+// It exists for tests and for deployments whose upstream is known to be slower
+// than DefaultSnapshotFetchTimeout; values <= 0 restore the default.
+func (p *Pipeline) SetSnapshotFetchTimeout(d time.Duration) {
+	if d <= 0 {
+		d = DefaultSnapshotFetchTimeout
+	}
+	p.snapshotTimeout = d
 }
 
 // ProcessCamera executes the full single-camera harvesting pipeline:
 // download -> JPEG validation -> inference -> PCU / waterline mapping -> Draft-07 validation -> R2 upload.
 func (p *Pipeline) ProcessCamera(ctx context.Context, cam Camera, scope Scope, weather *WeatherInfo) error {
-	// Step 1: Download frame
-	frameData, err := p.fetcher.FetchSnapshot(ctx, cam)
+	// Step 1: Download frame, bounded so a dead feed cannot hold a worker slot.
+	timeout := p.snapshotTimeout
+	if timeout <= 0 {
+		timeout = DefaultSnapshotFetchTimeout
+	}
+	fetchCtx, cancelFetch := context.WithTimeout(ctx, timeout)
+	frameData, err := p.fetcher.FetchSnapshot(fetchCtx, cam)
+	cancelFetch()
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+			return fmt.Errorf("fetch frame: camera %s timed out after %s: %w", cam.ID, timeout, err)
+		}
 		return fmt.Errorf("fetch frame: %w", err)
 	}
 
@@ -203,8 +230,23 @@ func (p *Pipeline) ProcessCamera(ctx context.Context, cam Camera, scope Scope, w
 }
 
 // HarvestCameras runs the pipeline across all given cameras concurrently bounded by semaphore.
+// Cameras the catalog marks offline, or ghost placeholders with no live feed,
+// are skipped before scheduling: queueing them would only occupy a concurrency
+// slot until the snapshot request fails.
 func (p *Pipeline) HarvestCameras(ctx context.Context, cameras []Camera, scope Scope, weather *WeatherInfo) (int, error) {
-	if len(cameras) == 0 {
+	eligible := make([]Camera, 0, len(cameras))
+	skipped := 0
+	for _, cam := range cameras {
+		if !cam.IsOnline || cam.IsGhost {
+			skipped++
+			continue
+		}
+		eligible = append(eligible, cam)
+	}
+	if skipped > 0 {
+		slog.Debug("harvester: skipping offline/ghost cameras", "scope", scope, "skipped", skipped, "eligible", len(eligible))
+	}
+	if len(eligible) == 0 {
 		return 0, nil
 	}
 
@@ -213,7 +255,7 @@ func (p *Pipeline) HarvestCameras(ctx context.Context, cameras []Camera, scope S
 	var successCount int64
 
 harvestLoop:
-	for _, cam := range cameras {
+	for _, cam := range eligible {
 		select {
 		case sem <- struct{}{}:
 		case <-ctx.Done():

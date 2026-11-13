@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -486,8 +488,8 @@ func TestPipeline_HarvestCameras(t *testing.T) {
 	pipeline := harvester.NewPipeline(fetcher, predictor, storage, 5, loc)
 
 	cameras := []harvester.Camera{
-		{ID: "cam_good", DisplayName: "Cam Good", SnapshotURL: "https://example.com/good"},
-		{ID: "cam_bad", DisplayName: "Cam Bad", SnapshotURL: "https://example.com/bad"},
+		{ID: "cam_good", DisplayName: "Cam Good", SnapshotURL: "https://example.com/good", IsOnline: true},
+		{ID: "cam_bad", DisplayName: "Cam Bad", SnapshotURL: "https://example.com/bad", IsOnline: true},
 	}
 
 	weather := &harvester.WeatherInfo{
@@ -545,6 +547,85 @@ func TestPipeline_HarvestCameras(t *testing.T) {
 	}
 }
 
+func TestPipeline_HarvestCameras_SkipsOfflineAndGhost(t *testing.T) {
+	loc := time.FixedZone("ICT", 7*3600)
+	fetcher := &mockSnapshotFetcher{}
+	predictor := &mockVisionPredictor{}
+	storage := newMockStorageUploader()
+	pipeline := harvester.NewPipeline(fetcher, predictor, storage, 2, loc)
+
+	cameras := []harvester.Camera{
+		{ID: "cam_online", DisplayName: "Online", SnapshotURL: "https://example.com/online", IsOnline: true},
+		{ID: "cam_offline", DisplayName: "Offline", SnapshotURL: "https://example.com/offline", IsOnline: false},
+		{ID: "cam_ghost", DisplayName: "Ghost", SnapshotURL: "https://example.com/ghost", IsOnline: true, IsGhost: true},
+	}
+
+	count, err := pipeline.HarvestCameras(context.Background(), cameras, harvester.ScopeScheduled, nil)
+	if err != nil {
+		t.Fatalf("harvest returned error: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected only the online camera to be harvested, got %d", count)
+	}
+	if got := atomic.LoadInt64(&predictor.callCount); got != 1 {
+		t.Errorf("expected inference to run once, got %d", got)
+	}
+	if got := storage.count(); got != 2 {
+		t.Errorf("expected 2 uploads for the single online camera, got %d", got)
+	}
+	for path := range storage.uploads {
+		if !strings.Contains(path, "cam_online") {
+			t.Errorf("unexpected upload for a filtered camera: %s", path)
+		}
+	}
+}
+
+// hangingSnapshotFetcher blocks until the context deadline, simulating a dead
+// camera whose snapshot endpoint accepts the connection and never responds.
+type hangingSnapshotFetcher struct {
+	deadlineSeen time.Duration
+}
+
+func (h *hangingSnapshotFetcher) FetchSnapshot(ctx context.Context, cam harvester.Camera) ([]byte, error) {
+	if dl, ok := ctx.Deadline(); ok {
+		h.deadlineSeen = time.Until(dl)
+	}
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestPipeline_ProcessCamera_SnapshotFetchTimeoutFailsFast(t *testing.T) {
+	if harvester.DefaultSnapshotFetchTimeout != 5*time.Second {
+		t.Fatalf("expected DefaultSnapshotFetchTimeout=5s, got %s", harvester.DefaultSnapshotFetchTimeout)
+	}
+
+	loc := time.FixedZone("ICT", 7*3600)
+	fetcher := &hangingSnapshotFetcher{}
+	pipeline := harvester.NewPipeline(fetcher, &mockVisionPredictor{}, newMockStorageUploader(), 1, loc)
+	// Keep the test fast while exercising the same timeout path.
+	pipeline.SetSnapshotFetchTimeout(50 * time.Millisecond)
+
+	start := time.Now()
+	err := pipeline.ProcessCamera(context.Background(), harvester.Camera{ID: "cam_dead", IsOnline: true}, harvester.ScopeScheduled, nil)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected timeout error for hanging snapshot fetch")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("expected wrapped context.DeadlineExceeded, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "timed out") {
+		t.Errorf("expected explicit timeout context in error, got %v", err)
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("snapshot fetch timeout did not fail fast: took %s", elapsed)
+	}
+	if fetcher.deadlineSeen <= 0 || fetcher.deadlineSeen > time.Second {
+		t.Errorf("expected a short fetch deadline to be applied, saw %s", fetcher.deadlineSeen)
+	}
+}
+
 func TestCoordinator_LifecycleAndManualHarvest(t *testing.T) {
 	loc := time.FixedZone("ICT", 7*3600)
 	weather := &mockWeatherProvider{
@@ -560,10 +641,10 @@ func TestCoordinator_LifecycleAndManualHarvest(t *testing.T) {
 	storage := newMockStorageUploader()
 
 	hotsetCams := []harvester.Camera{
-		{ID: "c1", RoadKeys: []string{"vo_van_kiet", "ky_con"}},
+		{ID: "c1", RoadKeys: []string{"vo_van_kiet", "ky_con"}, IsOnline: true},
 	}
 	rainCams := []harvester.Camera{
-		{ID: "c2", RoadKeys: []string{"huynh_tan_phat"}},
+		{ID: "c2", RoadKeys: []string{"huynh_tan_phat"}, IsOnline: true},
 	}
 
 	cfg := harvester.Config{
@@ -664,6 +745,7 @@ func TestHarvester_ContextCancellationCleanShutdown(t *testing.T) {
 		cameras[i] = harvester.Camera{
 			ID:          fmt.Sprintf("cam_%d", i),
 			DisplayName: fmt.Sprintf("Camera %d", i),
+			IsOnline:    true,
 		}
 	}
 
@@ -781,8 +863,8 @@ func TestCoordinator_StatusSnapshot(t *testing.T) {
 		Fetcher:       fetcher,
 		Predictor:     predictor,
 		Storage:       storage,
-		HotsetCameras: []harvester.Camera{{ID: "c1"}, {ID: "c2"}},
-		RainCameras:   []harvester.Camera{{ID: "c1"}},
+		HotsetCameras: []harvester.Camera{{ID: "c1", IsOnline: true}, {ID: "c2", IsOnline: true}},
+		RainCameras:   []harvester.Camera{{ID: "c1", IsOnline: true}},
 	})
 	if err != nil {
 		t.Fatalf("failed to construct coordinator: %v", err)
@@ -827,10 +909,19 @@ func TestCoordinator_MissedSlotWatchdog(t *testing.T) {
 	loc := time.FixedZone("ICT", 7*3600)
 	now := time.Now().In(loc)
 
-	// Configure a slot that was due 1 hour ago
-	pastHour := (now.Hour() + 23) % 24
-	pastMin := now.Minute()
-	slotStr := fmt.Sprintf("%02d:%02d", pastHour, pastMin)
+	// Pick a slot that is already overdue today: one hour back, clamped to
+	// local midnight. Between 00:00 and 00:15 no overdue slot exists today, so
+	// the watchdog has nothing to flag and the scenario is untestable.
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	elapsedToday := now.Sub(midnight)
+	if elapsedToday < 16*time.Minute {
+		t.Skip("no slot older than the 15-minute watchdog grace period exists before 00:15 local time")
+	}
+	overdueBy := time.Hour
+	if elapsedToday < time.Hour {
+		overdueBy = elapsedToday
+	}
+	slotStr := now.Add(-overdueBy).Format("15:04")
 
 	coord, err := harvester.New(harvester.Config{
 		Enabled:             true,
@@ -843,8 +934,8 @@ func TestCoordinator_MissedSlotWatchdog(t *testing.T) {
 		Fetcher:       fetcher,
 		Predictor:     predictor,
 		Storage:       storage,
-		HotsetCameras: []harvester.Camera{{ID: "c1"}},
-		RainCameras:   []harvester.Camera{{ID: "c1"}},
+		HotsetCameras: []harvester.Camera{{ID: "c1", IsOnline: true}},
+		RainCameras:   []harvester.Camera{{ID: "c1", IsOnline: true}},
 	})
 	if err != nil {
 		t.Fatalf("failed to construct coordinator: %v", err)

@@ -404,6 +404,75 @@ func (r *VerdictHistoryRepo) GetCoverage(ctx context.Context, cameraID string, w
 	}, nil
 }
 
+// DefaultCoverageBinInterval is the fixed bin width the coverage endpoint
+// reports (ADR-012 D2). Ten minutes resolves a forecast horizon while keeping a
+// 24h window at 144 comparable bins.
+const DefaultCoverageBinInterval = 10 * time.Minute
+
+// BinCoverage summarises how many equal-width bins of a window contain at least
+// one observation.
+type BinCoverage struct {
+	// BinInterval is the width of one bin.
+	BinInterval time.Duration
+	// ExpectedBins is the number of bins that fit in the window.
+	ExpectedBins int
+	// ObservedBins is the number of bins that contain at least one timestamp.
+	ObservedBins int
+}
+
+// Ratio returns ObservedBins/ExpectedBins clamped to [0, 1].
+func (c BinCoverage) Ratio() float64 {
+	if c.ExpectedBins <= 0 {
+		return 0
+	}
+	r := float64(c.ObservedBins) / float64(c.ExpectedBins)
+	if r > 1 {
+		return 1
+	}
+	if r < 0 {
+		return 0
+	}
+	return r
+}
+
+// MeasureBinCoverage counts the bins of [since, since+window) that contain at
+// least one observation.
+//
+// It is a pure function so the production coverage endpoint and offline
+// verification harnesses (such as the 24h Hot Set coverage simulation for
+// Issue #441) share one definition of "continuous coverage". A simulation that
+// reimplemented the bin math could claim 95% while the endpoint reported
+// something else.
+func MeasureBinCoverage(timestamps []time.Time, since time.Time, window, binInterval time.Duration) BinCoverage {
+	if binInterval <= 0 {
+		binInterval = DefaultCoverageBinInterval
+	}
+	expectedBins := 1
+	if window > 0 {
+		expectedBins = int(math.Ceil(window.Minutes() / binInterval.Minutes()))
+		if expectedBins < 1 {
+			expectedBins = 1
+		}
+	}
+
+	seen := make(map[int]struct{}, expectedBins)
+	for _, t := range timestamps {
+		if t.Before(since) {
+			continue
+		}
+		b := int(t.Sub(since) / binInterval)
+		if b >= 0 && b < expectedBins {
+			seen[b] = struct{}{}
+		}
+	}
+
+	return BinCoverage{
+		BinInterval:  binInterval,
+		ExpectedBins: expectedBins,
+		ObservedBins: len(seen),
+	}
+}
+
 func calculateCameraCoverage(cameraID string, window time.Duration, binIntervalMinutes int, expectedBins int, since time.Time, now time.Time, timestamps []time.Time) *CoverageReport {
 	if len(timestamps) == 0 {
 		return &CoverageReport{
@@ -427,26 +496,16 @@ func calculateCameraCoverage(cameraID string, window time.Duration, binIntervalM
 		}
 	}
 
-	binSet := make(map[int]bool)
+	binCov := MeasureBinCoverage(timestamps, since, window, time.Duration(binIntervalMinutes)*time.Minute)
+	observedBins := binCov.ObservedBins
+	coverageRatio := binCov.Ratio()
+
 	longestGap := int64(0)
-
-	for i, t := range timestamps {
-		b := int(t.Sub(since).Minutes() / float64(binIntervalMinutes))
-		if b >= 0 && b < expectedBins {
-			binSet[b] = true
+	for i := 1; i < len(timestamps); i++ {
+		gap := int64(timestamps[i].Sub(timestamps[i-1]).Seconds())
+		if gap > longestGap {
+			longestGap = gap
 		}
-		if i > 0 {
-			gap := int64(t.Sub(timestamps[i-1]).Seconds())
-			if gap > longestGap {
-				longestGap = gap
-			}
-		}
-	}
-
-	observedBins := len(binSet)
-	coverageRatio := float64(observedBins) / float64(expectedBins)
-	if coverageRatio > 1.0 {
-		coverageRatio = 1.0
 	}
 
 	earliest := timestamps[0]
