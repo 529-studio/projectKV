@@ -46,7 +46,6 @@ export interface SnapshotItem {
   reason: string;
   size: number;
   raw_url: string;
-  public_url?: string;
 }
 
 export type LabelFilterStatus = 'all' | 'pending_auto' | 'approved_human';
@@ -387,7 +386,6 @@ export function snapshotFromLabel(
     reason: 'harvest',
     size: 0,
     raw_url: `/api/archiver/snapshots/raw?key=${encodeURIComponent(key)}`,
-    public_url: `https://file.529studio.site/${key}`,
   };
 }
 

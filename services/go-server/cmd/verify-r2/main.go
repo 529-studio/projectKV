@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"time"
 
 	"github.com/529-studio/projectKV/services/go-server/internal/archiver"
@@ -32,7 +31,6 @@ func main() {
 		Region:          cfg.R2Region,
 		AccessKeyID:     cfg.R2AccessKeyID,
 		SecretAccessKey: cfg.R2SecretAccessKey,
-		PublicBaseURL:   cfg.R2PublicURL,
 	})
 	if err != nil {
 		log.Fatalf("[FATAL] Failed to create R2 storage driver: %v", err)
@@ -73,23 +71,7 @@ func main() {
 	}
 	log.Printf("[PASS] Downloaded data verified intact (%d bytes).", len(downloaded))
 
-	publicURL := store.PublicURL(testKey)
-	log.Printf("[TEST 4/5] Checking Public Edge URL: %s", publicURL)
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, publicURL, nil)
-	resp, httpErr := http.DefaultClient.Do(req)
-	if httpErr != nil {
-		log.Printf("[WARN] Edge URL check could not reach %s: %v (public DNS/edge might take a moment to propagate)", publicURL, httpErr)
-	} else {
-		defer resp.Body.Close()
-		log.Printf("[INFO] Edge URL HTTP status: %d %s", resp.StatusCode, resp.Status)
-		if resp.StatusCode == http.StatusOK {
-			log.Println("[PASS] Edge CDN serves the uploaded snapshot successfully.")
-		} else {
-			log.Printf("[INFO] Note: Edge URL returned status %d (bucket might require public read permission or presigned URL).", resp.StatusCode)
-		}
-	}
-
-	log.Printf("[TEST 5/7] Cleaning up test artifact via DeleteObject...")
+	log.Printf("[TEST 4/6] Cleaning up test artifact via DeleteObject...")
 	if err := store.Delete(ctx, testKey); err != nil {
 		log.Fatalf("[FAIL] Delete failed: %v", err)
 	}
@@ -102,14 +84,14 @@ func main() {
 	}
 	log.Println("[PASS] Cleanup verified. Test object removed.")
 
-	log.Printf("[TEST 6/7] Testing List operation on live R2 partition (prefix %q)...", now.Format("2006-01-02"))
+	log.Printf("[TEST 5/6] Testing List operation on live R2 partition (prefix %q)...", now.Format("2006-01-02"))
 	items, err := store.List(ctx, now.Format("2006-01-02"))
 	if err != nil {
 		log.Fatalf("[FAIL] List failed on R2: %v", err)
 	}
 	log.Printf("[PASS] List returned %d items from live R2 partition %q.", len(items), now.Format("2006-01-02"))
 
-	log.Printf("[TEST 7/7] Testing ListDirectories operation with Delimiter on live R2 bucket...")
+	log.Printf("[TEST 6/6] Testing ListDirectories operation with Delimiter on live R2 bucket...")
 	dirStart := time.Now()
 	dirs, err := store.ListDirectories(ctx, "")
 	dirDuration := time.Since(dirStart)

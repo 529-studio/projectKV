@@ -274,7 +274,7 @@ tensors (`--allow-untrained-head` stays `UNVERIFIED`). Evidence:
 | **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `edge host` | Map visualization, discrete camera marker dots, H3 hex overlays, horizontal corridor dock, bilingual UI (`vi` / `en`). |
 | **Backend API** (`services/go-server`) | Go 1.26, Gin, SQLite (WAL mode) | `3000` | `edge host` | Snapshot proxy cache, camera catalog, hotset scheduler, flood report archiver, PCU Saturation Index, SSE stream, R2 storage. |
 | **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR, YOLOv8n-seg FP16 | `8000` | `inference worker` | Vehicle detection, directional roadway assignment, water segmentation (`POST /predict`), Dual-Layer Physical Triangulation, `GET /healthz`. |
-| **Storage & Edge CDN** | Cloudflare R2, AWS Signature V4 | `443` | Cloudflare Edge (`file.529studio.site`) | S3-compatible snapshot proof repository (`warded-proofs`), Vietnam ICT (`UTC+7`) key hierarchy (`YYYY-MM-DD/<camera_id>/<unix_ts>_<reason>.jpg`). |
+| **Storage** | Cloudflare R2, AWS Signature V4 | `443` | Cloudflare R2 (private bucket) | S3-compatible snapshot proof repository (`warded-proofs`), Vietnam ICT (`UTC+7`) key hierarchy (`YYYY-MM-DD/<camera_id>/<unix_ts>_<reason>.jpg`). Frames reach clients only through the authenticated `GET /api/archiver/snapshots/raw` route; the bucket has no public URL. |
 
 ### Tech Stack & Core Libraries
 
@@ -300,7 +300,6 @@ tensors (`--allow-untrained-head` stays `UNVERIFIED`). Evidence:
 | `R2_ENDPOINT` | `https://<account_id>.r2.cloudflarestorage.com` | Base S3 API endpoint for Cloudflare R2 |
 | `R2_BUCKET_NAME` | `warded-proofs` | Object storage bucket name |
 | `R2_REGION` | `auto` | R2 signing region |
-| `R2_PUBLIC_URL` | `https://file.529studio.site` | Cloudflare Edge CDN custom domain |
 | `CV_ENGINE_URL` | `http://localhost:8000` | URL of self-hosted CV inference worker |
 | `ANALYZER` | `none` | Traffic analyzer (`none`, `mock`, `vlm`, `onnx`) |
 | `SNAPSHOT_UPSTREAM_BASE_URL` | *(required)* | DOT upstream image snapshot endpoint |

@@ -152,13 +152,13 @@ func (m *mockS3Client) ListObjectsV2(ctx context.Context, params *s3.ListObjects
 }
 
 func TestR2Storage_InterfaceCompliance(t *testing.T) {
-	store := NewR2StorageWithClient(newMockS3Client(), "test-bucket", "https://file.529studio.site")
+	store := NewR2StorageWithClient(newMockS3Client(), "test-bucket")
 	var _ Storage = store
 }
 
 func TestR2Storage_PutAndGet(t *testing.T) {
 	mockClient := newMockS3Client()
-	store := NewR2StorageWithClient(mockClient, "warded-proofs", "https://file.529studio.site")
+	store := NewR2StorageWithClient(mockClient, "warded-proofs")
 
 	ctx := context.Background()
 	key := "2026-10-10/cam123/1791550000_sample.jpg"
@@ -198,7 +198,7 @@ func TestR2Storage_PutAndGet(t *testing.T) {
 
 func TestR2Storage_Delete(t *testing.T) {
 	mockClient := newMockS3Client()
-	store := NewR2StorageWithClient(mockClient, "warded-proofs", "https://file.529studio.site")
+	store := NewR2StorageWithClient(mockClient, "warded-proofs")
 
 	ctx := context.Background()
 	key := "2026-10-10/cam123/delete_me.jpg"
@@ -224,7 +224,7 @@ func TestR2Storage_Delete(t *testing.T) {
 
 func TestR2Storage_PathSanitization(t *testing.T) {
 	mockClient := newMockS3Client()
-	store := NewR2StorageWithClient(mockClient, "warded-proofs", "https://file.529studio.site")
+	store := NewR2StorageWithClient(mockClient, "warded-proofs")
 	ctx := context.Background()
 
 	badPaths := []string{
@@ -268,26 +268,9 @@ func TestR2Storage_PathSanitization(t *testing.T) {
 	}
 }
 
-func TestR2Storage_PublicURL(t *testing.T) {
-	mockClient := newMockS3Client()
-	store := NewR2StorageWithClient(mockClient, "warded-proofs", "https://file.529studio.site")
-
-	url := store.PublicURL("2026-10-10/cam123/1791550000_sample.jpg")
-	expected := "https://file.529studio.site/2026-10-10/cam123/1791550000_sample.jpg"
-	if url != expected {
-		t.Errorf("expected %q, got %q", expected, url)
-	}
-
-	// Should strip leading slash cleanly
-	urlSlash := store.PublicURL("/2026-10-10/cam123/1791550000_sample.jpg")
-	if urlSlash != expected {
-		t.Errorf("expected %q, got %q", expected, urlSlash)
-	}
-}
-
 func TestR2Storage_ContextCanceled(t *testing.T) {
 	mockClient := newMockS3Client()
-	store := NewR2StorageWithClient(mockClient, "warded-proofs", "https://file.529studio.site")
+	store := NewR2StorageWithClient(mockClient, "warded-proofs")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // canceled context
@@ -312,7 +295,7 @@ func TestR2Storage_ContextCanceled(t *testing.T) {
 
 func TestR2Storage_List(t *testing.T) {
 	mockClient := newMockS3Client()
-	store := NewR2StorageWithClient(mockClient, "warded-proofs", "https://file.529studio.site")
+	store := NewR2StorageWithClient(mockClient, "warded-proofs")
 	ctx := context.Background()
 
 	files := map[string][]byte{
@@ -380,7 +363,7 @@ func TestR2Storage_List(t *testing.T) {
 
 func TestR2Storage_ListDirectories(t *testing.T) {
 	mockClient := newMockS3Client()
-	store := NewR2StorageWithClient(mockClient, "warded-proofs", "https://file.529studio.site")
+	store := NewR2StorageWithClient(mockClient, "warded-proofs")
 	ctx := context.Background()
 
 	files := map[string][]byte{

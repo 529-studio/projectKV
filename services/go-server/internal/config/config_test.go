@@ -462,7 +462,6 @@ func TestLoadConfig_R2_Defaults(t *testing.T) {
 	_ = os.Unsetenv("R2_REGION")
 	_ = os.Unsetenv("R2_ACCESS_KEY_ID")
 	_ = os.Unsetenv("R2_SECRET_ACCESS_KEY")
-	_ = os.Unsetenv("R2_PUBLIC_URL")
 
 	cfg := config.LoadConfig()
 	if cfg.StorageDriver != "local" {
@@ -474,9 +473,6 @@ func TestLoadConfig_R2_Defaults(t *testing.T) {
 	if cfg.R2Region != "auto" {
 		t.Errorf("expected default R2Region='auto', got %q", cfg.R2Region)
 	}
-	if cfg.R2PublicURL != "https://file.529studio.site" {
-		t.Errorf("expected default R2PublicURL='https://file.529studio.site', got %q", cfg.R2PublicURL)
-	}
 }
 
 func TestLoadConfig_R2_Custom(t *testing.T) {
@@ -487,7 +483,6 @@ func TestLoadConfig_R2_Custom(t *testing.T) {
 	_ = os.Setenv("R2_REGION", "apac")
 	_ = os.Setenv("R2_ACCESS_KEY_ID", "key123")
 	_ = os.Setenv("R2_SECRET_ACCESS_KEY", "sec123")
-	_ = os.Setenv("R2_PUBLIC_URL", "https://cdn.example.com")
 	defer func() {
 		_ = os.Unsetenv("STORAGE_DRIVER")
 		_ = os.Unsetenv("R2_ACCOUNT_ID")
@@ -496,7 +491,6 @@ func TestLoadConfig_R2_Custom(t *testing.T) {
 		_ = os.Unsetenv("R2_REGION")
 		_ = os.Unsetenv("R2_ACCESS_KEY_ID")
 		_ = os.Unsetenv("R2_SECRET_ACCESS_KEY")
-		_ = os.Unsetenv("R2_PUBLIC_URL")
 	}()
 
 	cfg := config.LoadConfig()
@@ -520,9 +514,6 @@ func TestLoadConfig_R2_Custom(t *testing.T) {
 	}
 	if cfg.R2SecretAccessKey != "sec123" {
 		t.Errorf("expected R2SecretAccessKey='sec123', got %q", cfg.R2SecretAccessKey)
-	}
-	if cfg.R2PublicURL != "https://cdn.example.com" {
-		t.Errorf("expected R2PublicURL='https://cdn.example.com', got %q", cfg.R2PublicURL)
 	}
 }
 
@@ -661,7 +652,6 @@ func TestLoadConfig_SanitizationAndQuotedVariables(t *testing.T) {
 		"R2_REGION":                        " \"apac\" ",
 		"R2_ACCESS_KEY_ID":                 " 'key999' ",
 		"R2_SECRET_ACCESS_KEY":             " \"sec999\" ",
-		"R2_PUBLIC_URL":                    " 'https://cdn.example.org' ",
 		"DEV_ACCESS_TOKEN":                 " 'token-xyz-123' ",
 		"HARVESTER_ENABLED":                " \"true\" ",
 		"HARVESTER_SCHEDULE_HOURS":         " '6,12,18' ",
@@ -775,9 +765,6 @@ func TestLoadConfig_SanitizationAndQuotedVariables(t *testing.T) {
 	}
 	if cfg.R2SecretAccessKey != "sec999" {
 		t.Errorf("expected R2SecretAccessKey='sec999', got %q", cfg.R2SecretAccessKey)
-	}
-	if cfg.R2PublicURL != "https://cdn.example.org" {
-		t.Errorf("expected R2PublicURL='https://cdn.example.org', got %q", cfg.R2PublicURL)
 	}
 	if cfg.DevAccessToken != "token-xyz-123" {
 		t.Errorf("expected DevAccessToken='token-xyz-123', got %q", cfg.DevAccessToken)

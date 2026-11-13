@@ -336,26 +336,55 @@ def check_compose_ha_stack(compose_path: Path) -> list[Violation]:
                     "Expected warded-stg-data mounted at /app/data",
                 )
             )
-        if not re.search(
-            r"\./deploy/litestream/litestream\.yml:/etc/litestream\.yml:ro\s*$",
-            litestream,
-            re.MULTILINE,
+        if re.search(
+            r"^\s+-\s+\./deploy/litestream/litestream\.yml", litestream, re.MULTILINE
         ):
             violations.append(
                 Violation(
                     compose_path,
-                    "litestream_config",
-                    "Expected read-only mount of deploy/litestream/litestream.yml",
+                    "litestream_config_mount",
+                    "Prohibited host-relative mount of deploy/litestream/litestream.yml: the "
+                    "Portainer stack directory holds only the compose file, so Docker creates the "
+                    "missing host path as a directory and Litestream cannot read its config",
                 )
             )
-        if not re.search(r"\breplicate\b", litestream) or not re.search(
-            r"/etc/litestream\.yml", litestream
+        if not re.search(r"cat\s*>\s*/tmp/litestream\.yml\s*<<'LITESTREAM_CONFIG'", litestream):
+            violations.append(
+                Violation(
+                    compose_path,
+                    "litestream_config",
+                    "Expected the Litestream config to be rendered into /tmp/litestream.yml from "
+                    "this compose file so the deployment has no host-file dependency",
+                )
+            )
+        elif not all(
+            re.search(pattern, litestream, re.MULTILINE)
+            for pattern in (
+                r"^\s+bucket:\s*\$\{R2_BUCKET_NAME\}\s*$",
+                r"^\s+endpoint:\s*\$\{R2_ENDPOINT\}\s*$",
+                r"^\s+path:\s*db-replicas/camera-view\.db\s*$",
+                r"^\s+sync-interval:\s*1s\s*$",
+                r"^\s+retention:\s*\d+h\s*$",
+                r"^\s+access-key-id:\s*\$\$\{LITESTREAM_ACCESS_KEY_ID\}\s*$",
+                r"^\s+secret-access-key:\s*\$\$\{LITESTREAM_SECRET_ACCESS_KEY\}\s*$",
+            )
+        ):
+            violations.append(
+                Violation(
+                    compose_path,
+                    "litestream_rendered_config",
+                    "Inline Litestream config must keep the R2 replica target, 1s sync interval, "
+                    "bounded retention and environment-only credentials",
+                )
+            )
+        if not re.search(
+            r"exec\s+litestream\s+replicate\s+-config\s+/tmp/litestream\.yml", litestream
         ):
             violations.append(
                 Violation(
                     compose_path,
                     "litestream_command",
-                    "Expected command to run 'replicate' with /etc/litestream.yml",
+                    "Expected command to run 'replicate' with /tmp/litestream.yml",
                 )
             )
         if not _depends_on_init_volume(litestream):

@@ -49,8 +49,26 @@ VALID_LITESTREAM_SERVICE = """
         condition: service_completed_successfully
     volumes:
       - warded-stg-data:/app/data
-      - ./deploy/litestream/litestream.yml:/etc/litestream.yml:ro
-    command: ["replicate", "-config", "/etc/litestream.yml"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        cat > /tmp/litestream.yml <<'LITESTREAM_CONFIG'
+        dbs:
+          - path: /app/data/camera-view.db
+            replicas:
+              - type: s3
+                name: r2
+                bucket: ${R2_BUCKET_NAME}
+                path: db-replicas/camera-view.db
+                endpoint: ${R2_ENDPOINT}
+                region: ${R2_REGION}
+                access-key-id: $${LITESTREAM_ACCESS_KEY_ID}
+                secret-access-key: $${LITESTREAM_SECRET_ACCESS_KEY}
+                sync-interval: 1s
+                snapshot-interval: 24h
+                retention: 168h
+        LITESTREAM_CONFIG
+        exec litestream replicate -config /tmp/litestream.yml
     environment:
       - R2_ENDPOINT=${R2_ENDPOINT:?R2_ENDPOINT must be provided for Litestream replication}
       - LITESTREAM_ACCESS_KEY_ID=${LITESTREAM_ACCESS_KEY_ID:-${R2_ACCESS_KEY_ID:-}}
@@ -250,11 +268,23 @@ Persistent=true
         rules = {v.rule for v in violations}
         self.assertIn("litestream_image", rules)
 
-    def test_litestream_config_mount_must_be_read_only(self) -> None:
+    def test_litestream_host_relative_config_mount_flagged(self) -> None:
         self.compose_path.write_text(
             self.compose_path.read_text().replace(
-                "./deploy/litestream/litestream.yml:/etc/litestream.yml:ro",
-                "./deploy/litestream/litestream.yml:/etc/litestream.yml",
+                "      - warded-stg-data:/app/data\n    entrypoint: [\"/bin/sh\", \"-c\"]",
+                "      - warded-stg-data:/app/data\n"
+                "      - ./deploy/litestream/litestream.yml:/etc/litestream.yml:ro\n"
+                "    entrypoint: [\"/bin/sh\", \"-c\"]",
+            )
+        )
+        violations = cdm.check_compose_ha_stack(self.compose_path)
+        self.assertTrue(any(v.rule == "litestream_config_mount" for v in violations))
+
+    def test_litestream_missing_inline_config_flagged(self) -> None:
+        self.compose_path.write_text(
+            self.compose_path.read_text().replace(
+                "cat > /tmp/litestream.yml <<'LITESTREAM_CONFIG'",
+                "true #",
             )
         )
         violations = cdm.check_compose_ha_stack(self.compose_path)

@@ -34,7 +34,6 @@ type Config struct {
 	R2Region                      string
 	R2AccessKeyID                 string
 	R2SecretAccessKey             string
-	R2PublicURL                   string
 	ArchiveSampleIntervalSeconds  int
 	ArchiveRetentionDays          int
 	ArchiveMaxDiskMB              int64
@@ -322,7 +321,6 @@ func LoadFromEnv() (*Config, error) {
 		R2Region:                      parseEnvString("R2_REGION", "auto"),
 		R2AccessKeyID:                 parseEnvString("R2_ACCESS_KEY_ID", ""),
 		R2SecretAccessKey:             parseEnvString("R2_SECRET_ACCESS_KEY", ""),
-		R2PublicURL:                   parseEnvString("R2_PUBLIC_URL", "https://file.529studio.site"),
 		ArchiveSampleIntervalSeconds:  parseEnvInt("ARCHIVE_SAMPLE_INTERVAL_SECONDS", 300, 1),
 		ArchiveRetentionDays:          parseEnvInt("ARCHIVE_RETENTION_DAYS", 14, 1),
 		ArchiveMaxDiskMB:              parseEnvInt64("ARCHIVE_MAX_DISK_MB", 20000, 1),
@@ -402,7 +400,6 @@ type ServerConfig struct {
 	R2Region                      string
 	R2AccessKeyID                 string
 	R2SecretAccessKey             string
-	R2PublicURL                   string
 	RateLimitRPS                  int           // default: 10
 	RateLimitBurst                int           // default: 30
 	AnalyzerDailyBudget           int           // default: 5000
@@ -542,7 +539,6 @@ func LoadConfig() *ServerConfig {
 	r2Region := parseEnvString("R2_REGION", "auto")
 	r2AccessKeyID := parseEnvString("R2_ACCESS_KEY_ID", "")
 	r2SecretAccessKey := parseEnvString("R2_SECRET_ACCESS_KEY", "")
-	r2PublicURL := parseEnvString("R2_PUBLIC_URL", "https://file.529studio.site")
 
 	sampleInterval := parseEnvInt("ARCHIVE_SAMPLE_INTERVAL_SECONDS", 300, 1)
 	retentionDays := parseEnvInt("ARCHIVE_RETENTION_DAYS", 14, 1)
@@ -629,7 +625,6 @@ func LoadConfig() *ServerConfig {
 		R2Region:                      r2Region,
 		R2AccessKeyID:                 r2AccessKeyID,
 		R2SecretAccessKey:             r2SecretAccessKey,
-		R2PublicURL:                   r2PublicURL,
 		RateLimitRPS:                  rateLimitRPS,
 		RateLimitBurst:                rateLimitBurst,
 		AnalyzerDailyBudget:           analyzerDailyBudget,
