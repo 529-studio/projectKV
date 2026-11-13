@@ -143,6 +143,8 @@ services:
           memory: "${MODEL_MEMORY_LIMIT:-512M}"
     labels:
       - "traefik.enable=false"
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - warded-model-weights:/app/models
 
@@ -153,6 +155,13 @@ services:
     restart: unless-stopped
     networks:
       - core-network
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "${HARVESTER_CPU_LIMIT:-0.50}"
+          memory: "${HARVESTER_MEMORY_LIMIT:-512M}"
     volumes:
       - warded-stg-data:/app/data
       - ./:/workspace:ro
