@@ -1,4 +1,26 @@
 services:
+  # One-shot volume ownership repair (Issue #442 / S14-T2). A freshly created
+  # Docker volume is owned by root, while the forecast cron and Litestream
+  # sidecar run as 10001:10001. Without this the forecast refit fails to write
+  # its state and Litestream cannot read the WAL. The backend also gates on it so
+  # the volume is in a known state before any service touches it. It runs as root
+  # only long enough to mkdir/chown/chmod, then exits.
+  warded-init-vol:
+    image: alpine:3.20
+    container_name: ${INIT_VOL_CONTAINER_NAME:-warded-init-vol}
+    restart: "no"
+    user: "0:0"
+    networks:
+      - core-network
+    volumes:
+      - warded-stg-data:/app/data
+    command:
+      - sh
+      - -c
+      - mkdir -p /app/data/locks /app/data/forecast /app/data/proofs && chown -R 10001:10001 /app/data && chmod -R 775 /app/data
+    security_opt:
+      - no-new-privileges:true
+
   warded-backend:
     image: ${BE_IMAGE_NAME:-ghcr.io/529-studio/projectkv-backend}:${BE_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
     container_name: ${BE_CONTAINER_NAME:-warded-backend}
@@ -6,6 +28,9 @@ services:
     pull_policy: always
     networks:
       - core-network
+    depends_on:
+      warded-init-vol:
+        condition: service_completed_successfully
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -139,6 +164,9 @@ services:
     user: "10001:10001"
     networks:
       - core-network
+    depends_on:
+      warded-init-vol:
+        condition: service_completed_successfully
     read_only: true
     init: true
     stop_grace_period: 60s
@@ -189,6 +217,48 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+
+  # Continuous SQLite replication to Cloudflare R2 (Issue #442 / S14-T2).
+  # Litestream tails camera-view.db's WAL and ships committed frames to
+  # s3://${R2_BUCKET_NAME}/db-replicas/camera-view.db every second. The config is
+  # mounted read-only; credentials arrive only as environment variables.
+  warded-litestream:
+    image: litestream/litestream:0.3.13
+    container_name: ${LITESTREAM_CONTAINER_NAME:-warded-litestream}
+    restart: unless-stopped
+    user: "10001:10001"
+    networks:
+      - core-network
+    depends_on:
+      warded-init-vol:
+        condition: service_completed_successfully
+    volumes:
+      - warded-stg-data:/app/data
+      - ./deploy/litestream/litestream.yml:/etc/litestream.yml:ro
+    command: ["replicate", "-config", "/etc/litestream.yml"]
+    environment:
+      - TZ=${TZ:-Asia/Ho_Chi_Minh}
+      - HOME=/tmp
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-warded-proofs}
+      # Required, never defaulted to empty: a missing endpoint would make the
+      # S3 client talk to AWS and hand it R2 credentials.
+      - R2_ENDPOINT=${R2_ENDPOINT:?R2_ENDPOINT must be provided for Litestream replication}
+      - R2_REGION=${R2_REGION:-auto}
+      # LITESTREAM_* wins; the R2 credentials are the documented fallback.
+      - LITESTREAM_ACCESS_KEY_ID=${LITESTREAM_ACCESS_KEY_ID:-${R2_ACCESS_KEY_ID:-}}
+      - LITESTREAM_SECRET_ACCESS_KEY=${LITESTREAM_SECRET_ACCESS_KEY:-${R2_SECRET_ACCESS_KEY:-}}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "${LITESTREAM_CPU_LIMIT:-0.20}"
+          memory: "${LITESTREAM_MEMORY_LIMIT:-64M}"
 
 volumes:
   warded-stg-data:

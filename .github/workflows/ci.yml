@@ -52,6 +52,8 @@ jobs:
               - '.github/workflows/ci.yml'
             tools_dataset:
               - 'tools/**'
+              - 'deploy/**'
+              - 'docker-compose*.yml'
               - 'cameras_all.json'
               - 'cameras_enriched.json'
               - 'h3_hex_polygons.json'
@@ -133,6 +135,14 @@ jobs:
           pip install pillow
           make test-eval
           make test-harvester
+
+      - name: Verify Deployment Manifests & Restore Drill
+        run: |
+          make lint-deploy
+          make test-deploy
+          # Hermetic simulator path: builds a real WAL-mode SQLite database,
+          # restores it and enforces the RTO/RPO budgets in CI.
+          make restore-drill EXTRA="--cycles 3 --sync-interval 0.2"
 
       - name: Verify Tools Syntax
         run: |

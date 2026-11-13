@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint lint-deploy test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast train-forecast-daemon export-seg export-seg-openvino train-seg benchmark-mock benchmark-real bench-seg-avx2 bench-seg-avx2-docker bench-seg-avx2-check materialize-seg smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint lint-deploy test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast train-forecast-daemon export-seg export-seg-openvino train-seg benchmark-mock benchmark-real bench-seg-avx2 bench-seg-avx2-docker bench-seg-avx2-check materialize-seg smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close test-deploy restore-drill
 
 # Segmentation training defaults (S11-T5). Override on the command line:
 #   make train-seg EPOCHS=100 DATA=data/yolo_seg/dataset.yaml
@@ -23,6 +23,13 @@ LATENCY_REPEATS ?= 3
 
 # S13-T1 soak evidence destination for the containerised gate.
 SOAK_OUT ?= docs/reports/s13_t1_latency_avx2.json
+
+# S14-T2 SQLite restore drill (Issue #442). Default auto mode is hermetic: it
+# uses Litestream only when RESTORE_DRILL_REPLICA_URL or EXTRA=--replica-url is
+# supplied explicitly, so this target never reaches a production bucket by
+# accident. MODE=live requires the litestream binary.
+RESTORE_DRILL_MODE ?= auto
+RESTORE_DRILL_OUT ?= docs/reports/s14_t2_restore_drill_summary.json
 
 # Dataset v3 materializer (S12-T5 §2.4).
 DATASET_DATES ?=
@@ -59,6 +66,8 @@ help:
 	@echo "  make evidence-lint   - Enforce evidence integrity, temporal invariants and anti-spoofing"
 	@echo "  make lint-deploy     - Lint and validate deployment manifests and invariants (S12-T1)"
 	@echo "  make test-ci         - Run unit tests for evidence integrity gate"
+	@echo "  make test-deploy     - Run unit tests for the deploy lint and restore drill (S14-T2)"
+	@echo "  make restore-drill   - Restore SQLite from a Litestream replica and verify RTO/RPO (S14-T2)"
 	@echo "  make test-eval       - Run unit tests for eval benchmark harness"
 	@echo "  make test-seg        - Run unit tests for SAM pre-labeling toolchain (S9-T2)"
 	@echo "  make test-forecast   - Run unit tests for the congestion forecast toolchain (S9-T6)"
@@ -188,6 +197,12 @@ train-forecast-daemon:
 
 lint-deploy:
 	python3 tools/ci/check_deploy_manifests.py
+
+test-deploy:
+	python3 -m unittest discover -s tools/deploy -p "*test*.py"
+
+restore-drill:
+	python3 tools/deploy/restore_drill.py --mode $(RESTORE_DRILL_MODE) --out $(RESTORE_DRILL_OUT) $(EXTRA)
 
 export-seg:
 	python3 tools/eval/export_yolo_seg.py --labels-dir tools/eval/labels_gold_standard --output-dir data/yolo_seg --verify

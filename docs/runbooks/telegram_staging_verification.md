@@ -57,3 +57,20 @@ TELEGRAM_BOT_TOKEN=fake_token TELEGRAM_CHAT_ID=12345 \
   TELEGRAM_API_BASE=http://127.0.0.1:19999 \
   bash scripts/verify_staging_telegram.sh
 ```
+
+## Citizen Subscriptions & Fail-Closed Webhook
+
+Citizens subscribe from the bell button (city-wide, zone, ward or chokepoint);
+the bot answers `/start`, `/status`, `/stop` and `/help`. Verify live delivery on
+staging before enabling public subscriptions:
+
+```bash
+# Credentials are read from environment variables or the gitignored .env (never hardcoded)
+TELEGRAM_BOT_TOKEN=<your-telegram-bot-token> TELEGRAM_CHAT_ID=<your-telegram-chat-id> \
+  ./scripts/verify_staging_telegram.sh
+```
+
+The script checks `getMe`, the bilingual zero-emoji copy and a real `sendMessage`
+(HTTP 200). The inbound `POST /api/notify/telegram/webhook` is mounted only when
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` and `TELEGRAM_WEBHOOK_SECRET` are
+all valid; otherwise it answers `404` (fail-closed).

@@ -1,0 +1,30 @@
+# Litestream replication for the staging SQLite database (Issue #442 / S14-T2).
+#
+# The warded-backend writes every verdict to /app/data/camera-view.db in WAL
+# mode. Litestream tails that WAL and ships each committed frame to Cloudflare R2
+# within one second, so a lost volume costs at most one second of writes.
+#
+# Secrets are never stored here: values are expanded from the environment that
+# docker-compose.stg.yml injects into the warded-litestream sidecar. Never put a
+# literal key in this file.
+#
+# Restore with tools/deploy/restore_drill.py (see
+# docs/runbooks/sqlite_litestream_disaster_recovery.md).
+
+dbs:
+  - path: /app/data/camera-view.db
+    replicas:
+      - type: s3
+        name: r2
+        bucket: ${R2_BUCKET_NAME}
+        path: db-replicas/camera-view.db
+        endpoint: ${R2_ENDPOINT}
+        region: ${R2_REGION}
+        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+        # RPO budget: at most one second of committed writes may be lost.
+        sync-interval: 1s
+        # A full snapshot every 24h bounds restore replay time; seven daily
+        # snapshots of retention bound the replica's storage growth.
+        snapshot-interval: 24h
+        retention: 168h
