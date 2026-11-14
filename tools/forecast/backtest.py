@@ -235,7 +235,7 @@ class Metrics:
         }
 
 
-@dataclass(frozen=True)
+@dataclass
 class BacktestConfig:
     """Validated backtest configuration shared by every horizon."""
 
@@ -246,6 +246,8 @@ class BacktestConfig:
     ridge_lambda: float = DEFAULT_RIDGE_LAMBDA
     timezone: str = DEFAULT_TIMEZONE
     direction_epsilon: float = DIRECTION_EPSILON
+    min_improvement_pct: float = 0.0
+    min_horizons: int = 1
 
     def validate(self) -> None:
         if not 0.0 < self.train_ratio < 1.0:
@@ -265,6 +267,10 @@ class BacktestConfig:
             raise BacktestError("ridge_lambda must be a positive finite number")
         if self.direction_epsilon < 0.0:
             raise BacktestError("direction_epsilon cannot be negative")
+        if self.min_improvement_pct < 0.0:
+            raise BacktestError("min_improvement_pct cannot be negative")
+        if self.min_horizons < 1:
+            raise BacktestError("min_horizons must be >= 1")
 
     @property
     def candidate_id(self) -> str:
@@ -1129,20 +1135,43 @@ def evaluate_horizon(
 
 
 def build_verification(
-    results: dict[str, Any], candidate_id: str
+    results: dict[str, Any],
+    candidate_id: str,
+    min_improvement_pct: float = 0.0,
+    min_horizons: int = 1,
 ) -> dict[str, Any]:
-    """Apply the gate: candidate MAE must beat persistence on >= 1 horizon."""
+    """Apply the gate: candidate MAE must beat persistence.
+
+    When min_improvement_pct > 0 or min_horizons > 1, enforces strict skill gating (Issue #444):
+    candidate MAE must achieve >= min_improvement_pct on >= min_horizons horizons.
+    """
     beats: list[int] = []
+    strict_beats: list[int] = []
     for horizon_key in sorted(results, key=int):
-        if results[horizon_key]["gate"]["beats_persistence"]:
+        gate = results[horizon_key]["gate"]
+        if gate["beats_persistence"]:
             beats.append(int(horizon_key))
+        pct = gate.get("mae_improvement_percent")
+        if pct is not None and pct >= min_improvement_pct:
+            strict_beats.append(int(horizon_key))
+
+    strict_mode = min_improvement_pct > 0.0 or min_horizons > 1
+    passed = len(strict_beats) >= min_horizons if strict_mode else bool(beats)
+
+    criterion = (
+        f"candidate MAE >= {min_improvement_pct:.1f}% improvement over persistence on at least {min_horizons} forecast horizons"
+        if strict_mode
+        else "candidate MAE < persistence MAE on at least one forecast horizon"
+    )
+
     return {
         "candidate_model": candidate_id,
-        "criterion": (
-            "candidate MAE < persistence MAE on at least one forecast horizon"
-        ),
+        "criterion": criterion,
         "beats_persistence_horizons": beats,
-        "passed": bool(beats),
+        "strict_skill_horizons": strict_beats,
+        "min_improvement_pct": min_improvement_pct,
+        "min_horizons": min_horizons,
+        "passed": passed,
     }
 
 
@@ -1165,7 +1194,12 @@ def run_backtest(
             records, saturation_index, split, horizon, config
         )
 
-    verification = build_verification(results, config.candidate_id)
+    verification = build_verification(
+        results,
+        config.candidate_id,
+        min_improvement_pct=config.min_improvement_pct,
+        min_horizons=config.min_horizons,
+    )
     train_row_count = sum(1 for record in records if record.bin_start < split.cutoff)
     test_row_count = len(records) - train_row_count
     generated = generated_at or datetime.now(timezone.utc)
@@ -1351,14 +1385,17 @@ def render_markdown(result: dict[str, Any]) -> str:
         )
     lines.append("")
     if verification["passed"]:
-        horizons = ", ".join(
-            f"{value} min" for value in verification["beats_persistence_horizons"]
+        qualifying = (
+            verification.get("strict_skill_horizons")
+            if (verification.get("min_improvement_pct", 0) > 0 or verification.get("min_horizons", 1) > 1)
+            else verification.get("beats_persistence_horizons", [])
         )
-        lines.append(f"Gate result: PASSED. The candidate beats persistence at {horizons}.")
+        horizons = ", ".join(f"{value} min" for value in (qualifying or verification["beats_persistence_horizons"]))
+        lines.append(f"Gate result: PASSED. Criterion: {verification.get('criterion', 'The candidate beats persistence')}. Qualifying horizons: {horizons}.")
     else:
         lines.append(
-            "Gate result: FAILED. The candidate does not beat persistence on any "
-            "horizon. Do not expose a forecast endpoint or UI (ADR-011 D7)."
+            f"Gate result: FAILED. Criterion '{verification.get('criterion', 'beats persistence')}' was not met. "
+            "Do not expose a forecast endpoint or UI (ADR-011 D7)."
         )
     lines.append("")
 
@@ -1932,6 +1969,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional provenance note embedded in the JSON and Markdown report",
     )
     parser.add_argument(
+        "--min-improvement-pct",
+        type=float,
+        default=0.0,
+        help="Minimum percentage MAE improvement over persistence to qualify as skill (default 0.0, use 5.0 for strict skill gating)",
+    )
+    parser.add_argument(
+        "--min-horizons",
+        type=int,
+        default=1,
+        help="Minimum number of horizons that must satisfy skill gating (default 1, use 2 for strict skill gating)",
+    )
+    parser.add_argument(
         "--log-level",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
         default="INFO",
@@ -1962,6 +2011,8 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
         target_mode=args.target_mode,
         ridge_lambda=args.ridge_lambda,
         timezone=args.timezone,
+        min_improvement_pct=args.min_improvement_pct,
+        min_horizons=args.min_horizons,
     )
     try:
         config.validate()

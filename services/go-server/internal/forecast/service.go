@@ -91,6 +91,7 @@ type Service struct {
 	mu             sync.RWMutex
 	history        HistoryReader
 	catalog        CameraCatalog
+	weather        WeatherReader
 	artifact       *ModelArtifact
 	model          ModelMetadata
 	allowSynthetic bool
@@ -119,6 +120,7 @@ type snapshot struct {
 	artifact       *ModelArtifact
 	model          ModelMetadata
 	allowSynthetic bool
+	weather        WeatherReader
 }
 
 // Option configures Service options.
@@ -130,6 +132,15 @@ func WithAllowSynthetic(allow bool) Option {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		s.allowSynthetic = allow
+	}
+}
+
+// WithWeatherReader configures the weather history reader for meteorological feature enrichment.
+func WithWeatherReader(weather WeatherReader) Option {
+	return func(s *Service) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.weather = weather
 	}
 }
 
@@ -297,6 +308,7 @@ func (s *Service) snapshot() snapshot {
 		artifact:       s.artifact,
 		model:          s.model,
 		allowSynthetic: s.allowSynthetic,
+		weather:        s.weather,
 	}
 }
 
@@ -567,8 +579,16 @@ func (s *Service) PredictMulti(ctx context.Context, req Request) (*MultiHorizonR
 
 	experimental := (snap.model.FitSource != string(FitSourceLiveHistory))
 
-	// Extract features
-	features, currentSI, _ := BuildFeatures(observations, req.BaseTime)
+	// Extract features (including as-of meteorological data if weather reader is configured)
+	var weatherObs []WeatherObservation
+	if snap.weather != nil {
+		if history, err := snap.weather.GetHistory(ctx, req.BaseTime.Add(-60*time.Minute), req.BaseTime, 50); err == nil && len(history) > 0 {
+			weatherObs = history
+		} else if latest, err := snap.weather.GetAsOf(ctx, req.BaseTime, 30*time.Minute); err == nil && latest != nil {
+			weatherObs = []WeatherObservation{*latest}
+		}
+	}
+	features, currentSI, _ := BuildFeaturesWithWeather(observations, req.BaseTime, weatherObs)
 	if math.IsNaN(currentSI) || math.IsInf(currentSI, 0) || currentSI < 0.0 {
 		currentSI = 0.0
 	}

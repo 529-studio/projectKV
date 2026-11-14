@@ -1172,8 +1172,52 @@ func makeProxyTouchCallback(camCatalog *camera.Catalog, hotsetRegistry *hotset.R
 	}
 }
 
+type forecastWeatherAdapter struct {
+	repo *store.WeatherRepo
+}
+
+func (a *forecastWeatherAdapter) GetAsOf(ctx context.Context, target time.Time, maxAge time.Duration) (*forecast.WeatherObservation, error) {
+	if a == nil || a.repo == nil {
+		return nil, store.ErrWeatherNotFound
+	}
+	obs, err := a.repo.GetAsOf(ctx, target, maxAge)
+	if err != nil {
+		return nil, err
+	}
+	return &forecast.WeatherObservation{
+		PrecipitationMm: obs.PrecipitationMm,
+		WeatherCode:     obs.WeatherCode,
+		TemperatureC:    obs.TemperatureC,
+		HumidityPct:     obs.HumidityPct,
+		RadarActive:     obs.RadarActive,
+		ObservedAt:      obs.ObservedAt,
+	}, nil
+}
+
+func (a *forecastWeatherAdapter) GetHistory(ctx context.Context, since, until time.Time, limit int) ([]forecast.WeatherObservation, error) {
+	if a == nil || a.repo == nil {
+		return nil, nil
+	}
+	history, err := a.repo.GetHistory(ctx, since, until, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]forecast.WeatherObservation, len(history))
+	for i, obs := range history {
+		out[i] = forecast.WeatherObservation{
+			PrecipitationMm: obs.PrecipitationMm,
+			WeatherCode:     obs.WeatherCode,
+			TemperatureC:    obs.TemperatureC,
+			HumidityPct:     obs.HumidityPct,
+			RadarActive:     obs.RadarActive,
+			ObservedAt:      obs.ObservedAt,
+		}
+	}
+	return out, nil
+}
+
 // initForecastHandler configures the short-horizon congestion forecast service and starts its background reloader.
-func initForecastHandler(ctx context.Context, cfg *config.ServerConfig, camCatalog *camera.Catalog, verdictHistoryRepo *store.VerdictHistoryRepo) *forecast.Handler {
+func initForecastHandler(ctx context.Context, cfg *config.ServerConfig, camCatalog *camera.Catalog, verdictHistoryRepo *store.VerdictHistoryRepo, weatherRepo *store.WeatherRepo) *forecast.Handler {
 	if camCatalog == nil {
 		return nil
 	}
@@ -1194,6 +1238,9 @@ func initForecastHandler(ctx context.Context, cfg *config.ServerConfig, camCatal
 	var forecastOpts []forecast.Option
 	if modelPath := strings.TrimSpace(os.Getenv("FORECAST_MODEL_PATH")); modelPath != "" {
 		forecastOpts = append(forecastOpts, forecast.WithModelPath(modelPath))
+	}
+	if weatherRepo != nil {
+		forecastOpts = append(forecastOpts, forecast.WithWeatherReader(&forecastWeatherAdapter{repo: weatherRepo}))
 	}
 	forecastService := forecast.NewService(forecastHistAdapter, forecastCamAdapter, forecastOpts...)
 	startForecastReloaderJob(ctx, forecastService)

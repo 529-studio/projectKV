@@ -947,6 +947,72 @@ class TestAblationBacktest(unittest.TestCase):
         self.assertIn("PASSED", markdown)
 
 
+class TestStrictSkillGating(unittest.TestCase):
+    """Verify strict skill gating criteria (Issue #444 / S14-T4)."""
+
+    def test_strict_skill_gating_passes_with_two_horizons_ge_5pct(self):
+        results = {
+            "10": {
+                "gate": {
+                    "beats_persistence": True,
+                    "mae_improvement_percent": 6.2,
+                }
+            },
+            "20": {
+                "gate": {
+                    "beats_persistence": True,
+                    "mae_improvement_percent": 5.1,
+                }
+            },
+            "30": {
+                "gate": {
+                    "beats_persistence": True,
+                    "mae_improvement_percent": 1.5,
+                }
+            },
+        }
+        verification = build_verification(
+            results,
+            "ridge_delta",
+            min_improvement_pct=5.0,
+            min_horizons=2,
+        )
+        self.assertTrue(verification["passed"])
+        self.assertEqual(verification["strict_skill_horizons"], [10, 20])
+        self.assertEqual(verification["beats_persistence_horizons"], [10, 20, 30])
+
+    def test_strict_skill_gating_fails_when_fewer_than_two_horizons_ge_5pct(self):
+        results = {
+            "10": {
+                "gate": {
+                    "beats_persistence": True,
+                    "mae_improvement_percent": 8.0,
+                }
+            },
+            "20": {
+                "gate": {
+                    "beats_persistence": True,
+                    "mae_improvement_percent": 4.9,  # Just below 5%
+                }
+            },
+            "30": {
+                "gate": {
+                    "beats_persistence": True,
+                    "mae_improvement_percent": 2.0,
+                }
+            },
+        }
+        verification = build_verification(
+            results,
+            "ridge_delta",
+            min_improvement_pct=5.0,
+            min_horizons=2,
+        )
+        self.assertFalse(verification["passed"])
+        self.assertEqual(verification["strict_skill_horizons"], [10])
+        self.assertEqual(verification["beats_persistence_horizons"], [10, 20, 30])
+
+
 class TestParseUtcTimestamp(unittest.TestCase):
     """Verify parse_utc_timestamp handles standard RFC3339 and 9-digit RFC3339Nano."""
 
