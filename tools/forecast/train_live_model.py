@@ -410,7 +410,12 @@ def build_model_artifact(
     return artifact
 
 
-def verify_artifact_data(data: Any, candidate_key: str = "ridge_delta") -> tuple[bool, str]:
+def verify_artifact_data(
+    data: Any,
+    candidate_key: str = "ridge_delta",
+    min_improvement_pct: float = 0.0,
+    min_horizons: int = 1,
+) -> tuple[bool, str]:
     """Validate in-memory candidate model artifact against schema and Go server invariants."""
     if not isinstance(data, dict):
         return False, "Artifact root must be a JSON object"
@@ -482,26 +487,51 @@ def verify_artifact_data(data: Any, candidate_key: str = "ridge_delta") -> tuple
                 params = h_entry.get("params")
                 if not isinstance(params, dict):
                     return False, f"{candidate_key} horizon {h_min} is missing 'params'"
+                means_len = len(params.get("means", []))
+                if means_len not in (6, 12, 14):
+                    return False, f"{candidate_key} horizon {h_min} has unsupported feature count {means_len} (expected 6 or 12)"
                 for key in ("means", "stds", "coeffs"):
                     arr = params.get(key)
-                    if not isinstance(arr, list) or len(arr) != 6:
-                        return False, f"{candidate_key} horizon {h_min} param '{key}' must have exactly 6 floats"
+                    if not isinstance(arr, list) or len(arr) != means_len:
+                        return False, f"{candidate_key} horizon {h_min} param '{key}' must have exactly {means_len} floats"
                     if any(not math.isfinite(x) for x in arr):
                         return False, f"{candidate_key} horizon {h_min} param '{key}' contains non-finite numbers"
                 if "intercept" not in params or not math.isfinite(params["intercept"]):
                     return False, f"{candidate_key} horizon {h_min} intercept must be finite"
 
-    # Enforce verification gate: candidate MAE must beat persistence on at least 1 horizon
+    # Enforce verification gate: candidate MAE must beat persistence
     candidate_horizons = {h["horizon_minutes"]: h["mae"] for h in model_map[candidate_key]["horizons"]}
     persist_horizons = {h["horizon_minutes"]: h["mae"] for h in model_map["persistence"]["horizons"]}
-    beats = [h for h in candidate_horizons if candidate_horizons[h] < persist_horizons.get(h, 0.0)]
-    if not beats:
+    beats = []
+    strict_beats = []
+    for h, c_mae in candidate_horizons.items():
+        p_mae = persist_horizons.get(h, 0.0)
+        if c_mae < p_mae:
+            beats.append(h)
+            improvement_pct = 100.0 * (p_mae - c_mae) / p_mae if p_mae > 0 else 0.0
+            if improvement_pct >= min_improvement_pct:
+                strict_beats.append(h)
+
+    strict_mode = min_improvement_pct > 0.0 or min_horizons > 1
+    if strict_mode:
+        if len(strict_beats) < min_horizons:
+            return False, (
+                f"Gate failed: candidate {candidate_key} achieves >= {min_improvement_pct:.1f}% improvement "
+                f"on {len(strict_beats)} horizons ({strict_beats}), but requires >= {min_horizons} horizons"
+            )
+    elif not beats:
         return False, f"Gate failed: candidate {candidate_key} does not beat persistence on any horizon"
 
-    return True, f"Artifact verification passed (beats persistence on horizons: {beats})"
+    qualifying = strict_beats if strict_mode else beats
+    return True, f"Artifact verification passed (qualifying horizons: {qualifying})"
 
 
-def verify_artifact(artifact_path: Path) -> tuple[bool, str]:
+def verify_artifact(
+    artifact_path: Path,
+    candidate_key: str = "ridge_delta",
+    min_improvement_pct: float = 0.0,
+    min_horizons: int = 1,
+) -> tuple[bool, str]:
     """Verify an existing model artifact from disk without refitting."""
     if not artifact_path.exists():
         return False, f"Artifact file does not exist: {artifact_path}"
@@ -512,7 +542,12 @@ def verify_artifact(artifact_path: Path) -> tuple[bool, str]:
     except Exception as exc:
         return False, f"Failed to parse JSON in {artifact_path}: {exc}"
 
-    return verify_artifact_data(data)
+    return verify_artifact_data(
+        data,
+        candidate_key=candidate_key,
+        min_improvement_pct=min_improvement_pct,
+        min_horizons=min_horizons,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -606,6 +641,25 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default=DEFAULT_TIMEZONE,
         help="Local timezone for calendar feature alignment",
+    )
+    parser.add_argument(
+        "--feature-set",
+        type=str,
+        default="auto",
+        choices=("auto", "default", "weather", "directional"),
+        help="Feature column configuration (default: auto - selects weather when observations exist, otherwise default)",
+    )
+    parser.add_argument(
+        "--min-improvement-pct",
+        type=float,
+        default=5.0,
+        help="Strict skill gate: minimum percent MAE improvement over persistence (default: 5.0%%, S14-T4)",
+    )
+    parser.add_argument(
+        "--min-horizons",
+        type=int,
+        default=2,
+        help="Strict skill gate: minimum number of horizons required to beat persistence (default: 2, S14-T4)",
     )
     parser.add_argument(
         "--promote",
@@ -1732,23 +1786,42 @@ def run_cycle(args: argparse.Namespace) -> int:
         return EXIT_DATA_ERROR
 
     # 3. Model Fitting & Backtest Evaluation
+    has_weather = any(r.values.get("precip_mm_15m") is not None for r in rows)
+    feature_set = getattr(args, "feature_set", "auto")
+    if feature_set == "weather":
+        feature_columns = backtest.VARIANT_B_COLUMNS
+    elif feature_set == "directional":
+        feature_columns = backtest.VARIANT_C_COLUMNS
+    elif feature_set == "default":
+        feature_columns = backtest.DEFAULT_FEATURE_COLUMNS
+    else:  # auto
+        if has_weather:
+            feature_columns = backtest.VARIANT_B_COLUMNS
+        else:
+            feature_columns = backtest.DEFAULT_FEATURE_COLUMNS
+
     try:
         records, summary = backtest.load_feature_records(
             features_csv_path,
-            feature_columns=backtest.DEFAULT_FEATURE_COLUMNS,
+            feature_columns=feature_columns,
             timezone_name=args.timezone,
         )
     except Exception as exc:
         LOG.error("Failed to load feature records for backtest: %s", exc)
         return EXIT_DATA_ERROR
 
+    min_improvement_pct = getattr(args, "min_improvement_pct", 5.0)
+    min_horizons = getattr(args, "min_horizons", 2)
+
     config = backtest.BacktestConfig(
         train_ratio=args.train_ratio,
         horizons_minutes=horizons,
-        feature_columns=backtest.DEFAULT_FEATURE_COLUMNS,
+        feature_columns=feature_columns,
         target_mode=args.target_mode,
         ridge_lambda=args.ridge_lambda,
         timezone=args.timezone,
+        min_improvement_pct=min_improvement_pct,
+        min_horizons=min_horizons,
     )
 
     try:
@@ -1781,11 +1854,13 @@ def run_cycle(args: argparse.Namespace) -> int:
     verification = backtest_result.get("verification", {})
     gate_passed = bool(verification.get("passed"))
     beats_horizons = verification.get("beats_persistence_horizons", [])
+    strict_horizons = verification.get("strict_skill_horizons", beats_horizons)
 
     LOG.info(
-        "Verification gate result: passed=%s (beats persistence at horizons: %s)",
+        "Verification gate result: passed=%s (beats persistence at horizons: %s, qualifying skill horizons: %s)",
         gate_passed,
         beats_horizons,
+        strict_horizons,
     )
 
     candidate_key = f"ridge_{args.target_mode}"
@@ -1818,7 +1893,8 @@ def run_cycle(args: argparse.Namespace) -> int:
 
     if not gate_passed:
         LOG.error(
-            "Gate failed: candidate model does not beat persistence on any horizon. Deployment halted."
+            "Gate failed: candidate model does not meet skill gate criteria (%s). Deployment halted.",
+            verification.get("criterion", "beats persistence"),
         )
         if not args.dry_run:
             try:
@@ -1840,7 +1916,12 @@ def run_cycle(args: argparse.Namespace) -> int:
 
     # Pre-promotion validation (RB1 / B2 / N16: validate in-memory before writing outputs)
     if args.promote:
-        valid, msg = verify_artifact_data(candidate_artifact, candidate_key=candidate_key)
+        valid, msg = verify_artifact_data(
+            candidate_artifact,
+            candidate_key=candidate_key,
+            min_improvement_pct=min_improvement_pct,
+            min_horizons=min_horizons,
+        )
         if not valid:
             LOG.error("Candidate artifact failed pre-promotion validation: %s", msg)
             return EXIT_GATE_FAILED

@@ -214,3 +214,160 @@ func TestBuildFeatures(t *testing.T) {
 		t.Errorf("expected positive rolling mean, got %v", features.RollingMean15m)
 	}
 }
+
+func TestClassifyWeatherCode(t *testing.T) {
+	cases := []struct {
+		code int
+		want float64
+	}{
+		{0, 0.0},
+		{1, 0.0},
+		{2, 1.0},
+		{3, 1.0},
+		{45, 1.0},
+		{48, 1.0},
+		{51, 2.0},
+		{53, 2.0},
+		{61, 2.0},
+		{80, 2.0},
+		{63, 3.0},
+		{65, 3.0},
+		{81, 3.0},
+		{95, 4.0},
+		{96, 4.0},
+		{99, 4.0},
+		{100, 0.0},
+	}
+	for _, tc := range cases {
+		got := forecast.ClassifyWeatherCode(tc.code)
+		if got != tc.want {
+			t.Errorf("ClassifyWeatherCode(%d) = %v, want %v", tc.code, got, tc.want)
+		}
+	}
+}
+
+func TestComputeWeatherFeatures(t *testing.T) {
+	baseTime := time.Date(2026, time.November, 14, 10, 0, 0, 0, time.UTC)
+	weatherObs := []forecast.WeatherObservation{
+		{
+			PrecipitationMm: 1.5,
+			WeatherCode:     61, // slight rain -> class 2
+			RadarActive:     1,
+			ObservedAt:      baseTime.Add(-25 * time.Minute),
+		},
+		{
+			PrecipitationMm: 2.0,
+			WeatherCode:     63, // moderate rain -> class 3
+			RadarActive:     1,
+			ObservedAt:      baseTime.Add(-10 * time.Minute),
+		},
+		{
+			PrecipitationMm: 0.5,
+			WeatherCode:     61, // class 2
+			RadarActive:     1,
+			ObservedAt:      baseTime.Add(-5 * time.Minute),
+		},
+	}
+
+	p15, p60, rf, hsr, wcc, ra := forecast.ComputeWeatherFeatures(weatherObs, baseTime)
+	// Observations at -10m (2.0) and -5m (0.5) fall within 15m -> sum = 2.5
+	if math.Abs(p15-2.5) > 1e-4 {
+		t.Errorf("expected precip15m=2.5, got %v", p15)
+	}
+	// All three fall within 60m -> sum = 4.0
+	if math.Abs(p60-4.0) > 1e-4 {
+		t.Errorf("expected precip60m=4.0, got %v", p60)
+	}
+	if rf != 1.0 {
+		t.Errorf("expected rainFlag=1.0, got %v", rf)
+	}
+	if math.Abs(hsr-(5.0/60.0)) > 1e-4 {
+		t.Errorf("expected hoursSinceRain ~0.0833, got %v", hsr)
+	}
+	if wcc != 2.0 {
+		t.Errorf("expected weatherCodeClass=2.0, got %v", wcc)
+	}
+	if ra != 1.0 {
+		t.Errorf("expected radarActive=1.0, got %v", ra)
+	}
+
+	// Test strict 30-minute age cutoff:
+	staleObs := []forecast.WeatherObservation{
+		{
+			PrecipitationMm: 5.0,
+			WeatherCode:     65,
+			RadarActive:     1,
+			ObservedAt:      baseTime.Add(-45 * time.Minute),
+		},
+	}
+	p15S, p60S, rfS, hsrS, wccS, raS := forecast.ComputeWeatherFeatures(staleObs, baseTime)
+	if p15S != 0.0 || p60S != 0.0 || rfS != 0.0 || hsrS != 24.0 || wccS != 0.0 || raS != 0.0 {
+		t.Errorf("expected defaults on stale weather obs, got p15=%v p60=%v rf=%v hsr=%v wcc=%v ra=%v",
+			p15S, p60S, rfS, hsrS, wccS, raS)
+	}
+}
+
+func TestBuildFeaturesWithWeather(t *testing.T) {
+	baseTime := time.Date(2026, time.November, 14, 10, 0, 0, 0, time.UTC)
+	trafficObs := []forecast.Observation{
+		{CameraID: "cam-1", SaturationIndex: 0.50, ObservedAt: baseTime.Add(-1 * time.Minute)},
+		{CameraID: "cam-1", SaturationIndex: 0.45, ObservedAt: baseTime.Add(-5 * time.Minute)},
+	}
+	weatherObs := []forecast.WeatherObservation{
+		{
+			PrecipitationMm: 1.0,
+			WeatherCode:     61,
+			RadarActive:     1,
+			ObservedAt:      baseTime.Add(-8 * time.Minute),
+		},
+	}
+
+	f, currentSI, ok := forecast.BuildFeaturesWithWeather(trafficObs, baseTime, weatherObs)
+	if !ok {
+		t.Fatal("expected BuildFeaturesWithWeather to succeed")
+	}
+	if currentSI != 0.50 {
+		t.Errorf("expected currentSI 0.50, got %v", currentSI)
+	}
+	if f.PrecipMm15m != 1.0 || f.RainFlag != 1.0 || f.RadarActive != 1.0 {
+		t.Errorf("expected weather features populated, got precip15m=%v rainFlag=%v radarActive=%v",
+			f.PrecipMm15m, f.RainFlag, f.RadarActive)
+	}
+	slice := f.AsSlice()
+	if len(slice) != 12 {
+		t.Fatalf("expected AsSlice length 12, got %d", len(slice))
+	}
+	if slice[6] != 1.0 || slice[8] != 1.0 || slice[11] != 1.0 {
+		t.Errorf("expected weather values at slice indices 6, 8, 11, got %v", slice)
+	}
+}
+
+func TestPredictRidgeDelta_12Features(t *testing.T) {
+	// Calibrated parameters with 12 features (Variant B)
+	params := forecast.ModelParams{
+		HorizonMinutes: 10,
+		Intercept:      0.01,
+		Means:          []float64{0.3, 0.3, 0.3, 0.3, 10.0, 5.0, 0.5, 1.0, 0.2, 5.0, 1.0, 0.1},
+		Stds:           []float64{0.1, 0.1, 0.1, 0.1, 2.0, 1.0, 0.5, 1.0, 0.4, 4.0, 1.0, 0.3},
+		Coeffs:         []float64{0.01, 0.01, 0.005, 0.005, 0.001, -0.001, 0.02, 0.01, 0.015, -0.005, 0.01, 0.008},
+	}
+	f := forecast.Features{
+		Lag5m:            0.35,
+		Lag10m:           0.35,
+		Lag15m:           0.35,
+		RollingMean15m:   0.35,
+		HourOfDay:        10.0,
+		DayOfWeek:        5.0,
+		PrecipMm15m:      2.0, // Heavy rain -> positive delta
+		PrecipMm60m:      3.0,
+		RainFlag:         1.0,
+		HoursSinceRain:   0.1,
+		WeatherCodeClass: 3.0,
+		RadarActive:      1.0,
+	}
+
+	pred := forecast.PredictRidgeDelta(0.40, f, params)
+	if pred <= 0.40 {
+		t.Errorf("expected rain to increase saturation index (> 0.40), got %v", pred)
+	}
+}

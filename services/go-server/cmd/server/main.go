@@ -155,7 +155,7 @@ func main() {
 		))
 	}
 
-	forecastHandler := initForecastHandler(appCtx, cfg, camCatalog, verdictHistoryRepo)
+	forecastHandler := initForecastHandler(appCtx, cfg, camCatalog, verdictHistoryRepo, weatherRepo)
 	weatherService := weather.NewService()
 	weatherHandler := weather.NewHandler(weatherService)
 	startWeatherSamplerJob(appCtx, weather.NewSampler(weatherService, &weatherStoreAdapter{repo: weatherRepo}, slog.Default()), 10*time.Minute)

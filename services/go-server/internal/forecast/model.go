@@ -33,14 +33,14 @@ func IsSupportedHorizon(h int) bool {
 
 // ModelParams holds calibrated ridge regression parameters for a single horizon.
 type ModelParams struct {
-	HorizonMinutes int        `json:"horizon_minutes"`
-	Intercept      float64    `json:"intercept"`
-	Means          [6]float64 `json:"means"`
-	Stds           [6]float64 `json:"stds"`
-	Coeffs         [6]float64 `json:"coeffs"`
-	MAE            float64    `json:"mae"`
-	RMSE           float64    `json:"rmse"`
-	GlobalMedian   float64    `json:"global_median"`
+	HorizonMinutes int       `json:"horizon_minutes"`
+	Intercept      float64   `json:"intercept"`
+	Means          []float64 `json:"means"`
+	Stds           []float64 `json:"stds"`
+	Coeffs         []float64 `json:"coeffs"`
+	MAE            float64   `json:"mae"`
+	RMSE           float64   `json:"rmse"`
+	GlobalMedian   float64   `json:"global_median"`
 }
 
 // CalibratedRidgeParams provides backwards-compatible access to default ridge parameters,
@@ -52,6 +52,7 @@ var CalibratedRidgeParams = DefaultArtifact().RidgeParams()
 var DefaultModelMetadata = DefaultArtifact().DefaultMetadata()
 
 // Features contains the input feature vector for the Ridge regression delta model.
+// Includes 6 traffic lag/calendar features + 6 weather features (Issue #444 / S14-T4).
 type Features struct {
 	Lag5m          float64
 	Lag10m         float64
@@ -59,30 +60,57 @@ type Features struct {
 	RollingMean15m float64
 	HourOfDay      float64
 	DayOfWeek      float64
+
+	// Weather features (ADR-012 D3, Issue #444)
+	PrecipMm15m      float64
+	PrecipMm60m      float64
+	RainFlag         float64
+	HoursSinceRain   float64
+	WeatherCodeClass float64
+	RadarActive      float64
 }
 
-// AsSlice returns features in the standardized order:
-// [lag_5m, lag_10m, lag_15m, rolling_mean_15m, hour_of_day, day_of_week].
-func (f Features) AsSlice() [6]float64 {
-	return [6]float64{
+// AsSlice returns features in standardized order:
+// [lag_5m, lag_10m, lag_15m, rolling_mean_15m, hour_of_day, day_of_week,
+//
+//	precip_mm_15m, precip_mm_60m, rain_flag, hours_since_rain, weather_code_class, radar_active]
+func (f Features) AsSlice() []float64 {
+	return []float64{
 		f.Lag5m,
 		f.Lag10m,
 		f.Lag15m,
 		f.RollingMean15m,
 		f.HourOfDay,
 		f.DayOfWeek,
+		f.PrecipMm15m,
+		f.PrecipMm60m,
+		f.RainFlag,
+		f.HoursSinceRain,
+		f.WeatherCodeClass,
+		f.RadarActive,
 	}
 }
 
 // PredictRidgeDelta calculates predicted saturation index using the calibrated ridge model.
 // Non-negative saturation index is enforced by flooring at 0.0.
+// Dynamically supports both 6-feature baseline and 12-feature weather models.
 func PredictRidgeDelta(currentSI float64, f Features, params ModelParams) float64 {
 	if math.IsNaN(currentSI) || math.IsInf(currentSI, 0) {
 		currentSI = 0.0
 	}
 	x := f.AsSlice()
 	delta := params.Intercept
-	for i := 0; i < 6; i++ {
+	n := len(params.Coeffs)
+	if len(params.Means) < n {
+		n = len(params.Means)
+	}
+	if len(params.Stds) < n {
+		n = len(params.Stds)
+	}
+	if len(x) < n {
+		n = len(x)
+	}
+	for i := 0; i < n; i++ {
 		std := params.Stds[i]
 		if std <= 0 || math.IsNaN(std) || math.IsInf(std, 0) {
 			std = 1.0
@@ -179,10 +207,123 @@ func ComputeConfidenceIntervals(predictedSI float64, rmse float64) (siLower, siU
 	return
 }
 
+// ClassifyWeatherCode maps WMO weather code (0-99) into discrete forecast classes (0-4).
+// Matches tools/forecast/extract_features.py:classify_weather_code.
+func ClassifyWeatherCode(code int) float64 {
+	switch {
+	case code == 0 || code == 1:
+		return 0.0
+	case code == 2 || code == 3 || code == 45 || code == 48:
+		return 1.0
+	case code == 51 || code == 53 || code == 55 || code == 56 || code == 57 || code == 61 || code == 80:
+		return 2.0
+	case code == 63 || code == 65 || code == 66 || code == 67 || code == 81 || code == 82:
+		return 3.0
+	case code == 95 || code == 96 || code == 99:
+		return 4.0
+	default:
+		return 0.0
+	}
+}
+
+// ComputeWeatherFeatures derives meteorological features as-of target time (ADR-012 D3, Lesson 67).
+// Strict 30-minute cutoff: if no observation is within [target - 30m, target], default values are used.
+func ComputeWeatherFeatures(weatherObs []WeatherObservation, target time.Time) (precip15m, precip60m, rainFlag, hoursSinceRain, weatherCodeClass, radarActive float64) {
+	hoursSinceRain = 24.0 // Default dry history
+	if len(weatherObs) == 0 {
+		return
+	}
+
+	// Find the most recent observation at or before target time
+	var latest *WeatherObservation
+	var latestIdx = -1
+	for i := len(weatherObs) - 1; i >= 0; i-- {
+		obs := &weatherObs[i]
+		if !obs.ObservedAt.After(target) {
+			latest = obs
+			latestIdx = i
+			break
+		}
+	}
+	if latest == nil {
+		return
+	}
+
+	age := target.Sub(latest.ObservedAt)
+	if age > 30*time.Minute || age < 0 {
+		// Strict age cutoff: outside 30 minutes, do not forward-fill
+		return
+	}
+
+	// Rolling precipitation over 15m and 60m
+	var sum15m, sum60m float64
+	var count15m int
+	for i := latestIdx; i >= 0; i-- {
+		obs := &weatherObs[i]
+		if obs.ObservedAt.After(target) {
+			continue
+		}
+		dt := target.Sub(obs.ObservedAt)
+		if dt > 60*time.Minute {
+			break
+		}
+		p := obs.PrecipitationMm
+		if math.IsNaN(p) || p < 0 {
+			p = 0
+		}
+		sum60m += p
+		if dt <= 15*time.Minute {
+			sum15m += p
+			count15m++
+		}
+	}
+
+	if count15m == 0 {
+		p := latest.PrecipitationMm
+		if math.IsNaN(p) || p < 0 {
+			p = 0
+		}
+		sum15m = p
+	}
+	precip15m = sum15m
+	precip60m = sum60m
+
+	weatherCodeClass = ClassifyWeatherCode(latest.WeatherCode)
+	if precip15m > 0 || latest.PrecipitationMm > 0 || weatherCodeClass >= 2 {
+		rainFlag = 1.0
+	}
+
+	// Hours since last rain: search backwards
+	for i := latestIdx; i >= 0; i-- {
+		obs := &weatherObs[i]
+		if obs.ObservedAt.After(target) {
+			continue
+		}
+		p := obs.PrecipitationMm
+		if math.IsNaN(p) || p < 0 {
+			p = 0
+		}
+		pClass := ClassifyWeatherCode(obs.WeatherCode)
+		if p > 0 || pClass >= 2 {
+			hoursSinceRain = math.Max(0.0, target.Sub(obs.ObservedAt).Hours())
+			break
+		}
+	}
+
+	radarActive = float64(latest.RadarActive)
+	return
+}
+
 // BuildFeatures extracts regression features from a list of recent observations
+// relative to baseTime (UTC). Preserves backward compatibility.
+func BuildFeatures(observations []Observation, baseTime time.Time) (Features, float64, bool) {
+	return BuildFeaturesWithWeather(observations, baseTime, nil)
+}
+
+// BuildFeaturesWithWeather extracts regression features and weather observations
 // relative to baseTime (UTC). If fewer than 3 observations exist or lag values are
 // missing, reasonable historical fallback interpolation is performed.
-func BuildFeatures(observations []Observation, baseTime time.Time) (Features, float64, bool) {
+func BuildFeaturesWithWeather(observations []Observation, baseTime time.Time, weatherObs []WeatherObservation) (Features, float64, bool) {
 	if len(observations) == 0 {
 		return Features{}, 0.0, false
 	}
@@ -233,13 +374,21 @@ func BuildFeatures(observations []Observation, baseTime time.Time) (Features, fl
 		rollingMean = currentSI
 	}
 
+	p15, p60, rf, hsr, wcc, ra := ComputeWeatherFeatures(weatherObs, baseTime)
+
 	return Features{
-		Lag5m:          lag5m,
-		Lag10m:         lag10m,
-		Lag15m:         lag15m,
-		RollingMean15m: rollingMean,
-		HourOfDay:      hourOfDay,
-		DayOfWeek:      dayOfWeek,
+		Lag5m:            lag5m,
+		Lag10m:           lag10m,
+		Lag15m:           lag15m,
+		RollingMean15m:   rollingMean,
+		HourOfDay:        hourOfDay,
+		DayOfWeek:        dayOfWeek,
+		PrecipMm15m:      p15,
+		PrecipMm60m:      p60,
+		RainFlag:         rf,
+		HoursSinceRain:   hsr,
+		WeatherCodeClass: wcc,
+		RadarActive:      ra,
 	}, currentSI, true
 }
 

@@ -201,8 +201,9 @@ func TestArtifact_ExternalFileLoad(t *testing.T) {
 		if p.HorizonMinutes != h {
 			t.Fatalf("expected horizon %d, got %d", h, p.HorizonMinutes)
 		}
-		if len(p.Means) != 6 || len(p.Stds) != 6 || len(p.Coeffs) != 6 {
-			t.Fatal("expected 6 features in means/stds/coeffs")
+		if (len(p.Means) != 6 && len(p.Means) != 12) || len(p.Stds) != len(p.Means) || len(p.Coeffs) != len(p.Means) {
+			t.Fatalf("expected 6 or 12 features in means/stds/coeffs, got means=%d stds=%d coeffs=%d",
+				len(p.Means), len(p.Stds), len(p.Coeffs))
 		}
 	}
 }

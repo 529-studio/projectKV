@@ -771,6 +771,98 @@ class TestGoArtifactLoaderIntegration(unittest.TestCase):
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    def test_promoted_weather_artifact_compatibility_with_go(self) -> None:
+        """Verify that 12-feature weather models load cleanly in Go and verify via hermetic test."""
+        tmp_dir = Path(tempfile.mkdtemp(prefix="projectkv_test_go_weather_"))
+        try:
+            db_path = tmp_dir / "traffic_weather.db"
+            base_time = datetime(2026, 11, 1, 0, 0, tzinfo=timezone.utc)
+            rows = generate_curved_traffic_rows(steps=150, base_time=base_time)
+            weather_rows = []
+            for step in range(150):
+                t = (base_time + timedelta(minutes=step * 5)).isoformat()
+                precip = 1.5 if (step % 12 < 4) else 0.0
+                weather_code = 61 if precip > 0 else 1
+                weather_rows.append(
+                    (
+                        precip,
+                        weather_code,
+                        28.0,
+                        80.0,
+                        1 if precip > 0 else 0,
+                        10,
+                        "open_meteo",
+                        f"hash_{step}",
+                        t,
+                        t,
+                    )
+                )
+            create_test_db(db_path, rows, weather_rows)
+
+            features_csv = tmp_dir / "features.csv"
+            artifact_json = tmp_dir / "prototype_v1.json"
+            report_md = tmp_dir / "report.md"
+            eval_json = tmp_dir / "eval.json"
+
+            ret = tlm.run(
+                [
+                    "--db",
+                    str(db_path),
+                    "--weather-db",
+                    str(db_path),
+                    "--feature-set",
+                    "weather",
+                    "--features-out",
+                    str(features_csv),
+                    "--artifact-out",
+                    str(artifact_json),
+                    "--report-out",
+                    str(report_md),
+                    "--eval-json-out",
+                    str(eval_json),
+                    "--promote",
+                ]
+            )
+            self.assertEqual(ret, tlm.EXIT_OK)
+            self.assertTrue(artifact_json.exists())
+
+            # Check that artifact has 12 features in params
+            with artifact_json.open("r", encoding="utf-8") as f:
+                art = json.load(f)
+            ridge_model = next(m for m in art["models"] if m["name"] == "ridge_delta")
+            for h in ridge_model["horizons"]:
+                self.assertEqual(len(h["params"]["means"]), 12)
+                self.assertEqual(len(h["params"]["stds"]), 12)
+                self.assertEqual(len(h["params"]["coeffs"]), 12)
+
+            # Hermetic Go verifier executed via standard go test with path override
+            proc = subprocess.run(
+                [
+                    "go",
+                    "test",
+                    "-v",
+                    "-count=1",
+                    "-run",
+                    "^TestArtifact_ExternalFileLoad$",
+                    "./internal/forecast/...",
+                ],
+                cwd=REPO_ROOT / "services" / "go-server",
+                env={
+                    **os.environ,
+                    "FORECAST_TEST_ARTIFACT_PATH": str(artifact_json.resolve()),
+                },
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                proc.returncode,
+                0,
+                f"Hermetic Go verification failed:\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}",
+            )
+            self.assertIn("PASS: TestArtifact_ExternalFileLoad", proc.stdout)
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
 
 # ---------------------------------------------------------------------------
 # Sprint 12 Wave 0 Task 1 (S12-T1): forecast refit scheduler, lock, and state.

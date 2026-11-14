@@ -48,6 +48,22 @@ type HistoryReader interface {
 	GetRecentByCameraBefore(ctx context.Context, cameraID string, before time.Time, window time.Duration, limit int) ([]Observation, error)
 }
 
+// WeatherObservation represents one meteorological and radar observation for weather feature extraction.
+type WeatherObservation struct {
+	PrecipitationMm float64
+	WeatherCode     int
+	TemperatureC    float64
+	HumidityPct     float64
+	RadarActive     int
+	ObservedAt      time.Time
+}
+
+// WeatherReader defines as-of and historical weather queries per DIP.
+type WeatherReader interface {
+	GetAsOf(ctx context.Context, target time.Time, maxAge time.Duration) (*WeatherObservation, error)
+	GetHistory(ctx context.Context, since, until time.Time, limit int) ([]WeatherObservation, error)
+}
+
 // CameraInfo holds camera metadata needed by the forecast service.
 type CameraInfo struct {
 	ID           string
