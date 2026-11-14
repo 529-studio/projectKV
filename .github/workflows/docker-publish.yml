@@ -228,7 +228,7 @@ jobs:
     environment: staging
     concurrency:
       group: staging-deployment
-      cancel-in-progress: false
+      cancel-in-progress: true
     needs: [detect-changes, build-backend, build-frontend, build-model]
     if: |
       always() &&
@@ -367,22 +367,33 @@ jobs:
               --argjson env "$ENV_JSON" \
               '{stackFileContent: $file, env: $env, prune: true, pullImage: true}')
 
-            DEPLOY_RESPONSE=$(curl -sS -X PUT "${PORTAINER_URL}/api/stacks/${STACK_APP_ID}?endpointId=${EP_EDGE_ID}" \
-              -H "X-API-Key: ${PORTAINER_KEY}" \
-              -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
-              -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
-              -H "Content-Type: application/json" \
-              -H "User-Agent: Mozilla/5.0" \
-              -w '\n%{http_code}' \
-              -d "$PAYLOAD")
+            PUT_CODE=""
+            MAX_RETRIES=4
+            RETRY_DELAY=30
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              DEPLOY_RESPONSE=$(curl -sS -X PUT "${PORTAINER_URL}/api/stacks/${STACK_APP_ID}?endpointId=${EP_EDGE_ID}" \
+                -H "X-API-Key: ${PORTAINER_KEY}" \
+                -H "CF-Access-Client-Id: ${CF_CLIENT_ID}" \
+                -H "CF-Access-Client-Secret: ${CF_CLIENT_SECRET}" \
+                -H "Content-Type: application/json" \
+                -H "User-Agent: Mozilla/5.0" \
+                -w '\n%{http_code}' \
+                -d "$PAYLOAD")
 
-            PUT_CODE=$(echo "$DEPLOY_RESPONSE" | tail -n1)
-            if [ "$PUT_CODE" != "200" ]; then
-              echo "Portainer stack update failed with HTTP ${PUT_CODE}."
-              exit 1
-            fi
+              PUT_CODE=$(echo "$DEPLOY_RESPONSE" | tail -n1)
+              if [ "$PUT_CODE" = "200" ]; then
+                echo "Application stack update accepted (HTTP 200)."
+                break
+              fi
 
-            echo "Application stack update accepted (HTTP ${PUT_CODE})."
+              if [ "$PUT_CODE" = "409" ] && [ "$attempt" -lt "$MAX_RETRIES" ]; then
+                echo "Portainer stack is currently busy/deploying (HTTP 409). Retrying in ${RETRY_DELAY}s (attempt ${attempt}/${MAX_RETRIES})..."
+                sleep $RETRY_DELAY
+              else
+                echo "Portainer stack update failed with HTTP ${PUT_CODE}."
+                exit 1
+              fi
+            done
           fi
 
       - name: Verify Post-Deploy Health
