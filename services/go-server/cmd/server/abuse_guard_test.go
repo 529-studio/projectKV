@@ -10,7 +10,7 @@ import (
 )
 
 func TestServer_RateLimiting_BlocksBurstAndExemptsHealth(t *testing.T) {
-	port := "38922"
+	port := getFreePort(t)
 	absCameras, err := filepath.Abs("../../../../cameras_enriched.json")
 	if err != nil {
 		t.Fatalf("resolve cameras path: %v", err)

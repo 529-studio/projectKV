@@ -51,7 +51,7 @@ func TestStartup_RefusesMockOutsideDev(t *testing.T) {
 }
 
 func TestStartup_AnalyzerNone_EmptyVerdictsAndNoSSE(t *testing.T) {
-	port := "38921"
+	port := getFreePort(t)
 	absCameras, err := filepath.Abs("../../../../cameras_enriched.json")
 	if err != nil {
 		t.Fatalf("resolve cameras path: %v", err)
