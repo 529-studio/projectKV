@@ -479,15 +479,15 @@ export default function CameraModal({
             <div className="flex flex-wrap gap-2 mt-2 text-xs font-bold items-center">
               {camera.isGhost ? (
                 <span className="px-2 py-0.5 rounded border bg-amber-950/70 border-amber-800 text-amber-400">
-                  {currentLang === 'vi' ? '[MẤT TÍN HIỆU THỰC ĐỊA]' : '[NO FIELD SIGNAL]'}
+                  {currentLang === 'vi' ? 'MẤT TÍN HIỆU THỰC ĐỊA' : 'NO FIELD SIGNAL'}
                 </span>
               ) : isActuallyAvailable ? (
                 <span className="px-2 py-0.5 rounded border bg-zinc-800 border-zinc-600 text-white">
-                  {currentLang === 'vi' ? '[HOẠT ĐỘNG]' : '[ONLINE]'}
+                  {currentLang === 'vi' ? 'HOẠT ĐỘNG' : 'ONLINE'}
                 </span>
               ) : (
                 <span className="px-2 py-0.5 rounded border bg-red-950/70 border-red-800 text-red-400">
-                  {currentLang === 'vi' ? '[MẤT KẾT NỐI]' : '[OFFLINE]'}
+                  {currentLang === 'vi' ? 'MẤT KẾT NỐI' : 'OFFLINE'}
                 </span>
               )}
 

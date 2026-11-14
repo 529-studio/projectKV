@@ -636,3 +636,25 @@ func TestCVEngineAnalyzer_Analyze_PredictFailuresAreNotFeedErrors(t *testing.T) 
 		})
 	}
 }
+
+// TestCVEngineAnalyzer_Analyze_DirectionalRegionsPredictFailureNoPanic ensures
+// that if predict fails on a camera with directional regions, the error is returned
+// without panicking on nil predResp (Issue #452 / shadowing bug regression).
+func TestCVEngineAnalyzer_Analyze_DirectionalRegionsPredictFailureNoPanic(t *testing.T) {
+	srv, analyzer := makeCVEngineTestServer(t, http.StatusOK, http.StatusInternalServerError, `{"error":"inference failed"}`)
+	cam := hotset.Camera{
+		ID:          "cam-directional-err",
+		SnapshotURL: srv.URL + "/snapshot/cam-directional-err.jpg",
+		Regions: []hotset.RoadwayRegion{
+			{RegionID: "r1", Direction: "EB", CapacityShare: 0.5},
+		},
+	}
+
+	verdict, err := analyzer.Analyze(context.Background(), cam)
+	if err == nil {
+		t.Fatal("expected an error when predict fails")
+	}
+	if verdict.Severity != hotset.SeverityUnknown {
+		t.Errorf("expected unknown severity on error, got %s", verdict.Severity)
+	}
+}

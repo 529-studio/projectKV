@@ -29,29 +29,29 @@ export const CAMERA_FILTER_I18N = Object.freeze({
     en: (visible: number, total: number) => `${visible} / ${total} cams`,
   },
   HIDE_OFFLINE_BTN: {
-    vi: '[Ẩn camera mất tín hiệu]',
-    en: '[Hide offline cameras]',
+    vi: 'Ẩn camera mất tín hiệu',
+    en: 'Hide offline cameras',
   },
   HIDE_OFFLINE_BTN_COMPACT: {
-    vi: '[Ẩn offline]',
-    en: '[Hide offline]',
+    vi: 'Ẩn offline',
+    en: 'Hide offline',
   },
   SHOW_OFFLINE_BTN: {
-    vi: '[Hiện camera mất tín hiệu]',
-    en: '[Show offline cameras]',
+    vi: 'Hiện camera mất tín hiệu',
+    en: 'Show offline cameras',
   },
   SHOW_OFFLINE_BTN_COMPACT: {
-    vi: '[Hiện offline]',
-    en: '[Show offline]',
+    vi: 'Hiện offline',
+    en: 'Show offline',
   },
   TOOLTIP: {
     vi: (hidden: boolean) =>
       hidden
-        ? 'Bấm để hiển thị cả 135 camera mất tín hiệu'
-        : 'Bấm để ẩn 135 camera mất tín hiệu khỏi bản đồ',
+        ? 'Bấm để hiển thị camera mất tín hiệu'
+        : 'Bấm để ẩn camera mất tín hiệu khỏi bản đồ',
     en: (hidden: boolean) =>
       hidden
-        ? 'Click to show all 135 offline cameras'
-        : 'Click to hide 135 offline cameras from map',
+        ? 'Click to show offline cameras'
+        : 'Click to hide offline cameras from map',
   },
 });

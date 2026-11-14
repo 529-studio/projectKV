@@ -89,10 +89,10 @@ describe('Camera Filter Utilities (S7-T2 / Issue #247)', () => {
 
     assert.equal(counterVi, 'Đang hiển thị 702 / 837 camera');
     assert.equal(counterEn, 'Showing 702 / 837 cameras');
-    assert.equal(hideBtnVi, '[Ẩn camera mất tín hiệu]');
-    assert.equal(hideBtnEn, '[Hide offline cameras]');
-    assert.equal(showBtnVi, '[Hiện camera mất tín hiệu]');
-    assert.equal(showBtnEn, '[Show offline cameras]');
+    assert.equal(hideBtnVi, 'Ẩn camera mất tín hiệu');
+    assert.equal(hideBtnEn, 'Hide offline cameras');
+    assert.equal(showBtnVi, 'Hiện camera mất tín hiệu');
+    assert.equal(showBtnEn, 'Show offline cameras');
 
     const allStrings = [
       counterVi,
@@ -124,10 +124,10 @@ describe('Camera Filter Utilities (S7-T2 / Issue #247)', () => {
 
     assert.equal(counterCompactVi, '9 / 837 cam');
     assert.equal(counterCompactEn, '9 / 837 cams');
-    assert.equal(hideBtnCompactVi, '[Ẩn offline]');
-    assert.equal(hideBtnCompactEn, '[Hide offline]');
-    assert.equal(showBtnCompactVi, '[Hiện offline]');
-    assert.equal(showBtnCompactEn, '[Show offline]');
+    assert.equal(hideBtnCompactVi, 'Ẩn offline');
+    assert.equal(hideBtnCompactEn, 'Hide offline');
+    assert.equal(showBtnCompactVi, 'Hiện offline');
+    assert.equal(showBtnCompactEn, 'Show offline');
 
     const compactStrings = [
       counterCompactVi,

@@ -364,8 +364,8 @@ export const PINNED_DOCK_I18N = Object.freeze({
     en: (count: number, cap: number) => `Pinned ${count} out of maximum ${cap} cameras`,
   },
   CLEAR_ALL: {
-    vi: '[XÓA HẾT]',
-    en: '[CLEAR ALL]',
+    vi: 'Xóa tất cả',
+    en: 'Clear all',
   },
   COLLAPSE: {
     vi: 'Thu gọn',
@@ -553,16 +553,16 @@ export const USER_FLOOD_REPORT_I18N = Object.freeze({
 
 export const HOTSET_LEGEND_I18N = Object.freeze({
   CLEAR: {
-    vi: '[Xanh: Thông thoáng]',
-    en: '[Green: Clear]',
+    vi: 'Thông thoáng',
+    en: 'Clear',
   },
   MODERATE: {
-    vi: '[Vàng: Đông xe]',
-    en: '[Yellow: Moderate]',
+    vi: 'Đông xe',
+    en: 'Moderate',
   },
   CONGESTED: {
-    vi: '[Đỏ: Ùn ứ]',
-    en: '[Red: Congested]',
+    vi: 'Ùn ứ',
+    en: 'Congested',
   },
 });
 

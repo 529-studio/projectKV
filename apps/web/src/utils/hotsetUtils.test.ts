@@ -26,13 +26,13 @@ describe('Hot Set Saturation Utilities (Issue #251 / S7-T6)', () => {
   });
 
   test('HOTSET_LEGEND_I18N provides exact bilingual strings without emojis', () => {
-    assert.strictEqual(HOTSET_LEGEND_I18N.CLEAR.vi, '[Xanh: Thông thoáng]');
-    assert.strictEqual(HOTSET_LEGEND_I18N.MODERATE.vi, '[Vàng: Đông xe]');
-    assert.strictEqual(HOTSET_LEGEND_I18N.CONGESTED.vi, '[Đỏ: Ùn ứ]');
+    assert.strictEqual(HOTSET_LEGEND_I18N.CLEAR.vi, 'Thông thoáng');
+    assert.strictEqual(HOTSET_LEGEND_I18N.MODERATE.vi, 'Đông xe');
+    assert.strictEqual(HOTSET_LEGEND_I18N.CONGESTED.vi, 'Ùn ứ');
 
-    assert.strictEqual(HOTSET_LEGEND_I18N.CLEAR.en, '[Green: Clear]');
-    assert.strictEqual(HOTSET_LEGEND_I18N.MODERATE.en, '[Yellow: Moderate]');
-    assert.strictEqual(HOTSET_LEGEND_I18N.CONGESTED.en, '[Red: Congested]');
+    assert.strictEqual(HOTSET_LEGEND_I18N.CLEAR.en, 'Clear');
+    assert.strictEqual(HOTSET_LEGEND_I18N.MODERATE.en, 'Moderate');
+    assert.strictEqual(HOTSET_LEGEND_I18N.CONGESTED.en, 'Congested');
   });
 
   test('getSaturationColor maps saturation index thresholds accurately', () => {

@@ -13,12 +13,14 @@
 import assert from 'node:assert/strict';
 import { test, describe } from 'node:test';
 import {
+  CLUSTER_COLLISION_PADDING_PX,
   CLUSTER_GRID_PX,
   CLUSTER_MIN_DIAMETER_PX,
   CLUSTER_MAX_DIAMETER_PX,
   CLUSTER_ZOOM_THRESHOLD,
   DEGENERATE_BOUNDS_PAD_DEG,
   buildCameraClusters,
+  getAdaptiveGridPx,
   getClusterDiameter,
   getClusterHazardVisual,
   lngToWorldX,
@@ -349,5 +351,61 @@ describe('cluster configuration and copy', () => {
     assert.equal(MAP_CLUSTER_I18N.COUNT.vi(3), '3 camera giám sát');
     assert.equal(MAP_CLUSTER_I18N.COUNT.en(1), '1 camera');
     assert.equal(MAP_CLUSTER_I18N.COUNT.en(3), '3 cameras');
+  });
+
+  describe('deconflictClusters & collision prevention (Issue #452)', () => {
+    test('padding constant is defined and at least 8 px', () => {
+      assert.ok(typeof CLUSTER_COLLISION_PADDING_PX === 'number');
+      assert.ok(CLUSTER_COLLISION_PADDING_PX >= 8);
+    });
+
+    test('overlapping aggregate clusters in adjacent cells merge deterministically', () => {
+      // 4 cameras creating two adjacent cells close to each other
+      const cam1: ClusterPoint = { id: 'c1', latitude: 10.7743, longitude: 106.7035 };
+      const cam2: ClusterPoint = { id: 'c2', latitude: 10.7744, longitude: 106.7036 };
+      const cam3: ClusterPoint = { id: 'c3', latitude: 10.7750, longitude: 106.7042 };
+      const cam4: ClusterPoint = { id: 'c4', latitude: 10.7751, longitude: 106.7043 };
+
+      const result = buildCameraClusters([cam1, cam2, cam3, cam4], {
+        zoom: 11,
+        levelFor: (id) => (id === 'c3' ? 3 : 1),
+      });
+
+      // At zoom 11, cameras in close proximity must not form overlapping badges
+      const aggregateClusters = result.clusters.filter((c) => c.count >= 2);
+      for (let i = 0; i < aggregateClusters.length; i++) {
+        const cA = aggregateClusters[i];
+        const xA = lngToWorldX(cA.longitude, 11);
+        const yA = latToWorldY(cA.latitude, 11);
+        const dA = getClusterDiameter(cA.count);
+
+        for (let j = i + 1; j < aggregateClusters.length; j++) {
+          const cB = aggregateClusters[j];
+          const xB = lngToWorldX(cB.longitude, 11);
+          const yB = latToWorldY(cB.latitude, 11);
+          const dB = getClusterDiameter(cB.count);
+
+          const dist = Math.hypot(xB - xA, yB - yA);
+          assert.ok(
+            dist >= (dA + dB) / 2 + CLUSTER_COLLISION_PADDING_PX,
+            `Clusters collide: dist=${dist.toFixed(2)}px < required=${((dA + dB) / 2 + CLUSTER_COLLISION_PADDING_PX).toFixed(2)}px`,
+          );
+        }
+      }
+
+      // Worst hazard level 3 bubbles up to the merged cluster
+      const topCluster = result.clusters.find((c) => c.cameraIds.includes('c3'));
+      assert.ok(topCluster);
+      assert.equal(topCluster.hazardLevel, 3);
+    });
+
+    test('getAdaptiveGridPx scales grid size inversely with zoom to prevent city clutter (Issue #454)', () => {
+      assert.equal(getAdaptiveGridPx(10), 180);
+      assert.equal(getAdaptiveGridPx(11), 150);
+      assert.equal(getAdaptiveGridPx(12), 105);
+      assert.equal(getAdaptiveGridPx(13), 70);
+      // Custom override takes precedence
+      assert.equal(getAdaptiveGridPx(11, 200), 200);
+    });
   });
 });
