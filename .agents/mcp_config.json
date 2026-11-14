@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "lore": {
+      "command": "lore",
+      "args": [
+        "mcp"
+      ],
+      "env": {
+        "LORE_SESSION": "antigravity"
+      }
+    }
+  }
+}
