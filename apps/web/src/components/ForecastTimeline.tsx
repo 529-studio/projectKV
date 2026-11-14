@@ -326,12 +326,21 @@ function ForecastTimelineContent({
                   />
                 )}
 
-                {/* Point Center Dot */}
+                {/* Generous invisible hit target to prevent jitter at boundary edges (Issue #456) */}
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r="16"
+                  className="fill-transparent cursor-default pointer-events-auto"
+                />
+
+                {/* Point Center Dot with origin-centered scaling */}
                 <circle
                   cx={p.x}
                   cy={p.y}
                   r="4.5"
-                  className="fill-zinc-950 stroke-zinc-100 stroke-[2] transition-transform duration-150 group-hover:scale-125"
+                  style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+                  className="fill-zinc-950 stroke-zinc-100 stroke-[2] transition-transform duration-150 group-hover:scale-125 pointer-events-none"
                 />
 
                 {/* SI Value Badge on Top */}
