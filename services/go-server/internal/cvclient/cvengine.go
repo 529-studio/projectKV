@@ -467,7 +467,9 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 	predictURL := a.url + "/predict"
 	var predResp *http.Response
 	if len(cam.Regions) > 0 {
-		mpBody, contentType, err := buildMultipartBody(jpegBytes, cam.Regions)
+		var mpBody []byte
+		var contentType string
+		mpBody, contentType, err = buildMultipartBody(jpegBytes, cam.Regions)
 		if err != nil {
 			return unknownVerdict(cam.ID), err
 		}
@@ -477,6 +479,9 @@ func (a *CVEngineAnalyzer) Analyze(ctx context.Context, cam hotset.Camera) (hots
 	}
 	if err != nil {
 		return unknownVerdict(cam.ID), err
+	}
+	if predResp == nil || predResp.Body == nil {
+		return unknownVerdict(cam.ID), errors.New("cv-engine: nil predict response")
 	}
 	defer predResp.Body.Close()
 

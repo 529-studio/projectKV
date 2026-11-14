@@ -41,6 +41,12 @@ export const CLUSTER_MIN_DIAMETER_PX = 48;
 export const CLUSTER_MAX_DIAMETER_PX = 68;
 
 /**
+ * Minimum gap in CSS pixels between adjacent cluster badge edges to guarantee
+ * zero visual overlap and distinct touch targets (Issue #452).
+ */
+export const CLUSTER_COLLISION_PADDING_PX = 8;
+
+/**
  * A degenerate one-camera bounds would make `flyToBounds` jump to max zoom, so a
  * zero-area box is widened by this many degrees (~55 m at the equator).
  */
@@ -256,11 +262,84 @@ export function buildCameraClusters(
   for (const [key, members] of cells) {
     clusters.push(toCluster(key, members, levelFor));
   }
+
+  // Deconflict adjacent aggregate cluster badges to guarantee zero visual collisions (Issue #452)
+  const deconflicted = deconflictClusters(clusters, zoom);
+
   for (const point of individual) {
-    clusters.push(toCluster(point.id, [point], levelFor));
+    deconflicted.push(toCluster(point.id, [point], levelFor));
   }
 
-  return { clustered: true, clusters };
+  return { clustered: true, clusters: deconflicted };
+}
+
+/**
+ * Deterministically merges overlapping cluster badges at the current zoom level
+ * so that no two rendered badges visually collide or obscure each other.
+ */
+export function deconflictClusters(
+  clusters: CameraCluster[],
+  zoom: number,
+  paddingPx: number = CLUSTER_COLLISION_PADDING_PX,
+): CameraCluster[] {
+  if (clusters.length <= 1) return clusters;
+
+  const result = [...clusters];
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < result.length; i++) {
+      const c1 = result[i];
+      if (c1.count < 2) continue;
+      const d1 = getClusterDiameter(c1.count);
+      const x1 = lngToWorldX(c1.longitude, zoom);
+      const y1 = latToWorldY(c1.latitude, zoom);
+
+      for (let j = i + 1; j < result.length; j++) {
+        const c2 = result[j];
+        if (c2.count < 2) continue;
+        const d2 = getClusterDiameter(c2.count);
+        const x2 = lngToWorldX(c2.longitude, zoom);
+        const y2 = latToWorldY(c2.latitude, zoom);
+
+        const dist = Math.hypot(x2 - x1, y2 - y1);
+        const requiredDist = (d1 + d2) / 2 + paddingPx;
+
+        if (dist < requiredDist) {
+          const mergedCount = c1.count + c2.count;
+          const mergedLat = (c1.latitude * c1.count + c2.latitude * c2.count) / mergedCount;
+          const mergedLng = (c1.longitude * c1.count + c2.longitude * c2.count) / mergedCount;
+          const mergedCameraIds = Array.from(new Set([...c1.cameraIds, ...c2.cameraIds])).sort();
+          const mergedHazard = worstHazardLevel([c1.hazardLevel, c2.hazardLevel]);
+          const mergedBounds: ClusterBounds = {
+            south: Math.min(c1.bounds.south, c2.bounds.south),
+            west: Math.min(c1.bounds.west, c2.bounds.west),
+            north: Math.max(c1.bounds.north, c2.bounds.north),
+            east: Math.max(c1.bounds.east, c2.bounds.east),
+          };
+
+          const merged: CameraCluster = {
+            key: c1.key < c2.key ? `${c1.key}+${c2.key}` : `${c2.key}+${c1.key}`,
+            count: mergedCount,
+            cameraIds: mergedCameraIds,
+            latitude: mergedLat,
+            longitude: mergedLng,
+            bounds: mergedBounds,
+            hazardLevel: mergedHazard,
+          };
+
+          result.splice(j, 1);
+          result[i] = merged;
+          changed = true;
+          break;
+        }
+      }
+      if (changed) break;
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -298,25 +377,25 @@ export function getClusterHazardVisual(level: HazardLevel | null): ClusterHazard
       return {
         level,
         hasDangerRing: true,
-        ringClass: 'ring-2 ring-red-500 ring-offset-2 ring-offset-zinc-950',
-        surfaceClass: 'bg-zinc-950 text-red-300 border-red-500',
+        ringClass: 'ring-2 ring-red-500 ring-offset-1 ring-offset-zinc-950',
+        surfaceClass: 'bg-zinc-900/90 text-red-200 border-red-500 shadow-red-950/50 backdrop-blur-md',
         indicatorClass: 'bg-red-500',
       };
     case 2:
       return {
         level,
         hasDangerRing: false,
-        ringClass: 'ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-950',
-        surfaceClass: 'bg-zinc-950 text-amber-200 border-amber-400',
+        ringClass: 'ring-2 ring-amber-400 ring-offset-1 ring-offset-zinc-950',
+        surfaceClass: 'bg-zinc-900/90 text-amber-200 border-amber-400 shadow-amber-950/40 backdrop-blur-md',
         indicatorClass: 'bg-amber-400',
       };
     default:
       return {
         level,
         hasDangerRing: false,
-        ringClass: 'ring-1 ring-zinc-600',
-        surfaceClass: 'bg-zinc-950 text-zinc-100 border-zinc-600',
-        indicatorClass: 'bg-zinc-500',
+        ringClass: 'ring-1 ring-zinc-700/60',
+        surfaceClass: 'bg-zinc-900/85 text-zinc-100 border-zinc-700/80 shadow-zinc-950/60 backdrop-blur-md',
+        indicatorClass: 'bg-zinc-400',
       };
   }
 }

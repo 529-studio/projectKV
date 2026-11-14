@@ -553,16 +553,16 @@ export const USER_FLOOD_REPORT_I18N = Object.freeze({
 
 export const HOTSET_LEGEND_I18N = Object.freeze({
   CLEAR: {
-    vi: '[Xanh: Thông thoáng]',
-    en: '[Green: Clear]',
+    vi: 'Thông thoáng',
+    en: 'Clear',
   },
   MODERATE: {
-    vi: '[Vàng: Đông xe]',
-    en: '[Yellow: Moderate]',
+    vi: 'Đông xe',
+    en: 'Moderate',
   },
   CONGESTED: {
-    vi: '[Đỏ: Ùn ứ]',
-    en: '[Red: Congested]',
+    vi: 'Ùn ứ',
+    en: 'Congested',
   },
 });
 
