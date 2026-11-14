@@ -235,7 +235,7 @@ export function buildCameraClusters(
 ): ClusterResult {
   const {
     zoom,
-    gridPx = CLUSTER_GRID_PX,
+    gridPx,
     thresholdZoom = CLUSTER_ZOOM_THRESHOLD,
     enabled = true,
     levelFor,

@@ -407,5 +407,21 @@ describe('cluster configuration and copy', () => {
       // Custom override takes precedence
       assert.equal(getAdaptiveGridPx(11, 200), 200);
     });
+
+    test('buildCameraClusters uses adaptive grid when gridPx is omitted and splits clusters smoothly on zoom (Issue #460)', () => {
+      // 3 cameras along a corridor
+      const c1: ClusterPoint = { id: 'c1', latitude: 10.770, longitude: 106.690 };
+      const c2: ClusterPoint = { id: 'c2', latitude: 10.778, longitude: 106.698 };
+      const c3: ClusterPoint = { id: 'c3', latitude: 10.785, longitude: 106.705 };
+
+      // At zoom 10 (adaptive grid = 180px), they collapse into 1 macro cluster
+      const resZ10 = buildCameraClusters([c1, c2, c3], { zoom: 10 });
+      assert.equal(resZ10.clusters.length, 1);
+      assert.equal(resZ10.clusters[0].count, 3);
+
+      // At zoom 13 (adaptive grid = 70px), they split into distinct clusters
+      const resZ13 = buildCameraClusters([c1, c2, c3], { zoom: 13 });
+      assert.ok(resZ13.clusters.length > 1);
+    });
   });
 });

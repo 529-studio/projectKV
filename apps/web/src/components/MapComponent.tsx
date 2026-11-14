@@ -118,6 +118,7 @@ export default function MapComponent({
   // re-runs the marker effect instead of waiting for the next SSE tick.
   const [markerEpoch, setMarkerEpoch] = useState(0);
   const clusteredRef = useRef<boolean | null>(null);
+  const lastRenderedZoomRef = useRef<number | null>(null);
 
   const internalHotset = useHotsetStatus({ enabled: !propHotsetStatus });
   const hotsetStatus = propHotsetStatus ?? internalHotset.hotsetStatus;
@@ -326,17 +327,22 @@ export default function MapComponent({
         }
       });
 
-      // Dynamically scale marker sizes and macro dimming on zoomend
+      // Dynamically scale marker sizes, re-cluster, and update macro dimming on zoomend
       map.on('zoomend', () => {
         const currentZoom = map.getZoom();
+        const roundedZoom = Math.round(currentZoom);
 
-        // Crossing the clustering threshold changes the marker vocabulary, which a
-        // radius tweak cannot express: rebuild the layer once (S14-T3).
+        // Crossing the clustering threshold (zoom 14) or changing zoom levels while clustered
+        // changes cluster boundaries and counts (Issue #460). Rebuild layer immediately on zoomend.
         const nextClustered =
           shouldClusterMarkers(currentZoom, activeLensRef.current === 'flood') &&
           !isFilteredRef.current;
-        if (clusteredRef.current !== nextClustered) {
+        const regimeChanged = clusteredRef.current !== nextClustered;
+        const zoomStepChanged = nextClustered && lastRenderedZoomRef.current !== roundedZoom;
+
+        if (regimeChanged || zoomStepChanged) {
           clusteredRef.current = nextClustered;
+          lastRenderedZoomRef.current = roundedZoom;
           setMarkerEpoch((epoch) => epoch + 1);
         }
 
@@ -511,6 +517,7 @@ export default function MapComponent({
     markersMapRef.current.clear();
 
     const zoom = mapRef.current.getZoom();
+    lastRenderedZoomRef.current = Math.round(zoom);
     const isFew = isFiltered && filteredCameraIds ? filteredCameraIds.size <= 40 : cameras.length <= 40;
     const isMacro = Boolean(hexOverlayEnabled && isHexVisibleAtZoom(zoom));
     const currentVerdicts = verdictsRef.current;
@@ -555,7 +562,6 @@ export default function MapComponent({
       })),
       {
         zoom,
-        gridPx: MAP_CONFIG.CLUSTER_GRID_PX,
         thresholdZoom: MAP_CONFIG.CLUSTER_ZOOM_THRESHOLD,
         enabled: clusterEnabled,
         levelFor: (camId) => resolveHazard(currentFloodVerdicts.get(camId))?.level ?? null,
@@ -845,7 +851,7 @@ export default function MapComponent({
         const icon = L.divIcon({
           className: 'warded-cluster',
           html:
-            `<div aria-hidden="true" class="relative flex items-center justify-center rounded-full border-2 ${hazardVisual.ringClass} ${hazardVisual.surfaceClass} font-mono font-bold tabular-nums leading-none shadow-2xl select-none" ` +
+            `<div aria-hidden="true" class="relative flex items-center justify-center rounded-full border-2 ${hazardVisual.ringClass} ${hazardVisual.surfaceClass} font-mono font-bold tabular-nums leading-none shadow-2xl select-none cursor-pointer transition-all duration-150 hover:scale-105 active:scale-90" ` +
             `style="width:${diameter}px;height:${diameter}px;font-size:${diameter >= 60 ? 15 : 13}px;">` +
             `<span aria-hidden="true">${cluster.count}</span>` +
             (hazardVisual.level !== null
@@ -875,12 +881,34 @@ export default function MapComponent({
         clusterMarker.on('click', () => {
           const currentMap = mapRef.current;
           if (!currentMap) return;
+
+          const markerEl = clusterMarker.getElement();
+          if (markerEl) {
+            markerEl.classList.add('scale-90', 'opacity-75');
+          }
+
           const { south, west, north, east } = cluster.bounds;
-          currentMap.flyToBounds(L.latLngBounds([south, west], [north, east]), {
-            padding: [48, 48],
-            maxZoom: MAP_CONFIG.CLUSTER_ZOOM_THRESHOLD + 2,
-            duration: 0.6,
-          });
+          const bounds = L.latLngBounds([south, west], [north, east]);
+          const currentZoom = currentMap.getZoom();
+          const boundsZoom = currentMap.getBoundsZoom(bounds, false, L.point(48, 48));
+          // Macro clusters (count >= 20) need at least +2 zoom leap so they fracture into sub-clusters cleanly
+          const minZoomLeap = cluster.count >= 20 ? 2 : 1;
+          const targetZoom = Math.min(
+            MAP_CONFIG.CLUSTER_ZOOM_THRESHOLD + 1,
+            Math.max(currentZoom + minZoomLeap, boundsZoom),
+          );
+
+          if (targetZoom > boundsZoom) {
+            currentMap.flyTo([cluster.latitude, cluster.longitude], targetZoom, {
+              duration: 0.5,
+            });
+          } else {
+            currentMap.flyToBounds(bounds, {
+              padding: [48, 48],
+              maxZoom: MAP_CONFIG.CLUSTER_ZOOM_THRESHOLD + 1,
+              duration: 0.5,
+            });
+          }
         });
 
         markersLayerRef.current?.addLayer(clusterMarker);
