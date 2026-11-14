@@ -123,16 +123,29 @@ type sentMessage struct {
 }
 
 type fakeSender struct {
-	mu       sync.Mutex
-	messages []sentMessage
-	err      error
-	gate     <-chan struct{}
+	mu          sync.Mutex
+	messages    []sentMessage
+	err         error
+	gate        <-chan struct{}
+	enteredGate chan struct{}
 }
 
 func (s *fakeSender) SendMessage(ctx context.Context, chatID, html string) error {
-	if s.gate != nil {
+	s.mu.Lock()
+	gate := s.gate
+	entered := s.enteredGate
+	s.mu.Unlock()
+
+	if entered != nil {
 		select {
-		case <-s.gate:
+		case entered <- struct{}{}:
+		default:
+		}
+	}
+
+	if gate != nil {
+		select {
+		case <-gate:
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -1045,6 +1058,7 @@ func TestStoreFailureIsReportedWithoutLeaking(t *testing.T) {
 
 func TestQueueFullReturns503WithRetryAfter(t *testing.T) {
 	gate := make(chan struct{})
+	enteredGate := make(chan struct{}, 1)
 	released := false
 	release := func() {
 		if !released {
@@ -1058,21 +1072,28 @@ func TestQueueFullReturns503WithRetryAfter(t *testing.T) {
 		c.Workers = 1
 		c.QueueSize = 1
 	})
+	f.sender.mu.Lock()
 	f.sender.gate = gate
+	f.sender.enteredGate = enteredGate
+	f.sender.mu.Unlock()
 
-	// First update occupies the single worker, second fills the queue.
-	f.postUpdate(t, privateMessageUpdate(1, 202020202, "/status"))
-	f.postUpdate(t, privateMessageUpdate(2, 202020202, "/status"))
-
-	// Wait for the single worker to pick up job 1 so job 2 sits in the queue.
-	deadline := time.Now().Add(2 * time.Second)
-	for len(f.h.jobs) != 1 && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
+	// 1. Post first update and wait until the single worker picks it up and blocks on gate.
+	if w := f.postUpdate(t, privateMessageUpdate(1, 202020202, "/status")); w.Code != http.StatusOK {
+		t.Fatalf("first update must be accepted, got %d", w.Code)
 	}
-	if len(f.h.jobs) != 1 {
-		t.Fatalf("expected one queued job, got %d", len(f.h.jobs))
+	select {
+	case <-enteredGate:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not pick up first job in time")
 	}
 
+	// 2. Worker is now busy with job 1. Post second update to fill the queue buffer (QueueSize = 1).
+	if w := f.postUpdate(t, privateMessageUpdate(2, 202020202, "/status")); w.Code != http.StatusOK {
+		t.Fatalf("second update must be queued, got %d", w.Code)
+	}
+
+	// 3. Queue is now completely full (1 worker busy + 1 in queue buffer).
+	// Third update must be rejected with 503 Service Unavailable.
 	w := f.postUpdate(t, privateMessageUpdate(3, 202020202, "/status"))
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503 when the queue is full", w.Code)
