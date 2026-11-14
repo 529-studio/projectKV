@@ -890,7 +890,7 @@ export default function MapComponent({
           const { south, west, north, east } = cluster.bounds;
           const bounds = L.latLngBounds([south, west], [north, east]);
           const currentZoom = currentMap.getZoom();
-          const boundsZoom = currentMap.getBoundsZoom(bounds, false, [48, 48]);
+          const boundsZoom = currentMap.getBoundsZoom(bounds, false, L.point(48, 48));
           // Macro clusters (count >= 20) need at least +2 zoom leap so they fracture into sub-clusters cleanly
           const minZoomLeap = cluster.count >= 20 ? 2 : 1;
           const targetZoom = Math.min(
