@@ -364,8 +364,8 @@ export const PINNED_DOCK_I18N = Object.freeze({
     en: (count: number, cap: number) => `Pinned ${count} out of maximum ${cap} cameras`,
   },
   CLEAR_ALL: {
-    vi: '[XÓA HẾT]',
-    en: '[CLEAR ALL]',
+    vi: 'Xóa tất cả',
+    en: 'Clear all',
   },
   COLLAPSE: {
     vi: 'Thu gọn',

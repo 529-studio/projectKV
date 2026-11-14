@@ -42,9 +42,24 @@ export const CLUSTER_MAX_DIAMETER_PX = 68;
 
 /**
  * Minimum gap in CSS pixels between adjacent cluster badge edges to guarantee
- * zero visual overlap and distinct touch targets (Issue #452).
+ * zero visual overlap and distinct touch targets (Issue #452 / #454).
  */
-export const CLUSTER_COLLISION_PADDING_PX = 8;
+export const CLUSTER_COLLISION_PADDING_PX = 12;
+
+/**
+ * Dynamic adaptive grid width based on zoom level (Issue #454).
+ * At overview zoom levels (<= 12), larger grid sizes collapse city-wide noise into
+ * clean regional hubs (5-8 clusters) instead of peppering the map with 30+ micro-clusters.
+ */
+export function getAdaptiveGridPx(zoom: number, customGridPx?: number): number {
+  if (Number.isFinite(customGridPx) && (customGridPx as number) > 0) {
+    return customGridPx as number;
+  }
+  if (zoom <= 10) return 180;
+  if (zoom <= 11) return 150;
+  if (zoom <= 12) return 105;
+  return 70;
+}
 
 /**
  * A degenerate one-camera bounds would make `flyToBounds` jump to max zoom, so a
@@ -241,7 +256,7 @@ export function buildCameraClusters(
     };
   }
 
-  const cellSize = Number.isFinite(gridPx) && gridPx > 0 ? gridPx : CLUSTER_GRID_PX;
+  const cellSize = getAdaptiveGridPx(zoom, gridPx);
   const cells = new Map<string, ClusterPoint[]>();
   const individual: ClusterPoint[] = [];
 

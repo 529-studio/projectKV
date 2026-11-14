@@ -20,6 +20,7 @@ import {
   CLUSTER_ZOOM_THRESHOLD,
   DEGENERATE_BOUNDS_PAD_DEG,
   buildCameraClusters,
+  getAdaptiveGridPx,
   getClusterDiameter,
   getClusterHazardVisual,
   lngToWorldX,
@@ -396,6 +397,15 @@ describe('cluster configuration and copy', () => {
       const topCluster = result.clusters.find((c) => c.cameraIds.includes('c3'));
       assert.ok(topCluster);
       assert.equal(topCluster.hazardLevel, 3);
+    });
+
+    test('getAdaptiveGridPx scales grid size inversely with zoom to prevent city clutter (Issue #454)', () => {
+      assert.equal(getAdaptiveGridPx(10), 180);
+      assert.equal(getAdaptiveGridPx(11), 150);
+      assert.equal(getAdaptiveGridPx(12), 105);
+      assert.equal(getAdaptiveGridPx(13), 70);
+      // Custom override takes precedence
+      assert.equal(getAdaptiveGridPx(11, 200), 200);
     });
   });
 });

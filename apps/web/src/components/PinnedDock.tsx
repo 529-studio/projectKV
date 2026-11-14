@@ -730,12 +730,12 @@ export default function PinnedDock({
                   : 'bg-zinc-950 border-zinc-700 text-zinc-300'
               }`}
             >
-              [{PINNED_DOCK_I18N.PIN_COUNT_BADGE[lang](pinnedCameras.length, PINNED_DOCK_CAP)}]
+              {PINNED_DOCK_I18N.PIN_COUNT_BADGE[lang](pinnedCameras.length, PINNED_DOCK_CAP)}
             </span>
 
             {isCapReached && (
               <span className="text-[10px] text-amber-400 font-semibold uppercase">
-                [{PINNED_DOCK_I18N.PIN_LIMIT_BADGE[lang]}]
+                {PINNED_DOCK_I18N.PIN_LIMIT_BADGE[lang]}
               </span>
             )}
           </div>
@@ -872,7 +872,7 @@ export default function PinnedDock({
                 title={PINNED_DOCK_I18N.PIN_COUNT_TOOLTIP[lang](pinnedCameras.length, PINNED_DOCK_CAP)}
                 className="text-[10px] text-zinc-400"
               >
-                [{PINNED_DOCK_I18N.PIN_COUNT_BADGE_COMPACT[lang](pinnedCameras.length, PINNED_DOCK_CAP)}]
+                {PINNED_DOCK_I18N.PIN_COUNT_BADGE_COMPACT[lang](pinnedCameras.length, PINNED_DOCK_CAP)}
               </span>
               <span className="text-zinc-400 text-xs">▴</span>
             </button>
@@ -923,7 +923,7 @@ export default function PinnedDock({
                             : 'bg-zinc-900 border-zinc-700 text-zinc-300'
                         }`}
                       >
-                        [{PINNED_DOCK_I18N.PIN_COUNT_BADGE_COMPACT[lang](pinnedCameras.length, PINNED_DOCK_CAP)}]
+                        {PINNED_DOCK_I18N.PIN_COUNT_BADGE_COMPACT[lang](pinnedCameras.length, PINNED_DOCK_CAP)}
                       </span>
                     </div>
 

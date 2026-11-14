@@ -133,24 +133,43 @@ export default function Home() {
     }
   }, []);
 
-  // Active Lens default & persistence (ADR-004 §D11 / S9 Issue #144)
+  // Active Lens default & persistence (ADR-004 §D11 / S9 Issue #144 / S14 Issue #454)
+  const hasUserSelectedLensRef = useRef(false);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const savedLens = localStorage.getItem('warded_active_lens');
     if (savedLens === 'flood' || savedLens === 'radar' || savedLens === 'traffic' || savedLens === 'off') {
+      hasUserSelectedLensRef.current = true;
       setActiveLens(savedLens as ActiveLensMode);
       return;
     }
     // Backward compatibility for legacy 'warded_hex_mode'
     const savedMode = localStorage.getItem('warded_hex_mode');
-    if (savedMode === 'traffic') {
-      setActiveLens('traffic');
-    } else if (savedMode === 'flood') {
-      setActiveLens('flood');
+    if (savedMode === 'traffic' || savedMode === 'flood') {
+      hasUserSelectedLensRef.current = true;
+      setActiveLens(savedMode);
     }
   }, []);
 
+  // Smart Context-Aware Default Lens (Issue #454)
+  // For users without explicit saved choice: switch to 'radar' on active rain/flooding, otherwise keep 'traffic'.
+  useEffect(() => {
+    if (hasUserSelectedLensRef.current) return;
+    const isRaining = Boolean(
+      weather && (weather.rain_mm > 0.2 || weather.precipitation_probability_percent >= 60),
+    );
+    const hasActiveFlooding = Array.from(floodVerdicts.values()).some(
+      (v) => v && (v.flood_hazard_level === 2 || v.flood_hazard_level === 3),
+    );
+
+    if (isRaining || hasActiveFlooding) {
+      setActiveLens('radar');
+    }
+  }, [weather, floodVerdicts]);
+
   const handleModeChange = useCallback((newMode: ActiveLensMode) => {
+    hasUserSelectedLensRef.current = true;
     setActiveLens(newMode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('warded_active_lens', newMode);

@@ -37,7 +37,7 @@ test('PINNED_DOCK_I18N contains all required keys and correct Vietnamese diacrit
   assert.equal(PINNED_DOCK_I18N.TITLE.vi, 'DOCK THEO DÕI');
   assert.equal(PINNED_DOCK_I18N.COLLAPSED_PILL.vi(1), 'Đang theo dõi: 1 cam');
   assert.equal(PINNED_DOCK_I18N.COLLAPSED_PILL.vi(3), 'Đang theo dõi: 3 cam');
-  assert.equal(PINNED_DOCK_I18N.CLEAR_ALL.vi, '[XÓA HẾT]');
+  assert.equal(PINNED_DOCK_I18N.CLEAR_ALL.vi, 'Xóa tất cả');
   assert.equal(PINNED_DOCK_I18N.COLLAPSE.vi, 'Thu gọn');
   assert.equal(PINNED_DOCK_I18N.EXPAND.vi, 'Mở rộng');
   assert.equal(PINNED_DOCK_I18N.UNPIN.vi, 'Bỏ ghim');
@@ -73,7 +73,7 @@ test('PINNED_DOCK_I18N contains all required keys and correct Vietnamese diacrit
   assert.equal(PINNED_DOCK_I18N.PIN_COUNT_BADGE.en(6, 12), 'Pinned 6 / Max 12 cameras');
   assert.equal(PINNED_DOCK_I18N.PIN_COUNT_BADGE_COMPACT.en(6, 12), '6/12 max');
   assert.equal(PINNED_DOCK_I18N.PIN_COUNT_TOOLTIP.en(6, 12), 'Pinned 6 out of maximum 12 cameras');
-  assert.equal(PINNED_DOCK_I18N.CLEAR_ALL.en, '[CLEAR ALL]');
+  assert.equal(PINNED_DOCK_I18N.CLEAR_ALL.en, 'Clear all');
   assert.equal(PINNED_DOCK_I18N.COLLAPSE.en, 'Collapse');
   assert.equal(PINNED_DOCK_I18N.EXPAND.en, 'Expand');
   assert.equal(PINNED_DOCK_I18N.UNPIN.en, 'Unpin');
