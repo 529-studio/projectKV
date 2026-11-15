@@ -237,10 +237,25 @@ jobs:
       needs.build-frontend.result != 'failure' && needs.build-frontend.result != 'cancelled' &&
       needs.build-model.result != 'failure' && needs.build-model.result != 'cancelled' &&
       (needs.build-backend.result == 'success' || needs.build-frontend.result == 'success' || needs.build-model.result == 'success')
+    env:
+      # Job-level so the tailnet step can test it in `if`: secrets are not
+      # available in expressions, but their env projection is.
+      TS_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      # Portainer is tailnet-only. The runner joins the tailnet when the OAuth
+      # client is configured; until then the job keeps using the public Access
+      # path, so this step is optional and the deploy never depends on it.
+      - name: Join the tailnet for Portainer access
+        if: env.TS_CLIENT_ID != ''
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
 
       - name: Trigger Staging Redeploy
         env:
@@ -257,6 +272,12 @@ jobs:
           if [ -z "${PORTAINER_KEY}" ] || [ -z "${PORTAINER_URL}" ]; then
             echo "PORTAINER_URL / PORTAINER_API_KEY not configured — skipping deploy trigger."
             exit 0
+          fi
+          if [ -n "${TS_CLIENT_ID}" ]; then
+            PORTAINER_URL="${PORTAINER_TAILNET_URL}"
+            echo "Reaching Portainer over the tailnet at ${PORTAINER_URL}."
+          else
+            echo "[WARN] TS_OAUTH_CLIENT_ID is not set; using the public Access path."
           fi
 
           # Shape check for a stack environment. Printed diagnostics carry names only,
@@ -426,6 +447,7 @@ jobs:
         env:
           STG_HEALTH_URL: ${{ secrets.STG_HEALTH_URL }}
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          PORTAINER_TAILNET_URL: ${{ secrets.PORTAINER_TAILNET_URL }}
           PORTAINER_KEY: ${{ secrets.PORTAINER_API_KEY }}
           CF_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
@@ -434,6 +456,9 @@ jobs:
           EP_WORKER_ID: ${{ secrets.PORTAINER_ENDPOINT_DEVBOX }}
           CV_CONTAINER_NAME: ${{ secrets.PORTAINER_CV_CONTAINER_NAME }}
         run: |
+          if [ -n "${TS_CLIENT_ID}" ]; then
+            PORTAINER_URL="${PORTAINER_TAILNET_URL}"
+          fi
           echo "Verifying health after redeployment..."
 
           # Container state first: a stack that failed to come up reports success on
