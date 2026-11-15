@@ -25,7 +25,7 @@ services:
     image: ${BE_IMAGE_NAME:-ghcr.io/529-studio/projectkv-backend}:${BE_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
     container_name: ${BE_CONTAINER_NAME:-warded-backend}
     restart: unless-stopped
-    pull_policy: ${PULL_POLICY:-always}
+    pull_policy: ${PULL_POLICY:-missing}
     networks:
       - core-network
     depends_on:
@@ -60,19 +60,19 @@ services:
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
       - CV_ENGINE_URL=${CV_ENGINE_URL:?CV_ENGINE_URL must be provided by the deployment pipeline}
       - DEV_ACCESS_TOKEN=${DEV_ACCESS_TOKEN:-}
-      - CF_ACCESS_AUDIENCE=${CF_ACCESS_AUDIENCE:-}
-      - CF_ACCESS_CERTS_URL=${CF_ACCESS_CERTS_URL:-}
+      - CF_ACCESS_AUDIENCE=${CF_ACCESS_AUDIENCE:-58f979e92770aca2907841541616efe2c5c43572c3de9deb2f82e5f8bb101c31}
+      - CF_ACCESS_CERTS_URL=${CF_ACCESS_CERTS_URL:-https://529studio.cloudflareaccess.com/cdn-cgi/access/certs}
       - CF_ACCESS_CLIENT_ID=${CF_ACCESS_CLIENT_ID:-}
       - CF_ACCESS_CLIENT_SECRET=${CF_ACCESS_CLIENT_SECRET:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - STORAGE_DRIVER=${STORAGE_DRIVER:-r2}
       - STORAGE_LOCAL_ROOT=${STORAGE_LOCAL_ROOT:-/app/data/proofs}
-      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-bb67574163a065e4aad475fb3aa6bb92}
       - R2_BUCKET_NAME=${R2_BUCKET_NAME:-warded-proofs}
       - R2_REGION=${R2_REGION:-auto}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
       - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
-      - ARCHIVE_SAMPLE_INTERVAL_SECONDS=${ARCHIVE_SAMPLE_INTERVAL_SECONDS:-300}
+      - ARCHIVE_SAMPLE_INTERVAL_SECONDS=${ARCHIVE_SAMPLE_INTERVAL_SECONDS:-900}
       - ARCHIVE_RETENTION_DAYS=${ARCHIVE_RETENTION_DAYS:-7}
       - HARVESTER_ENABLED=${HARVESTER_ENABLED:-true}
       - HARVESTER_SCHEDULE_HOURS=${HARVESTER_SCHEDULE_HOURS:-07:30,12:00,17:30}
@@ -97,16 +97,16 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=${DOCKER_NETWORK:-core-network}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.rule=Host(`${DOMAIN_NAME:-warded-stg.529studio.site}`) && (PathPrefix(`/api`) || PathPrefix(`/ws`) || PathPrefix(`/health`) || PathPrefix(`/swagger`))"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.entrypoints=${TRAEFIK_ENTRYPOINT:-web}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-be.priority=100"
-      - "traefik.http.services.${ROUTER_NAME:-warded-stg}-be.loadbalancer.server.port=${BE_PORT:-3000}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded}-be.rule=Host(`${DOMAIN_NAME:-warded.529studio.site}`) && (PathPrefix(`/api`) || PathPrefix(`/ws`) || PathPrefix(`/health`) || PathPrefix(`/swagger`))"
+      - "traefik.http.routers.${ROUTER_NAME:-warded}-be.entrypoints=${TRAEFIK_ENTRYPOINT:-web}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded}-be.priority=100"
+      - "traefik.http.services.${ROUTER_NAME:-warded}-be.loadbalancer.server.port=${BE_PORT:-3000}"
 
   warded-frontend:
     image: ${FE_IMAGE_NAME:-ghcr.io/529-studio/projectkv-frontend}:${FE_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
     container_name: ${FE_CONTAINER_NAME:-warded-frontend}
     restart: unless-stopped
-    pull_policy: ${PULL_POLICY:-always}
+    pull_policy: ${PULL_POLICY:-missing}
     networks:
       - core-network
     security_opt:
@@ -119,17 +119,17 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=${DOCKER_NETWORK:-core-network}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.rule=Host(`${DOMAIN_NAME:-warded-stg.529studio.site}`)"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.entrypoints=${TRAEFIK_ENTRYPOINT:-web}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded-stg}-fe.priority=1"
-      - "traefik.http.services.${ROUTER_NAME:-warded-stg}-fe.loadbalancer.server.port=80"
+      - "traefik.http.routers.${ROUTER_NAME:-warded}-fe.rule=Host(`${DOMAIN_NAME:-warded.529studio.site}`)"
+      - "traefik.http.routers.${ROUTER_NAME:-warded}-fe.entrypoints=${TRAEFIK_ENTRYPOINT:-web}"
+      - "traefik.http.routers.${ROUTER_NAME:-warded}-fe.priority=1"
+      - "traefik.http.services.${ROUTER_NAME:-warded}-fe.loadbalancer.server.port=80"
 
   warded-model:
     profiles: ["model-local"]
     image: ${MODEL_IMAGE_NAME:-ghcr.io/529-studio/projectkv-model}:${MODEL_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
     container_name: ${MODEL_CONTAINER_NAME:-warded-model}
     restart: unless-stopped
-    pull_policy: ${PULL_POLICY:-always}
+    pull_policy: ${PULL_POLICY:-missing}
     networks:
       - core-network
     environment:
@@ -170,7 +170,7 @@ services:
     environment:
       - TZ=${TZ:-Asia/Ho_Chi_Minh}
       - BACKEND_URL=${BACKEND_URL:-http://warded-backend:3000}
-      - CV_ENGINE_URL=${CV_ENGINE_URL:-http://warded-model:8000}
+      - CV_ENGINE_URL=${CV_ENGINE_URL:?CV_ENGINE_URL must be provided by the deployment pipeline}
       - DEV_ACCESS_TOKEN=${DEV_ACCESS_TOKEN:-}
 
   warded-forecast-cron:
@@ -299,8 +299,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "${LITESTREAM_CPU_LIMIT:-0.20}"
-          memory: "${LITESTREAM_MEMORY_LIMIT:-64M}"
+          cpus: "${LITESTREAM_CPU_LIMIT:-0.25}"
+          memory: "${LITESTREAM_MEMORY_LIMIT:-128M}"
 
 volumes:
   warded-stg-data:
