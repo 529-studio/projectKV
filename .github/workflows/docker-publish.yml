@@ -259,6 +259,28 @@ jobs:
             exit 0
           fi
 
+          # Shape check for a stack environment. Printed diagnostics carry names only,
+          # never values.
+          #   $1 stack env array (JSON)   $2 compose file   $3 required secret names
+          assert_stack_env() {
+            local env_json="$1" compose_file="$2" required="$3" catalog
+            catalog=$(grep -oE '\$\{[A-Z_][A-Z0-9_]*' "$compose_file" | sed 's/^\${//' | sort -u)
+            echo "$env_json" | jq -e --arg req "$required" --arg cat "$catalog" '
+              ($req | split(" ")) as $required_names
+              | ([.[].name]) as $names
+              | ($required_names - $names) as $missing
+              | ([.[] | select(((.value // "") | length) == 0) | .name]) as $empty
+              | ([.[] | select((.name | test("_(URL|ENDPOINT)$"))
+                    and ((.name | test("_(DB|DATABASE)_URL$|_API_BASE_URL$|_BASE_URL$")) | not)
+                    and (((.value // "") | test("^https?://")) | not)) | .name]) as $bad_web_url
+              | ([.[] | select((.name | test("_(KEY|KEY_ID|SECRET|SECRET_ACCESS_KEY|TOKEN|PASSWORD)$"))
+                    and (((.value // "") | length) < 8)) | .name]) as $weak_secret
+              | ($names - ($cat | split("\n") | map(select(length > 0)))) as $unknown
+              | if (($missing | length) + ($empty | length) + ($bad_web_url | length) + ($weak_secret | length) + ($unknown | length)) > 0
+                then error("stack env assertion failed: missing=\($missing) empty=\($empty) bad_web_url=\($bad_web_url) weak_secret=\($weak_secret) unknown=\($unknown)")
+                else "stack env assertions passed for \($names | length) names" end'
+          }
+
           # Order matters. The inference worker is restarted before the backend:
           # the backend starts its analysis loop immediately, so restarting the
           # worker first and waiting for it to report healthy removes the window
@@ -288,6 +310,8 @@ jobs:
                   'map(if .name == "MODEL_IMAGE_TAG" then {"name":"MODEL_IMAGE_TAG","value":$t} else . end)
                    + (if (map(select(.name == "MODEL_IMAGE_TAG")) | length) == 0 then [{"name":"MODEL_IMAGE_TAG","value":$t}] else [] end)')
               fi
+
+              assert_stack_env "$ENV_JSON" docker-compose.cv.yml ""
 
               PAYLOAD=$(jq -n \
                 --arg file "$STACK_FILE" \
@@ -347,24 +371,10 @@ jobs:
 
             STACK_FILE=$(cat docker-compose.stg.yml)
 
-            # The stack environment in Portainer is the single source of truth for
-            # runtime configuration. Never rewrite it from GitHub secrets: a stale
-            # secret silently re-broke CV_ENGINE_URL on every deploy. Validate that
-            # the required values are present and deploy the environment unchanged.
-            REQUIRED_ENV="CV_ENGINE_URL R2_ENDPOINT R2_BUCKET_NAME R2_REGION R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY"
-            MISSING_ENV=""
-            for name in ${REQUIRED_ENV}; do
-              value=$(echo "$STACK_RES" | jq -r --arg n "$name" '(.Env // [])[] | select(.name == $n) | .value' | head -n1)
-              if [ -z "$value" ]; then
-                MISSING_ENV="${MISSING_ENV} ${name}"
-              fi
-            done
-            if [ -n "$MISSING_ENV" ]; then
-              echo "Missing required stack environment values:${MISSING_ENV}"
-              echo "Set them in the Portainer stack environment and re-run; refusing to deploy."
-              exit 1
-            fi
-
+            # The stack environment holds credentials and the CI-written tags only:
+            # every non-secret value lives in the compose file, so the repository is
+            # the single source of truth for configuration and the environment cannot
+            # silently override it. Assert the shape before deploying.
             ENV_JSON=$(echo "$STACK_RES" | jq -e 'if (.Env | type) == "array" then .Env else error("CRITICAL: stack Env missing or not an array") end')
             BE_BUILT=$([ "${{ needs.build-backend.result }}" = "success" ] && echo true || echo false)
             FE_BUILT=$([ "${{ needs.build-frontend.result }}" = "success" ] && echo true || echo false)
@@ -375,6 +385,8 @@ jobs:
                 else . end)
               + (if $be and ((map(select(.name == "BE_IMAGE_TAG")) | length) == 0) then [{"name":"BE_IMAGE_TAG","value":$t}] else [] end)
               + (if $fe and ((map(select(.name == "FE_IMAGE_TAG")) | length) == 0) then [{"name":"FE_IMAGE_TAG","value":$t}] else [] end)')
+
+            assert_stack_env "$ENV_JSON" docker-compose.stg.yml "R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY CV_ENGINE_URL R2_ENDPOINT"
 
             PAYLOAD=$(jq -n \
               --arg file "$STACK_FILE" \
