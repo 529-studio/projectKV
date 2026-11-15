@@ -282,7 +282,12 @@ jobs:
                 -H "User-Agent: Mozilla/5.0")
 
               STACK_FILE=$(cat docker-compose.cv.yml)
-              ENV_JSON=$(echo "$STACK_RES" | jq '.Env // []')
+              ENV_JSON=$(echo "$STACK_RES" | jq -e 'if (.Env | type) == "array" then .Env else error("CRITICAL: stack Env missing or not an array") end')
+              if [ "${{ needs.build-model.result }}" = "success" ]; then
+                ENV_JSON=$(echo "$ENV_JSON" | jq --arg t "${GITHUB_SHA}" \
+                  'map(if .name == "MODEL_IMAGE_TAG" then {"name":"MODEL_IMAGE_TAG","value":$t} else . end)
+                   + (if (map(select(.name == "MODEL_IMAGE_TAG")) | length) == 0 then [{"name":"MODEL_IMAGE_TAG","value":$t}] else [] end)')
+              fi
 
               PAYLOAD=$(jq -n \
                 --arg file "$STACK_FILE" \
@@ -360,7 +365,16 @@ jobs:
               exit 1
             fi
 
-            ENV_JSON=$(echo "$STACK_RES" | jq '(.Env // [])')
+            ENV_JSON=$(echo "$STACK_RES" | jq -e 'if (.Env | type) == "array" then .Env else error("CRITICAL: stack Env missing or not an array") end')
+            BE_BUILT=$([ "${{ needs.build-backend.result }}" = "success" ] && echo true || echo false)
+            FE_BUILT=$([ "${{ needs.build-frontend.result }}" = "success" ] && echo true || echo false)
+            ENV_JSON=$(echo "$ENV_JSON" | jq --arg t "${GITHUB_SHA}" --argjson be "$BE_BUILT" --argjson fe "$FE_BUILT" '
+              map(
+                if .name == "BE_IMAGE_TAG" then (if $be then {"name":"BE_IMAGE_TAG","value":$t} else . end)
+                elif .name == "FE_IMAGE_TAG" then (if $fe then {"name":"FE_IMAGE_TAG","value":$t} else . end)
+                else . end)
+              + (if $be and ((map(select(.name == "BE_IMAGE_TAG")) | length) == 0) then [{"name":"BE_IMAGE_TAG","value":$t}] else [] end)
+              + (if $fe and ((map(select(.name == "FE_IMAGE_TAG")) | length) == 0) then [{"name":"FE_IMAGE_TAG","value":$t}] else [] end)')
 
             PAYLOAD=$(jq -n \
               --arg file "$STACK_FILE" \
