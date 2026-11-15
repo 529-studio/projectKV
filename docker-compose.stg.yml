@@ -25,7 +25,7 @@ services:
     image: ${BE_IMAGE_NAME:-ghcr.io/529-studio/projectkv-backend}:${BE_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
     container_name: ${BE_CONTAINER_NAME:-warded-backend}
     restart: unless-stopped
-    pull_policy: always
+    pull_policy: ${PULL_POLICY:-always}
     networks:
       - core-network
     depends_on:
@@ -106,7 +106,7 @@ services:
     image: ${FE_IMAGE_NAME:-ghcr.io/529-studio/projectkv-frontend}:${FE_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
     container_name: ${FE_CONTAINER_NAME:-warded-frontend}
     restart: unless-stopped
-    pull_policy: always
+    pull_policy: ${PULL_POLICY:-always}
     networks:
       - core-network
     security_opt:
@@ -129,7 +129,7 @@ services:
     image: ${MODEL_IMAGE_NAME:-ghcr.io/529-studio/projectkv-model}:${MODEL_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
     container_name: ${MODEL_CONTAINER_NAME:-warded-model}
     restart: unless-stopped
-    pull_policy: always
+    pull_policy: ${PULL_POLICY:-always}
     networks:
       - core-network
     environment:

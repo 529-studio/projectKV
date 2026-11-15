@@ -6,7 +6,7 @@ services:
     image: ${MODEL_IMAGE_NAME:-ghcr.io/529-studio/projectkv-model}:${MODEL_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
     container_name: ${MODEL_CONTAINER_NAME:-warded-cv-engine}
     restart: unless-stopped
-    pull_policy: always
+    pull_policy: ${PULL_POLICY:-always}
     ports:
       - "8000:8000"
     environment:
