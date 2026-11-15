@@ -87,3 +87,4 @@ scratch/
 /var/
 
 .agents/.state/
+.lore/

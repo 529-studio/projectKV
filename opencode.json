@@ -1,0 +1,17 @@
+{
+  "mcp": {
+    "servers": {
+      "lore": {
+        "type": "local",
+        "command": [
+          "lore",
+          "mcp"
+        ],
+        "environment": {
+          "LORE_SESSION": "opencode"
+        },
+        "enabled": true
+      }
+    }
+  }
+}
