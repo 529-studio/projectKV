@@ -11,6 +11,7 @@ import {
   evaluateHexRadarIntensity,
   buildRadarTileUrl,
   generateOpenMeteoFallbackHexCells,
+  resolveRadarHexSeverity,
 } from '../utils/rainHexUtils';
 
 // Module-level cache for static H3 resolution 7 polygon definitions (121KB)
@@ -217,13 +218,10 @@ export function useRainHexRadar(
             }
           }
 
-          // If weather gauge shows < 0.2mm rain & sunny/clear weather code,
-          // and no ground cameras observe wet roads, the echo aloft is virga/high clouds.
-          const isSurfaceDry =
-            (!weather || (weather.rain_mm < 0.2 && weather.weather_code <= 3)) &&
-            activeGroundFloodCount === 0;
-
-          const finalSeverity = isSurfaceDry ? 'ADVISORY_CLOUD' : rawIntensity;
+          // Surface Cross-Validation Gate (Issue #465):
+          // Calibrated to protect true convective rain cores from NWP model latency while filtering virga
+          const finalSeverity = resolveRadarHexSeverity(rawIntensity, weather, activeGroundFloodCount);
+          if (!finalSeverity) continue;
 
           mappedCells.set(h3Id, {
             h3_id: h3Id,
