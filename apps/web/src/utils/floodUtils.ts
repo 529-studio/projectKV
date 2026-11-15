@@ -428,18 +428,18 @@ export function getRadarHexColorAndOpacity(severity: string): {
     case 'WET':
       return {
         fillColor: '#38bdf8', // Sky blue
-        fillOpacity: 0.08,
+        fillOpacity: 0.10,
         strokeColor: '#7dd3fc',
-        strokeWeight: 0.5,
+        strokeWeight: 0.75,
         dashArray: '3, 3',
       };
     case 'ADVISORY_CLOUD':
     default:
       return {
         fillColor: '#94a3b8', // Slate gray
-        fillOpacity: 0.04,
+        fillOpacity: 0.08,
         strokeColor: '#cbd5e1',
-        strokeWeight: 0.5,
+        strokeWeight: 0.75,
         dashArray: '2, 4',
       };
   }

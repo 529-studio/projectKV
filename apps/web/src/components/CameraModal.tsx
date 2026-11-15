@@ -349,7 +349,7 @@ export default function CameraModal({
 
   const hasRealVerdict = Boolean(verdict && verdict.severity);
   const severity = hasRealVerdict ? verdict!.severity : 'UNKNOWN';
-  let severityLabel = currentLang === 'vi' ? 'BÌNH THƯỜNG' : 'CLEAR';
+  let severityLabel = currentLang === 'vi' ? 'THÔNG THOÁNG' : 'CLEAR';
   let severityColor: string = FUNCTIONAL_COLORS.CLEAR;
   
   if (severity === 'MODERATE') {
@@ -524,7 +524,11 @@ export default function CameraModal({
 
               {isActuallyAvailable && hasRealVerdict && (
                 <>
-                  <span className="px-2 py-0.5 rounded border" style={{ borderColor: severityColor, color: severityColor, backgroundColor: `${severityColor}20` }}>
+                  <span
+                    className="px-2 py-0.5 rounded border"
+                    style={{ borderColor: severityColor, color: severityColor, backgroundColor: `${severityColor}20` }}
+                    title={currentLang === 'vi' ? `Lưu thông giao thông: ${severityLabel}` : `Traffic flow: ${severityLabel}`}
+                  >
                     {severityLabel}
                   </span>
                   {verdict?.stale && (

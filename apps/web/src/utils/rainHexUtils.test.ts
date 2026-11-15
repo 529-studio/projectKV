@@ -10,6 +10,7 @@ import {
   buildRadarTileUrl,
   mergeFloodHexCells,
   generateOpenMeteoFallbackHexCells,
+  resolveRadarHexSeverity,
 } from './rainHexUtils.ts';
 import type { FloodHexCell } from './floodUtils.ts';
 import type { WeatherData } from './weatherUtils.ts';
@@ -276,5 +277,67 @@ describe('Rain Hex Utils (Issue #106 / #120 Restoration & S8-T1 Pipeline Overhau
     };
     const traceResult = generateOpenMeteoFallbackHexCells(weatherTrace, polygons, monitoredCells);
     assert.equal(traceResult.size, 0);
+  });
+
+  describe('resolveRadarHexSeverity (Issue #465 - False Virga Suppression Fix)', () => {
+    test('returns null when rawIntensity is null', () => {
+      assert.equal(resolveRadarHexSeverity(null, null, 0), null);
+    });
+
+    test('never suppresses HEAVY_RAIN (>= 40 dBZ) even with dry Open-Meteo or zero cameras', () => {
+      // Open-Meteo lagging behind with 0mm and overcast
+      const laggingWeather = { weather_code: 3, rain_mm: 0 };
+      assert.equal(resolveRadarHexSeverity('HEAVY_RAIN', laggingWeather, 0), 'HEAVY_RAIN');
+
+      // Clear sky with zero cameras
+      const sunnyWeather = { weather_code: 0, rain_mm: 0 };
+      assert.equal(resolveRadarHexSeverity('HEAVY_RAIN', sunnyWeather, 0), 'HEAVY_RAIN');
+
+      // Null weather
+      assert.equal(resolveRadarHexSeverity('HEAVY_RAIN', null, 0), 'HEAVY_RAIN');
+    });
+
+    test('never suppresses MODERATE_RAIN (30 - 39 dBZ) even with dry Open-Meteo', () => {
+      const laggingWeather = { weather_code: 3, rain_mm: 0 };
+      assert.equal(resolveRadarHexSeverity('MODERATE_RAIN', laggingWeather, 0), 'MODERATE_RAIN');
+
+      const sunnyWeather = { weather_code: 1, rain_mm: 0 };
+      assert.equal(resolveRadarHexSeverity('MODERATE_RAIN', sunnyWeather, 0), 'MODERATE_RAIN');
+    });
+
+    test('retains LIGHT_RAIN when ground cameras detect wet or flooded surface', () => {
+      const sunnyWeather = { weather_code: 0, rain_mm: 0 };
+      assert.equal(resolveRadarHexSeverity('LIGHT_RAIN', sunnyWeather, 2), 'LIGHT_RAIN');
+    });
+
+    test('retains LIGHT_RAIN when Open-Meteo reports rain_mm >= 0.2 or rain WMO code', () => {
+      const rainyWeather = { weather_code: 61, rain_mm: 0.1 };
+      assert.equal(resolveRadarHexSeverity('LIGHT_RAIN', rainyWeather, 0), 'LIGHT_RAIN');
+
+      const gaugeWeather = { weather_code: 3, rain_mm: 0.5 };
+      assert.equal(resolveRadarHexSeverity('LIGHT_RAIN', gaugeWeather, 0), 'LIGHT_RAIN');
+    });
+
+    test('retains LIGHT_RAIN under overcast or cloudy skies even if rain_mm is 0 (NWP latency protection)', () => {
+      // Tropical convective shower developing before hourly model update
+      const overcastWeather = { weather_code: 3, rain_mm: 0 };
+      assert.equal(resolveRadarHexSeverity('LIGHT_RAIN', overcastWeather, 0), 'LIGHT_RAIN');
+
+      const partlyCloudyWeather = { weather_code: 2, rain_mm: 0 };
+      assert.equal(resolveRadarHexSeverity('LIGHT_RAIN', partlyCloudyWeather, 0), 'LIGHT_RAIN');
+    });
+
+    test('downgrades to ADVISORY_CLOUD strictly when weather is clear/sunny and measured rain is 0 and cameras dry', () => {
+      // True virga / high-altitude cirrus on clear sunny day
+      const clearSky = { weather_code: 0, rain_mm: 0 };
+      assert.equal(resolveRadarHexSeverity('LIGHT_RAIN', clearSky, 0), 'ADVISORY_CLOUD');
+
+      const mainlyClear = { weather_code: 1, rain_mm: 0.1 };
+      assert.equal(resolveRadarHexSeverity('LIGHT_RAIN', mainlyClear, 0), 'ADVISORY_CLOUD');
+    });
+
+    test('retains LIGHT_RAIN as safe fallback when weather is null', () => {
+      assert.equal(resolveRadarHexSeverity('LIGHT_RAIN', null, 0), 'LIGHT_RAIN');
+    });
   });
 });

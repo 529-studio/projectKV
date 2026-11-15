@@ -199,6 +199,52 @@ export function evaluateHexRadarIntensity(
 }
 
 /**
+ * Evaluates radar reflectivity against surface conditions.
+ *
+ * Meteorological rules (Issue #465):
+ * 1. Convective precipitation cores (HEAVY_RAIN >= 40 dBZ and MODERATE_RAIN 30 - 39 dBZ)
+ *    represent dense liquid precipitation. They must NEVER be suppressed by NWP model forecast latency.
+ * 2. Ground camera observation of wet pavement or standing water immediately confirms rain.
+ * 3. Numerical weather predictions (Open-Meteo) reporting active rain (>= 0.2mm or WMO rain codes) confirm rain.
+ * 4. Under overcast (code 3) or cloudy skies (code 2), tropical showers frequently occur ahead of hourly NWP syncs;
+ *    radar echoes are retained as LIGHT_RAIN.
+ * 5. Faint airborne echoes (LIGHT_RAIN 18 - 29 dBZ) are strictly classified as ADVISORY_CLOUD (virga)
+ *    only when the sky is verified sunny/clear (code <= 1), rain_mm is 0, and ground is confirmed dry.
+ */
+export function resolveRadarHexSeverity(
+  rawIntensity: RadarRainIntensity,
+  weather: WeatherDataLike | null,
+  activeGroundFloodCount = 0
+): 'HEAVY_RAIN' | 'MODERATE_RAIN' | 'LIGHT_RAIN' | 'ADVISORY_CLOUD' | null {
+  if (!rawIntensity) return null;
+
+  // 1. Moderate and Heavy rain are convective cores; never suppress
+  if (rawIntensity === 'HEAVY_RAIN' || rawIntensity === 'MODERATE_RAIN') {
+    return rawIntensity;
+  }
+
+  // 2. Confirmed ground wetness or flood
+  if (activeGroundFloodCount > 0) {
+    return 'LIGHT_RAIN';
+  }
+
+  // 3. Open-Meteo confirms rain
+  if (weather && (weather.rain_mm >= 0.2 || isWmoRain(weather.weather_code))) {
+    return 'LIGHT_RAIN';
+  }
+
+  // 4. Virga filter: strictly when weather is sunny/clear (WMO 0: Clear sky, 1: Mainly clear)
+  // and rain_mm is 0, and no ground cameras observe rain
+  const isSunnyAndDry = weather && weather.weather_code <= 1 && weather.rain_mm < 0.2;
+  if (isSunnyAndDry) {
+    return 'ADVISORY_CLOUD';
+  }
+
+  // 5. Default under overcast/cloudy skies or when weather is null
+  return 'LIGHT_RAIN';
+}
+
+/**
  * Replaces {z}, {x}, {y} placeholders in a tile template.
  */
 export function buildRadarTileUrl(template: string, tileX: number, tileY: number, zoom = 8): string {

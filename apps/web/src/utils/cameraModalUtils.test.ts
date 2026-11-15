@@ -12,7 +12,7 @@ import {
   clearCameraReportCooldowns,
   CAMERA_REPORT_MODAL_I18N,
 } from './cameraModalUtils.ts';
-import { FLOOD_VERIFY_I18N, FLOOD_REPORT_I18N } from '../config/constants.ts';
+import { FLOOD_VERIFY_I18N, FLOOD_REPORT_I18N, VERDICT_I18N } from '../config/constants.ts';
 
 describe('CameraModal UI/UX & Cooldown Utilities (S6-T3 & S7-T3 / Issue #223, #248)', () => {
   // Unicode regex to enforce Rule 1 zero-emoji policy across all generated UI texts
@@ -307,6 +307,14 @@ describe('CameraModal UI/UX & Cooldown Utilities (S6-T3 & S7-T3 / Issue #223, #2
       assert.equal(CAMERA_REPORT_MODAL_I18N.BUTTON_LABEL.en, FLOOD_REPORT_I18N.BUTTON_LABEL.en);
       assert.equal(CAMERA_REPORT_MODAL_I18N.SUCCESS_CHIP.vi, FLOOD_REPORT_I18N.SUCCESS_CHIP.vi);
       assert.equal(CAMERA_REPORT_MODAL_I18N.SUCCESS_CHIP.en, FLOOD_REPORT_I18N.SUCCESS_CHIP.en);
+    });
+
+    test('VERDICT_I18N traffic severity aligns with modal disambiguation (Issue #465)', () => {
+      // In Issue #465, modal label for CLEAR was disambiguated to THÔNG THOÁNG (matching map legend)
+      assert.equal(VERDICT_I18N.SEVERITY.CLEAR.vi.toUpperCase(), 'THÔNG THOÁNG');
+      assert.equal(VERDICT_I18N.SEVERITY.CLEAR.en.toUpperCase(), 'CLEAR');
+      assert.equal(VERDICT_I18N.SEVERITY.MODERATE.vi.toUpperCase(), 'ĐÔNG XE');
+      assert.equal(VERDICT_I18N.SEVERITY.CONGESTED.vi.toUpperCase(), 'ÙN TẮC');
     });
   });
 });
