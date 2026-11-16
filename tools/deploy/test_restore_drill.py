@@ -817,6 +817,26 @@ class TestWebhookAlerting(unittest.TestCase):
         body = json.loads(req.data.decode("utf-8"))
         self.assertEqual(body["status"], "SUCCESS")
 
+    def test_send_webhook_alert_telegram_url_formats_telegram_payload(self) -> None:
+        mock_response = mock.MagicMock()
+        mock_response.status = 200
+        mock_response.__enter__.return_value = mock_response
+
+        mock_opener = mock.MagicMock()
+        mock_opener.open.return_value = mock_response
+
+        delivered = rd.send_webhook_alert(
+            "https://api.telegram.org/bot123456:ABC-DEF/sendMessage?chat_id=-100999",
+            self.sample_pass_summary,
+            opener=mock_opener,
+        )
+        self.assertTrue(delivered)
+        req = mock_opener.open.call_args[0][0]
+        body = json.loads(req.data.decode("utf-8"))
+        self.assertEqual(body["chat_id"], "-100999")
+        self.assertIn("[PROJECTKV RESTORE DRILL: SUCCESS]", body["text"])
+        self.assertNotIn("event", body)
+
     def test_send_webhook_alert_retry_on_500_then_succeed(self) -> None:
         mock_response = mock.MagicMock()
         mock_response.status = 200

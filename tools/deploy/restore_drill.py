@@ -1517,7 +1517,8 @@ def send_webhook_alert(
         if "chat_id" in qs and qs["chat_id"]:
             resolved_chat_id = qs["chat_id"][0]
 
-    is_telegram = "api.telegram.org" in parsed.netloc.lower()
+    hostname = (parsed.hostname or "").lower()
+    is_telegram = hostname == "api.telegram.org"
 
     payload = build_webhook_payload(summary, is_telegram=is_telegram, chat_id=resolved_chat_id)
     body_bytes = json.dumps(payload).encode("utf-8")
