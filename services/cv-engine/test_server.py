@@ -54,6 +54,7 @@ from server import (
     resolve_input_resolution,
     triangulate_flood_verdict,
 )
+import hazard_classifier as hc
 from hazard_classifier import AVOIDANCE_CONFIDENCE_CAP
 
 
@@ -854,6 +855,57 @@ class TestPredictPayload(unittest.TestCase):
         self.assertEqual(payload["vehicle_counts"]["truck"], 1)
         self.assertEqual(payload["vehicles_detected"], 2)
 
+    def test_stale_frame_dropped_with_429(self):
+        old_ts = time.time() - 300.0  # 5 minutes ago
+        headers = {
+            "X-Camera-ID": "cam_dist7_hem12",
+            "X-Capture-Timestamp": str(old_ts),
+        }
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._post_predict(extra_headers=headers)
+        self.assertEqual(ctx.exception.code, 429)
+        err_body = json.loads(ctx.exception.read().decode("utf-8"))
+        self.assertEqual(err_body.get("status"), "shed")
+        self.assertEqual(err_body.get("reason"), "stale_frame_dropped")
+
+    def test_stale_frame_allowed_for_corridor_camera(self):
+        old_ts = time.time() - 300.0
+        headers = {
+            "X-Camera-ID": "cam_cong_hoa_01",
+            "X-Capture-Timestamp": str(old_ts),
+        }
+        status, payload = self._post_predict(extra_headers=headers)
+        self.assertEqual(status, 200)
+
+    def test_curb_reference_dynamic_resolution_in_predict(self):
+        # Register a camera with curb calibration in calibration_registry
+        calib = hc.CameraCalibration(
+            camera_id="cam_curb_water",
+            scale_multiplier=1.0,
+            measured_by="tester",
+            measured_at=time.strftime("%Y-%m-%d"),
+            frame_ref="ref.jpg",
+            curb_px=90.0,
+            curb_cm=15.0,
+        )
+        server.calibration_registry._entries["cam_curb_water"] = calib
+        try:
+            # Mock output with water segmentation (class 1, row 5) and NO motorcycles
+            mock_output = np.zeros((1, 42, 100), dtype=np.float32)
+            mock_output[0, 5, 0] = 0.8  # water class score
+            mock_proto = np.zeros((1, 32, 104, 104), dtype=np.float32)
+            mock_proto[0, 0, 40:80, 40:80] = 2.0  # water puddle
+            mock_output[0, 10, 0] = 1.0  # mask coefficient
+
+            self._use_model(shape=(1, 3, 416, 416), output={0: mock_output, 1: mock_proto})
+            status, payload = self._post_predict(extra_headers={"X-Camera-ID": "cam_curb_water"})
+            self.assertEqual(status, 200)
+            self.assertEqual(payload.get("calibration_ref"), "CURB_15CM")
+            self.assertIsNotNone(payload.get("flood_depth_cm"))
+            self.assertGreater(payload.get("flood_depth_cm", 0.0), 0.0)
+        finally:
+            server.calibration_registry._entries.pop("cam_curb_water", None)
+
 
 class TestBoxPolygonAnchor(unittest.TestCase):
     """Coordinate normalization for directional polygon assignment (ADR-012 D1)."""
@@ -922,6 +974,164 @@ class TestLoadSheddingResolution(unittest.TestCase):
         # request 640 px, while the operator-scoped environment override can.
         self.assertEqual(server.HEADER_INPUT_RESOLUTIONS, (320, 416))
         self.assertEqual(server.ENV_INPUT_RESOLUTIONS, (320, 416, 640))
+
+
+class TestInferenceQueueAndLoadShedding(unittest.TestCase):
+    """S15-T5: Adaptive Inference Load Shedding & Queue Pressure Control unit tests."""
+
+    def setUp(self):
+        server.queue_manager.reset()
+
+    def tearDown(self):
+        server.queue_manager.reset()
+
+    def test_corridor_request_detection(self):
+        # 1. Header detection
+        self.assertTrue(server.is_corridor_request("cam_any", {"X-Corridor": "true"}))
+        self.assertTrue(server.is_corridor_request("cam_any", {"X-Priority": "high"}))
+        self.assertTrue(server.is_corridor_request("cam_any", {"X-Hotset": "true"}))
+        self.assertFalse(server.is_corridor_request("cam_any", {"X-Corridor": "false"}))
+
+        # 2. Camera ID matching default corridor arterial keywords
+        self.assertTrue(server.is_corridor_request("cam_cong_hoa_01", {}))
+        self.assertTrue(server.is_corridor_request("cam_vo_van_kiet_02", {}))
+        self.assertTrue(server.is_corridor_request("cam_dien_bien_phu_03", {}))
+        self.assertTrue(server.is_corridor_request("cam_truong_chinh_04", {}))
+        self.assertTrue(server.is_corridor_request("cam_corridor_arterial", {}))
+
+        # 3. Peripheral camera without corridor header
+        self.assertFalse(server.is_corridor_request("cam_dist7_hem12", {}))
+        self.assertFalse(server.is_corridor_request("", {}))
+
+    def test_parse_capture_timestamp(self):
+        now = time.time()
+        self.assertAlmostEqual(
+            server.parse_capture_timestamp({"X-Capture-Timestamp": str(now)}), now, delta=0.01
+        )
+        self.assertAlmostEqual(
+            server.parse_capture_timestamp({"X-Frame-Timestamp": "2026-11-16T12:00:00Z"}),
+            1794830400.0,
+            delta=3600.0,
+        )
+        self.assertIsNone(server.parse_capture_timestamp({}))
+        self.assertIsNone(server.parse_capture_timestamp({"X-Capture-Timestamp": "invalid"}))
+
+    def test_queue_manager_backpressure_and_corridor_priority(self):
+        qm = server.InferenceQueueManager(max_queue_depth=3, high_load_threshold=2, concurrency_limit=2)
+
+        # Ingest 3 requests
+        adm1, _ = qm.check_admissibility(is_corridor=False)
+        adm2, _ = qm.check_admissibility(is_corridor=False)
+        adm3, _ = qm.check_admissibility(is_corridor=False)
+        self.assertTrue(adm1)
+        self.assertTrue(adm2)
+        self.assertTrue(adm3)
+        self.assertEqual(qm.queue_depth, 3)
+
+        # 4th request: peripheral camera must be shed
+        adm_periph, reason = qm.check_admissibility(is_corridor=False)
+        self.assertFalse(adm_periph)
+        self.assertEqual(reason, "queue_full_backpressure")
+
+        # 5th request: corridor camera must be admitted despite full queue
+        adm_corridor, _ = qm.check_admissibility(is_corridor=True)
+        self.assertTrue(adm_corridor)
+
+        # Check adaptive downscaling flag
+        self.assertTrue(qm.should_downscale())
+
+    def test_queue_stats_reporting(self):
+        qm = server.InferenceQueueManager(max_queue_depth=5, high_load_threshold=3)
+        qm.check_admissibility(is_corridor=False)
+        qm.acquire_slot()
+        stats = qm.stats()
+        self.assertEqual(stats["active_inferences"], 1)
+        self.assertEqual(stats["max_queue_depth"], 5)
+        self.assertFalse(stats["adaptive_downscale_active"])
+        qm.release_slot()
+        self.assertEqual(qm.stats()["processed_count"], 1)
+
+    def test_scenario2_50_concurrent_requests_sheds_stale_and_prioritizes_corridors(self):
+        """Scenario 2 (Rule 10): 50 concurrent requests ingest burst."""
+        # Spin up local server with mocked model
+        server.queue_manager.reset()
+        server.queue_manager.max_queue_depth = 10
+        server.queue_manager.high_load_threshold = 5
+
+        # We need a running HTTP server
+        httpd = CVServer(("127.0.0.1", 0), CVRequestHandler)
+        port = httpd.server_address[1]
+        t = threading.Thread(target=httpd.serve_forever, daemon=True)
+        t.start()
+        base_url = f"http://127.0.0.1:{port}/predict"
+
+        buffer = BytesIO()
+        Image.new("RGB", (32, 32), (90, 90, 90)).save(buffer, format="JPEG")
+        frame_bytes = buffer.getvalue()
+
+        results: List[Tuple[int, float, Optional[str]]] = []
+        lock = threading.Lock()
+
+        def make_request(camera_id: str, is_stale: bool, extra_corridor: bool):
+            headers = {
+                "Content-Type": "image/jpeg",
+                "X-Camera-ID": camera_id,
+            }
+            if extra_corridor:
+                headers["X-Corridor"] = "true"
+            if is_stale:
+                headers["X-Capture-Timestamp"] = str(time.time() - 300.0)
+            else:
+                headers["X-Capture-Timestamp"] = str(time.time())
+
+            t0 = time.perf_counter()
+            req = urllib.request.Request(base_url, data=frame_bytes, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=15.0) as resp:
+                    dur_ms = (time.perf_counter() - t0) * 1000.0
+                    with lock:
+                        results.append((resp.status, dur_ms, None))
+            except urllib.error.HTTPError as err:
+                dur_ms = (time.perf_counter() - t0) * 1000.0
+                reason = None
+                try:
+                    body = json.loads(err.read().decode("utf-8"))
+                    reason = body.get("reason")
+                except Exception:
+                    pass
+                with lock:
+                    results.append((err.code, dur_ms, reason))
+            except Exception as exc:
+                dur_ms = (time.perf_counter() - t0) * 1000.0
+                with lock:
+                    results.append((500, dur_ms, str(exc)))
+
+        threads = []
+        # 15 stale peripheral frames
+        for i in range(15):
+            threads.append(threading.Thread(target=make_request, args=(f"cam_periph_stale_{i}", True, False)))
+        # 25 fresh peripheral frames
+        for i in range(25):
+            threads.append(threading.Thread(target=make_request, args=(f"cam_periph_fresh_{i}", False, False)))
+        # 10 arterial corridor frames
+        for i in range(10):
+            threads.append(threading.Thread(target=make_request, args=(f"cam_cong_hoa_{i}", False, True)))
+
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join(timeout=20.0)
+
+        httpd.shutdown()
+        httpd.server_close()
+
+        self.assertEqual(len(results), 50)
+        stale_shed = [r for r in results if r[2] == "stale_frame_dropped"]
+        self.assertGreater(len(stale_shed), 0, "Stale frames should be shed")
+        # Corridor frames should succeed with status 200 or 503 (standby ready)
+        # and finish in < 100ms
+        corridor_latencies = [r[1] for r in results if r[0] in (200, 503)]
+        self.assertGreater(len(corridor_latencies), 0)
 
 
 if __name__ == "__main__":

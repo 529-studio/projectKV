@@ -180,6 +180,7 @@ class CameraCalibration:
     frame_ref: str
     curb_px: Optional[float] = None
     curb_cm: Optional[float] = None
+    curb_polygon: Optional[Tuple[Tuple[float, float], ...]] = None
 
 
 # ---------------------------------------------------------------------------
@@ -617,13 +618,30 @@ class CalibrationRegistry:
         landmarks = raw.get("landmarks") or {}
         curb_px: Optional[float] = None
         curb_cm: Optional[float] = None
+        curb_polygon: Optional[Tuple[Tuple[float, float], ...]] = None
         if isinstance(landmarks, dict):
             raw_curb_px = landmarks.get("curb_px")
             raw_curb_cm = landmarks.get("curb_cm")
+            raw_curb_poly = landmarks.get("curb_polygon")
             if isinstance(raw_curb_px, (int, float)) and not isinstance(raw_curb_px, bool):
                 curb_px = float(raw_curb_px)
             if isinstance(raw_curb_cm, (int, float)) and not isinstance(raw_curb_cm, bool):
                 curb_cm = float(raw_curb_cm)
+            if isinstance(raw_curb_poly, (list, tuple)):
+                parsed_poly: List[Tuple[float, float]] = []
+                for pt in raw_curb_poly:
+                    if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                        try:
+                            parsed_poly.append((float(pt[0]), float(pt[1])))
+                        except (ValueError, TypeError):
+                            pass
+                if len(parsed_poly) >= 2:
+                    curb_polygon = tuple(parsed_poly)
+                    if curb_px is None:
+                        ys = [p[1] for p in parsed_poly]
+                        delta_y = max(ys) - min(ys)
+                        if delta_y > 0:
+                            curb_px = delta_y
 
         age_days = (self._today() - measured_at).days
         if age_days > CALIBRATION_STALE_DAYS:
@@ -644,6 +662,7 @@ class CalibrationRegistry:
             frame_ref=frame_ref.strip(),
             curb_px=curb_px,
             curb_cm=curb_cm,
+            curb_polygon=curb_polygon,
         )
 
     def load(self) -> "CalibrationRegistry":
@@ -717,6 +736,15 @@ class CalibrationRegistry:
     def entry_for(self, camera_id: str) -> Optional[CameraCalibration]:
         """Validated entry for ``camera_id``, or ``None``."""
         return self._entries.get(camera_id)
+
+    def has_curb_reference(self, camera_id: str) -> bool:
+        """True if camera_id has calibrated curb geometry (curb_px > 0 or curb_polygon)."""
+        entry = self.entry_for(camera_id)
+        if entry is None:
+            return False
+        return (entry.curb_px is not None and entry.curb_px > 0) or (
+            entry.curb_polygon is not None and len(entry.curb_polygon) >= 2
+        )
 
     @property
     def errors(self) -> Tuple[str, ...]:
