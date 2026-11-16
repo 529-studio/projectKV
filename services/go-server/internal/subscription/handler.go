@@ -242,6 +242,14 @@ func (h *Handler) Subscribe(c *gin.Context) {
 				})
 				return
 			}
+		case TargetCorridor:
+			if !h.taxonomy.HasCorridor(sub.TargetID) {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": "invalid corridor target_id",
+					"hint":  "consult GET /api/subscriptions/taxonomy or /api/corridors/overview",
+				})
+				return
+			}
 		}
 	}
 
@@ -433,6 +441,9 @@ func (h *Handler) GetTaxonomy(c *gin.Context) {
 		}
 		if cp := h.taxonomy.Chokepoints(); len(cp) > 0 {
 			resp.Chokepoints = cp
+		}
+		if corr := h.taxonomy.Corridors(); len(corr) > 0 {
+			resp.Corridors = corr
 		}
 	}
 

@@ -857,6 +857,13 @@ definitions:
       name:
         type: string
     type: object
+  subscription.CorridorInfo:
+    properties:
+      display_name:
+        type: string
+      key:
+        type: string
+    type: object
   subscription.SubscribeRequest:
     properties:
       channel_name:
@@ -887,6 +894,10 @@ definitions:
       chokepoints:
         items:
           $ref: '#/definitions/subscription.ChokepointInfo'
+        type: array
+      corridors:
+        items:
+          $ref: '#/definitions/subscription.CorridorInfo'
         type: array
       deep_link_enabled:
         description: |-

@@ -279,4 +279,105 @@ func TestSubscription_Validation(t *testing.T) {
 	if err := s3.IsValid(); err != ErrInvalidTargetType {
 		t.Fatalf("expected ErrInvalidTargetType, got %v", err)
 	}
+
+	// Corridor validation
+	sCorridorMissing := Subscription{ChatID: "123", ChannelName: "telegram", TargetType: TargetCorridor, TargetID: ""}
+	if err := sCorridorMissing.IsValid(); err != ErrMissingTargetID {
+		t.Fatalf("expected ErrMissingTargetID for empty corridor ID, got %v", err)
+	}
+
+	sCorridorValid := Subscription{ChatID: "123", ChannelName: "telegram", TargetType: TargetCorridor, TargetID: "vo_van_kiet"}
+	if err := sCorridorValid.IsValid(); err != nil {
+		t.Fatalf("expected valid corridor subscription, got %v", err)
+	}
+}
+
+func TestSQLiteStore_CorridorSubscriptions(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	store := NewSQLiteStore(db)
+	ctx := context.Background()
+
+	// 1. Subscribe chat1 to corridor "vo_van_kiet"
+	sub1 := Subscription{
+		ChannelName: "telegram",
+		ChatID:      "chat_corridor_1",
+		TargetType:  TargetCorridor,
+		TargetID:    "vo_van_kiet",
+	}
+	if err := store.Subscribe(ctx, sub1); err != nil {
+		t.Fatalf("Subscribe corridor failed: %v", err)
+	}
+
+	// 2. Subscribe chat2 to corridor "mai_chi_tho"
+	sub2 := Subscription{
+		ChannelName: "telegram",
+		ChatID:      "chat_corridor_2",
+		TargetType:  TargetCorridor,
+		TargetID:    "mai_chi_tho",
+	}
+	if err := store.Subscribe(ctx, sub2); err != nil {
+		t.Fatalf("Subscribe corridor 2 failed: %v", err)
+	}
+
+	// 3. Subscribe chat3 to citywide "all"
+	sub3 := Subscription{
+		ChannelName: "telegram",
+		ChatID:      "chat_all",
+		TargetType:  TargetAll,
+	}
+	if err := store.Subscribe(ctx, sub3); err != nil {
+		t.Fatalf("Subscribe all failed: %v", err)
+	}
+
+	// 4. Query subscribers for "vo_van_kiet": should return chat_all and chat_corridor_1
+	subsVVK, err := store.GetSubscribersForCorridor(ctx, "telegram", "vo_van_kiet")
+	if err != nil {
+		t.Fatalf("GetSubscribersForCorridor(vo_van_kiet) failed: %v", err)
+	}
+	if len(subsVVK) != 2 || subsVVK[0] != "chat_all" || subsVVK[1] != "chat_corridor_1" {
+		t.Fatalf("GetSubscribersForCorridor(vo_van_kiet) = %v, want [chat_all, chat_corridor_1]", subsVVK)
+	}
+
+	// 5. Query subscribers with hyphen alias "vo-van-kiet": should match "vo_van_kiet"
+	subsHyphen, err := store.GetSubscribersForCorridor(ctx, "telegram", "vo-van-kiet")
+	if err != nil {
+		t.Fatalf("GetSubscribersForCorridor(vo-van-kiet) failed: %v", err)
+	}
+	if len(subsHyphen) != 2 || subsHyphen[0] != "chat_all" || subsHyphen[1] != "chat_corridor_1" {
+		t.Fatalf("GetSubscribersForCorridor(vo-van-kiet) = %v, want [chat_all, chat_corridor_1]", subsHyphen)
+	}
+
+	// 6. Query subscribers for "mai_chi_tho": should return chat_all and chat_corridor_2
+	subsMCT, err := store.GetSubscribersForCorridor(ctx, "telegram", "mai_chi_tho")
+	if err != nil {
+		t.Fatalf("GetSubscribersForCorridor(mai_chi_tho) failed: %v", err)
+	}
+	if len(subsMCT) != 2 || subsMCT[0] != "chat_all" || subsMCT[1] != "chat_corridor_2" {
+		t.Fatalf("GetSubscribersForCorridor(mai_chi_tho) = %v, want [chat_all, chat_corridor_2]", subsMCT)
+	}
+
+	// 7. Unsubscribe chat1 from corridor "vo_van_kiet" using hyphen alias "vo-van-kiet"
+	if err := store.Unsubscribe(ctx, "telegram", "chat_corridor_1", TargetCorridor, "vo-van-kiet"); err != nil {
+		t.Fatalf("Unsubscribe corridor failed: %v", err)
+	}
+
+	// 8. Re-query subscribers for "vo_van_kiet": now only chat_all should remain
+	subsAfterUnsub, err := store.GetSubscribersForCorridor(ctx, "telegram", "vo_van_kiet")
+	if err != nil {
+		t.Fatalf("GetSubscribersForCorridor after unsub failed: %v", err)
+	}
+	if len(subsAfterUnsub) != 1 || subsAfterUnsub[0] != "chat_all" {
+		t.Fatalf("GetSubscribersForCorridor after unsub = %v, want [chat_all]", subsAfterUnsub)
+	}
+
+	// 9. Verify ListSubscriptions reflects the corridor subscription for chat2
+	list, err := store.ListSubscriptions(ctx, "telegram", "chat_corridor_2")
+	if err != nil {
+		t.Fatalf("ListSubscriptions failed: %v", err)
+	}
+	if len(list) != 1 || list[0].TargetType != TargetCorridor || list[0].TargetID != "mai_chi_tho" {
+		t.Fatalf("ListSubscriptions = %v, want 1 TargetCorridor 'mai_chi_tho'", list)
+	}
 }

@@ -29,15 +29,25 @@ var (
 // It formats flood alerts into clean, monochromatic, bilingual HTML messages
 // with strictly zero emojis per Rule 1.
 type TelegramChannel struct {
-	botToken string
-	baseURL  string
-	client   *http.Client
-	finder   SubscriberFinder
-	log      *slog.Logger
+	botToken       string
+	baseURL        string
+	client         *http.Client
+	finder         SubscriberFinder
+	corridorFinder CorridorSubscriberFinder
+	log            *slog.Logger
 }
 
 // TelegramOption configures TelegramChannel.
 type TelegramOption func(*TelegramChannel)
+
+// WithCorridorSubscriberFinder overrides or configures the corridor subscriber lookup.
+func WithCorridorSubscriberFinder(finder CorridorSubscriberFinder) TelegramOption {
+	return func(c *TelegramChannel) {
+		if finder != nil {
+			c.corridorFinder = finder
+		}
+	}
+}
 
 // WithBaseURL overrides the default Telegram API base URL (useful for test servers).
 func WithBaseURL(url string) TelegramOption {
@@ -74,6 +84,9 @@ func NewTelegramChannel(botToken string, finder SubscriberFinder, opts ...Telegr
 		client:   &http.Client{Timeout: defaultHTTPTimeout},
 		finder:   finder,
 		log:      slog.Default(),
+	}
+	if cf, ok := finder.(CorridorSubscriberFinder); ok {
+		c.corridorFinder = cf
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -164,6 +177,49 @@ func (c *TelegramChannel) Send(ctx context.Context, alert FloodAlert) error {
 // SendTo sends a formatted flood alert message directly to a specific Telegram chat ID.
 func (c *TelegramChannel) SendTo(ctx context.Context, chatID string, alert FloodAlert) error {
 	return c.SendMessage(ctx, chatID, FormatTelegramMessage(alert))
+}
+
+// SendCorridor dispatches a CorridorAlert to all subscribers registered for this corridor.
+func (c *TelegramChannel) SendCorridor(ctx context.Context, alert CorridorAlert) error {
+	if !c.IsConfigured() {
+		c.log.Info("telegram: bot token not configured, skipping corridor alert delivery", "road_key", alert.RoadKey)
+		return nil
+	}
+
+	if c.corridorFinder == nil {
+		c.log.Warn("telegram: no CorridorSubscriberFinder configured, skipping corridor alert", "road_key", alert.RoadKey)
+		return nil
+	}
+
+	subscribers, err := c.corridorFinder.GetSubscribersForCorridorAlert(ctx, c.Name(), alert)
+	if err != nil {
+		return fmt.Errorf("telegram: lookup subscribers for corridor alert %s: %w", alert.RoadKey, err)
+	}
+
+	if len(subscribers) == 0 {
+		c.log.Debug("telegram: no subscribers matching corridor alert", "road_key", alert.RoadKey, "passability", alert.Passability)
+		return nil
+	}
+
+	c.log.Info("telegram: dispatching corridor alert", "road_key", alert.RoadKey, "passability", alert.Passability, "recipients_count", len(subscribers))
+
+	htmlMsg := FormatTelegramCorridorMessage(alert)
+	var errs []error
+	for _, chatID := range subscribers {
+		if err := c.SendMessage(ctx, chatID, htmlMsg); err != nil {
+			errs = append(errs, fmt.Errorf("chat %s: %w", chatID, err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+// SendCorridorTo sends a formatted corridor hazard alert message directly to a specific Telegram chat ID.
+func (c *TelegramChannel) SendCorridorTo(ctx context.Context, chatID string, alert CorridorAlert) error {
+	return c.SendMessage(ctx, chatID, FormatTelegramCorridorMessage(alert))
 }
 
 // SendMessage delivers one already-rendered HTML message to a chat. It is the
@@ -336,6 +392,67 @@ func FormatTelegramMessage(alert FloodAlert) string {
 	}
 	if liveURL != "" {
 		sb.WriteString(fmt.Sprintf("<b>Chi tiết / Live View:</b> <a href=\"%s\">%s</a>", escapeHTML(liveURL), escapeHTML(liveURL)))
+	}
+
+	return sb.String()
+}
+
+// FormatTelegramCorridorMessage formats a CorridorAlert into clean, monochromatic, bilingual HTML.
+// Strictly zero emojis per Rule 1.
+func FormatTelegramCorridorMessage(alert CorridorAlert) string {
+	var verdictVI, verdictEN string
+	switch strings.ToUpper(alert.Passability) {
+	case "IMPASSABLE":
+		verdictVI = "NGẬP SÂU - ÙN TẮC"
+		verdictEN = "IMPASSABLE"
+	case "CAUTION":
+		verdictVI = "CẢNH BÁO"
+		verdictEN = "CAUTION"
+	case "CLEAR":
+		verdictVI = "THÔNG THOÁNG"
+		verdictEN = "CLEAR"
+	default:
+		verdictVI = "CẢNH BÁO"
+		verdictEN = "ALERT"
+	}
+
+	obsTime := alert.ObservedAt
+	if obsTime.IsZero() {
+		obsTime = time.Now()
+	}
+	ict := time.FixedZone("ICT", 7*3600)
+	timeFormatted := obsTime.In(ict).Format("15:04 02/01/2006 (ICT)")
+
+	corridorName := escapeHTML(alert.RoadName)
+	if corridorName == "" {
+		corridorName = escapeHTML(alert.RoadKey)
+	}
+
+	var sb strings.Builder
+	sb.WriteString("<b>[CẢNH BÁO TUYẾN ĐƯỜNG / CORRIDOR HAZARD ALERT]</b>\n\n")
+	sb.WriteString(fmt.Sprintf("<b>Tuyến đường / Corridor:</b> %s\n", corridorName))
+	sb.WriteString(fmt.Sprintf("<b>Trạng thái / Passability:</b> [%s / %s]\n", verdictVI, verdictEN))
+
+	if alert.MaxDepthCm != nil && *alert.MaxDepthCm > 0 {
+		if alert.PeakLocation != "" {
+			sb.WriteString(fmt.Sprintf("<b>Mức nước cao nhất / Peak Depth:</b> %.0f cm tại %s\n", *alert.MaxDepthCm, escapeHTML(alert.PeakLocation)))
+		} else {
+			sb.WriteString(fmt.Sprintf("<b>Mức nước cao nhất / Peak Depth:</b> %.0f cm\n", *alert.MaxDepthCm))
+		}
+	}
+
+	if alert.EstimatedDelayMin > 0 {
+		sb.WriteString(fmt.Sprintf("<b>Ước tính chậm trễ / Est. Delay:</b> +%d phút / +%d mins\n", alert.EstimatedDelayMin, alert.EstimatedDelayMin))
+	}
+
+	sb.WriteString(fmt.Sprintf("<b>Thời gian / Time:</b> %s\n", timeFormatted))
+
+	routeURL := alert.RouteWebURL
+	if routeURL == "" && alert.RoadKey != "" {
+		routeURL = fmt.Sprintf("https://warded.529studio.site/roads/%s", alert.RoadKey)
+	}
+	if routeURL != "" {
+		sb.WriteString(fmt.Sprintf("<b>Xem bản đồ lộ trình / Route Map:</b> <a href=\"%s\">%s</a>", escapeHTML(routeURL), escapeHTML(routeURL)))
 	}
 
 	return sb.String()

@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -55,6 +56,7 @@ var (
 // subscription SQLite store to it (DIP); telegrambot imports no internal package.
 type Store interface {
 	Subscribe(ctx context.Context, channelName, chatID string, rec Record) error
+	Unsubscribe(ctx context.Context, channelName, chatID string, targetType, targetID string) error
 	UnsubscribeAll(ctx context.Context, channelName, chatID string) (int64, error)
 	List(ctx context.Context, channelName, chatID string) ([]Record, error)
 }
@@ -69,7 +71,13 @@ type Taxonomy interface {
 	CanonicalZone(string) (string, bool)
 	CanonicalWard(string) (string, bool)
 	CanonicalChokepoint(string) (string, bool)
+	CanonicalCorridor(string) (string, bool)
 	Label(Target) string
+}
+
+// CorridorConditionReporter optionally provides current status for corridor onboarding.
+type CorridorConditionReporter interface {
+	CorridorCondition(roadKey string) (status string, maxDepthCm *float64, ok bool)
 }
 
 // Config controls the bot runtime. Zero numeric fields take the spec defaults.
@@ -357,10 +365,14 @@ func (h *Handler) process(j job) {
 		h.handleStart(chatID, msg.Chat.ID, cmd.Arg)
 	case "help":
 		h.reply(msg.Chat.ID, RenderHelp(h.cfg.WebURL))
-	case "status":
+	case "status", "my_subs":
 		h.handleStatus(chatID, msg.Chat.ID)
 	case "stop", "unsubscribe":
 		h.handleStop(chatID, msg.Chat.ID)
+	case "sub":
+		h.handleSub(chatID, msg.Chat.ID, cmd.Arg)
+	case "unsub":
+		h.handleUnsub(chatID, msg.Chat.ID, cmd.Arg)
 	default:
 		h.replyHelp(chatID, msg.Chat.ID)
 	}
@@ -420,7 +432,135 @@ func (h *Handler) handleStart(chatID string, numericChatID int64, arg string) {
 		h.reply(numericChatID, RenderDeliveryFailed())
 		return
 	}
+
+	if target.Type == targetTypeCorridor {
+		if status, maxDepthCm, ok := h.corridorCondition(target.ID); ok {
+			webURL := fmt.Sprintf("%s/roads/%s", h.cfg.WebURL, target.ID)
+			h.reply(numericChatID, RenderSubscribedWithCorridorStatus(target, label, status, maxDepthCm, webURL))
+			return
+		}
+	}
+
 	h.reply(numericChatID, RenderSubscribed(target, label))
+}
+
+func (h *Handler) handleSub(chatID string, numericChatID int64, arg string) {
+	ctx := context.Background()
+	parts := strings.Fields(strings.TrimSpace(arg))
+	if len(parts) < 2 {
+		h.reply(numericChatID, RenderSubUsage())
+		return
+	}
+
+	scopeType := strings.ToLower(parts[0])
+	scopeID := strings.TrimSpace(strings.Join(parts[1:], " "))
+
+	var rawTarget Target
+	switch scopeType {
+	case "corridor", "tuyen_duong", "duong":
+		rawTarget = Target{Type: targetTypeCorridor, ID: scopeID}
+	case "zone", "khu_vuc":
+		rawTarget = Target{Type: targetTypeZone, ID: scopeID}
+	case "ward", "phuong", "xa":
+		rawTarget = Target{Type: targetTypeWard, ID: scopeID}
+	case "chokepoint", "cam", "camera":
+		rawTarget = Target{Type: targetTypeChokepoint, ID: scopeID}
+	case "all":
+		rawTarget = Target{Type: targetTypeAll}
+	default:
+		h.reply(numericChatID, RenderSubUsage())
+		return
+	}
+
+	target, ok := h.resolve(rawTarget)
+	if !ok {
+		h.reply(numericChatID, RenderUnknownTarget(arg))
+		return
+	}
+
+	subs, err := h.store.List(ctx, SubscriptionChannel, chatID)
+	if err != nil {
+		h.logger.Error("telegram sub: list failed", "chat", tail4(chatID), "error", err)
+		h.reply(numericChatID, RenderDeliveryFailed())
+		return
+	}
+
+	label := h.labelFor(target)
+	for _, existing := range subs {
+		if sameTarget(existing.TargetType, existing.TargetID, target) {
+			h.reply(numericChatID, RenderAlreadySubscribed(target, label))
+			return
+		}
+	}
+	if len(subs) >= h.cfg.MaxSubsPerChat {
+		h.reply(numericChatID, RenderLimitReached(h.cfg.MaxSubsPerChat))
+		return
+	}
+
+	rec := Record{TargetType: target.Type, TargetID: target.ID, CreatedAt: h.now()}
+	if err := h.store.Subscribe(ctx, SubscriptionChannel, chatID, rec); err != nil {
+		h.logger.Error("telegram sub: subscribe failed", "chat", tail4(chatID), "error", err)
+		h.reply(numericChatID, RenderDeliveryFailed())
+		return
+	}
+
+	if target.Type == targetTypeCorridor {
+		if status, maxDepthCm, ok := h.corridorCondition(target.ID); ok {
+			webURL := fmt.Sprintf("%s/roads/%s", h.cfg.WebURL, target.ID)
+			h.reply(numericChatID, RenderSubscribedWithCorridorStatus(target, label, status, maxDepthCm, webURL))
+			return
+		}
+	}
+
+	h.reply(numericChatID, RenderSubscribed(target, label))
+}
+
+func (h *Handler) handleUnsub(chatID string, numericChatID int64, arg string) {
+	ctx := context.Background()
+	parts := strings.Fields(strings.TrimSpace(arg))
+	if len(parts) < 2 {
+		h.reply(numericChatID, RenderUnsubUsage())
+		return
+	}
+
+	scopeType := strings.ToLower(parts[0])
+	scopeID := strings.TrimSpace(strings.Join(parts[1:], " "))
+
+	var rawTarget Target
+	switch scopeType {
+	case "corridor", "tuyen_duong", "duong":
+		rawTarget = Target{Type: targetTypeCorridor, ID: scopeID}
+	case "zone", "khu_vuc":
+		rawTarget = Target{Type: targetTypeZone, ID: scopeID}
+	case "ward", "phuong", "xa":
+		rawTarget = Target{Type: targetTypeWard, ID: scopeID}
+	case "chokepoint", "cam", "camera":
+		rawTarget = Target{Type: targetTypeChokepoint, ID: scopeID}
+	default:
+		h.reply(numericChatID, RenderUnsubUsage())
+		return
+	}
+
+	target, ok := h.resolve(rawTarget)
+	if !ok {
+		target = rawTarget
+	}
+
+	label := h.labelFor(target)
+	if err := h.store.Unsubscribe(ctx, SubscriptionChannel, chatID, target.Type, target.ID); err != nil {
+		h.logger.Error("telegram unsub: unsubscribe failed", "chat", tail4(chatID), "error", err)
+		h.reply(numericChatID, RenderDeliveryFailed())
+		return
+	}
+
+	h.reply(numericChatID, RenderUnsubscribed(target, label))
+}
+
+func (h *Handler) corridorCondition(roadKey string) (string, *float64, bool) {
+	if rep, ok := h.taxonomy.(CorridorConditionReporter); ok && rep != nil {
+		return rep.CorridorCondition(roadKey)
+	}
+	return "", nil, false
 }
 
 func (h *Handler) handleStatus(chatID string, numericChatID int64) {
@@ -473,6 +613,10 @@ func (h *Handler) resolve(t Target) (Target, bool) {
 		if canonical, ok := h.taxonomy.CanonicalChokepoint(t.ID); ok {
 			return Target{Type: targetTypeChokepoint, ID: canonical}, true
 		}
+	case targetTypeCorridor:
+		if canonical, ok := h.taxonomy.CanonicalCorridor(t.ID); ok {
+			return Target{Type: targetTypeCorridor, ID: canonical}, true
+		}
 	}
 	return Target{}, false
 }
@@ -509,6 +653,11 @@ func sameTarget(storedType, storedID string, t Target) bool {
 	}
 	if t.Type == targetTypeChokepoint {
 		return storedID == t.ID
+	}
+	if t.Type == targetTypeCorridor {
+		normStored := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(storedID), "-", "_"))
+		normTarget := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(t.ID), "-", "_"))
+		return normStored == normTarget
 	}
 	return strings.EqualFold(strings.TrimSpace(storedID), strings.TrimSpace(t.ID))
 }

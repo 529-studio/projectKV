@@ -26,10 +26,12 @@ const (
 	targetTypeZone       = "zone"
 	targetTypeWard       = "ward"
 	targetTypeChokepoint = "chokepoint"
+	targetTypeCorridor   = "corridor"
 
-	zonePrefix = "zone_"
-	wardPrefix = "ward_"
-	camPrefix  = "cam_"
+	zonePrefix     = "zone_"
+	wardPrefix     = "ward_"
+	camPrefix      = "cam_"
+	corridorPrefix = "corridor_"
 )
 
 // Sentinel errors for deep-link payload handling.
@@ -44,6 +46,9 @@ var (
 
 // camIDPattern is the normative camera/chokepoint id grammar (spec §2.1).
 var camIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,40}$`)
+
+// corridorIDPattern is the normative corridor road key grammar.
+var corridorIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,40}$`)
 
 // Target is the decoded subscription scope carried by a deep link.
 type Target struct {
@@ -112,6 +117,12 @@ func EncodePayload(t Target) (string, error) {
 			return "", ErrPayloadMalformed
 		}
 		payload = PayloadPrefix + camPrefix + t.ID
+	case targetTypeCorridor:
+		id := strings.TrimSpace(t.ID)
+		if !corridorIDPattern.MatchString(id) {
+			return "", ErrPayloadMalformed
+		}
+		payload = PayloadPrefix + corridorPrefix + id
 	default:
 		return "", ErrPayloadUnknown
 	}
@@ -163,6 +174,12 @@ func DecodePayload(payload string) (Target, error) {
 			return Target{}, ErrPayloadMalformed
 		}
 		return Target{Type: targetTypeChokepoint, ID: id}, nil
+	case strings.HasPrefix(lower, corridorPrefix):
+		id := rest[len(corridorPrefix):]
+		if !corridorIDPattern.MatchString(id) {
+			return Target{}, ErrPayloadMalformed
+		}
+		return Target{Type: targetTypeCorridor, ID: id}, nil
 	default:
 		return Target{}, ErrPayloadUnknown
 	}

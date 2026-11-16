@@ -2748,6 +2748,17 @@ const docTemplate = `{
                 }
             }
         },
+        "subscription.CorridorInfo": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                }
+            }
+        },
         "subscription.SubscribeRequest": {
             "type": "object",
             "required": [
@@ -2785,6 +2796,12 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/subscription.ChokepointInfo"
+                    }
+                },
+                "corridors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/subscription.CorridorInfo"
                     }
                 },
                 "deep_link_enabled": {

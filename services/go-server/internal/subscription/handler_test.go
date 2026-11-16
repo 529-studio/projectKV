@@ -14,6 +14,7 @@ type mockTaxonomyProvider struct {
 	zones       []string
 	wards       []WardInfo
 	chokepoints []ChokepointInfo
+	corridors   []CorridorInfo
 }
 
 func (m *mockTaxonomyProvider) Zones() []string {
@@ -26,6 +27,10 @@ func (m *mockTaxonomyProvider) Wards() []WardInfo {
 
 func (m *mockTaxonomyProvider) Chokepoints() []ChokepointInfo {
 	return m.chokepoints
+}
+
+func (m *mockTaxonomyProvider) Corridors() []CorridorInfo {
+	return m.corridors
 }
 
 func (m *mockTaxonomyProvider) HasZone(zone string) bool {
@@ -49,6 +54,15 @@ func (m *mockTaxonomyProvider) HasWard(ward string) bool {
 func (m *mockTaxonomyProvider) HasChokepoint(id string) bool {
 	for _, cp := range m.chokepoints {
 		if cp.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *mockTaxonomyProvider) HasCorridor(key string) bool {
+	for _, c := range m.corridors {
+		if c.Key == key {
 			return true
 		}
 	}
@@ -168,8 +182,8 @@ func TestHandler_Endpoints(t *testing.T) {
 	if err := json.Unmarshal(wTax.Body.Bytes(), &taxResp); err != nil {
 		t.Fatalf("failed to decode taxonomy response: %v", err)
 	}
-	if len(taxResp.TargetTypes) != 4 {
-		t.Errorf("expected 4 target types, got %d", len(taxResp.TargetTypes))
+	if len(taxResp.TargetTypes) != len(CanonicalTargetTypes) {
+		t.Errorf("expected %d target types, got %d", len(CanonicalTargetTypes), len(taxResp.TargetTypes))
 	}
 	if len(taxResp.Zones) != len(CanonicalZones) {
 		t.Errorf("expected %d zones, got %d", len(CanonicalZones), len(taxResp.Zones))

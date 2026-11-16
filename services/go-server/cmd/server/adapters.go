@@ -11,11 +11,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/529-studio/projectKV/services/go-server/internal/camera"
 	"github.com/529-studio/projectKV/services/go-server/internal/config"
+	"github.com/529-studio/projectKV/services/go-server/internal/corridor"
 	"github.com/529-studio/projectKV/services/go-server/internal/cvclient"
 	"github.com/529-studio/projectKV/services/go-server/internal/feedback"
 	"github.com/529-studio/projectKV/services/go-server/internal/flood"
@@ -229,6 +231,25 @@ func (a *subscriptionTaxonomyAdapter) HasChokepoint(id string) bool {
 	return ok
 }
 
+func (a *subscriptionTaxonomyAdapter) Corridors() []subscription.CorridorInfo {
+	list := make([]subscription.CorridorInfo, 0, len(corridor.ArterialCorridors))
+	for _, def := range corridor.ArterialCorridors {
+		list = append(list, subscription.CorridorInfo{
+			Key:         def.Key,
+			DisplayName: def.DisplayName,
+		})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Key < list[j].Key
+	})
+	return list
+}
+
+func (a *subscriptionTaxonomyAdapter) HasCorridor(key string) bool {
+	_, ok := corridor.LookupCorridor(key)
+	return ok
+}
+
 // telegramBotStoreAdapter adapts the subscription SQLite store to
 // telegrambot.Store (Dependency Inversion: the bot package imports no internal
 // package, so the composition root maps the shapes, S12-T4 spec §4.1).
@@ -248,6 +269,10 @@ func (a *telegramBotStoreAdapter) Subscribe(ctx context.Context, channelName, ch
 
 func (a *telegramBotStoreAdapter) UnsubscribeAll(ctx context.Context, channelName, chatID string) (int64, error) {
 	return a.store.UnsubscribeAll(ctx, channelName, chatID)
+}
+
+func (a *telegramBotStoreAdapter) Unsubscribe(ctx context.Context, channelName, chatID string, targetType, targetID string) error {
+	return a.store.Unsubscribe(ctx, channelName, chatID, subscription.TargetType(targetType), targetID)
 }
 
 func (a *telegramBotStoreAdapter) List(ctx context.Context, channelName, chatID string) ([]telegrambot.Record, error) {
@@ -270,7 +295,8 @@ func (a *telegramBotStoreAdapter) List(ctx context.Context, channelName, chatID 
 // Canonicalisation is the security-relevant part: a deep link carries a raw id,
 // and only a value that resolves against the live catalog may reach the store.
 type telegramBotTaxonomyAdapter struct {
-	catalog camera.Reader
+	catalog         camera.Reader
+	corridorService *corridor.Service
 }
 
 func (a *telegramBotTaxonomyAdapter) CanonicalZone(raw string) (string, bool) {
@@ -316,6 +342,31 @@ func (a *telegramBotTaxonomyAdapter) CanonicalChokepoint(id string) (string, boo
 	return cam.ID, true
 }
 
+func (a *telegramBotTaxonomyAdapter) CanonicalCorridor(raw string) (string, bool) {
+	if def, ok := corridor.LookupCorridor(raw); ok {
+		return def.Key, true
+	}
+	return "", false
+}
+
+func (a *telegramBotTaxonomyAdapter) CorridorCondition(roadKey string) (string, *float64, bool) {
+	if def, ok := corridor.LookupCorridor(roadKey); ok {
+		if a != nil && a.corridorService != nil {
+			st, ok := a.corridorService.GetStatus(def.Key)
+			if ok && st != nil {
+				severity := st.WorstSeverity
+				if st.WorstFloodSeverity != "" && st.WorstFloodSeverity != "CLEAR" {
+					severity = st.WorstFloodSeverity
+				}
+				return severity, st.MaxDepthCm, true
+			}
+		}
+		depth := 0.0
+		return "CLEAR", &depth, true
+	}
+	return "", nil, false
+}
+
 func (a *telegramBotTaxonomyAdapter) Label(target telegrambot.Target) string {
 	switch target.Type {
 	case "all":
@@ -339,6 +390,10 @@ func (a *telegramBotTaxonomyAdapter) Label(target telegrambot.Target) string {
 				}
 				return cam.ID
 			}
+		}
+	case "corridor":
+		if def, ok := corridor.LookupCorridor(target.ID); ok {
+			return def.DisplayName
 		}
 	}
 	return strings.TrimSpace(target.ID)

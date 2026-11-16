@@ -122,15 +122,17 @@ func RenderHelp(webURL string) string {
 
 	vi := []string{
 		"Warded Alert - Trợ giúp",
-		"- /status: xem các đăng ký đang hoạt động",
-		"- /stop: huỷ toàn bộ đăng ký",
-		"- /unsubscribe: huỷ toàn bộ đăng ký",
+		"- /status hoặc /my_subs: xem các đăng ký đang hoạt động",
+		"- /sub corridor <tên_đường>: đăng ký theo dõi tuyến đường",
+		"- /unsub corridor <tên_đường>: huỷ theo dõi tuyến đường",
+		"- /stop hoặc /unsubscribe: huỷ toàn bộ đăng ký",
 	}
 	en := []string{
 		"Warded Alert - Help",
-		"- /status: view your active subscriptions",
-		"- /stop: remove all subscriptions",
-		"- /unsubscribe: remove all subscriptions",
+		"- /status or /my_subs: view your active subscriptions",
+		"- /sub corridor <road_key>: subscribe to corridor alerts",
+		"- /unsub corridor <road_key>: unsubscribe from corridor",
+		"- /stop or /unsubscribe: remove all subscriptions",
 	}
 	if link != "" {
 		vi = append(vi, "Đăng ký trên web: "+link)
@@ -191,6 +193,9 @@ func RenderStatus(subs []Record, labeler Labeler) string {
 		case targetTypeChokepoint:
 			vi = append(vi, "- Điểm ngập: "+escapeHTML(label))
 			en = append(en, "- Chokepoint: "+escapeHTML(label))
+		case targetTypeCorridor:
+			vi = append(vi, "- Tuyến đường: "+escapeHTML(label))
+			en = append(en, "- Corridor: "+escapeHTML(label))
 		default:
 			vi = append(vi, "- "+escapeHTML(label))
 			en = append(en, "- "+escapeHTML(label))
@@ -198,6 +203,75 @@ func RenderStatus(subs []Record, labeler Labeler) string {
 	}
 
 	return strings.Join(vi, "\n") + "\n\n" + strings.Join(en, "\n")
+}
+
+// RenderSubUsage returns guidance for the /sub command.
+func RenderSubUsage() string {
+	return "Cách dùng: /sub corridor <tên_tuyến_đường>\n" +
+		"Ví dụ: /sub corridor vo_van_kiet\n\n" +
+		"Usage: /sub corridor <road_key>\n" +
+		"Example: /sub corridor vo_van_kiet"
+}
+
+// RenderUnsubUsage returns guidance for the /unsub command.
+func RenderUnsubUsage() string {
+	return "Cách dùng: /unsub corridor <tên_tuyến_đường>\n" +
+		"Ví dụ: /unsub corridor vo_van_kiet\n\n" +
+		"Usage: /unsub corridor <road_key>\n" +
+		"Example: /unsub corridor vo_van_kiet"
+}
+
+// RenderUnsubscribed confirms cancellation of a specific subscription.
+func RenderUnsubscribed(t Target, label string) string {
+	viLabel, enLabel := scopeLabels(t, label)
+	return fmt.Sprintf(
+		"Đã huỷ đăng ký thành công.\nPhạm vi: %s\nGõ /status hoặc /my_subs để xem danh sách.\n\n"+
+			"Unsubscribed successfully.\nScope: %s\nSend /status or /my_subs to review subscriptions.",
+		escapeHTML(viLabel), escapeHTML(enLabel),
+	)
+}
+
+// RenderCorridorReport builds an initial condition report for a corridor. Strictly zero emojis per Rule 1.
+func RenderCorridorReport(label string, status string, maxDepthCm *float64, webURL string) string {
+	var statusVI, statusEN string
+	switch strings.ToUpper(status) {
+	case "IMPASSABLE":
+		statusVI = "NGẬP SÂU - ÙN TẮC"
+		statusEN = "IMPASSABLE"
+	case "CAUTION":
+		statusVI = "CẢNH BÁO - CHẬM TRỄ"
+		statusEN = "CAUTION"
+	case "CLEAR":
+		statusVI = "THÔNG THOÁNG"
+		statusEN = "CLEAR"
+	default:
+		statusVI = "BÌNH THƯỜNG"
+		statusEN = "NORMAL"
+	}
+
+	depthStrVI := "Không ghi nhận điểm ngập sâu"
+	depthStrEN := "No deep flooding recorded"
+	if maxDepthCm != nil && *maxDepthCm > 0 {
+		depthStrVI = fmt.Sprintf("Mức nước cao nhất: %.0f cm", *maxDepthCm)
+		depthStrEN = fmt.Sprintf("Peak water depth: %.0f cm", *maxDepthCm)
+	}
+
+	vi := fmt.Sprintf("Tình trạng hiện tại: %s\n- Trạng thái: %s\n- %s", escapeHTML(label), statusVI, depthStrVI)
+	en := fmt.Sprintf("Current condition: %s\n- Status: %s\n- %s", escapeHTML(label), statusEN, depthStrEN)
+
+	if webURL != "" {
+		vi += fmt.Sprintf("\nXem bản đồ lộ trình: %s", escapeHTML(webURL))
+		en += fmt.Sprintf("\nView route map: %s", escapeHTML(webURL))
+	}
+
+	return vi + "\n\n" + en
+}
+
+// RenderSubscribedWithCorridorStatus combines confirmation with the current corridor condition report.
+func RenderSubscribedWithCorridorStatus(t Target, label string, status string, maxDepthCm *float64, webURL string) string {
+	confirmation := RenderSubscribed(t, label)
+	report := RenderCorridorReport(label, status, maxDepthCm, webURL)
+	return confirmation + "\n\n" + report
 }
 
 // RenderStopped reports how many subscriptions /stop or /unsubscribe removed.
@@ -269,6 +343,9 @@ func scopeLabels(t Target, label string) (string, string) {
 	value := strings.TrimSpace(label)
 	if value == "" {
 		value = t.ID
+	}
+	if t.Type == targetTypeCorridor {
+		return "Tuyến đường: " + value, "Corridor: " + value
 	}
 	return value, value
 }

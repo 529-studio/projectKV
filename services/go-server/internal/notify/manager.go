@@ -5,15 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
+	"time"
 )
+
+// DefaultCorridorDebounceWindow is the standard anti-spam quiet period (15 minutes)
+// between hazard notifications for the same arterial corridor.
+const DefaultCorridorDebounceWindow = 15 * time.Minute
 
 // Manager coordinates notification channels and enforces anti-spam debouncing.
 type Manager struct {
-	mu        sync.RWMutex
-	channels  map[string]Channel
-	debouncer *Debouncer
-	log       *slog.Logger
+	mu                sync.RWMutex
+	channels          map[string]Channel
+	debouncer         *Debouncer
+	corridorDebouncer *Debouncer
+	log               *slog.Logger
 }
 
 // ManagerOption configures Manager.
@@ -28,15 +35,34 @@ func WithManagerLogger(log *slog.Logger) ManagerOption {
 	}
 }
 
+// WithCorridorDebouncer overrides the default corridor debouncer.
+func WithCorridorDebouncer(d *Debouncer) ManagerOption {
+	return func(m *Manager) {
+		if d != nil {
+			m.corridorDebouncer = d
+		}
+	}
+}
+
+// WithCorridorDebounceWindow sets the quiet period for corridor debouncing.
+func WithCorridorDebounceWindow(w time.Duration) ManagerOption {
+	return func(m *Manager) {
+		if w > 0 {
+			m.corridorDebouncer = NewDebouncer(w)
+		}
+	}
+}
+
 // NewManager creates a new notification Manager.
 func NewManager(debouncer *Debouncer, opts ...ManagerOption) *Manager {
 	if debouncer == nil {
 		debouncer = NewDebouncer(DefaultDebounceWindow)
 	}
 	m := &Manager{
-		channels:  make(map[string]Channel),
-		debouncer: debouncer,
-		log:       slog.Default(),
+		channels:          make(map[string]Channel),
+		debouncer:         debouncer,
+		corridorDebouncer: NewDebouncer(DefaultCorridorDebounceWindow),
+		log:               slog.Default(),
 	}
 	for _, opt := range opts {
 		opt(m)
@@ -77,6 +103,11 @@ func (m *Manager) Channels() []Channel {
 // Debouncer returns the underlying Debouncer instance.
 func (m *Manager) Debouncer() *Debouncer {
 	return m.debouncer
+}
+
+// CorridorDebouncer returns the underlying Debouncer instance for arterial corridors.
+func (m *Manager) CorridorDebouncer() *Debouncer {
+	return m.corridorDebouncer
 }
 
 // IsFloodSeverity returns true if severity represents actionable flooding.
@@ -121,6 +152,73 @@ func (m *Manager) Dispatch(ctx context.Context, alert FloodAlert) error {
 				errCh <- fmt.Errorf("channel %s: %w", c.Name(), err)
 			}
 		}(ch)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	var errs []error
+	for err := range errCh {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+// DispatchCorridor evaluates a CorridorAlert, checks the 15-minute anti-spam debounce window,
+// and fans out delivery to registered channels that support corridor alerts.
+func (m *Manager) DispatchCorridor(ctx context.Context, alert CorridorAlert) error {
+	// 1. Only dispatch actionable hazard conditions (IMPASSABLE, CAUTION, or depth >= 15 cm)
+	isHazard := strings.EqualFold(alert.Passability, "IMPASSABLE") ||
+		strings.EqualFold(alert.Passability, "CAUTION") ||
+		alert.WorstFloodSeverity == "FLOODED_SHALLOW" ||
+		alert.WorstFloodSeverity == "FLOODED_DEEP" ||
+		(alert.MaxDepthCm != nil && *alert.MaxDepthCm >= 15.0)
+
+	if !isHazard {
+		m.log.Debug("notify: skipping non-hazard corridor status", "road_key", alert.RoadKey, "passability", alert.Passability)
+		return nil
+	}
+
+	// 2. 15-Minute anti-spam sliding debounce check per corridor
+	if m.corridorDebouncer.ShouldSuppress(alert.RoadKey, alert.ObservedAt) {
+		m.log.Info("notify: corridor alert suppressed by 15-minute debounce window", "road_key", alert.RoadKey, "passability", alert.Passability)
+		return nil
+	}
+
+	// 3. Collect registered channels
+	channels := m.Channels()
+	if len(channels) == 0 {
+		m.log.Debug("notify: no channels registered, corridor alert not dispatched", "road_key", alert.RoadKey)
+		return nil
+	}
+
+	m.log.Info("notify: dispatching corridor alert to channels", "road_key", alert.RoadKey, "passability", alert.Passability, "channels_count", len(channels))
+
+	// 4. Concurrent fan-out across channels supporting corridor alerts
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(channels))
+
+	for _, ch := range channels {
+		corridorCh, ok := ch.(interface {
+			SendCorridor(ctx context.Context, alert CorridorAlert) error
+		})
+		if !ok {
+			continue
+		}
+		wg.Add(1)
+		go func(c interface {
+			SendCorridor(ctx context.Context, alert CorridorAlert) error
+		}, name string) {
+			defer wg.Done()
+			if err := c.SendCorridor(ctx, alert); err != nil {
+				m.log.Error("notify: corridor channel dispatch failed", "channel", name, "road_key", alert.RoadKey, "error", err)
+				errCh <- fmt.Errorf("channel %s: %w", name, err)
+			}
+		}(corridorCh, ch.Name())
 	}
 
 	wg.Wait()
