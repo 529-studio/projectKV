@@ -4,100 +4,110 @@ One row per engineering lesson. The full text lives in the linked file; this ind
 is the only part an agent should read by default.
 
 | # | Lesson | Mandatory guardrail | File |
-|---|---|---|---|
-| 1 | Passing Unit Tests is Never Sufficient | Simulate real client workflows end-to-end; unit tests alone are never sufficient. | [L01](L01-passing-unit-tests-is-never-sufficient-upstream-waf-header.md) |
-| 2 | Sequence Inversion Risk & Downstream Divergence | Document inversions; sequence tasks strictly to prevent architectural divergence. | [L02](L02-sequence-inversion-risk-invisible-downstream-divergence.md) |
-| 3 | Completion Claims vs. Production Reality | Verify end-to-end against live endpoints before claiming task completion. | [L03](L03-completion-claims-vs-production-reality-gap.md) |
-| 4 | Tooling & Environment Discrepancies | Multi-environment resilience: support standalone binaries and containerized runtimes. | [L04](L04-tooling-environment-discrepancies-on-host-platforms.md) |
-| 5 | Zero-Emoji Standard & Telemetry Streams | Zero emojis in UI and backend logs; use monochromatic SVGs and clean plaintext labels. | [L05](L05-zero-emoji-standard-telemetry-stream-corruption.md) |
-| 6 | Single-Threaded HTTP vs Concurrent Go | Services receiving concurrent requests from Go workers must handle concurrency safely. | [L06](L06-single-threaded-http-servers-vs-concurrent-go-dispatchers.md) |
+| --- | --- | --- | --- |
+| 1 | Passing Unit Tests is Never Sufficient | Simulate client workflows end-to-end; unit tests alone are never sufficient. | [L01](L01-passing-unit-tests-is-never-sufficient-upstream-waf-header.md) |
+| 2 | Sequence Inversion Risk & Downstream Divergence | Document inversions; sequence tasks strictly to prevent divergence. | [L02](L02-sequence-inversion-risk-invisible-downstream-divergence.md) |
+| 3 | Completion Claims vs. Production Reality | Verify against live endpoints before claiming completion. | [L03](L03-completion-claims-vs-production-reality-gap.md) |
+| 4 | Tooling & Environment Discrepancies | Support standalone binaries and containerized runtimes. | [L04](L04-tooling-environment-discrepancies-on-host-platforms.md) |
+| 5 | Zero-Emoji Standard & Telemetry Streams | Zero emojis in UI and backend logs; use monochromatic SVGs and plaintext. | [L05](L05-zero-emoji-standard-telemetry-stream-corruption.md) |
+| 6 | Single-Threaded HTTP vs Concurrent Go | Services receiving concurrent requests from Go workers must be thread-safe. | [L06](L06-single-threaded-http-servers-vs-concurrent-go-dispatchers.md) |
 | 7 | Upstream Timestamp Mismatch & Mock Blind Spots | Normalize time series to common bins before joining; avoid mock blind spots. | [L07](L07-upstream-timestamp-resolution-mismatch-mock-contract-blind.md) |
-| 8 | GitHub Actions Billing & Duplicate Jobs | Steps are free, jobs are not: fold logic into an already-running job as a step when possible. | [L08](L08-github-actions-billing-ceiling-rounding-duplicate.md) |
-| 9 | Competing Sources of Truth & Silent Drift | Single source of truth: never hardcode a second copy of state that can be derived. | [L09](L09-competing-sources-of-truth-silent-drift-ghost-camera.md) |
-| 10 | CD Pipeline Configuration & Environment Propagation | Git as CD single source: never rely solely on ad-hoc UI or host edits on Portainer. | [L10](L10-cd-pipeline-configuration-overwrite-environment-propagation.md) |
-| 11 | Decoupled Scheduled Pipelines vs. On-Demand Proxy Caches | Separate scheduled pipelines and on-demand proxy caches with explicit boundaries. | [L11](L11-decoupled-scheduled-pipelines-vs-on-demand-proxy-caches.md) |
-| 12 | Machine Learning Model Classes vs. Domain Formulas | Model-to-domain sync: business scoring formulas must stay synchronized with model classes. | [L12](L12-machine-learning-model-classes-vs-domain-business-formulas.md) |
-| 13 | Ground-Truth Baselines vs. Spot-Checking | Curate deterministic extremes: isolate cameras with predictable, extreme baselines. | [L13](L13-ground-truth-smoke-test-baselines-vs-anecdotal-spot-checking.md) |
-| 14 | Active Labeling vs. Passive Data Accumulation | Dataset authenticity: never fabricate labels or substitute mock frames to pass gates. | [L14](L14-active-labeling-effort-vs-passive-environmental-data.md) |
-| 15 | Empirical Auditing & Cold-Start Capacity | Strict gate integrity: evaluating safety-critical class requires authentic non-zero positives. | [L15](L15-empirical-ground-truth-auditing-cold-start-capacity.md) |
-| 16 | Heterogeneous Distributed Microservices | Decoupled topology: distribute microservices based on hardware affinity and compute cost. | [L16](L16-heterogeneous-distributed-microservices-multi-endpoint.md) |
-| 17 | CCTV Viewport Limits vs Link Capacity | Optical viewport geometry: calibrate visual saturation floors based on physical geometry. | [L17](L17-instantaneous-cctv-camera-viewport-physical-limits-vs.md) |
-| 18 | High-Frequency Telemetry vs Cloud VLM Economics | Decoupled hybrid architecture: retain self-hosted OpenVINO for continuous local inference. | [L18](L18-high-frequency-edge-telemetry-vs-cloud-vlm-economics-the.md) |
-| 19 | Unit-Test Trap & Calibration Paradox | Closed-loop empirical gating: calibration of parameters or formulas must be empirical. | [L19](L19-the-unit-test-verification-trap-the-parameter-calibration.md) |
-| 20 | VPN SPOF & Decoupling Cloud Budgets | Decouple cloud cost budgets: local neural compute incurs $0 API cost and fails gracefully. | [L20](L20-vpn-spof-graceful-degradation-decoupling-cloud-daily.md) |
-| 21 | S3-Compatible Cloudflare R2 Integration | Set UsePathStyle = true in AWS SDK Go v2 for Cloudflare R2 endpoints. | [L21](L21-s3-compatible-cloudflare-r2-integration-path-style-routing.md) |
-| 22 | Plaintext Credential Exposure Prevention | Zero secret fallbacks; load dynamically from .env or fail-fast at boot. | [L22](L22-plaintext-credential-exposure-prevention-benchmark.md) |
-| 23 | YOLO Activation Summation vs Missing NMS | NMS is non-negotiable: raw output tensors must never be summed without NMS. | [L23](L23-yolo-anchor-activation-summation-vs-object-counts-missing.md) |
-| 24 | Decoupled Multimodal Hybrid Architecture | Retain high-throughput local inference; guard cloud VLMs with strict quotas. | [L24](L24-decoupled-multimodal-hybrid-architecture-quota-guarded-dual.md) |
-| 25 | CI Linter Schema Validation Flakiness | Set verify: false in golangci-lint-action to prevent remote schema flakiness. | [L25](L25-ci-linter-schema-validation-flakiness-toolchain-version.md) |
-| 26 | GitHub Issue Auto-Closing Semantics | Every PR resolving an issue must begin directly with Close #<number>. | [L26](L26-github-issue-auto-closing-keyword-semantics-vs-descriptive.md) |
+| 8 | GitHub Actions Billing & Duplicate Jobs | Steps are free, jobs are not: fold logic into existing jobs as steps. | [L08](L08-github-actions-billing-ceiling-rounding-duplicate.md) |
+| 9 | Competing Sources of Truth & Silent Drift | Never hardcode a second copy of state that can be derived. | [L09](L09-competing-sources-of-truth-silent-drift-ghost-camera.md) |
+| 10 | CD Pipeline Configuration & Environment Propagation | Never rely solely on ad-hoc UI or host edits on Portainer. | [L10](L10-cd-pipeline-configuration-overwrite-environment-propagation.md) |
+| 11 | Scheduled Pipelines vs Proxy Caches | Separate scheduled pipelines and on-demand proxy caches with explicit boundaries. | [L11](L11-decoupled-scheduled-pipelines-vs-on-demand-proxy-caches.md) |
+| 12 | ML Model Classes vs Domain Formulas | Business scoring formulas must stay synchronized with model classes. | [L12](L12-machine-learning-model-classes-vs-domain-business-formulas.md) |
+| 13 | Ground-Truth Baselines vs. Spot-Checking | Isolate cameras with predictable, extreme baselines. | [L13](L13-ground-truth-smoke-test-baselines-vs-anecdotal-spot-checking.md) |
+| 14 | Active Labeling vs. Passive Data Accumulation | Never fabricate labels or substitute mock frames to pass gates. | [L14](L14-active-labeling-effort-vs-passive-environmental-data.md) |
+| 15 | Empirical Auditing & Cold-Start Capacity | Evaluating safety-critical class requires authentic non-zero positives. | [L15](L15-empirical-ground-truth-auditing-cold-start-capacity.md) |
+| 16 | Heterogeneous Distributed Microservices | Distribute microservices based on hardware affinity and compute cost. | [L16](L16-heterogeneous-distributed-microservices-multi-endpoint.md) |
+| 17 | CCTV Viewport Limits vs Link Capacity | Calibrate visual saturation floors based on physical geometry. | [L17](L17-instantaneous-cctv-camera-viewport-physical-limits-vs.md) |
+| 18 | High-Frequency Telemetry vs Cloud VLM | Retain self-hosted OpenVINO for continuous local inference. | [L18](L18-high-frequency-edge-telemetry-vs-cloud-vlm-economics-the.md) |
+| 19 | Unit-Test Trap & Calibration Gating | Calibration of parameters or formulas must be empirical. | [L19](L19-the-unit-test-verification-trap-the-parameter-calibration.md) |
+| 20 | VPN SPOF & Decoupled Compute | Local neural compute incurs $0 API cost and fails gracefully. | [L20](L20-vpn-spof-graceful-degradation-decoupling-cloud-daily.md) |
+| 21 | S3-Compatible Cloudflare R2 Integration | Set UsePathStyle = true in AWS SDK Go v2 for Cloudflare R2. | [L21](L21-s3-compatible-cloudflare-r2-integration-path-style-routing.md) |
+| 22 | Plaintext Credential Exposure Prevention | Zero secret fallbacks; load dynamically from .env or fail-fast. | [L22](L22-plaintext-credential-exposure-prevention-benchmark.md) |
+| 23 | YOLO Activation Summation vs Missing NMS | Raw output tensors must never be summed without NMS. | [L23](L23-yolo-anchor-activation-summation-vs-object-counts-missing.md) |
+| 24 | Decoupled Multimodal Hybrid Architecture | Retain local inference; guard cloud VLMs with strict quotas. | [L24](L24-decoupled-multimodal-hybrid-architecture-quota-guarded-dual.md) |
+| 25 | CI Linter Schema Validation Flakiness | Set verify: false in golangci-lint-action to prevent schema flakiness. | [L25](L25-ci-linter-schema-validation-flakiness-toolchain-version.md) |
+| 26 | GitHub Issue Auto-Closing Semantics | Every PR resolving an issue must start with Close #<number>. | [L26](L26-github-issue-auto-closing-keyword-semantics-vs-descriptive.md) |
 | 27 | Centralized Collaborative Team Labeling | Dual-driver List(ctx, prefix) abstraction for local and cloud storage. | [L27](L27-centralized-collaborative-team-labeling-over-local.md) |
-| 28 | Zero Unauthenticated Dev Endpoints | Endpoints managing labels or archives require dev token authentication. | [L28](L28-zero-unauthenticated-dev-endpoints-fail-closed-developer.md) |
-| 29 | Perception-Layer Fixes vs Scoring Hacks | Implemented standard NMS with letterbox preprocessing. | [L29](L29-perception-layer-fixes-vs-scoring-hacks-empirical.md) |
-| 30 | Uniform Capacity Floors vs Physical Geometry | Enrich camera catalog with physical corridor capacity baselines. | [L30](L30-uniform-capacity-floors-vs-physical-corridor-geometry.md) |
-| 31 | Active Environmental Opportunism & Cloud Synchronization | Use real-time rain triggers to archive flood frames continuously. | [L31](L31-active-environmental-opportunism-continuous-cloud-label.md) |
-| 32 | Affordance Collision & Rate-Limit Cooldown | Brackets reserved for badges; cooldowns prevent multi-clicks. | [L32](L32-affordance-collision-client-side-rate-limit-cooldown-in.md) |
-| 33 | Defense-in-Depth Secret Sanitization & Hysteresis | middleware.SecretSanitizer() wraps responses; hysteresis deadband. | [L33](L33-defense-in-depth-secret-sanitization-hysteresis-filtering.md) |
-| 34 | Architectural Priority: Sound Solutions Precede Estimation | Strict Priority Inversion (Rule 2 Precedes Rule 3): Never anchor effort to shortcuts. | [L34](L34-architectural-psychological-priority-sound-solutions.md) |
-| 35 | Holistic Repository Knowledge Maintenance | Rule 6 Expansion: Audit and sync all affected docs across repo, not just status logs. | [L35](L35-holistic-repository-knowledge-maintenance-vs-isolated.md) |
-| 36 | Leaf-Modulith Notification Infrastructure & Debouncing | Pure Leaf Boundary: internal/notify has zero sibling imports; 30-min sliding debouncing. | [L36](L36-leaf-modulith-notification-infrastructure-30-minute-sliding.md) |
-| 37 | Data Labeling Paradigms & Zero-VLM Flood Detection | Taxonomy Clarity: Distinguish eval suites from train sets; frame diff fails outdoor glare. | [L37](L37-data-labeling-paradigms-why-frame-diff-fails-in-outdoor.md) |
-| 38 | Trust & Safety for Arterial Saturation & Status Degradation | Never Default to Green: Unanalyzed or stale metrics degrade to Unknown, never Clear. | [L38](L38-trust-safety-for-arterial-saturation-status-degradation.md) |
-| 39 | Heuristic Ground-Truth Pollution & Empirical Taxonomy | No Heuristic Benchmarks: Never generate ground-truth keys with heuristic rules. | [L39](L39-heuristic-ground-truth-pollution-vs-empirical-directional.md) |
-| 40 | Autonomous Zero-VLM Harvester Architecture & Dual-Trigger Watcher | Edge Telemetry Directive: Transition runtime telemetry to edge neural compute with rain cooldowns. | [L40](L40-autonomous-zero-vlm-harvester-architecture-dual-trigger.md) |
-| 41 | Airborne Radar Reflectivity vs Ground Inundation | RGB dBZ Decoding: Calibrated RainViewer reflectivity into rainfall mm/h; alpha blindness eliminated. | [L41](L41-airborne-radar-reflectivity-dbz-vs-ground-surface.md) |
-| 42 | Map Coordinate Zoning & Collision Prevention | Dedicated Contextual Sub-Rows: System toolbars occupy dedicated row to avoid collision. | [L42](L42-map-overlay-coordinate-zoning-hierarchical-collision.md) |
-| 43 | Tile Server Zoom Ceiling & Canvas Placeholders | Zoom 7 Tile Space: HCMC bounds tile grid; blank tile fallback avoided. | [L43](L43-upstream-tile-server-zoom-ceiling-silent-200-ok-placeholder.md) |
-| 44 | Spatial Aggregator TTL Sync & Multi-Lens Markers | Dual TTL Eviction: Sync in-memory aggregator with store TTL to avoid stale markers. | [L44](L44-in-memory-spatial-aggregator-ttl-synchronization-multi-lens.md) |
-| 45 | Crowdsourced Ground-Truth & IP-Hashed Privacy | Pure Leaf Package: internal/feedback has zero sibling imports; salted SHA-256 IP. | [L45](L45-crowdsourced-ground-truth-ingestion-ip-hashed-privacy-and.md) |
-| 46 | Standalone Data Harvesting CLI & Offline Eval | Standalone Harvesting CLI: auto_harvest.py builds Draft-07 manifests from live feeds. | [L46](L46-standalone-automated-data-harvesting-offline-evaluation.md) |
-| 47 | Web Labeler Active Learning Flywheel & Badging | Tri-State Status Filtering: Added LabelFilterStatus in /labeler for candidate approval. | [L47](L47-web-labeler-active-learning-flywheel-provenance-badging-and.md) |
-| 48 | Zero-VLM Self-Hosted Flood Segmentation | Empirical Benchmarking: Validated FP16 IR models on edge worker within 30s hotset budget. | [L48](L48-zero-vlm-self-hosted-flood-segmentation-openvino-model.md) |
-| 49 | Object Enumeration vs S3 Delimiter Hierarchy | Hierarchical Discovery: ListDirectories uses S3 delimiters to prevent 524 timeouts. | [L49](L49-unbounded-object-enumeration-vs-s3-delimiter-hierarchy.md) |
-| 50 | Waterway & Bridge Footing Sensor Hygiene | Tri-Tier Camera Exclusion: Whitelist roads, filter waterway nodes at ingest, API, UI. | [L50](L50-waterway-bridge-footing-sensor-hygiene-exclusion-of-non.md) |
-| 51 | Partition Object Scalability & Client Pacing | In-Memory Cache: Thread-safe labelCache with 60s TTL prevents redundant GETs. | [L51](L51-partition-object-scalability-client-pacing-in-active.md) |
-| 52 | Go Select Break Fallacy & Heuristic Deprecation | Worker Loop Break: Labeled loop break in HarvestCameras ensures clean termination. | [L52](L52-go-select-break-concurrency-fallacy-heuristic-ground-truth.md) |
-| 53 | Active Learning Queue Desync & Dual-Storage Routing | Queue Merging: filterSnapshots sources frames from both local proof storage and R2 catalog. | [L53](L53-active-learning-queue-desync-dual-storage-frame-routing-in.md) |
-| 56 | Off-Box Training Guardrails & Segmentation Manifests | Strict Off-Box Training Guardrails: Host guard enforces AVX2 compute for training pipelines. | [L56](L56-off-box-training-guardrails-yolov8-segmentation-dataset.md) |
-| 55 | Crowdsource Feedback & Leaf Modulith Bridging | Decoupled Leaf Modulith: feedback has zero sibling imports; registered in main. | [L55](L55-the-crowdsource-feedback-black-hole-decoupled-leaf-modulith.md) |
-| 57 | Telegram Bot Token Leaks, Regex Pitfalls & Ops Parity | Token Sanitizer: SanitizeBytes scrubs token before logging; parity test prevents drift. | [L57](L57-telegram-bot-token-leak-vectors-word-boundary-regex.md) |
-| 58 | Parity Verification Illusion & Single-Source Alerts | Pure Helper (notify.BuildFloodAlert): Extracted alert building into exported pure function. | [L58](L58-parity-verification-illusion-single-source-alert-generation.md) |
-| 59 | Documentation Cross-Reference Rot & Dead Links | verify_doc_move.py: Moved docs proven byte-identical before reference rewrite. | [L59](L59-documentation-cross-reference-rot-links-to-never-merged-files.md) |
-| 60 | Read Frequency Cost Multiplier: Tiered Docs | Two-Tier Context Budget: always-loaded <=36KB total, <=16KB/file (INDEX 20KB); on-demand <=25KB. | [L60](L60-read-frequency-is-the-cost-multiplier-documentation-tiering.md) |
-| 61 | One Decision, One File: ADR Register Separation | ADR registers do not append successor decisions; use separate ADR files per decision. | [L61](L61-one-decision-one-file-adr-register-that-embeds-its-successors.md) |
-| 62 | Offline SAM Pre-Labeling & Storage Parity | Host guard enforces AVX2 off-box; decoupled local path from R2 snapshot_key. | [L62](L62-offline-sam-prelabeling-provenance-and-dual-layer-storage-parity.md) |
-| 63 | VLM Output Variance & Array Unmarshal Resilience | Gemini VLM emits arrays; cvclient falls back to []verdictJSON, extracts arr[0]. | [L63](L63-vlm-structured-output-variance-and-array-unmarshal-resilience.md) |
-| 64 | First Segmentation Cycle: OpenVINO FP16 & mAP Gate | Strict annotation purity; water_puddle IoU must beat null baseline before deploy. | [L64](L64-first-segmentation-cycle-openvino-fp16-and-map-gating.md) |
-| 65 | Directional Roadway Polygons & Sidecars | Optional direction on roadway (a/b); roadway_regions.json sidecar per split. | [L65](L65-directional-roadway-polygons-sidecar-and-per-direction-ground-truth.md) |
-| 66 | Self-Referential Tests and Silent Fallbacks | Test live code: extract decisions into pure functions; announce narrow fallbacks. | [L66](L66-self-referential-tests-and-silent-fallbacks-hide-the-live-path.md) |
-| 67 | Upsert-Only State Tables Cannot Feed Time-Series Models | Append-only history with idempotent keys, UTC timestamps, stale exclusion, and timeline lag bounds. | [L67](L67-upsert-only-state-tables-cannot-feed-time-series-models.md) |
-| 68 | Chronological Splits Still Leak at Horizon Boundaries | Purge training samples whose target crosses test cutoff; score on common eligible set. | [L68](L68-chronological-split-horizon-boundary-leakage.md) |
-| 69 | Hardcoded Prototype Fixtures & Cost of Shortcuts | Dynamic artifact loader (//go:embed & path override); fail-closed path/size guards. | [L69](L69-hardcoded-prototype-fixtures-and-the-cost-of-shortcuts.md) |
-| 70 | Semantic Taxonomy Drift & Notification Routing | Reconcile zone & ward taxonomy; alias normalization, quarantine table, audit tool. | [L70](L70-canonical-zone-and-ward-subscription-taxonomy.md) |
-| 71 | Directional Runtime Ingestion & Worst-Direction Pinning | Polygon assignment in cv-engine, per-direction PCU, severity pinning, migration 0008. | [L71](L71-directional-runtime-ingestion-and-worst-direction-pinning.md) |
-| 72 | Schema Assertions & Non-Blocking Batch Retention | Assert migration readiness at boot; 10m bin observability; chunked rowid retention. | [L72](L72-fail-fast-schema-assertions-and-nonblocking-batch-retention.md) |
-| 73 | As-Of Weather Feature Store & Ablation Gating | Append-only weather observations (0009); as-of join with 30m cutoff (no forward fill); 3-way ablation gate. | [L73](L73-asof-weather-feature-store-and-ablation-gating.md) |
-| 74 | Frontend Forecast Contract Gating & Uncertainty Visualization | Fail-closed checks (ok/stale/insufficient/unvalidated), 95% CI band, 50% stale dimming, 4-file pattern. | [L74](L74-frontend-forecast-contract-gating-and-uncertainty-visualization.md) |
-| 75 | Segmentation Dataset v2 Group Splitting & Retraining Gate | Group split by camera/date; 550 frames; IoU >= 0.612, mAP50-95 >= 0.496, p95 <= 25ms. | [L75](L75-segmentation-dataset-v2-group-splitting-and-retraining-gates.md) |
-| 76 | Inference Worker Co-Tenancy & Adaptive Load-Shedding | Recompute cgroup invariants; tag profiles; cron gate exits 1; assert tensor input; clamp anchors. | [L76](L76-inference-worker-cotenancy-and-adaptive-loadshedding.md) |
-| 77 | Evidence Integrity CI Gate & Synthetic Prohibition | No synthetic fixtures; non-future soak timestamps; model entropy >= 3.0; baseline ratchet. | [L77](L77-evidence-integrity-gate-and-synthetic-prohibition.md) |
-| 78 | Unattended Staging Soak & Proof Archive Ingestion | 24/7 harvester; WAL; 11,905 real-frame replay; process-anchored soak telemetry. | [L78](L78-unattended-soak-and-proof-archive-ingestion.md) |
-| 79 | Directional Roadway Registry Scale-Out & Geometry Invariants | 59-camera dual Hot Set; IoU < 0.05; capacity sum 1.0+-0.01; Go integration. | [L79](L79-directional-roadway-registry-scaleout.md) |
-| 80 | Automated Forecast Refit & Live History Deployment | Stdlib Ridge; chronological gate; atomic promotion; native 200 OK. | [L80](L80-automated-forecast-refit-and-live-deployment.md) |
-| 81 | Temporal Baseline Ratchet Expiry & Manual Approval Gate Concurrency | No clock-dependent baselines; SUPERSEDED lifecycle; deployment concurrency. | [L81](L81-temporal-baseline-ratchet-and-approval-gate-concurrency.md) |
-| 82 | Authentic Model Artifacts & Untrained Heads | Real export only; no dry-run IR; refuse untrained heads; execute every resolution. | [L82](L82-authentic-model-artifacts-and-untrained-head-guard.md) |
-| 83 | Native GitHub Protection & CI Gate Consolidation | Verify native controls; migrate checks before delete; public gate; no bypasses. | [L83](L83-native-github-protection-and-ci-gate-consolidation.md) |
-| 84 | Forecast Refit Daemon & Single-Flight Locking | Daemon, non-unlinked fcntl.flock, state quarantine, row-delta gating. | [L84](L84-forecast-refit-daemon-and-singleflight-locking.md) |
-| 85 | Commuter Geolocation, Multi-Tier Banded Sorting & Kiosk Ergonomics | 250m bands; clock-free comparator; zero coordinate exfiltration; >=48px. | [L85](L85-commuter-geolocation-banded-sorting.md) |
-| 86 | RFC3339Nano 9-Digit Timestamps & Microsecond Truncation | Fixed 9-digit layout; regex microsecond truncation; cross-runtime UTC invariants. | [L86](L86-rfc3339nano-9digit-timestamps-microsecond-truncation.md) |
-| 87 | Cryptographic JWT & CORS Whitelisting | Never trust plain headers; verify RS256 & aud via JWKS; whitelist CORS credentials. | [L87](L87-cryptographic-jwt-verification-and-cors-origin-whitelisting.md) |
-| 88 | Proxy OOM Bounds & Compression Middleware Ordering | Cap upstream reads via io.LimitReader; order gzip outer of sanitizing middleware. | [L88](L88-proxy-oom-bounds-and-compression-middleware-ordering.md) |
-| 89 | Unified SSE Stream, Canvas Rendering & Visibility Throttling | Single EventSource; ref mirror breaks reconnect loop; preferCanvas; visibility pause. | [L89](L89-unified-sse-stream-provider-canvas-rendering-and-visibility-throttling.md) |
-| 90 | Physical Depth Hazard Classification | Avoidance is hazard; physical cm depth; latch drops; no fake levels. | [L90](L90-physical-depth-hazard-classification.md) |
-| 91 | Staging Proxy Entrypoint Alignment | Bind internal proxy to upstream tunnel HTTP entrypoint; avoid phantom certresolvers. | [L91](L91-staging-reverse-proxy-entrypoint-and-tunnel-alignment.md) |
-| 92 | Issue-Keyed Lessons & Fail-Closed Webhooks | Name files after issue; fail-closed webhook route without secret token; chat rate-limit. | [402](402-telegram-bot-and-web-subscription.md) |
-| 93 | Real Provenance vs Orphaned Segmentation Labels | Exact timestamp & hash join; purge dead labels; frozen split; measured retraining gate. | [411](411-dataset-v3-provenance-and-avx2-evidence.md) |
-| 94 | SSE Streaming Sanitizer Buffering & Flusher | Streaming content types bypass body buffering; explicit Flusher interface assertions. | [420](420-sse-streaming-sanitizer-buffering.md) |
-| 95 | Decomposing Monolithic Go Composition Root | Factor main.go into adapters, jobs, routes (<250 lines); test 'go run .'. | [425](425-decompose-monolithic-cmd-server-main.md) |
-| 96 | Moore Boundary Tracing & Jacob's Criterion | State tracking (pixel, backtrack); 8-connected merge; restores SAM proposal yield. | [438](438-moore-boundary-tracing-jacobs-criterion.md) |
+| 28 | Zero Unauthenticated Dev Endpoints | Endpoints managing labels or archives require dev token auth. | [L28](L28-zero-unauthenticated-dev-endpoints-fail-closed-developer.md) |
+| 29 | Perception Fixes vs Scoring Hacks | Implement standard NMS with letterbox preprocessing. | [L29](L29-perception-layer-fixes-vs-scoring-hacks-empirical.md) |
+| 30 | Capacity Floors vs Physical Geometry | Enrich camera catalog with physical corridor capacity baselines. | [L30](L30-uniform-capacity-floors-vs-physical-corridor-geometry.md) |
+| 31 | Environmental Triggers & Cloud Sync | Use real-time rain triggers to archive flood frames continuously. | [L31](L31-active-environmental-opportunism-continuous-cloud-label.md) |
+| 32 | Affordance Collision & Rate Limits | Brackets reserved for badges; cooldowns prevent multi-clicks. | [L32](L32-affordance-collision-client-side-rate-limit-cooldown-in.md) |
+| 33 | Secret Sanitizer & Hysteresis Deadband | Middleware.SecretSanitizer() wraps responses; hysteresis deadband. | [L33](L33-defense-in-depth-secret-sanitization-hysteresis-filtering.md) |
+| 34 | Sound Solutions Precede Estimation | Never anchor effort to convenient shortcuts. | [L34](L34-architectural-psychological-priority-sound-solutions.md) |
+| 35 | Holistic Repository Docs Maintenance | Audit and sync all affected docs across repo, not just status logs. | [L35](L35-holistic-repository-knowledge-maintenance-vs-isolated.md) |
+| 36 | Notification Modulith & Debouncing | Internal/notify has zero sibling imports; 30-min sliding debouncing. | [L36](L36-leaf-modulith-notification-infrastructure-30-minute-sliding.md) |
+| 37 | Labeling Paradigms & Flood Detection | Distinguish eval suites from train sets; frame diff fails outdoor glare. | [L37](L37-data-labeling-paradigms-why-frame-diff-fails-in-outdoor.md) |
+| 38 | Arterial Saturation & Degradation | Unanalyzed or stale metrics degrade to Unknown, never Clear. | [L38](L38-trust-safety-for-arterial-saturation-status-degradation.md) |
+| 39 | Heuristic Ground-Truth & Taxonomy | Never generate ground-truth keys with heuristic rules. | [L39](L39-heuristic-ground-truth-pollution-vs-empirical-directional.md) |
+| 40 | Harvester Architecture & Watcher | Transition runtime telemetry to edge neural compute with rain cooldowns. | [L40](L40-autonomous-zero-vlm-harvester-architecture-dual-trigger.md) |
+| 41 | Airborne Radar vs Ground Inundation | Calibrate RainViewer reflectivity to rainfall mm/h; fix alpha blindness. | [L41](L41-airborne-radar-reflectivity-dbz-vs-ground-surface.md) |
+| 42 | Map Coordinate Zoning & Collision | System toolbars occupy dedicated row to avoid layout collisions. | [L42](L42-map-overlay-coordinate-zoning-hierarchical-collision.md) |
+| 43 | Tile Server Zoom Ceiling & Canvas | Zoom 7 bounds tile grid; blank tile fallback avoided. | [L43](L43-upstream-tile-server-zoom-ceiling-silent-200-ok-placeholder.md) |
+| 44 | Spatial Aggregator TTL Sync & Markers | Sync in-memory aggregator with store TTL to avoid stale markers. | [L44](L44-in-memory-spatial-aggregator-ttl-synchronization-multi-lens.md) |
+| 45 | Crowdsourced Ground-Truth & Privacy | Internal/feedback has zero sibling imports; salted SHA-256 IP. | [L45](L45-crowdsourced-ground-truth-ingestion-ip-hashed-privacy-and.md) |
+| 46 | Standalone Harvesting CLI & Offline Eval | Auto_harvest.py builds Draft-07 manifests from live feeds. | [L46](L46-standalone-automated-data-harvesting-offline-evaluation.md) |
+| 47 | Web Labeler Active Learning Flywheel & Badging | Add LabelFilterStatus in /labeler for candidate approval workflow. | [L47](L47-web-labeler-active-learning-flywheel-provenance-badging-and.md) |
+| 48 | Zero-VLM Self-Hosted Flood Segmentation | Validate FP16 IR models on edge worker within 30s hotset budget. | [L48](L48-zero-vlm-self-hosted-flood-segmentation-openvino-model.md) |
+| 49 | Object Enumeration vs S3 Delimiters | Hierarchical Discovery: ListDirectories uses S3 delimiters to prevent 524 timeouts. | [L49](L49-unbounded-object-enumeration-vs-s3-delimiter-hierarchy.md) |
+| 50 | Waterway & Bridge Sensor Hygiene | Whitelist roads, filter waterway nodes at ingest, API, UI. | [L50](L50-waterway-bridge-footing-sensor-hygiene-exclusion-of-non.md) |
+| 51 | Partition Scalability & Client Pacing | Thread-safe labelCache with 60s TTL prevents redundant GETs. | [L51](L51-partition-object-scalability-client-pacing-in-active.md) |
+| 52 | Go Select Break Fallacy & Cleanup | Labeled loop break in HarvestCameras ensures clean termination. | [L52](L52-go-select-break-concurrency-fallacy-heuristic-ground-truth.md) |
+| 53 | Active Learning Queue & Dual-Storage | FilterSnapshots sources frames from both local proof storage and R2 catalog. | [L53](L53-active-learning-queue-desync-dual-storage-frame-routing-in.md) |
+| 56 | Off-Box Training Guardrails & Manifests | Host guard enforces AVX2 compute for training pipelines. | [L56](L56-off-box-training-guardrails-yolov8-segmentation-dataset.md) |
+| 55 | Crowdsource Feedback & Leaf Modulith | Feedback has zero sibling imports; registered in main. | [L55](L55-the-crowdsource-feedback-black-hole-decoupled-leaf-modulith.md) |
+| 57 | Bot Token Leaks, Sanitize & Parity | SanitizeBytes scrubs token before logging; parity test prevents drift. | [L57](L57-telegram-bot-token-leak-vectors-word-boundary-regex.md) |
+| 58 | Parity Verification & Single-Source Alerts | Extract alert building into exported pure function notify.BuildFloodAlert. | [L58](L58-parity-verification-illusion-single-source-alert-generation.md) |
+| 59 | Docs Cross-Reference Rot & Dead Links | Verify_doc_move.py: Moved docs proven byte-identical before reference rewrite. | [L59](L59-documentation-cross-reference-rot-links-to-never-merged-files.md) |
+| 60 | Read Frequency Cost & Tiered Docs | Always-loaded <=36KB total, <=16KB/file (INDEX 20KB); on-demand <=25KB. | [L60](L60-read-frequency-is-the-cost-multiplier-documentation-tiering.md) |
+| 61 | One Decision, One File: ADR Separation | ADR registers do not append successor decisions; use separate ADR files. | [L61](L61-one-decision-one-file-adr-register-that-embeds-its-successors.md) |
+| 62 | Offline SAM Pre-Labeling & Storage | Host guard enforces AVX2 off-box; decoupled local path from R2 snapshot_key. | [L62](L62-offline-sam-prelabeling-provenance-and-dual-layer-storage-parity.md) |
+| 63 | VLM Output Variance & Array Unmarshal | Gemini VLM emits arrays; cvclient falls back to []verdictJSON, extracts arr[0]. | [L63](L63-vlm-structured-output-variance-and-array-unmarshal-resilience.md) |
+| 64 | First Segmentation Cycle: OpenVINO | Strict annotation purity; water_puddle IoU must beat null baseline before deploy. | [L64](L64-first-segmentation-cycle-openvino-fp16-and-map-gating.md) |
+| 65 | Roadway Polygons & Sidecars | Optional direction on roadway (a/b); roadway_regions.json sidecar per split. | [L65](L65-directional-roadway-polygons-sidecar-and-per-direction-ground-truth.md) |
+| 66 | Self-Referential Tests & Fallbacks | Test live code: extract decisions into pure functions; announce narrow fallbacks. | [L66](L66-self-referential-tests-and-silent-fallbacks-hide-the-live-path.md) |
+| 67 | Upsert-Only State Cannot Feed Models | Append-only history with idempotent keys, UTC timestamps, stale exclusion. | [L67](L67-upsert-only-state-tables-cannot-feed-time-series-models.md) |
+| 68 | Chronological Splits Leak at Boundaries | Purge training samples crossing test cutoff; score on common eligible set. | [L68](L68-chronological-split-horizon-boundary-leakage.md) |
+| 69 | Hardcoded Fixtures & Cost of Shortcuts | Dynamic artifact loader (//go:embed & override); fail-closed path/size guards. | [L69](L69-hardcoded-prototype-fixtures-and-the-cost-of-shortcuts.md) |
+| 70 | Semantic Drift & Notification Routing | Reconcile zone/ward taxonomy; alias normalization, quarantine table. | [L70](L70-canonical-zone-and-ward-subscription-taxonomy.md) |
+| 71 | Directional Runtime Ingestion & Pinning | Polygon assignment in cv-engine, per-direction PCU, severity pinning. | [L71](L71-directional-runtime-ingestion-and-worst-direction-pinning.md) |
+| 72 | Schema Assertions & Batch Retention | Assert migration readiness at boot; 10m bin observability; chunked retention. | [L72](L72-fail-fast-schema-assertions-and-nonblocking-batch-retention.md) |
+| 73 | As-Of Weather Feature Store & Gating | Append-only weather (0009); as-of join with 30m cutoff; 3-way ablation gate. | [L73](L73-asof-weather-feature-store-and-ablation-gating.md) |
+| 74 | Frontend Forecast Gating & Visualization | Fail-closed checks (ok/stale/insufficient), 95% CI band, 50% stale dimming. | [L74](L74-frontend-forecast-contract-gating-and-uncertainty-visualization.md) |
+| 75 | Segmentation Dataset v2 Group Split | Group split by camera/date; 550 frames; IoU >= 0.612, mAP50-95 >= 0.496. | [L75](L75-segmentation-dataset-v2-group-splitting-and-retraining-gates.md) |
+| 76 | Inference Worker Co-Tenancy & Tuning | Recompute cgroup invariants; tag profiles; cron gate exits 1; clamp anchors. | [L76](L76-inference-worker-cotenancy-and-adaptive-loadshedding.md) |
+| 77 | Evidence Integrity Gate & Synthetic Ban | No synthetic fixtures; non-future soak timestamps; model entropy >= 3.0. | [L77](L77-evidence-integrity-gate-and-synthetic-prohibition.md) |
+| 78 | Unattended Soak & Proof Ingestion | 24/7 harvester; WAL; 11,905 real-frame replay; process-anchored soak. | [L78](L78-unattended-soak-and-proof-archive-ingestion.md) |
+| 79 | Roadway Registry Scale-Out & Geometry | 59-camera dual Hot Set; IoU < 0.05; capacity sum 1.0+-0.01. | [L79](L79-directional-roadway-registry-scaleout.md) |
+| 80 | Automated Forecast Refit & Promotion | Stdlib Ridge; chronological gate; atomic promotion; native 200 OK. | [L80](L80-automated-forecast-refit-and-live-deployment.md) |
+| 81 | Temporal Baseline Ratchet & Gate | No clock-dependent baselines; SUPERSEDED lifecycle; deploy concurrency. | [L81](L81-temporal-baseline-ratchet-and-approval-gate-concurrency.md) |
+| 82 | Authentic Artifacts & Untrained Heads | Real export only; no dry-run IR; refuse untrained heads; test every resolution. | [L82](L82-authentic-model-artifacts-and-untrained-head-guard.md) |
+| 83 | Native GitHub Protection & CI Gate | Verify native controls; migrate checks before delete; public gate. | [L83](L83-native-github-protection-and-ci-gate-consolidation.md) |
+| 84 | Forecast Refit Daemon & File Locking | Daemon, non-unlinked fcntl.flock, state quarantine, row-delta gating. | [L84](L84-forecast-refit-daemon-and-singleflight-locking.md) |
+| 85 | Commuter Geolocation & Privacy Bands | 250m bands; clock-free comparator; zero coordinate exfiltration; >=48px. | [L85](L85-commuter-geolocation-banded-sorting.md) |
+| 86 | RFC3339Nano Timestamps & Truncation | Fixed 9-digit layout; microsecond truncation; cross-runtime UTC invariants. | [L86](L86-rfc3339nano-9digit-timestamps-microsecond-truncation.md) |
+| 87 | JWT & CORS Whitelisting for Live Feeds | Never trust plain headers; verify RS256 & aud via JWKS; whitelist CORS. | [L87](L87-cryptographic-jwt-verification-and-cors-origin-whitelisting.md) |
+| 88 | Proxy OOM Bounds & Compression Order | Cap upstream reads via io.LimitReader; gzip outer of sanitizing middleware. | [L88](L88-proxy-oom-bounds-and-compression-middleware-ordering.md) |
+| 89 | Unified SSE, Canvas & Memory Bounds | Single EventSource; ref mirror breaks reconnect loop; preferCanvas. | [L89](L89-unified-sse-stream-provider-canvas-rendering-and-visibility-throttling.md) |
+| 90 | Physical Depth Hazard & Monotonic Drops | Avoidance is hazard; physical cm depth; latch drops; no fake levels. | [L90](L90-physical-depth-hazard-classification.md) |
+| 91 | Staging Proxy Entrypoint Alignment | Bind proxy to upstream tunnel HTTP entrypoint; avoid phantom certresolvers. | [L91](L91-staging-reverse-proxy-entrypoint-and-tunnel-alignment.md) |
+| 92 | Issue-Keyed Lessons & Webhook Routes | Name files after issue; fail-closed webhook route without secret; rate-limit. | [402](402-telegram-bot-and-web-subscription.md) |
+| 93 | Real Provenance vs Orphaned Labels | Exact timestamp & hash join; purge dead labels; measured retraining gate. | [411](411-dataset-v3-provenance-and-avx2-evidence.md) |
+| 94 | SSE Sanitizer Buffering & Flusher | Streaming content types bypass body buffering; explicit Flusher assertions. | [420](420-sse-streaming-sanitizer-buffering.md) |
+| 95 | Decompose Monolithic Go Composition Root | Factor main.go into adapters, jobs, routes (<250 lines); test 'go run .'. | [425](425-decompose-monolithic-cmd-server-main.md) |
+| 96 | Moore Boundary Tracing & Jacob's Criterion | State tracking (pixel, backtrack); 8-connected merge; restores SAM yield. | [438](438-moore-boundary-tracing-jacobs-criterion.md) |
+| 97 | Dead Camera Isolation & Health Metrics | Isolate 404/5xx feeds from breaker; export 24h health metrics. | [441](441-feed-error-breaker-isolation-and-health-observability.md) |
+| 98 | Litestream R2 Replication & Restore Drill | Backups are hypotheses until drill restores SQLite DB; verify tables. | [442](442-litestream-r2-replication-and-restore-drill.md) |
+| 99 | Map Clustering & Worst-Severity Bubble-Up | Cluster markers bubble up deepest hazard; fallback tiles avoid failure. | [443](443-commuter-map-clustering-and-hazard-depth.md) |
+| 100 | Forecast Weather Parity & Skill Gating | Mirror Go feature store in Python; require valid skill gating. | [444](444-forecast-weather-parity-and-skill-gating.md) |
+| 101 | Cluster Deconfliction & Toolbar Hierarchy | Repel overlapping clusters; dedicate separate row for toolbars. | [452](452-map-cluster-collision-and-toolbar-deconfliction.md) |
+| 102 | Adaptive Macro Clustering & Smart Lens | Zoom-adaptive clustering grid; smart lens defaults; eliminate clutter. | [454](454-adaptive-macro-clustering-and-smart-lens.md) |
+| 103 | SVG Geometry Transform & Hit Targets | Anchor SVG transform origins; expand transparent hit target. | [456](456-svg-forecast-dot-transform-origin-and-hit-targets.md) |
+| 104 | Leaflet Zoom Lifecycle & Reactive Split | Rebuild clusters on zoomend; leap +2 on macro cluster click. | [460](460-macro-cluster-zoomend-reactive-trigger.md) |
+| 105 | Lore Verifiable Memory Setup | Ingest git commits into Lore ontology; configure agy/opencode MCP. | [463](463-lore-verifiable-memory-setup-opencode-agy.md) |
+| 106 | Doppler Radar Virga Gating & Modal Status | Never suppress convective cores (>=30 dBZ); label THÔNG THOÁNG. | [465](465-radar-virga-suppression-and-traffic-label.md) |
 > Numbering note: Lesson 54 does not exist; numbers are preserved as cited.
