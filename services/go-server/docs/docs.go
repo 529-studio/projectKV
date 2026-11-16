@@ -410,6 +410,29 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/corridors/overview": {
+            "get": {
+                "description": "Returns list of all arterial commuter corridors with real-time passability verdicts, travel delay in seconds, and peak flood depth.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Corridor"
+                ],
+                "summary": "Get operational overview of all arterial corridors",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/corridor.CorridorRouteSummary"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/flood-hex": {
             "get": {
                 "description": "Returns the snapshot of all currently active H3 hexagonal cells with qualifying flood observations for immediate client hydration on startup.",
@@ -571,6 +594,45 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/corridor.RoadsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/roads/{road_key}/route": {
+            "get": {
+                "description": "Returns pre-computed GeoJSON FeatureCollection containing LineString and camera Points along with cumulative flood hazard, travel delay, and passability verdict.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Corridor"
+                ],
+                "summary": "Get arterial corridor route GeoJSON and hazard summary",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Road Key identifier (e.g. vo_van_kiet, mai_chi_tho)",
+                        "name": "road_key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Corridor not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -1726,8 +1788,20 @@ const docTemplate = `{
                 "confidence": {
                     "type": "number"
                 },
+                "flood_depth_cm": {
+                    "type": "number"
+                },
+                "flood_hazard_level": {
+                    "type": "integer"
+                },
                 "flood_severity": {
                     "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
                 },
                 "name": {
                     "type": "string"
@@ -1747,6 +1821,68 @@ const docTemplate = `{
                 }
             }
         },
+        "corridor.CorridorRouteSummary": {
+            "type": "object",
+            "properties": {
+                "chokepoint_count": {
+                    "type": "integer"
+                },
+                "coverage_pct": {
+                    "type": "number"
+                },
+                "delay_seconds": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "estimated_seconds": {
+                    "type": "integer"
+                },
+                "free_flow_seconds": {
+                    "type": "integer"
+                },
+                "free_flow_speed_kmh": {
+                    "type": "number"
+                },
+                "length_km": {
+                    "type": "number"
+                },
+                "max_depth_cm": {
+                    "type": "number"
+                },
+                "max_hazard_level": {
+                    "type": "integer"
+                },
+                "passability_verdict": {
+                    "$ref": "#/definitions/corridor.PassabilityVerdict"
+                },
+                "road_key": {
+                    "type": "string"
+                },
+                "status_color": {
+                    "description": "\"#22c55e\" | \"#eab308\" | \"#ef4444\" | \"#71717a\"",
+                    "type": "string"
+                },
+                "total_cameras": {
+                    "type": "integer"
+                },
+                "verified_cameras": {
+                    "type": "integer"
+                },
+                "worst_flood_severity": {
+                    "description": "\"DRY\" | \"WET\" | \"FLOODED_SHALLOW\" | \"FLOODED_DEEP\" | \"UNKNOWN\"",
+                    "type": "string"
+                },
+                "worst_severity": {
+                    "description": "\"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\" | \"UNKNOWN\"",
+                    "type": "string"
+                }
+            }
+        },
         "corridor.CorridorStatus": {
             "type": "object",
             "properties": {
@@ -1757,6 +1893,9 @@ const docTemplate = `{
                     }
                 },
                 "coverage_pct": {
+                    "type": "number"
+                },
+                "max_depth_cm": {
                     "type": "number"
                 },
                 "oldest_observation_age_s": {
@@ -1771,11 +1910,41 @@ const docTemplate = `{
                 "verified_cameras": {
                     "type": "integer"
                 },
+                "worst_flood_severity": {
+                    "type": "string"
+                },
                 "worst_severity": {
                     "description": "\"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\" | \"UNKNOWN\"",
                     "type": "string"
                 }
             }
+        },
+        "corridor.PassabilityVerdict": {
+            "type": "string",
+            "enum": [
+                "PASSABLE",
+                "CAUTION",
+                "IMPASSABLE",
+                "UNKNOWN"
+            ],
+            "x-enum-comments": {
+                "PassabilityCaution": "CẢNH BÁO XE GẦM THẤP / ÙN TẮC",
+                "PassabilityImpassable": "NGUY CƠ CHẾT MÁY / THỦY KÍCH",
+                "PassabilityPassable": "THÔNG THOÁNG",
+                "PassabilityUnknown": "CHƯA ĐỦ DỮ LIỆU"
+            },
+            "x-enum-descriptions": [
+                "THÔNG THOÁNG",
+                "CẢNH BÁO XE GẦM THẤP / ÙN TẮC",
+                "NGUY CƠ CHẾT MÁY / THỦY KÍCH",
+                "CHƯA ĐỦ DỮ LIỆU"
+            ],
+            "x-enum-varnames": [
+                "PassabilityPassable",
+                "PassabilityCaution",
+                "PassabilityImpassable",
+                "PassabilityUnknown"
+            ]
         },
         "corridor.RoadSummary": {
             "type": "object",
