@@ -192,6 +192,7 @@ func TestRenderStatus(t *testing.T) {
 		"zone|Quận 7 - Nhà Bè":  "Quận 7 - Nhà Bè",
 		"ward|Bến Nghé":         "Bến Nghé",
 		"chokepoint|cam-vvk-01": "Võ Văn Kiệt - Ký Con",
+		"corridor|vo_van_kiet":  "Đại lộ Võ Văn Kiệt",
 	}}
 	created := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
 	subs := []Record{
@@ -199,15 +200,17 @@ func TestRenderStatus(t *testing.T) {
 		{TargetType: targetTypeZone, TargetID: "Quận 7 - Nhà Bè", CreatedAt: created},
 		{TargetType: targetTypeWard, TargetID: "Bến Nghé", CreatedAt: created},
 		{TargetType: targetTypeChokepoint, TargetID: "cam-vvk-01", CreatedAt: created},
+		{TargetType: targetTypeCorridor, TargetID: "vo_van_kiet", CreatedAt: created},
 	}
 
 	out := RenderStatus(subs, labeler)
-	assertBilingual(t, "RenderStatus", out, "Đăng ký đang hoạt động (4):", "Active subscriptions (4):")
+	assertBilingual(t, "RenderStatus", out, "Đăng ký đang hoạt động (5):", "Active subscriptions (5):")
 	for _, want := range []string{
 		"Toàn thành phố", "City-wide",
 		"Khu vực: Quận 7 - Nhà Bè", "Zone: Quận 7 - Nhà Bè",
 		"Phường / Xã: Bến Nghé", "Ward / Commune: Bến Nghé",
 		"Điểm ngập: Võ Văn Kiệt - Ký Con", "Chokepoint: Võ Văn Kiệt - Ký Con",
+		"Tuyến đường: Đại lộ Võ Văn Kiệt", "Corridor: Đại lộ Võ Văn Kiệt",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("RenderStatus missing %q:\n%s", want, out)
@@ -337,18 +340,24 @@ func TestRenderersHTMLEscaping(t *testing.T) {
 // TestAllRenderersAreEmojiFree walks every renderer once more through a single
 // table so a new renderer cannot be added without joining the guard.
 func TestAllRenderersAreEmojiFree(t *testing.T) {
+	d35 := 35.0
 	outputs := map[string]string{
-		"RenderWelcome":           RenderWelcome(0, testBotUsername),
-		"RenderHelp":              RenderHelp(defaultWebURL),
-		"RenderSubscribed":        RenderSubscribed(Target{Type: targetTypeAll}, ""),
-		"RenderAlreadySubscribed": RenderAlreadySubscribed(Target{Type: targetTypeZone, ID: "Bình Dương"}, "Bình Dương"),
-		"RenderStatus":            RenderStatus([]Record{{TargetType: targetTypeZone, TargetID: "Bình Dương"}}, nil),
-		"RenderStopped":           RenderStopped(0),
-		"RenderUnknownTarget":     RenderUnknownTarget("sub_bogus"),
-		"RenderLimitReached":      RenderLimitReached(20),
-		"RenderPrivateChatOnly":   RenderPrivateChatOnly(testBotUsername),
-		"RenderSlowDown":          RenderSlowDown(),
-		"RenderDeliveryFailed":    RenderDeliveryFailed(),
+		"RenderWelcome":                      RenderWelcome(0, testBotUsername),
+		"RenderHelp":                         RenderHelp(defaultWebURL),
+		"RenderSubscribed":                   RenderSubscribed(Target{Type: targetTypeAll}, ""),
+		"RenderAlreadySubscribed":            RenderAlreadySubscribed(Target{Type: targetTypeZone, ID: "Bình Dương"}, "Bình Dương"),
+		"RenderStatus":                       RenderStatus([]Record{{TargetType: targetTypeZone, TargetID: "Bình Dương"}}, nil),
+		"RenderStopped":                      RenderStopped(0),
+		"RenderUnknownTarget":                RenderUnknownTarget("sub_bogus"),
+		"RenderLimitReached":                 RenderLimitReached(20),
+		"RenderPrivateChatOnly":              RenderPrivateChatOnly(testBotUsername),
+		"RenderSlowDown":                     RenderSlowDown(),
+		"RenderDeliveryFailed":               RenderDeliveryFailed(),
+		"RenderSubUsage":                     RenderSubUsage(),
+		"RenderUnsubUsage":                   RenderUnsubUsage(),
+		"RenderUnsubscribed":                 RenderUnsubscribed(Target{Type: targetTypeCorridor, ID: "vo_van_kiet"}, "Đại lộ Võ Văn Kiệt"),
+		"RenderCorridorReport":               RenderCorridorReport("Đại lộ Võ Văn Kiệt", "IMPASSABLE", &d35, "https://warded.529studio.site/roads/vo_van_kiet"),
+		"RenderSubscribedWithCorridorStatus": RenderSubscribedWithCorridorStatus(Target{Type: targetTypeCorridor, ID: "vo_van_kiet"}, "Đại lộ Võ Văn Kiệt", "CAUTION", &d35, "https://warded.529studio.site/roads/vo_van_kiet"),
 	}
 	for name, out := range outputs {
 		if strings.TrimSpace(out) == "" {

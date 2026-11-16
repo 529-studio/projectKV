@@ -22,6 +22,19 @@ type FloodAlert struct {
 	LiveWebURL     string    `json:"live_web_url,omitempty"`
 }
 
+// CorridorAlert represents a verified hazard event along an arterial traffic corridor.
+type CorridorAlert struct {
+	RoadKey            string    `json:"road_key"`
+	RoadName           string    `json:"road_name"`
+	Passability        string    `json:"passability"` // "CLEAR" | "CAUTION" | "IMPASSABLE"
+	WorstFloodSeverity string    `json:"worst_flood_severity,omitempty"`
+	MaxDepthCm         *float64  `json:"max_depth_cm,omitempty"`
+	PeakLocation       string    `json:"peak_location,omitempty"`
+	EstimatedDelayMin  int       `json:"estimated_delay_min,omitempty"`
+	ObservedAt         time.Time `json:"observed_at"`
+	RouteWebURL        string    `json:"route_web_url,omitempty"`
+}
+
 // Channel defines the pluggable delivery adapter contract for notification channels.
 // Implementations know how to deliver a FloodAlert to all relevant subscribers of that channel.
 type Channel interface {
@@ -42,5 +55,19 @@ type SubscriberFinderFunc func(ctx context.Context, channelName string, alert Fl
 
 // GetSubscribersForAlert calls the underlying function.
 func (f SubscriberFinderFunc) GetSubscribersForAlert(ctx context.Context, channelName string, alert FloodAlert) ([]string, error) {
+	return f(ctx, channelName, alert)
+}
+
+// CorridorSubscriberFinder is the dependency inversion interface for looking up
+// recipient identifiers matching an arterial corridor alert.
+type CorridorSubscriberFinder interface {
+	GetSubscribersForCorridorAlert(ctx context.Context, channelName string, alert CorridorAlert) ([]string, error)
+}
+
+// CorridorSubscriberFinderFunc allows plain functions to satisfy the CorridorSubscriberFinder interface.
+type CorridorSubscriberFinderFunc func(ctx context.Context, channelName string, alert CorridorAlert) ([]string, error)
+
+// GetSubscribersForCorridorAlert calls the underlying function.
+func (f CorridorSubscriberFinderFunc) GetSubscribersForCorridorAlert(ctx context.Context, channelName string, alert CorridorAlert) ([]string, error) {
 	return f(ctx, channelName, alert)
 }

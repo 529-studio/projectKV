@@ -91,10 +91,17 @@ func main() {
 		}
 		return subStore.GetSubscribersForChokepoint(ctx, channelName, alert.CameraID, alert.Zone, alert.Ward)
 	})
-	telegramOpts := make([]notify.TelegramOption, 0, 1)
+	corridorSubFinder := notify.CorridorSubscriberFinderFunc(func(ctx context.Context, channelName string, alert notify.CorridorAlert) ([]string, error) {
+		if subStore == nil {
+			return nil, nil
+		}
+		return subStore.GetSubscribersForCorridor(ctx, channelName, alert.RoadKey)
+	})
+	telegramOpts := make([]notify.TelegramOption, 0, 2)
 	if telegramAPIBaseURL != "" {
 		telegramOpts = append(telegramOpts, notify.WithBaseURL(telegramAPIBaseURL))
 	}
+	telegramOpts = append(telegramOpts, notify.WithCorridorSubscriberFinder(corridorSubFinder))
 	telegramChan := notify.NewTelegramChannel(cfg.TelegramBotToken, subFinder, telegramOpts...)
 	notifyManager.Register(telegramChan)
 
@@ -102,6 +109,13 @@ func main() {
 	webhookEnabled := cfg.TelegramBotToken != "" &&
 		telegrambot.ValidBotUsername(botUsername) &&
 		telegrambot.ValidWebhookSecret(cfg.TelegramWebhookSecret)
+
+	var corridorService *corridor.Service
+	if camCatalog != nil {
+		corridorService = corridor.NewService(
+			camCatalog, &verdictStoreAdapter{repo: verdictRepo}, cfg.AppEnv, time.Duration(cfg.VerdictStaleTTLSeconds)*time.Second,
+		)
+	}
 
 	var taxonomyProv subscription.TaxonomyProvider
 	if camCatalog != nil {
@@ -115,7 +129,7 @@ func main() {
 	botHandler := telegrambot.NewHandler(
 		telegrambot.Config{BotUsername: botUsername, WebhookSecret: cfg.TelegramWebhookSecret},
 		&telegramBotStoreAdapter{store: subStore},
-		&telegramBotTaxonomyAdapter{catalog: camCatalog},
+		&telegramBotTaxonomyAdapter{catalog: camCatalog, corridorService: corridorService},
 		telegramChan,
 		slog.Default(),
 	)
@@ -149,10 +163,8 @@ func main() {
 	}
 
 	var corridorHandler *corridor.Handler
-	if camCatalog != nil {
-		corridorHandler = corridor.NewHandler(corridor.NewService(
-			camCatalog, &verdictStoreAdapter{repo: verdictRepo}, cfg.AppEnv, time.Duration(cfg.VerdictStaleTTLSeconds)*time.Second,
-		))
+	if corridorService != nil {
+		corridorHandler = corridor.NewHandler(corridorService)
 	}
 
 	forecastHandler := initForecastHandler(appCtx, cfg, camCatalog, verdictHistoryRepo, weatherRepo)

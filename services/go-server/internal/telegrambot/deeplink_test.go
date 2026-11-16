@@ -44,6 +44,15 @@ var sampleChokepoints = []string{
 	"A_b-9",
 }
 
+// sampleCorridors covers canonical arterial corridor keys.
+var sampleCorridors = []string{
+	"vo_van_kiet",
+	"mai_chi_tho",
+	"cong_hoa",
+	"xa_lo_ha_noi",
+	"dien_bien_phu",
+}
+
 func TestSlugConformanceVectors(t *testing.T) {
 	vectors := []struct {
 		name string
@@ -108,6 +117,9 @@ func TestPayloadLengthBoundOverTaxonomy(t *testing.T) {
 	}
 	for _, cam := range sampleChokepoints {
 		samples = append(samples, sample{targetTypeChokepoint, cam})
+	}
+	for _, corridor := range sampleCorridors {
+		samples = append(samples, sample{targetTypeCorridor, corridor})
 	}
 
 	maxLen, maxValue := 0, ""

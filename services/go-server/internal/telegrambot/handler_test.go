@@ -85,6 +85,25 @@ func (s *fakeStore) UnsubscribeAll(_ context.Context, channelName, chatID string
 	return int64(len(existing)), nil
 }
 
+func (s *fakeStore) Unsubscribe(_ context.Context, channelName, chatID string, targetType, targetID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.unsubscribeCalls++
+	if s.unsubscribeErr != nil {
+		return s.unsubscribeErr
+	}
+	existing := s.rows[chatID]
+	var remaining []Record
+	for _, r := range existing {
+		if r.TargetType == targetType && (r.TargetID == targetID || (targetType == targetTypeCorridor && strings.EqualFold(strings.ReplaceAll(r.TargetID, "-", "_"), strings.ReplaceAll(targetID, "-", "_")))) {
+			continue
+		}
+		remaining = append(remaining, r)
+	}
+	s.rows[chatID] = remaining
+	return nil
+}
+
 func (s *fakeStore) List(_ context.Context, channelName, chatID string) ([]Record, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -176,10 +195,11 @@ func (s *fakeSender) texts() []string {
 }
 
 type fakeTaxonomy struct {
-	zones   map[string]string // canonical name (lower) -> canonical name
-	aliases map[string]string // legacy alias (lower) -> canonical
-	wards   map[string]string // bare name (lower) -> bare name
-	cams    map[string]string // id -> display label
+	zones     map[string]string // canonical name (lower) -> canonical name
+	aliases   map[string]string // legacy alias (lower) -> canonical
+	wards     map[string]string // bare name (lower) -> bare name
+	cams      map[string]string // id -> display label
+	corridors map[string]string // roadKey -> display label
 }
 
 func newFakeTaxonomy() *fakeTaxonomy {
@@ -202,6 +222,11 @@ func newFakeTaxonomy() *fakeTaxonomy {
 		cams: map[string]string{
 			"591c6d3ba6bfb500119400ac": "Nguyễn Văn Linh - Nguyễn Hữu Thọ",
 			"cam-vvk-01":               "Võ Văn Kiệt - Ký Con",
+		},
+		corridors: map[string]string{
+			"vo_van_kiet": "Đại lộ Võ Văn Kiệt",
+			"mai_chi_tho": "Đường Mai Chí Thọ",
+			"cong_hoa":    "Đường Cộng Hòa",
 		},
 	}
 }
@@ -238,9 +263,33 @@ func (f *fakeTaxonomy) CanonicalChokepoint(id string) (string, bool) {
 	return "", false
 }
 
+func (f *fakeTaxonomy) CanonicalCorridor(id string) (string, bool) {
+	key := strings.ToLower(strings.TrimSpace(id))
+	key = strings.ReplaceAll(key, "-", "_")
+	if _, ok := f.corridors[key]; ok {
+		return key, true
+	}
+	return "", false
+}
+
+func (f *fakeTaxonomy) CorridorCondition(roadKey string) (string, *float64, bool) {
+	key := strings.ToLower(strings.TrimSpace(roadKey))
+	key = strings.ReplaceAll(key, "-", "_")
+	if _, ok := f.corridors[key]; ok {
+		depth := 0.0
+		return "CLEAR", &depth, true
+	}
+	return "", nil, false
+}
+
 func (f *fakeTaxonomy) Label(t Target) string {
 	if t.Type == targetTypeChokepoint {
 		if name, ok := f.cams[t.ID]; ok {
+			return name
+		}
+	}
+	if t.Type == targetTypeCorridor {
+		if name, ok := f.corridors[t.ID]; ok {
 			return name
 		}
 	}
@@ -1232,5 +1281,84 @@ func TestConfigDefaults(t *testing.T) {
 	}
 	if got := (Config{BotUsername: "@WardedAlertBot"}).normalized().BotUsername; got != "WardedAlertBot" {
 		t.Fatalf("leading @ must be stripped, got %q", got)
+	}
+}
+
+// TestCorridorBotScenarios verifies S15-T4 corridor bot workflows:
+// 1. /sub corridor vo_van_kiet saves record and replies confirmation.
+// 2. /start sub_corridor_mai_chi_tho auto-enrolls and returns condition report.
+// 3. /my_subs lists registered corridors.
+// 4. /unsub corridor vo_van_kiet removes the corridor subscription.
+func TestCorridorBotScenarios(t *testing.T) {
+	f := newBotFixture(t, nil)
+
+	const numChatID int64 = 777888999
+	const chatID = "777888999"
+
+	// 1. Send /sub corridor vo_van_kiet
+	f.postUpdate(t, privateMessageUpdate(101, numChatID, "/sub corridor vo_van_kiet"))
+	f.drain()
+
+	rows := f.store.rowsFor(chatID)
+	if len(rows) != 1 || rows[0].TargetType != targetTypeCorridor || rows[0].TargetID != "vo_van_kiet" {
+		t.Fatalf("rows after /sub corridor: %+v, want 1 corridor row", rows)
+	}
+	texts := f.sender.texts()
+	if len(texts) != 1 {
+		t.Fatalf("expected 1 reply, got %d", len(texts))
+	}
+	assertNoEmoji(t, "sub corridor reply", texts[0])
+	if !strings.Contains(texts[0], "Đã đăng ký thành công") || !strings.Contains(texts[0], "Đại lộ Võ Văn Kiệt") {
+		t.Fatalf("reply does not contain confirmation or display name:\n%s", texts[0])
+	}
+
+	// 2. Simulate deep link /start sub_corridor_mai_chi_tho
+	f.postUpdate(t, privateMessageUpdate(102, numChatID, "/start sub_corridor_mai_chi_tho"))
+	f.drain()
+
+	rows = f.store.rowsFor(chatID)
+	if len(rows) != 2 {
+		t.Fatalf("rows after deep-link /start: %+v, want 2 rows", rows)
+	}
+	texts = f.sender.texts()
+	if len(texts) != 2 {
+		t.Fatalf("expected 2 replies total, got %d", len(texts))
+	}
+	startReply := texts[1]
+	assertNoEmoji(t, "start corridor reply", startReply)
+	if !strings.Contains(startReply, "Đường Mai Chí Thọ") || !strings.Contains(startReply, "Tình trạng hiện tại") {
+		t.Fatalf("deep-link reply missing corridor condition report:\n%s", startReply)
+	}
+
+	// 3. Send /my_subs to list active subscriptions
+	f.postUpdate(t, privateMessageUpdate(103, numChatID, "/my_subs"))
+	f.drain()
+
+	texts = f.sender.texts()
+	if len(texts) != 3 {
+		t.Fatalf("expected 3 replies total, got %d", len(texts))
+	}
+	mySubsReply := texts[2]
+	assertNoEmoji(t, "my_subs reply", mySubsReply)
+	if !strings.Contains(mySubsReply, "Đại lộ Võ Văn Kiệt") || !strings.Contains(mySubsReply, "Đường Mai Chí Thọ") {
+		t.Fatalf("/my_subs missing active corridors:\n%s", mySubsReply)
+	}
+
+	// 4. Send /unsub corridor vo_van_kiet
+	f.postUpdate(t, privateMessageUpdate(104, numChatID, "/unsub corridor vo_van_kiet"))
+	f.drain()
+
+	rows = f.store.rowsFor(chatID)
+	if len(rows) != 1 || rows[0].TargetID != "mai_chi_tho" {
+		t.Fatalf("rows after /unsub: %+v, want only mai_chi_tho remaining", rows)
+	}
+	texts = f.sender.texts()
+	if len(texts) != 4 {
+		t.Fatalf("expected 4 replies total, got %d", len(texts))
+	}
+	unsubReply := texts[3]
+	assertNoEmoji(t, "unsub reply", unsubReply)
+	if !strings.Contains(unsubReply, "Đã huỷ đăng ký thành công") || !strings.Contains(unsubReply, "Đại lộ Võ Văn Kiệt") {
+		t.Fatalf("unsub reply missing confirmation:\n%s", unsubReply)
 	}
 }

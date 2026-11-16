@@ -116,6 +116,104 @@ func TestTelegramChannel_Send_MockServer(t *testing.T) {
 	}
 }
 
+func TestFormatTelegramCorridorMessage_ZeroEmojiAndBilingual(t *testing.T) {
+	depth := 35.0
+	alert := CorridorAlert{
+		RoadKey:            "vo_van_kiet",
+		RoadName:           "Đại lộ Võ Văn Kiệt & Ký Con",
+		Passability:        "IMPASSABLE",
+		WorstFloodSeverity: "FLOODED_DEEP",
+		MaxDepthCm:         &depth,
+		PeakLocation:       "Cầu Rạch Chiếc",
+		EstimatedDelayMin:  25,
+		ObservedAt:         time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC),
+		RouteWebURL:        "https://warded.529studio.site/roads/vo_van_kiet",
+	}
+
+	msg := FormatTelegramCorridorMessage(alert)
+
+	// 1. Verify Zero-Emoji policy (Rule 1)
+	for _, r := range msg {
+		if unicode.Is(unicode.So, r) || unicode.Is(unicode.Sk, r) {
+			if r > 0x1F000 {
+				t.Fatalf("Rule 1 violation: found emoji in message: %c (U+%04X)", r, r)
+			}
+		}
+	}
+	if strings.Contains(msg, "⚠️") || strings.Contains(msg, "🚨") || strings.Contains(msg, "🌊") || strings.Contains(msg, "🚗") {
+		t.Fatalf("Rule 1 violation: found explicit banned alert emoji in corridor message")
+	}
+
+	// 2. Verify bilingual format and HTML escaping
+	expectedSubstrings := []string{
+		"[CẢNH BÁO TUYẾN ĐƯỜNG / CORRIDOR HAZARD ALERT]",
+		"Tuyến đường / Corridor:",
+		"Đại lộ Võ Văn Kiệt &amp; Ký Con", // properly HTML escaped &
+		"Trạng thái / Passability:",
+		"[NGẬP SÂU - ÙN TẮC / IMPASSABLE]",
+		"35 cm tại Cầu Rạch Chiếc",
+		"+25 phút / +25 mins",
+		"17:00 16/11/2026 (ICT)", // 10:00 UTC + 7 = 17:00 ICT
+		"<a href=\"https://warded.529studio.site/roads/vo_van_kiet\">",
+	}
+
+	for _, sub := range expectedSubstrings {
+		if !strings.Contains(msg, sub) {
+			t.Errorf("expected corridor message to contain %q, but got:\n%s", sub, msg)
+		}
+	}
+}
+
+func TestTelegramChannel_SendCorridor_MockServer(t *testing.T) {
+	var receivedRequests []telegramSendMessagePayload
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var p telegramSendMessagePayload
+		_ = json.Unmarshal(body, &p)
+		receivedRequests = append(receivedRequests, p)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok": true, "result": {"message_id": 999}}`))
+	}))
+	defer server.Close()
+
+	corridorFinder := CorridorSubscriberFinderFunc(func(ctx context.Context, channelName string, alert CorridorAlert) ([]string, error) {
+		return []string{"chat-corr-1", "chat-corr-2"}, nil
+	})
+
+	ch := NewTelegramChannel(
+		"my-secret-token",
+		nil,
+		WithCorridorSubscriberFinder(corridorFinder),
+		WithBaseURL(server.URL),
+	)
+
+	depth := 22.0
+	alert := CorridorAlert{
+		RoadKey:     "mai_chi_tho",
+		RoadName:    "Đường Mai Chí Thọ",
+		Passability: "CAUTION",
+		MaxDepthCm:  &depth,
+	}
+
+	err := ch.SendCorridor(context.Background(), alert)
+	if err != nil {
+		t.Fatalf("expected SendCorridor to succeed, got %v", err)
+	}
+
+	if len(receivedRequests) != 2 {
+		t.Fatalf("expected 2 telegram requests, got %d", len(receivedRequests))
+	}
+	if receivedRequests[0].ChatID != "chat-corr-1" || receivedRequests[1].ChatID != "chat-corr-2" {
+		t.Errorf("unexpected recipients: %+v", receivedRequests)
+	}
+	if !strings.Contains(receivedRequests[0].Text, "Đường Mai Chí Thọ") || !strings.Contains(receivedRequests[0].Text, "22 cm") {
+		t.Errorf("unexpected message text:\n%s", receivedRequests[0].Text)
+	}
+}
+
 func TestTelegramChannel_Send_TokenRedactedOnError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

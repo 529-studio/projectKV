@@ -14,6 +14,7 @@ type Store interface {
 	Unsubscribe(ctx context.Context, channelName, chatID string, targetType TargetType, targetID string) error
 	UnsubscribeAll(ctx context.Context, channelName, chatID string) (int64, error)
 	GetSubscribersForChokepoint(ctx context.Context, channelName, chokepointID, zone, ward string) ([]string, error)
+	GetSubscribersForCorridor(ctx context.Context, channelName, roadKey string) ([]string, error)
 	ListSubscriptions(ctx context.Context, channelName, chatID string) ([]Subscription, error)
 }
 
@@ -64,15 +65,22 @@ func (s *SQLiteStore) Subscribe(ctx context.Context, sub Subscription) error {
 
 // Unsubscribe removes an existing subscription.
 func (s *SQLiteStore) Unsubscribe(ctx context.Context, channelName, chatID string, targetType TargetType, targetID string) error {
+	normalizedTargetID := strings.TrimSpace(targetID)
+	normalizedCorridorKey := strings.ToLower(strings.ReplaceAll(normalizedTargetID, "-", "_"))
+
 	query := `
 		DELETE FROM flood_subscriptions
-		WHERE channel_name = ? AND chat_id = ? AND target_type = ? AND target_id = ?
+		WHERE channel_name = ? AND chat_id = ? AND target_type = ? AND (
+			target_id = ? OR
+			(target_type = 'corridor' AND LOWER(REPLACE(target_id, '-', '_')) = ?)
+		)
 	`
 	_, err := s.db.ExecContext(ctx, query,
 		strings.TrimSpace(channelName),
 		strings.TrimSpace(chatID),
 		string(targetType),
-		strings.TrimSpace(targetID),
+		normalizedTargetID,
+		normalizedCorridorKey,
 	)
 	if err != nil {
 		return fmt.Errorf("unsubscribe: %w", err)
@@ -143,6 +151,50 @@ func (s *SQLiteStore) GetSubscribersForChokepoint(ctx context.Context, channelNa
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query subscribers for chokepoint (%s): %w", chokepointID, err)
+	}
+	defer rows.Close()
+
+	var recipients []string
+	for rows.Next() {
+		var chatID string
+		if err := rows.Scan(&chatID); err != nil {
+			return nil, fmt.Errorf("scan subscriber chat_id: %w", err)
+		}
+		recipients = append(recipients, chatID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	return recipients, nil
+}
+
+// GetSubscribersForCorridor queries all distinct chat IDs subscribed to a given arterial corridor.
+// Matches subscriptions with target_type = 'all', or target_type = 'corridor' matching roadKey (case & hyphen-insensitive).
+func (s *SQLiteStore) GetSubscribersForCorridor(ctx context.Context, channelName, roadKey string) ([]string, error) {
+	roadKey = strings.TrimSpace(roadKey)
+	normalizedKey := strings.ToLower(strings.ReplaceAll(roadKey, "-", "_"))
+
+	query := `
+		SELECT DISTINCT chat_id FROM flood_subscriptions
+		WHERE channel_name = ? AND (
+			(target_type = 'all') OR
+			(target_type = 'corridor' AND (
+				LOWER(target_id) = LOWER(?) OR
+				LOWER(REPLACE(target_id, '-', '_')) = ?
+			))
+		)
+		ORDER BY chat_id ASC
+	`
+
+	rows, err := s.db.QueryContext(ctx, query,
+		channelName,
+		roadKey,
+		normalizedKey,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query subscribers for corridor (%s): %w", roadKey, err)
 	}
 	defer rows.Close()
 

@@ -18,6 +18,7 @@ const (
 	TargetChokepoint TargetType = "chokepoint" // Specific camera / chokepoint ID
 	TargetZone       TargetType = "zone"       // Operational traffic zone (e.g. "Quận 7 - Nhà Bè")
 	TargetWard       TargetType = "ward"       // Administrative ward / Phường
+	TargetCorridor   TargetType = "corridor"   // Arterial traffic corridor (e.g. "vo_van_kiet")
 )
 
 // CanonicalTargetTypes defines the complete, fixed set of valid target types.
@@ -26,6 +27,7 @@ var CanonicalTargetTypes = []string{
 	string(TargetChokepoint),
 	string(TargetZone),
 	string(TargetWard),
+	string(TargetCorridor),
 }
 
 // CanonicalZones contains the authoritative traffic zone classifications.
@@ -161,8 +163,8 @@ func NormalizeZone(input string) (string, bool) {
 var (
 	ErrInvalidChatID     = errors.New("chat_id is required")
 	ErrInvalidChannel    = errors.New("channel_name is required")
-	ErrInvalidTargetType = errors.New("invalid target_type: must be all, chokepoint, zone, or ward")
-	ErrMissingTargetID   = errors.New("target_id is required for chokepoint, zone, and ward target types")
+	ErrInvalidTargetType = errors.New("invalid target_type: must be all, chokepoint, zone, ward, or corridor")
+	ErrMissingTargetID   = errors.New("target_id is required for chokepoint, zone, ward, and corridor target types")
 	ErrInvalidTargetID   = errors.New("invalid target_id: target does not exist in canonical taxonomy")
 )
 
@@ -178,12 +180,19 @@ type ChokepointInfo struct {
 	Name string `json:"name,omitempty"`
 }
 
+// CorridorInfo carries arterial corridor information for taxonomy introspection.
+type CorridorInfo struct {
+	Key         string `json:"key"`
+	DisplayName string `json:"display_name"`
+}
+
 // TaxonomyResponse represents the payload returned by GET /api/subscriptions/taxonomy.
 type TaxonomyResponse struct {
 	TargetTypes []string         `json:"target_types"`
 	Zones       []string         `json:"zones"`
 	Wards       []WardInfo       `json:"wards"`
 	Chokepoints []ChokepointInfo `json:"chokepoints"`
+	Corridors   []CorridorInfo   `json:"corridors,omitempty"`
 	// BotUsername is the public Telegram handle the web UI turns into a deep
 	// link. Empty when the bot is unprovisioned; the UI then disables the CTA
 	// and keeps the manual chat-id form usable (S12-T4 spec §4.3, AC4).
@@ -199,9 +208,11 @@ type TaxonomyProvider interface {
 	Zones() []string
 	Wards() []WardInfo
 	Chokepoints() []ChokepointInfo
+	Corridors() []CorridorInfo
 	HasZone(zone string) bool
 	HasWard(ward string) bool
 	HasChokepoint(id string) bool
+	HasCorridor(key string) bool
 }
 
 // Subscription represents a persistent alert registration for a user on a delivery channel.
@@ -209,8 +220,8 @@ type Subscription struct {
 	ID          int64      `json:"id,omitempty"`
 	ChannelName string     `json:"channel_name"` // "telegram"
 	ChatID      string     `json:"chat_id"`      // Telegram chat ID or recipient identifier
-	TargetType  TargetType `json:"target_type"`  // "all" | "chokepoint" | "zone" | "ward"
-	TargetID    string     `json:"target_id"`    // Camera ID, Canonical Zone name, Ward name, or empty for "all"
+	TargetType  TargetType `json:"target_type"`  // "all" | "chokepoint" | "zone" | "ward" | "corridor"
+	TargetID    string     `json:"target_id"`    // Camera ID, Canonical Zone name, Ward name, Corridor key, or empty for "all"
 	CreatedAt   time.Time  `json:"created_at,omitempty"`
 }
 
@@ -230,7 +241,7 @@ func (s *Subscription) IsValid() error {
 	case TargetAll:
 		s.TargetID = ""
 		return nil
-	case TargetChokepoint, TargetWard:
+	case TargetChokepoint, TargetWard, TargetCorridor:
 		if s.TargetID == "" {
 			return ErrMissingTargetID
 		}
