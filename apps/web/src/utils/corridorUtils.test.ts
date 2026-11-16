@@ -7,6 +7,7 @@ import {
   formatObservationAge,
   fetchCorridorStatus,
   getCorridorWorstVerdict,
+  toRoadKey,
   type CorridorStatus,
 } from './corridorUtils.ts';
 import { CORRIDOR_I18N } from '../config/constants.ts';
@@ -167,3 +168,20 @@ test('fetchCorridorStatus network and caching behavior', async () => {
     clearCorridorCache();
   }
 });
+
+test('toRoadKey converts accented Vietnamese corridor names to canonical snake_case road keys', () => {
+  assert.equal(toRoadKey('Võ Văn Kiệt'), 'vo_van_kiet');
+  assert.equal(toRoadKey('Đại lộ Võ Văn Kiệt'), 'vo_van_kiet');
+  assert.equal(toRoadKey('Đường Cộng Hòa'), 'cong_hoa');
+  assert.equal(toRoadKey('Điện Biên Phủ'), 'dien_bien_phu');
+  assert.equal(toRoadKey('Nguyễn Hữu Cảnh'), 'nguyen_huu_canh');
+  assert.equal(toRoadKey('Trường Chinh'), 'truong_chinh');
+  assert.equal(toRoadKey('Phạm Văn Đồng'), 'pham_van_dong');
+  assert.equal(toRoadKey('Cách Mạng Tháng Tám'), 'cach_mang_thang_tam');
+  assert.equal(toRoadKey('Mai Chí Thọ'), 'mai_chi_tho');
+  assert.equal(toRoadKey('Quốc lộ 1'), 'quoc_lo_1');
+  assert.equal(toRoadKey(''), '');
+  assert.equal(toRoadKey(null), '');
+  assert.equal(toRoadKey(undefined), '');
+});
+
