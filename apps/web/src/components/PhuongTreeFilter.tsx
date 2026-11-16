@@ -65,6 +65,8 @@ import {
   calculateMarkerStyle,
   ARTERIAL_CORRIDORS,
   groupCamerasByCityCorridors,
+  sanitizeAddressSearchQuery,
+  formatStreetDisplayName,
   type CorridorDisplay,
   type TrafficVerdictLike,
   type CityCorridorGroup,
@@ -242,6 +244,9 @@ export default function PhuongTreeFilter({
       moderateTag: lang === 'vi' ? 'đông' : 'slow',
     };
   }, [lang]);
+
+  // Address query sanitization for house number and alley detection
+  const addressMeta = useMemo(() => sanitizeAddressSearchQuery(searchTerm), [searchTerm]);
 
   // Group cameras into: Phường → Đường → Camera
   const { treeData, phuongTypeMap } = useMemo(() => {
@@ -682,6 +687,26 @@ export default function PhuongTreeFilter({
               </button>
             )}
           </div>
+
+          {/* Contextual Feedback Hint for House/Alley Searches */}
+          {addressMeta.isHouseNumberDetected && addressMeta.cleanStreetQuery && (
+            <div
+              data-testid="address-search-hint"
+              className="mt-2 px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-[11px] text-zinc-400 font-mono leading-relaxed"
+            >
+              <span className="text-zinc-300 font-medium">
+                {lang === 'vi' ? 'Đang lọc theo trục đường: ' : 'Filtering corridor: '}
+                <span className="text-white underline decoration-zinc-600 underline-offset-2">
+                  {formatStreetDisplayName(addressMeta.cleanStreetQuery)}
+                </span>
+              </span>
+              <span className="block text-[10px] text-zinc-500 mt-0.5">
+                {lang === 'vi'
+                  ? '(Hệ thống camera giao thông định vị theo giao lộ, không gắn tại số nhà riêng lẻ)'
+                  : '(Traffic cameras are stationed at arterial intersections, not private addresses)'}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

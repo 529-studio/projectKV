@@ -10,6 +10,11 @@ import {
   matchesVietnameseSearch,
   ARTERIAL_CORRIDORS,
   groupCamerasByCityCorridors,
+  sanitizeAddressSearchQuery,
+  resolveStreetAlias,
+  formatStreetDisplayName,
+  PROTECTED_DATE_STREETS,
+  STREET_ALIASES,
 } from './phuongFormatters.ts';
 
 describe('formatPhuongName', () => {
@@ -310,5 +315,121 @@ describe('groupCamerasByCityCorridors & ARTERIAL_CORRIDORS', () => {
     assert.equal(searchCrossStreet[0].name, 'Điện Biên Phủ');
   });
 });
+
+describe('sanitizeAddressSearchQuery & PROTECTED_DATE_STREETS (Issue #484)', () => {
+  test('correctly isolates multi-slash deep alleys and extracts corridor', () => {
+    const res = sanitizeAddressSearchQuery('34/55/67 Cách Mạng Tháng Tám');
+    assert.equal(res.isHouseNumberDetected, true);
+    assert.equal(res.houseNumber, '34/55/67');
+    assert.equal(res.cleanStreetQuery, 'Cách Mạng Tháng Tám');
+  });
+
+  test('correctly isolates single house numbers with alphanumeric suffixes', () => {
+    const res = sanitizeAddressSearchQuery('123/4B Lê Văn Sỹ');
+    assert.equal(res.isHouseNumberDetected, true);
+    assert.equal(res.houseNumber, '123/4B');
+    assert.equal(res.cleanStreetQuery, 'Lê Văn Sỹ');
+  });
+
+  test('parses common Vietnamese house prefixes (Số, Hẻm, Ngõ, Kiệt)', () => {
+    const s1 = sanitizeAddressSearchQuery('Số 123 Nguyễn Trãi');
+    assert.equal(s1.isHouseNumberDetected, true);
+    assert.equal(s1.houseNumber, '123');
+    assert.equal(s1.cleanStreetQuery, 'Nguyễn Trãi');
+
+    const s2 = sanitizeAddressSearchQuery('Hẻm 456 Hoàng Văn Thụ');
+    assert.equal(s2.isHouseNumberDetected, true);
+    assert.equal(s2.houseNumber, '456');
+    assert.equal(s2.cleanStreetQuery, 'Hoàng Văn Thụ');
+
+    const s3 = sanitizeAddressSearchQuery('Ngõ 15 Điện Biên Phủ');
+    assert.equal(s3.isHouseNumberDetected, true);
+    assert.equal(s3.houseNumber, '15');
+    assert.equal(s3.cleanStreetQuery, 'Điện Biên Phủ');
+  });
+
+  test('extracts ward token from comma-separated address structures', () => {
+    const res = sanitizeAddressSearchQuery('34/55/67 Cách Mạng Tháng Tám, Phường 5, Tân Bình');
+    assert.equal(res.isHouseNumberDetected, true);
+    assert.equal(res.houseNumber, '34/55/67');
+    assert.equal(res.cleanStreetQuery, 'Cách Mạng Tháng Tám');
+    assert.equal(res.detectedWard, 'Phường 5');
+  });
+
+  test('preserves protected date streets and numbered streets without false-positive stripping', () => {
+    const d32 = sanitizeAddressSearchQuery('Đường 3/2');
+    assert.equal(d32.isHouseNumberDetected, false);
+    assert.equal(d32.cleanStreetQuery, 'Đường 3/2');
+
+    const bare32 = sanitizeAddressSearchQuery('3/2');
+    assert.equal(bare32.isHouseNumberDetected, false);
+    assert.equal(bare32.cleanStreetQuery, '3/2');
+
+    const d304 = sanitizeAddressSearchQuery('30/4');
+    assert.equal(d304.isHouseNumberDetected, false);
+    assert.equal(d304.cleanStreetQuery, '30/4');
+
+    const dSo7 = sanitizeAddressSearchQuery('Đường số 7');
+    assert.equal(dSo7.isHouseNumberDetected, false);
+    assert.equal(dSo7.cleanStreetQuery, 'Đường số 7');
+  });
+
+  test('correctly strips house number when in front of a protected date street', () => {
+    const res = sanitizeAddressSearchQuery('150 Đường 3/2');
+    assert.equal(res.isHouseNumberDetected, true);
+    assert.equal(res.houseNumber, '150');
+    assert.equal(res.cleanStreetQuery, 'Đường 3/2');
+  });
+});
+
+describe('resolveStreetAlias & formatStreetDisplayName', () => {
+  test('exports PROTECTED_DATE_STREETS and STREET_ALIASES registries', () => {
+    assert.ok(PROTECTED_DATE_STREETS.includes('3/2'));
+    assert.equal(STREET_ALIASES['cmt8'], 'cách mạng tháng tám');
+  });
+
+  test('maps common acronyms to canonical full names', () => {
+    assert.equal(resolveStreetAlias('cmt8'), 'cách mạng tháng tám');
+    assert.equal(resolveStreetAlias('CMTT'), 'cách mạng tháng tám');
+    assert.equal(resolveStreetAlias('vvk'), 'võ văn kiệt');
+    assert.equal(resolveStreetAlias('3/2'), 'ba tháng hai');
+    assert.equal(resolveStreetAlias('Đường 3/2'), 'ba tháng hai');
+    assert.equal(resolveStreetAlias('ql1a'), 'quốc lộ 1');
+  });
+
+  test('formats canonical display title case', () => {
+    assert.equal(formatStreetDisplayName('cmt8'), 'Cách Mạng Tháng Tám');
+    assert.equal(formatStreetDisplayName('3/2'), 'Ba Tháng Hai');
+    assert.equal(formatStreetDisplayName('cộng hòa'), 'Cộng Hòa');
+  });
+});
+
+describe('matchesVietnameseSearch with resilient address queries (Issue #484)', () => {
+  test('matches camera along corridor when deep alley address is searched', () => {
+    const target = 'Cách Mạng Tháng Tám - Phạm Văn Hai';
+    assert.equal(matchesVietnameseSearch(target, '34/55/67 Cách Mạng Tháng Tám'), true);
+    assert.equal(matchesVietnameseSearch(target, '34/55/67 cmt8'), true);
+  });
+
+  test('matches camera when prefix is entered', () => {
+    const target = 'Hoàng Văn Thụ - Út Tịch';
+    assert.equal(matchesVietnameseSearch(target, 'Hẻm 456 Hoàng Văn Thụ'), true);
+  });
+
+  test('matches camera with both street and ward if ward is specified', () => {
+    const camInPhuong5 = 'Cách Mạng Tháng Tám - Phạm Văn Hai Phường 5';
+    const camInPhuong13 = 'Cách Mạng Tháng Tám - Tô Hiến Thành Phường 13';
+
+    assert.equal(matchesVietnameseSearch(camInPhuong5, '34/55/67 CMT8, P.5'), true);
+    assert.equal(matchesVietnameseSearch(camInPhuong13, '34/55/67 CMT8, P.5'), false);
+  });
+
+  test('matches Ba Tháng Hai when 3/2 is searched', () => {
+    const target = 'Ba Tháng Hai - Sư Vạn Hạnh';
+    assert.equal(matchesVietnameseSearch(target, '3/2'), true);
+    assert.equal(matchesVietnameseSearch(target, '150 Đường 3/2'), true);
+  });
+});
+
 
 

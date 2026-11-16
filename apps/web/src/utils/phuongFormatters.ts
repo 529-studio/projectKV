@@ -240,6 +240,180 @@ export function extractCorridor(displayName?: string, title?: string): string {
 }
 
 /**
+ * Whitelist of canonical Vietnamese street names that contain dates or numbers,
+ * preventing them from being mistakenly stripped as house numbers.
+ */
+export const PROTECTED_DATE_STREETS: readonly string[] = [
+  '3/2',
+  '3 tháng 2',
+  '30/4',
+  '30 tháng 4',
+  '2/9',
+  '2 tháng 9',
+  '19/5',
+  '19 tháng 5',
+  '1/5',
+  '1 tháng 5',
+  '26/3',
+  '26 tháng 3',
+  '23/9',
+  '23 tháng 9',
+  '8/3',
+  '8 tháng 3',
+  '14/9',
+];
+
+/**
+ * Common street abbreviations and aliases mapped to canonical street names.
+ */
+export const STREET_ALIASES: Record<string, string> = {
+  cmt8: 'cách mạng tháng tám',
+  cmtt: 'cách mạng tháng tám',
+  '3/2': 'ba tháng hai',
+  '3 tháng 2': 'ba tháng hai',
+  '3 thang 2': 'ba tháng hai',
+  vvk: 'võ văn kiệt',
+  nvt: 'nguyễn văn trỗi',
+  pvd: 'phạm văn đồng',
+  dbp: 'điện biên phủ',
+  xlhn: 'xa lộ hà nội',
+  ql1: 'quốc lộ 1',
+  ql1a: 'quốc lộ 1',
+  ql13: 'quốc lộ 13',
+  ql22: 'quốc lộ 22',
+  ql50: 'quốc lộ 50',
+};
+
+/**
+ * Resolves street alias or abbreviation to canonical name.
+ */
+export function resolveStreetAlias(street: string): string {
+  const norm = street.trim().toLowerCase();
+  if (STREET_ALIASES[norm]) return STREET_ALIASES[norm];
+  const stripped = norm.replace(/^(đường|duong|đại lộ|dai lo|tuyến|tuyen)\s+/i, '').trim();
+  return STREET_ALIASES[stripped] || street;
+}
+
+/**
+ * Formats a street name with proper title capitalization.
+ */
+export function formatStreetDisplayName(name: string): string {
+  if (!name) return '';
+  const resolved = resolveStreetAlias(name);
+  return resolved
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+export interface ParsedAddressQuery {
+  rawQuery: string;
+  cleanStreetQuery: string;
+  houseNumber?: string;
+  detectedWard?: string;
+  isHouseNumberDetected: boolean;
+}
+
+/**
+ * Parses user input for address components (house number, deep alley, comma parts)
+ * and extracts the core street and ward query while preserving numeric date streets.
+ */
+export function sanitizeAddressSearchQuery(input: string): ParsedAddressQuery {
+  const raw = (input || '').trim();
+  if (!raw) {
+    return {
+      rawQuery: '',
+      cleanStreetQuery: '',
+      isHouseNumberDetected: false,
+    };
+  }
+
+  // Preserve named roads like "Đường số 7", "Đường số 10", "Duong so 8"
+  if (/^(đường\s+số|duong\s+so)\s+\d+/i.test(raw)) {
+    return {
+      rawQuery: raw,
+      cleanStreetQuery: raw,
+      isHouseNumberDetected: false,
+    };
+  }
+
+  // Split comma-separated tokens (e.g., "34/55/67 Cách Mạng Tháng Tám, Phường 5, Tân Bình")
+  const commaParts = raw.split(',').map(p => p.trim()).filter(Boolean);
+  const primaryPart = commaParts[0] || raw;
+  const wardPart = commaParts.length > 1 ? commaParts[1] : undefined;
+
+  const lowerPrimary = primaryPart.toLowerCase();
+
+  // Check if primaryPart itself is a protected numeric/date street
+  const isProtectedDirect = PROTECTED_DATE_STREETS.some(ps => {
+    const norm = lowerPrimary.replace(/^(đường|duong)\s+/i, '').trim();
+    return norm === ps;
+  });
+
+  if (isProtectedDirect) {
+    return {
+      rawQuery: raw,
+      cleanStreetQuery: primaryPart,
+      detectedWard: wardPart,
+      isHouseNumberDetected: false,
+    };
+  }
+
+  // Common prefix words indicating address, house, or alley
+  const prefixRegex = /^(số\s+nhà|số|hẻm|ngõ|kiệt|ngách|tổ)\s+/i;
+  const strippedPrefix = primaryPart.replace(prefixRegex, '');
+  const hadPrefix = strippedPrefix !== primaryPart;
+
+  // Match house number or deep alley notation at start (e.g., "34/55/67", "123/4B", "52A", "150")
+  const houseNumRegex = /^(\d+[a-zA-Z]?([\/\-]\d+[a-zA-Z]?)*)\s+(.+)$/;
+  const match = strippedPrefix.match(houseNumRegex);
+
+  let houseNumber: string | undefined = undefined;
+  let cleanStreet = primaryPart;
+  let isHouseNumberDetected = false;
+
+  if (match) {
+    houseNumber = match[1];
+    cleanStreet = match[3].trim();
+    isHouseNumberDetected = true;
+  } else if (hadPrefix) {
+    const prefixNumMatch = strippedPrefix.match(/^(\d+[a-zA-Z]?([\/\-]\d+[a-zA-Z]?)*)\s*(.*)$/);
+    if (prefixNumMatch && prefixNumMatch[3]) {
+      houseNumber = prefixNumMatch[1];
+      cleanStreet = prefixNumMatch[3].trim();
+      isHouseNumberDetected = true;
+    }
+  }
+
+  return {
+    rawQuery: raw,
+    cleanStreetQuery: cleanStreet,
+    houseNumber,
+    detectedWard: wardPart,
+    isHouseNumberDetected,
+  };
+}
+
+/**
+ * Normalizes ward tokens for flexible matching (e.g. "P.5" -> ["5", "phuong 5", "ward 5"]).
+ */
+export function normalizeWardTokens(wardStr?: string): string[] {
+  if (!wardStr) return [];
+  const raw = wardStr.trim();
+  const tokens: string[] = [];
+  const pMatch = raw.match(/^(?:p\.?|phường|phuong)\s*(\d+|[a-zA-ZÀ-ỹ\s]+)$/i);
+  if (pMatch) {
+    const val = pMatch[1].trim();
+    tokens.push(val);
+    tokens.push('phuong ' + removeVietnameseDiacritics(val));
+    tokens.push('ward ' + removeVietnameseDiacritics(val));
+  } else {
+    tokens.push(removeVietnameseDiacritics(raw.toLowerCase()));
+  }
+  return tokens;
+}
+
+/**
  * Strips Vietnamese diacritics for insensitive search.
  */
 export function removeVietnameseDiacritics(str: string): string {
@@ -251,7 +425,8 @@ export function removeVietnameseDiacritics(str: string): string {
 }
 
 /**
- * Checks whether target string matches search query considering Vietnamese diacritics and multiple words.
+ * Checks whether target string matches search query considering Vietnamese diacritics,
+ * multiple words, street aliases, and house/alley query sanitization.
  */
 export function matchesVietnameseSearch(target: string, query: string): boolean {
   const cleanQuery = query.trim().replace(/\s+/g, ' ');
@@ -271,6 +446,45 @@ export function matchesVietnameseSearch(target: string, query: string): boolean 
   const queryWords = normQuery.split(' ').filter(Boolean);
   if (queryWords.length > 1 && queryWords.every(w => normTarget.includes(w))) {
     return true;
+  }
+
+  // 4. Resilient Address Fallback (House number / alley stripping and aliases)
+  const parsed = sanitizeAddressSearchQuery(cleanQuery);
+  const candidateQueries = new Set<string>();
+
+  if (parsed.cleanStreetQuery) {
+    candidateQueries.add(parsed.cleanStreetQuery);
+    const resolved = resolveStreetAlias(parsed.cleanStreetQuery);
+    if (resolved !== parsed.cleanStreetQuery) {
+      candidateQueries.add(resolved);
+    }
+  }
+
+  const directAlias = resolveStreetAlias(cleanQuery);
+  if (directAlias !== cleanQuery) {
+    candidateQueries.add(directAlias);
+  }
+
+  for (const q of candidateQueries) {
+    const normQ = removeVietnameseDiacritics(q.toLowerCase());
+    const words = normQ.split(' ').filter(Boolean);
+    const streetMatches =
+      normTarget.includes(normQ) || (words.length > 0 && words.every(w => normTarget.includes(w)));
+
+    if (streetMatches) {
+      if (parsed.detectedWard) {
+        const wardTokens = normalizeWardTokens(parsed.detectedWard);
+        const matchesWard = wardTokens.some(token => normTarget.includes(token));
+        if (matchesWard) return true;
+        // If target is just a bare corridor name without ward tokens:
+        const hasAnyWardToken = ['phuong', 'xa', 'ward', 'commune'].some(t =>
+          normTarget.includes(t)
+        );
+        if (!hasAnyWardToken) return true;
+      } else {
+        return true;
+      }
+    }
   }
 
   return false;
