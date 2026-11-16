@@ -859,7 +859,7 @@ export default function PhuongTreeFilter({
           <button
             type="button"
             onClick={handleClearFilter}
-            className="px-2 py-0.5 rounded text-[10.5px] font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all shrink-0 cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
+            className="min-h-[36px] px-3 py-1 rounded text-xs font-bold text-red-200 bg-red-950/80 border border-red-500/60 hover:bg-red-900 hover:text-white transition-all shrink-0 cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 select-none"
             title={lang === 'vi' ? 'Xóa lọc' : 'Clear filter'}
           >
             <span className="font-bold text-xs leading-none">✕</span>
@@ -910,7 +910,7 @@ export default function PhuongTreeFilter({
                       <button
                         type="button"
                         onClick={e => toggleCityCorridorExpand(corr.name, e)}
-                        className="text-zinc-400 hover:text-white text-xs w-4 h-4 flex items-center justify-center shrink-0 focus:outline-none"
+                        className="text-zinc-400 hover:text-white text-xs w-8 h-8 min-w-[32px] min-h-[32px] -ml-1 flex items-center justify-center shrink-0 focus:outline-none cursor-pointer"
                         aria-label={lang === 'vi' ? 'Đóng/mở' : 'Toggle corridor'}
                       >
                         {isExpanded ? '▾' : '▸'}
@@ -1049,7 +1049,7 @@ export default function PhuongTreeFilter({
                     <button
                       type="button"
                       onClick={e => togglePhuongExpand(group.key, e)}
-                      className="text-zinc-400 hover:text-white text-xs w-4 h-4 flex items-center justify-center shrink-0 focus:outline-none"
+                      className="text-zinc-400 hover:text-white text-xs w-8 h-8 min-w-[32px] min-h-[32px] -ml-1 flex items-center justify-center shrink-0 focus:outline-none cursor-pointer"
                       aria-label={lang === 'vi' ? 'Đóng/mở' : 'Toggle ward'}
                     >
                       {isExpanded ? '▾' : '▸'}
@@ -1106,7 +1106,7 @@ export default function PhuongTreeFilter({
                                     <button
                                       type="button"
                                       onClick={e => toggleCorridorExpand(corridorId, e)}
-                                      className="text-zinc-500 hover:text-white text-[11px] w-3.5 h-3.5 flex items-center justify-center shrink-0 focus:outline-none"
+                                      className="text-zinc-500 hover:text-white text-xs w-7 h-7 min-w-[28px] min-h-[28px] -ml-1 flex items-center justify-center shrink-0 focus:outline-none cursor-pointer"
                                       aria-label={lang === 'vi' ? 'Đóng/mở đường' : 'Toggle corridor'}
                                     >
                                       {isCorrExpanded ? '▾' : '▸'}

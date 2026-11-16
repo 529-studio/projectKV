@@ -1,9 +1,33 @@
 'use client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+const STORAGE_KEY = 'warded_landing_seen_v1';
 
 export default function LandingOverlay() {
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    try {
+      const seen = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+      if (!seen) {
+        setIsVisible(true);
+      }
+    } catch {
+      // In case localStorage is blocked in private browsing
+    }
+  }, []);
+
+  const handleDismiss = () => {
+    setIsVisible(false);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, Date.now().toString());
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -28,8 +52,9 @@ export default function LandingOverlay() {
               Giúp đoạn đường của bạn đỡ chông gai hơn mỗi ngày.
             </p>
             <button 
-              onClick={() => setIsVisible(false)}
-              className="bg-white text-black font-bold py-3 px-8 rounded hover:scale-105 transition-transform duration-200 cursor-pointer"
+              type="button"
+              onClick={handleDismiss}
+              className="bg-white text-black font-bold min-h-[48px] py-3 px-8 rounded hover:scale-105 transition-transform duration-200 cursor-pointer inline-flex items-center justify-center select-none"
             >
               Truy cập Hệ thống
             </button>

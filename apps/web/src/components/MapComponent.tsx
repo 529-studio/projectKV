@@ -105,6 +105,7 @@ export default function MapComponent({
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const cameraRendererRef = useRef<L.Canvas | null>(null);
   const nearMeLayerRef = useRef<L.LayerGroup | null>(null);
   const nearMeLayerMapRef = useRef<L.Map | null>(null);
   const prevFilteredRef = useRef(false);
@@ -301,6 +302,12 @@ export default function MapComponent({
         const cameraPane = map.createPane('cameraMarkersPane');
         cameraPane.style.zIndex = '600';
       }
+
+      // Dedicated canvas renderer with expanded touch/click tolerance (>= 48px hit area)
+      cameraRendererRef.current = L.canvas({
+        tolerance: 14,
+        pane: 'cameraMarkersPane',
+      });
 
       // Dedicated non-interactive pane for the user fix, accuracy circle and ring.
       if (!map.getPane('nearMePane')) {
@@ -713,6 +720,7 @@ export default function MapComponent({
         fillOpacity,
         className,
         pane: 'cameraMarkersPane',
+        renderer: cameraRendererRef.current || undefined,
       });
 
       const customMarker = marker as CustomCircleMarker;

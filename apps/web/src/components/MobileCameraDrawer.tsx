@@ -82,7 +82,7 @@ export default function MobileCameraDrawer({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ duration: 0.28, ease: 'easeOut' }}
-            className="fixed bottom-0 left-0 right-0 z-[860] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden max-h-[85vh] h-[80vh]"
+            className="fixed bottom-0 left-0 right-0 z-[860] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden max-h-[85vh] h-[80vh] pb-[env(safe-area-inset-bottom,0px)]"
           >
             {/* Drag handle and close header */}
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-zinc-800 shrink-0 min-h-[56px]">

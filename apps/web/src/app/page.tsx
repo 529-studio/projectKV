@@ -736,7 +736,9 @@ export default function Home() {
             setMobileDrawerOpen(true);
           }}
           className={`md:hidden absolute right-3 z-[830] w-12 h-12 min-w-[48px] min-h-[48px] bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
-            pinnedCameras.length > 0 ? 'bottom-[4.5rem]' : 'bottom-3.5'
+            pinnedCameras.length > 0
+              ? 'bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'
+              : 'bottom-[calc(0.875rem+env(safe-area-inset-bottom,0px))]'
           }`}
           aria-label={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
           title={MOBILE_SEARCH_I18N.TRIGGER_LABEL[lang]}
@@ -766,7 +768,9 @@ export default function Home() {
           aria-haspopup="dialog"
           aria-expanded={nearMeOpen}
           className={`md:hidden absolute left-3 z-[840] w-12 h-12 min-w-[48px] min-h-[48px] bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-zinc-100 rounded-lg flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 ${
-            pinnedCameras.length > 0 ? 'bottom-[4.5rem]' : 'bottom-3.5'
+            pinnedCameras.length > 0
+              ? 'bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'
+              : 'bottom-[calc(0.875rem+env(safe-area-inset-bottom,0px))]'
           }`}
         >
           <svg

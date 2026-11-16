@@ -176,8 +176,9 @@ export default function PinnedDock({
     }
   };
 
-  // Drag-to-scroll on empty track background
+  // Drag-to-scroll on empty track background (desktop only; mobile uses native touch scrolling)
   const handleTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>, isMobile: boolean) => {
+    if (isMobile) return; // Allow native smooth touch momentum on mobile devices
     if (e.button !== 0) return;
     if (e.target !== e.currentTarget) return; // Only if clicked directly on empty track space
     stopMomentum();
@@ -854,7 +855,7 @@ export default function PinnedDock({
             initial={{ opacity: 0, y: 10, x: '-50%', scale: 0.95 }}
             animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
             exit={{ opacity: 0, y: 10, x: '-50%', scale: 0.95 }}
-            className="fixed bottom-3.5 left-1/2 z-[820] pointer-events-auto select-none"
+            className="fixed bottom-[calc(0.875rem+env(safe-area-inset-bottom,0px))] left-1/2 z-[820] pointer-events-auto select-none"
           >
             <button
               type="button"
@@ -901,7 +902,7 @@ export default function PinnedDock({
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ duration: 0.26, ease: 'easeOut' }}
-                className="fixed bottom-0 left-0 right-0 z-[850] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden pb-4 max-h-[60vh]"
+                className="fixed bottom-0 left-0 right-0 z-[850] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden pb-[calc(1rem+env(safe-area-inset-bottom,0px))] max-h-[60vh]"
               >
                 {/* Drag handle */}
                 <div className="pt-2 pb-1 flex justify-center shrink-0">
