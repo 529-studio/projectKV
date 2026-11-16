@@ -649,7 +649,7 @@ export default function CameraModal({
                   type="button"
                   onClick={handleVerifyFlood}
                   disabled={isFloodVerifyDisabled({ isVerifying: isVerifyingFlood, cooldownRemaining })}
-                  className={`px-2.5 py-1 rounded text-xs font-mono font-semibold tracking-wide inline-flex items-center gap-1.5 border transition-all select-none shadow-sm ${
+                  className={`min-h-[48px] px-3 py-1.5 rounded text-xs font-mono font-semibold tracking-wide inline-flex items-center gap-1.5 border transition-all select-none shadow-sm ${
                     isFloodVerifyDisabled({ isVerifying: isVerifyingFlood, cooldownRemaining })
                       ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed opacity-70 shadow-none'
                       : 'bg-zinc-100 hover:bg-white text-zinc-950 border-zinc-200 hover:border-white active:scale-[0.98] cursor-pointer'
@@ -695,7 +695,7 @@ export default function CameraModal({
                   type="button"
                   onClick={handleReportFlood}
                   disabled={isFloodReportDisabled({ isReporting: isReportingFlood, cooldownRemaining: reportCooldownRemaining })}
-                  className={`px-2.5 py-1 rounded text-xs font-mono font-medium tracking-wide inline-flex items-center gap-1.5 border transition-all select-none shadow-sm ${
+                  className={`min-h-[48px] px-3 py-1.5 rounded text-xs font-mono font-medium tracking-wide inline-flex items-center gap-1.5 border transition-all select-none shadow-sm ${
                     isFloodReportDisabled({ isReporting: isReportingFlood, cooldownRemaining: reportCooldownRemaining })
                       ? 'bg-zinc-900/60 text-zinc-600 border-zinc-800 cursor-not-allowed opacity-60 shadow-none'
                       : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700 hover:border-zinc-500 active:scale-[0.98] cursor-pointer'
@@ -890,7 +890,7 @@ export default function CameraModal({
           <button
             type="button"
             onClick={handleToggleLang}
-            className="mt-0.5 flex h-7 min-w-[2rem] shrink-0 items-center justify-center rounded border border-zinc-800 bg-zinc-900 px-2 font-mono text-[11px] font-semibold text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100"
+            className="mt-0.5 flex min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded border border-zinc-800 bg-zinc-900 px-3 font-mono text-xs font-semibold text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 cursor-pointer"
             aria-label={currentLang === 'vi' ? 'Chuyển sang tiếng Anh' : 'Switch to Vietnamese'}
             title={currentLang === 'vi' ? 'Chuyển sang tiếng Anh' : 'Switch to Vietnamese'}
             data-active-lang={currentLang}
@@ -899,7 +899,7 @@ export default function CameraModal({
           </button>
           <button
             onClick={onClose}
-            className="text-zinc-500 hover:text-white font-bold text-xl px-2"
+            className="flex min-w-[48px] min-h-[48px] items-center justify-center text-zinc-400 hover:text-white font-bold text-2xl px-2 transition-colors cursor-pointer select-none"
             aria-label={currentLang === 'vi' ? 'Đóng' : 'Close'}
           >
             ×
@@ -921,7 +921,7 @@ export default function CameraModal({
                   onPrevCamera?.();
                 }}
                 disabled={!hasPrevCamera}
-                className={`absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-950/80 hover:bg-zinc-900 border border-zinc-700/80 text-white flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-90 ${
+                className={`absolute left-3 top-1/2 -translate-y-1/2 z-20 w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-zinc-950/80 hover:bg-zinc-900 border border-zinc-700/80 text-white flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-90 ${
                   !hasPrevCamera
                     ? 'opacity-20 pointer-events-none'
                     : 'opacity-85 hover:opacity-100 hover:border-zinc-400 cursor-pointer'
@@ -942,7 +942,7 @@ export default function CameraModal({
                   onNextCamera?.();
                 }}
                 disabled={!hasNextCamera}
-                className={`absolute right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-950/80 hover:bg-zinc-900 border border-zinc-700/80 text-white flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-90 ${
+                className={`absolute right-3 top-1/2 -translate-y-1/2 z-20 w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-zinc-950/80 hover:bg-zinc-900 border border-zinc-700/80 text-white flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-90 ${
                   !hasNextCamera
                     ? 'opacity-20 pointer-events-none'
                     : 'opacity-85 hover:opacity-100 hover:border-zinc-400 cursor-pointer'
@@ -1021,7 +1021,7 @@ export default function CameraModal({
       </div>
 
         {/* FOOTER */}
-        <div className="px-4 py-3 bg-zinc-900 border-t border-zinc-800 flex justify-between items-center text-xs">
+        <div className="px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-zinc-900 border-t border-zinc-800 flex justify-between items-center text-xs">
           <div className="flex items-center gap-3 text-zinc-500">
             <span>
               {currentLang === 'vi' ? 'TỌA ĐỘ:' : 'COORDINATES:'} {camera.latitude?.toFixed(5)}, {camera.longitude?.toFixed(5)}
@@ -1033,9 +1033,10 @@ export default function CameraModal({
             )}
           </div>
           <button 
+            type="button"
             onClick={onTogglePin}
             title={!isPinned && pinCapReached ? (currentLang === 'vi' ? 'Đã đạt giới hạn ghim (tối đa 12 camera)' : 'Pin limit reached (maximum 12 cameras)') : undefined}
-            className={`px-3 py-1.5 border rounded transition ${
+            className={`min-h-[48px] min-w-[48px] px-4 py-2 border rounded transition font-mono font-semibold text-xs inline-flex items-center justify-center cursor-pointer select-none ${
               isPinned
                 ? 'bg-zinc-200 text-black border-white hover:bg-white'
                 : pinCapReached
