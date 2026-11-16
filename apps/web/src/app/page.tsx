@@ -37,9 +37,14 @@ import { getCameraSequence } from '../utils/cameraSequence';
 import type { ActiveLensMode } from '../components/HexOverlay';
 import CameraFilter from '../components/CameraFilter';
 import { isCameraOffline, isWaterwayCamera } from '../utils/cameraFilterUtils';
+import { extractCorridor } from '../utils/phuongFormatters';
+import { toRoadKey } from '../utils/corridorUtils';
+import { useCorridorRoute } from '../hooks/useCorridorRoute';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
+const CorridorRouteLayer = dynamic(() => import('../components/CorridorRouteLayer'), { ssr: false });
+const CorridorOverviewCard = dynamic(() => import('../components/CorridorOverviewCard'), { ssr: false });
 
 /** A fix younger than this is reused instead of starting a new GPS request (AC2). */
 const NEAR_ME_FIX_MAX_AGE_MS = 60_000;
@@ -274,6 +279,31 @@ export default function Home() {
     }
     return displayCameras.length;
   }, [displayCameras, isFiltered, filteredCameraIds]);
+
+  // S15-T2: Commuter Route & Corridor Overview State
+  const activeRoadKey = useMemo(() => {
+    return selectedCorridor ? toRoadKey(selectedCorridor) : null;
+  }, [selectedCorridor]);
+
+  const { route: corridorRoute } = useCorridorRoute(activeRoadKey);
+
+  const corridorCameras = useMemo(() => {
+    if (!selectedCorridor) return [];
+    return displayCameras.filter(c => {
+      const corr = c.road_name ? c.road_name.trim() : extractCorridor(c.displayName, c.title);
+      return corr === selectedCorridor || (activeRoadKey ? toRoadKey(corr) === activeRoadKey : false);
+    });
+  }, [displayCameras, selectedCorridor, activeRoadKey]);
+
+  const handleSelectCameraById = useCallback(
+    (camId: string) => {
+      const found = cameras.find(c => c.id === camId);
+      if (found) {
+        handleSelectCamera(found);
+      }
+    },
+    [cameras, handleSelectCamera]
+  );
 
   // S12-T2 / Issue #400 — proximity list derived from the live fix. Coordinates
   // never leave the browser: no fetch, no storage, no logging.
@@ -634,8 +664,25 @@ export default function Home() {
               radarLoading={rainRadarLoading}
               trafficLoading={trafficLoading}
             />
+            <CorridorRouteLayer
+              map={map}
+              routeData={corridorRoute}
+              onCameraClick={handleSelectCameraById}
+              lang={lang}
+            />
           </MapComponent>
         </div>
+
+        {/* CORRIDOR OVERVIEW CARD */}
+        {selectedCorridor && corridorRoute?.summary && (
+          <CorridorOverviewCard
+            summary={corridorRoute.summary}
+            corridorCameras={corridorCameras}
+            onClose={() => setSelectedCorridor(null)}
+            onCameraClick={handleSelectCamera}
+            lang={lang}
+          />
+        )}
         
         {/* BOTTOM DOCK */}
         <PinnedDock 

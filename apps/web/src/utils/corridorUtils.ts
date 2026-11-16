@@ -1,3 +1,5 @@
+import { removeVietnameseDiacritics } from './phuongFormatters.ts';
+
 export interface CameraVerdict {
   camera_id: string;
   name?: string;
@@ -26,6 +28,17 @@ export const getCorridorStatusUrl = (roadKey: string): string => {
   const base = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) || '';
   return `${base}/api/roads/${encodeURIComponent(roadKey)}/status`;
 };
+
+/**
+ * Converts a corridor display name or raw road name into its canonical road_key.
+ * e.g. "Võ Văn Kiệt" -> "vo_van_kiet", "Đại lộ Võ Văn Kiệt" -> "vo_van_kiet"
+ */
+export function toRoadKey(corridorName?: string | null): string {
+  if (!corridorName) return '';
+  let clean = removeVietnameseDiacritics(corridorName.trim().toLowerCase());
+  clean = clean.replace(/^(đường|duong|đại lộ|dai lo|tuyến|tuyen)\s+/i, '');
+  return clean.replace(/[\s\-–—−]+/g, '_').replace(/[^a-z0-9_]/g, '');
+}
 
 export function getCachedCorridorStatus(roadKey: string): CorridorStatus | null {
   const entry = corridorCache.get(roadKey.toLowerCase());
