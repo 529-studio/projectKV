@@ -365,4 +365,138 @@ func TestHandler_HTTPRoutes(t *testing.T) {
 	if roadsResp.Total == 0 {
 		t.Errorf("expected total > 0")
 	}
+
+	// 4. GET /api/roads/:road_key/route -> 200
+	reqRoute := httptest.NewRequest(http.MethodGet, "/api/roads/vo_van_kiet/route", nil)
+	wRoute := httptest.NewRecorder()
+	r.ServeHTTP(wRoute, reqRoute)
+	if wRoute.Code != http.StatusOK {
+		t.Errorf("expected 200 for /api/roads/:road_key/route, got %d: %s", wRoute.Code, wRoute.Body.String())
+	}
+
+	// 5. GET /api/corridors/overview -> 200
+	reqOverview := httptest.NewRequest(http.MethodGet, "/api/corridors/overview", nil)
+	wOverview := httptest.NewRecorder()
+	r.ServeHTTP(wOverview, reqOverview)
+	if wOverview.Code != http.StatusOK {
+		t.Errorf("expected 200 for /api/corridors/overview, got %d: %s", wOverview.Code, wOverview.Body.String())
+	}
+}
+
+func TestGetRoute_PassableAndGeoJSON(t *testing.T) {
+	now := time.Now()
+	cameras := sampleCameras()
+	depthZero := 0.0
+	verdicts := []hotset.Verdict{
+		{
+			CameraID:     "cam-1",
+			Severity:     "CLEAR",
+			FloodDepthCm: &depthZero,
+			ObservedAt:   now.Add(-20 * time.Second),
+			Source:       "onnx",
+		},
+		{
+			CameraID:     "cam-2",
+			Severity:     "CLEAR",
+			FloodDepthCm: &depthZero,
+			ObservedAt:   now.Add(-10 * time.Second),
+			Source:       "onnx",
+		},
+	}
+
+	camProv := &mockCameraProvider{cameras: cameras}
+	verdProv := &mockVerdictProvider{verdicts: verdicts}
+	svc := NewService(camProv, verdProv, "production", 180*time.Second)
+
+	geoJSON, summary, ok := svc.GetRoute("vo_van_kiet")
+	if !ok {
+		t.Fatalf("expected GetRoute to succeed for vo_van_kiet")
+	}
+
+	if summary.PassabilityVerdict != PassabilityPassable {
+		t.Errorf("expected PASSABLE, got %s", summary.PassabilityVerdict)
+	}
+	if summary.StatusColor != "#22c55e" {
+		t.Errorf("expected green #22c55e, got %s", summary.StatusColor)
+	}
+	if summary.FreeFlowSeconds <= 0 {
+		t.Errorf("expected positive free flow seconds")
+	}
+	if summary.EstimatedSeconds < summary.FreeFlowSeconds {
+		t.Errorf("estimated seconds cannot be less than free flow seconds")
+	}
+
+	// Verify GeoJSON structure
+	if geoJSON.Type != "FeatureCollection" {
+		t.Errorf("expected FeatureCollection, got %s", geoJSON.Type)
+	}
+	if len(geoJSON.Features) < 1 {
+		t.Fatalf("expected at least 1 feature (LineString)")
+	}
+
+	lineFeature := geoJSON.Features[0]
+	if lineFeature.Geometry.Type != "LineString" {
+		t.Errorf("first feature must be LineString, got %s", lineFeature.Geometry.Type)
+	}
+}
+
+func TestGetRoute_ImpassableFlood(t *testing.T) {
+	now := time.Now()
+	cameras := sampleCameras()
+	depthDeep := 26.5
+	hazardLvl := 3
+	verdicts := []hotset.Verdict{
+		{
+			CameraID:         "cam-1",
+			Severity:         "CONGESTED",
+			FloodSeverity:    "FLOODED_DEEP",
+			FloodDepthCm:     &depthDeep,
+			FloodHazardLevel: &hazardLvl,
+			ObservedAt:       now.Add(-15 * time.Second),
+			Source:           "onnx",
+		},
+	}
+
+	camProv := &mockCameraProvider{cameras: cameras}
+	verdProv := &mockVerdictProvider{verdicts: verdicts}
+	svc := NewService(camProv, verdProv, "production", 180*time.Second)
+
+	_, summary, ok := svc.GetRoute("vo_van_kiet")
+	if !ok {
+		t.Fatalf("expected GetRoute to succeed")
+	}
+
+	if summary.PassabilityVerdict != PassabilityImpassable {
+		t.Errorf("expected IMPASSABLE for 26.5cm flood, got %s", summary.PassabilityVerdict)
+	}
+	if summary.StatusColor != "#ef4444" {
+		t.Errorf("expected red #ef4444, got %s", summary.StatusColor)
+	}
+	if summary.DelaySeconds < 600 {
+		t.Errorf("expected delay penalty for deep flood, got %d", summary.DelaySeconds)
+	}
+}
+
+func TestGetCorridorsOverview(t *testing.T) {
+	cameras := sampleCameras()
+	camProv := &mockCameraProvider{cameras: cameras}
+	verdProv := &mockVerdictProvider{verdicts: nil}
+	svc := NewService(camProv, verdProv, "production", 180*time.Second)
+
+	overview := svc.GetCorridorsOverview()
+	if len(overview) == 0 {
+		t.Fatalf("expected non-empty corridors overview")
+	}
+	foundVoVanKiet := false
+	for _, item := range overview {
+		if item.RoadKey == "vo_van_kiet" {
+			foundVoVanKiet = true
+			if item.LengthKm <= 0 {
+				t.Errorf("expected positive length for vo_van_kiet")
+			}
+		}
+	}
+	if !foundVoVanKiet {
+		t.Errorf("expected vo_van_kiet in corridors overview")
+	}
 }
