@@ -140,7 +140,7 @@ export async function fetchCorridorStatus(roadKey: string): Promise<CorridorStat
     setCachedCorridorStatus(key, data);
     return data;
   } catch (err) {
-    console.warn(`[corridorUtils] Failed to fetch status for road ${key}:`, err);
+    console.warn('[corridorUtils] Failed to fetch status for road:', key, err);
     return null;
   }
 }

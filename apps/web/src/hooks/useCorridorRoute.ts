@@ -51,7 +51,7 @@ export async function fetchCorridorRoute(roadKey: string): Promise<CorridorRoute
     setCachedCorridorRoute(normKey, data);
     return data;
   } catch (err) {
-    console.warn(`[useCorridorRoute] Error fetching route for ${normKey}:`, err);
+    console.warn('[useCorridorRoute] Error fetching route for corridor:', normKey, err);
     return null;
   }
 }
