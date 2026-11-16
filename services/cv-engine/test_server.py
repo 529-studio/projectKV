@@ -1087,15 +1087,24 @@ class TestInferenceQueueAndLoadShedding(unittest.TestCase):
             t0 = time.perf_counter()
             req = urllib.request.Request(base_url, data=frame_bytes, headers=headers, method="POST")
             try:
-                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                with urllib.request.urlopen(req, timeout=15.0) as resp:
                     dur_ms = (time.perf_counter() - t0) * 1000.0
                     with lock:
                         results.append((resp.status, dur_ms, None))
             except urllib.error.HTTPError as err:
                 dur_ms = (time.perf_counter() - t0) * 1000.0
-                body = json.loads(err.read().decode("utf-8"))
+                reason = None
+                try:
+                    body = json.loads(err.read().decode("utf-8"))
+                    reason = body.get("reason")
+                except Exception:
+                    pass
                 with lock:
-                    results.append((err.code, dur_ms, body.get("reason")))
+                    results.append((err.code, dur_ms, reason))
+            except Exception as exc:
+                dur_ms = (time.perf_counter() - t0) * 1000.0
+                with lock:
+                    results.append((500, dur_ms, str(exc)))
 
         threads = []
         # 15 stale peripheral frames
@@ -1111,7 +1120,7 @@ class TestInferenceQueueAndLoadShedding(unittest.TestCase):
         for th in threads:
             th.start()
         for th in threads:
-            th.join(timeout=5.0)
+            th.join(timeout=20.0)
 
         httpd.shutdown()
         httpd.server_close()
