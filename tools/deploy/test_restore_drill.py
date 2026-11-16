@@ -686,5 +686,340 @@ class TestDrillOrchestration(unittest.TestCase):
             self.assertIn("committed_before_restore", entry)
 
 
+class TestWebhookAlerting(unittest.TestCase):
+    def setUp(self) -> None:
+        self.sample_pass_summary = {
+            "schema_version": 1,
+            "task": "S15-T6",
+            "issue": 480,
+            "generated_at": "2026-11-16T12:00:00Z",
+            "mode": "simulator",
+            "verdict": "pass",
+            "duration_seconds": 1.25,
+            "metrics": {
+                "rto_seconds": 0.85,
+                "rto_budget_seconds": 60.0,
+                "rpo_seconds": 0.10,
+                "rpo_budget_seconds": 10.0,
+                "rpo_method": "reference_newest_minus_restored_newest",
+            },
+            "restore": {
+                "transport": "hermetic_simulator",
+                "replica_url": "file:///tmp/sim/replica",
+                "duration_seconds": 0.85,
+            },
+            "counts": {
+                "camera_verdicts": {"count": 6},
+                "hotset_verdict_history": {"count": 6},
+                "flood_subscriptions": {"count": 6},
+            },
+            "checks": [
+                {"name": "integrity_check", "status": "pass", "detail": "ok"},
+                {"name": "quick_check", "status": "pass", "detail": "ok"},
+                {"name": "foreign_key_check", "status": "pass", "detail": "ok"},
+            ],
+            "failures": [],
+        }
+
+        self.sample_fail_summary = {
+            "schema_version": 1,
+            "task": "S15-T6",
+            "issue": 480,
+            "generated_at": "2026-11-16T12:00:00Z",
+            "mode": "simulator",
+            "verdict": "fail",
+            "duration_seconds": 3.10,
+            "metrics": {
+                "rto_seconds": 65.50,
+                "rto_budget_seconds": 60.0,
+                "rpo_seconds": 15.20,
+                "rpo_budget_seconds": 10.0,
+            },
+            "restore": {
+                "transport": "hermetic_simulator",
+                "replica_url": "file:///tmp/sim/replica",
+                "duration_seconds": 65.50,
+            },
+            "counts": {
+                "camera_verdicts": {"count": 0},
+            },
+            "checks": [
+                {"name": "integrity_check", "status": "fail", "detail": "row 3 missing from index"},
+                {"name": "rto_budget", "status": "fail", "detail": "RTO exceeded budget"},
+                {"name": "rpo_budget", "status": "fail", "detail": "RPO exceeded budget"},
+            ],
+            "failures": [
+                {"name": "integrity_check", "status": "fail", "detail": "row 3 missing from index"},
+                {"name": "rto_budget", "status": "fail", "detail": "RTO exceeded budget"},
+            ],
+            "error": "DatabaseCorruptionError: index malformed",
+        }
+
+    def test_build_webhook_payload_success(self) -> None:
+        payload = rd.build_webhook_payload(self.sample_pass_summary)
+        self.assertEqual(payload["event"], "sqlite_restore_drill")
+        self.assertEqual(payload["status"], "SUCCESS")
+        self.assertEqual(payload["verdict"], "pass")
+        self.assertEqual(payload["mode"], "simulator")
+        self.assertEqual(payload["task"], "S15-T6")
+        self.assertEqual(payload["issue"], 480)
+        self.assertTrue(payload["rto"]["passed"])
+        self.assertEqual(payload["rto"]["elapsed_seconds"], 0.85)
+        self.assertTrue(payload["rpo"]["passed"])
+        self.assertEqual(payload["rpo"]["lag_seconds"], 0.10)
+        self.assertEqual(payload["verifications"]["integrity_check"], "ok")
+        self.assertEqual(payload["counts"]["camera_verdicts"], 6)
+        self.assertIn("docs/runbooks/sqlite_litestream_disaster_recovery.md", payload["runbook"])
+        self.assertIn("[PROJECTKV RESTORE DRILL: SUCCESS]", payload["text"])
+        self.assertIn("PASS", payload["text"])
+        self.assertEqual(payload["content"], payload["text"])
+
+    def test_build_webhook_payload_failure(self) -> None:
+        payload = rd.build_webhook_payload(self.sample_fail_summary)
+        self.assertEqual(payload["status"], "FAILURE")
+        self.assertEqual(payload["verdict"], "fail")
+        self.assertFalse(payload["rto"]["passed"])
+        self.assertFalse(payload["rpo"]["passed"])
+        self.assertIn("BREACH", payload["text"])
+        self.assertIn("row 3 missing from index", payload["text"])
+        self.assertIn("DatabaseCorruptionError", payload["text"])
+        self.assertEqual(len(payload["failures"]), 2)
+
+    def test_build_webhook_payload_telegram(self) -> None:
+        payload = rd.build_webhook_payload(
+            self.sample_pass_summary,
+            is_telegram=True,
+            chat_id="-100987654321",
+        )
+        self.assertEqual(payload["chat_id"], "-100987654321")
+        self.assertIn("[PROJECTKV RESTORE DRILL: SUCCESS]", payload["text"])
+        self.assertNotIn("event", payload)
+        self.assertNotIn("status", payload)
+
+    def test_send_webhook_alert_success(self) -> None:
+        mock_response = mock.MagicMock()
+        mock_response.status = 200
+        mock_response.__enter__.return_value = mock_response
+
+        mock_opener = mock.MagicMock()
+        mock_opener.open.return_value = mock_response
+
+        delivered = rd.send_webhook_alert(
+            "http://example.com/webhook",
+            self.sample_pass_summary,
+            opener=mock_opener,
+        )
+        self.assertTrue(delivered)
+        mock_opener.open.assert_called_once()
+        req = mock_opener.open.call_args[0][0]
+        self.assertEqual(req.get_full_url(), "http://example.com/webhook")
+        self.assertEqual(req.headers["Content-type"], "application/json")
+        body = json.loads(req.data.decode("utf-8"))
+        self.assertEqual(body["status"], "SUCCESS")
+
+    def test_send_webhook_alert_telegram_url_formats_telegram_payload(self) -> None:
+        mock_response = mock.MagicMock()
+        mock_response.status = 200
+        mock_response.__enter__.return_value = mock_response
+
+        mock_opener = mock.MagicMock()
+        mock_opener.open.return_value = mock_response
+
+        delivered = rd.send_webhook_alert(
+            "https://api.telegram.org/bot123456:ABC-DEF/sendMessage?chat_id=-100999",
+            self.sample_pass_summary,
+            opener=mock_opener,
+        )
+        self.assertTrue(delivered)
+        req = mock_opener.open.call_args[0][0]
+        body = json.loads(req.data.decode("utf-8"))
+        self.assertEqual(body["chat_id"], "-100999")
+        self.assertIn("[PROJECTKV RESTORE DRILL: SUCCESS]", body["text"])
+        self.assertNotIn("event", body)
+
+    def test_send_webhook_alert_retry_on_500_then_succeed(self) -> None:
+        mock_response = mock.MagicMock()
+        mock_response.status = 200
+        mock_response.__enter__.return_value = mock_response
+
+        import urllib.error
+        http_error = urllib.error.HTTPError(
+            url="http://example.com/webhook",
+            code=500,
+            msg="Internal Server Error",
+            hdrs={},
+            fp=None,
+        )
+
+        mock_opener = mock.MagicMock()
+        mock_opener.open.side_effect = [http_error, mock_response]
+
+        with mock.patch("time.sleep") as mock_sleep:
+            delivered = rd.send_webhook_alert(
+                "http://example.com/webhook",
+                self.sample_pass_summary,
+                max_retries=3,
+                backoff_seconds=0.01,
+                opener=mock_opener,
+            )
+        self.assertTrue(delivered)
+        self.assertEqual(mock_opener.open.call_count, 2)
+        mock_sleep.assert_called_once_with(0.01)
+
+    def test_send_webhook_alert_no_retry_on_400(self) -> None:
+        import urllib.error
+        http_error = urllib.error.HTTPError(
+            url="http://example.com/webhook",
+            code=400,
+            msg="Bad Request",
+            hdrs={},
+            fp=None,
+        )
+
+        mock_opener = mock.MagicMock()
+        mock_opener.open.side_effect = http_error
+
+        with mock.patch("time.sleep") as mock_sleep:
+            delivered = rd.send_webhook_alert(
+                "http://example.com/webhook",
+                self.sample_pass_summary,
+                max_retries=3,
+                opener=mock_opener,
+            )
+        self.assertFalse(delivered)
+        self.assertEqual(mock_opener.open.call_count, 1)
+        mock_sleep.assert_not_called()
+
+    def test_send_webhook_alert_exhausts_retries_on_network_error(self) -> None:
+        import urllib.error
+        mock_opener = mock.MagicMock()
+        mock_opener.open.side_effect = urllib.error.URLError("Connection refused")
+
+        with mock.patch("time.sleep") as mock_sleep:
+            delivered = rd.send_webhook_alert(
+                "http://example.com/webhook",
+                self.sample_pass_summary,
+                max_retries=3,
+                backoff_seconds=0.01,
+                opener=mock_opener,
+            )
+        self.assertFalse(delivered)
+        self.assertEqual(mock_opener.open.call_count, 3)
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    def test_cli_options_parse_webhook_url_and_env(self) -> None:
+        parser = rd.build_parser()
+        args = parser.parse_args([
+            "--webhook-url", "http://hook.projectkv.dev",
+            "--chat-id", "98765",
+            "--webhook-max-retries", "5",
+            "--webhook-timeout", "15.0",
+        ])
+        opts = rd.options_from_args(args)
+        self.assertEqual(opts.webhook_url, "http://hook.projectkv.dev")
+        self.assertEqual(opts.chat_id, "98765")
+        self.assertEqual(opts.webhook_max_retries, 5)
+        self.assertEqual(opts.webhook_timeout_seconds, 15.0)
+
+        # Environment fallback test
+        with mock.patch.dict(os.environ, {
+            "RESTORE_DRILL_WEBHOOK_URL": "http://env-hook.projectkv.dev",
+            "RESTORE_DRILL_CHAT_ID": "chat-from-env",
+        }):
+            empty_opts = rd.DrillOptions()
+            self.assertEqual(rd._explicit_webhook_url(empty_opts), "http://env-hook.projectkv.dev")
+            self.assertEqual(rd._explicit_chat_id(empty_opts), "chat-from-env")
+
+    def test_main_dispatches_webhook_on_drill_success(self) -> None:
+        with mock.patch.object(rd, "send_webhook_alert") as mock_send:
+            mock_send.return_value = True
+            with tempfile.TemporaryDirectory() as tmp:
+                out_path = Path(tmp) / "summary.json"
+                exit_code = rd.main([
+                    "--mode", "simulator",
+                    "--webhook-url", "http://hook.local/test",
+                    "--out", str(out_path),
+                    "--quiet",
+                ])
+                self.assertEqual(exit_code, rd.EXIT_PASS)
+                mock_send.assert_called_once()
+                args, kwargs = mock_send.call_args
+                self.assertEqual(args[0], "http://hook.local/test")
+                self.assertEqual(args[1]["verdict"], "pass")
+
+    def test_main_dispatches_webhook_on_drill_failure(self) -> None:
+        with mock.patch.object(rd, "run_drill", side_effect=RuntimeError("catastrophic failure")):
+            with mock.patch.object(rd, "send_webhook_alert") as mock_send:
+                mock_send.return_value = True
+                with tempfile.TemporaryDirectory() as tmp:
+                    out_path = Path(tmp) / "summary.json"
+                    exit_code = rd.main([
+                        "--mode", "simulator",
+                        "--webhook-url", "http://hook.local/test",
+                        "--out", str(out_path),
+                        "--quiet",
+                    ])
+                    self.assertEqual(exit_code, rd.EXIT_FAIL)
+                    mock_send.assert_called_once()
+                    args, kwargs = mock_send.call_args
+                    self.assertEqual(args[0], "http://hook.local/test")
+                    self.assertEqual(args[1]["verdict"], "fail")
+                    self.assertIn("catastrophic failure", args[1]["error"])
+
+    def test_end_to_end_simulator_drill_with_local_http_listener(self) -> None:
+        """Rule 10: live local HTTP listener captures empirical webhook payload."""
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        import threading
+
+        received_payloads: list[dict[str, Any]] = []
+
+        class WebhookHandler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                length = int(self.headers.get("Content-Length", 0))
+                data = self.rfile.read(length)
+                try:
+                    payload = json.loads(data.decode("utf-8"))
+                    received_payloads.append(payload)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"ok": true}')
+                except Exception as err:
+                    self.send_response(400)
+                    self.end_headers()
+                    self.wfile.write(str(err).encode("utf-8"))
+
+            def log_message(self, *args: Any) -> None:
+                pass  # Suppress stderr logs during test
+
+        server = HTTPServer(("127.0.0.1", 0), WebhookHandler)
+        port = server.server_port
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                out_path = Path(tmp) / "summary.json"
+                exit_code = rd.main([
+                    "--mode", "simulator",
+                    "--webhook-url", f"http://127.0.0.1:{port}/alerts",
+                    "--out", str(out_path),
+                    "--quiet",
+                ])
+                self.assertEqual(exit_code, rd.EXIT_PASS)
+                self.assertEqual(len(received_payloads), 1)
+                received = received_payloads[0]
+                self.assertEqual(received["event"], "sqlite_restore_drill")
+                self.assertEqual(received["status"], "SUCCESS")
+                self.assertEqual(received["mode"], "simulator")
+                self.assertTrue(received["rto"]["passed"])
+                self.assertTrue(received["rpo"]["passed"])
+                self.assertEqual(received["verifications"]["integrity_check"], "ok")
+                self.assertIn("docs/runbooks/sqlite_litestream_disaster_recovery.md", received["runbook"])
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()
