@@ -69,6 +69,9 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -84,6 +87,10 @@ DEFAULT_RPO_BUDGET_SECONDS = 10.0
 DEFAULT_SYNC_INTERVAL_SECONDS = 1.0
 DEFAULT_CYCLES = 6
 DEFAULT_REPLICATE_SECONDS = 12.0
+
+DEFAULT_WEBHOOK_MAX_RETRIES = 3
+DEFAULT_WEBHOOK_TIMEOUT_SECONDS = 10.0
+DEFAULT_WEBHOOK_BACKOFF_SECONDS = 0.5
 
 EXIT_PASS = 0
 EXIT_FAIL = 1
@@ -1016,6 +1023,24 @@ class DrillOptions:
     timeout_seconds: float = 300.0
     json_stdout: bool = False
     quiet: bool = False
+    webhook_url: str | None = None
+    chat_id: str | None = None
+    webhook_max_retries: int = DEFAULT_WEBHOOK_MAX_RETRIES
+    webhook_timeout_seconds: float = DEFAULT_WEBHOOK_TIMEOUT_SECONDS
+    webhook_backoff_seconds: float = DEFAULT_WEBHOOK_BACKOFF_SECONDS
+
+
+def _explicit_webhook_url(options: DrillOptions) -> str | None:
+    return options.webhook_url or os.environ.get("RESTORE_DRILL_WEBHOOK_URL") or None
+
+
+def _explicit_chat_id(options: DrillOptions) -> str | None:
+    return (
+        options.chat_id
+        or os.environ.get("RESTORE_DRILL_CHAT_ID")
+        or os.environ.get("TELEGRAM_CHAT_ID")
+        or None
+    )
 
 
 def _explicit_replica_url(options: DrillOptions) -> str | None:
@@ -1347,6 +1372,193 @@ def build_summary(outcome: DrillOutcome, options: DrillOptions) -> dict[str, Any
     }
 
 
+def build_webhook_payload(
+    summary: dict[str, Any],
+    *,
+    is_telegram: bool = False,
+    chat_id: str | None = None,
+) -> dict[str, Any]:
+    """Format structured alert payload compatible with Telegram, Slack, and generic webhooks."""
+    verdict = str(summary.get("verdict", "fail")).lower()
+    status = "SUCCESS" if verdict == "pass" else "FAILURE"
+    mode = str(summary.get("mode", "unknown"))
+    metrics = summary.get("metrics") or {}
+    rto_seconds = metrics.get("rto_seconds")
+    rto_budget = metrics.get("rto_budget_seconds", DEFAULT_RTO_BUDGET_SECONDS)
+    rpo_seconds = metrics.get("rpo_seconds")
+    rpo_budget = metrics.get("rpo_budget_seconds", DEFAULT_RPO_BUDGET_SECONDS)
+
+    checks = summary.get("checks") or []
+    failures = summary.get("failures") or []
+    counts_raw = summary.get("counts") or {}
+
+    verifications: dict[str, str] = {}
+    for check in checks:
+        if isinstance(check, dict) and check.get("name") in (
+            "integrity_check",
+            "quick_check",
+            "foreign_key_check",
+        ):
+            verifications[check["name"]] = str(check.get("detail", check.get("status", "unknown")))
+    for fail in failures:
+        if isinstance(fail, dict) and fail.get("name") in (
+            "integrity_check",
+            "quick_check",
+            "foreign_key_check",
+        ):
+            verifications[fail["name"]] = str(fail.get("detail", "fail"))
+
+    if not verifications:
+        verifications = {
+            "integrity_check": "ok" if verdict == "pass" else "error",
+            "quick_check": "ok" if verdict == "pass" else "error",
+            "foreign_key_check": "ok" if verdict == "pass" else "error",
+        }
+
+    record_counts: dict[str, int] = {}
+    for table_name, data in counts_raw.items():
+        if isinstance(data, dict):
+            record_counts[table_name] = int(data.get("count", 0))
+        elif isinstance(data, (int, float)):
+            record_counts[table_name] = int(data)
+
+    lines: list[str] = [
+        f"[PROJECTKV RESTORE DRILL: {status}]",
+        f"Mode: {mode}",
+        f"Verdict: {verdict.upper()}",
+    ]
+    if rto_seconds is not None:
+        rto_pass = rto_seconds <= rto_budget
+        rto_str = f"{rto_seconds:.2f}s (budget <= {rto_budget:.0f}s) - {'PASS' if rto_pass else 'BREACH'}"
+        lines.append(f"RTO: {rto_str}")
+    if rpo_seconds is not None:
+        rpo_pass = rpo_seconds <= rpo_budget
+        rpo_str = f"{rpo_seconds:.2f}s (budget <= {rpo_budget:.0f}s) - {'PASS' if rpo_pass else 'BREACH'}"
+        lines.append(f"RPO: {rpo_str}")
+    elif verdict == "pass":
+        lines.append(f"RPO: n/a (budget <= {rpo_budget:.0f}s)")
+
+    if verifications:
+        v_items = [f"{k}={v}" for k, v in sorted(verifications.items())]
+        lines.append(f"Verifications: {', '.join(v_items)}")
+
+    if record_counts:
+        c_items = [f"{k}={v}" for k, v in sorted(record_counts.items())]
+        lines.append(f"Counts: {', '.join(c_items)}")
+
+    if failures:
+        lines.append("Failures:")
+        for f in failures[:5]:
+            lines.append(f"  - {f.get('name')}: {f.get('detail')}")
+
+    if "error" in summary:
+        lines.append(f"Error: {summary['error']}")
+
+    lines.append("Runbook: docs/runbooks/sqlite_litestream_disaster_recovery.md")
+    text_message = "\n".join(lines)
+
+    if is_telegram:
+        tg_payload: dict[str, Any] = {"text": text_message}
+        if chat_id:
+            tg_payload["chat_id"] = chat_id
+        return tg_payload
+
+    generic_payload: dict[str, Any] = {
+        "event": "sqlite_restore_drill",
+        "status": status,
+        "verdict": verdict,
+        "mode": mode,
+        "task": "S15-T6",
+        "issue": 480,
+        "generated_at": summary.get("generated_at", iso_utc(utc_now())),
+        "rto": {
+            "elapsed_seconds": rto_seconds,
+            "budget_seconds": rto_budget,
+            "passed": (rto_seconds <= rto_budget) if rto_seconds is not None else (verdict == "pass"),
+        },
+        "rpo": {
+            "lag_seconds": rpo_seconds,
+            "budget_seconds": rpo_budget,
+            "passed": (rpo_seconds <= rpo_budget) if rpo_seconds is not None else (verdict == "pass"),
+        },
+        "verifications": verifications,
+        "counts": record_counts,
+        "failures": failures,
+        "runbook": "docs/runbooks/sqlite_litestream_disaster_recovery.md",
+        "text": text_message,
+        "content": text_message,
+    }
+    if chat_id:
+        generic_payload["chat_id"] = chat_id
+    return generic_payload
+
+
+def send_webhook_alert(
+    webhook_url: str,
+    summary: dict[str, Any],
+    *,
+    chat_id: str | None = None,
+    max_retries: int = DEFAULT_WEBHOOK_MAX_RETRIES,
+    backoff_seconds: float = DEFAULT_WEBHOOK_BACKOFF_SECONDS,
+    timeout_seconds: float = DEFAULT_WEBHOOK_TIMEOUT_SECONDS,
+    opener: Any = None,
+) -> bool:
+    """Dispatches structured alert notification with exponential backoff retry.
+
+    Returns True if delivered (HTTP 2xx), False otherwise. Never crashes the caller.
+    """
+    if not webhook_url:
+        return False
+
+    parsed = urllib.parse.urlparse(webhook_url)
+    resolved_chat_id = chat_id
+    if not resolved_chat_id:
+        qs = urllib.parse.parse_qs(parsed.query)
+        if "chat_id" in qs and qs["chat_id"]:
+            resolved_chat_id = qs["chat_id"][0]
+
+    is_telegram = "api.telegram.org" in parsed.netloc.lower()
+
+    payload = build_webhook_payload(summary, is_telegram=is_telegram, chat_id=resolved_chat_id)
+    body_bytes = json.dumps(payload).encode("utf-8")
+
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "ProjectKV-RestoreDrill/1.0",
+    }
+    req = urllib.request.Request(webhook_url, data=body_bytes, headers=headers, method="POST")
+
+    dispatch = opener.open if opener is not None else urllib.request.urlopen
+
+    last_error: Exception | None = None
+    for attempt in range(max_retries):
+        try:
+            with dispatch(req, timeout=timeout_seconds) as response:
+                status_code = getattr(response, "status", getattr(response, "code", 200))
+                if 200 <= status_code < 300:
+                    return True
+                last_error = RuntimeError(f"HTTP {status_code}")
+        except urllib.error.HTTPError as exc:
+            last_error = exc
+            # Client errors (4xx) except 429 are permanent errors - do not retry
+            if 400 <= exc.code < 500 and exc.code != 429:
+                sys.stderr.write(
+                    f"restore drill webhook non-retryable error {exc.code}: {exc.reason}\n"
+                )
+                return False
+        except (urllib.error.URLError, TimeoutError, OSError, ConnectionError) as exc:
+            last_error = exc
+        except Exception as exc:
+            last_error = exc
+
+        if attempt < max_retries - 1:
+            sleep_duration = backoff_seconds * (2 ** attempt)
+            time.sleep(sleep_duration)
+
+    sys.stderr.write(f"restore drill webhook failed after {max_retries} attempts: {last_error}\n")
+    return False
+
+
 def format_human(summary: dict[str, Any]) -> str:
     metrics = summary["metrics"]
     lines = [
@@ -1415,6 +1627,36 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout", type=float, default=300.0, help="litestream restore timeout (seconds)")
     parser.add_argument("--json-stdout", action="store_true", help="Also print the JSON summary")
     parser.add_argument("--quiet", action="store_true", help="Suppress the human-readable summary")
+    parser.add_argument(
+        "--webhook-url",
+        default=None,
+        help="Structured alert webhook destination URL (or RESTORE_DRILL_WEBHOOK_URL)",
+    )
+    parser.add_argument(
+        "--chat-id",
+        default=None,
+        help="Optional Telegram chat ID (or RESTORE_DRILL_CHAT_ID / TELEGRAM_CHAT_ID)",
+    )
+    parser.add_argument(
+        "--webhook-max-retries",
+        type=int,
+        default=DEFAULT_WEBHOOK_MAX_RETRIES,
+        help="Maximum webhook delivery attempts",
+    )
+    parser.add_argument(
+        "--webhook-timeout",
+        dest="webhook_timeout_seconds",
+        type=float,
+        default=DEFAULT_WEBHOOK_TIMEOUT_SECONDS,
+        help="Webhook HTTP request timeout in seconds",
+    )
+    parser.add_argument(
+        "--webhook-backoff",
+        dest="webhook_backoff_seconds",
+        type=float,
+        default=DEFAULT_WEBHOOK_BACKOFF_SECONDS,
+        help="Initial backoff delay in seconds between webhook retries",
+    )
     return parser
 
 
@@ -1438,6 +1680,11 @@ def options_from_args(args: argparse.Namespace) -> DrillOptions:
         timeout_seconds=args.timeout,
         json_stdout=args.json_stdout,
         quiet=args.quiet,
+        webhook_url=args.webhook_url,
+        chat_id=args.chat_id,
+        webhook_max_retries=args.webhook_max_retries,
+        webhook_timeout_seconds=args.webhook_timeout_seconds,
+        webhook_backoff_seconds=args.webhook_backoff_seconds,
     )
 
 
@@ -1450,8 +1697,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Exception as exc:  # noqa: BLE001 - the drill must report, never crash silently
         failure = {
             "schema_version": 1,
-            "task": "S14-T2",
-            "issue": 442,
+            "task": "S15-T6",
+            "issue": 480,
             "generated_at": iso_utc(utc_now()),
             "mode": args.mode,
             "verdict": "fail",
@@ -1468,10 +1715,35 @@ def main(argv: Sequence[str] | None = None) -> int:
             options.out.write_text(payload, encoding="utf-8")
         if options.json_stdout or (options.out is not None and str(options.out) == "-"):
             sys.stdout.write(payload)
+
+        webhook_url = _explicit_webhook_url(options)
+        if webhook_url:
+            chat_id = _explicit_chat_id(options)
+            send_webhook_alert(
+                webhook_url,
+                failure,
+                chat_id=chat_id,
+                max_retries=options.webhook_max_retries,
+                backoff_seconds=options.webhook_backoff_seconds,
+                timeout_seconds=options.webhook_timeout_seconds,
+            )
         return EXIT_FAIL
 
     summary = build_summary(outcome, options)
     emit(summary, options)
+
+    webhook_url = _explicit_webhook_url(options)
+    if webhook_url:
+        chat_id = _explicit_chat_id(options)
+        send_webhook_alert(
+            webhook_url,
+            summary,
+            chat_id=chat_id,
+            max_retries=options.webhook_max_retries,
+            backoff_seconds=options.webhook_backoff_seconds,
+            timeout_seconds=options.webhook_timeout_seconds,
+        )
+
     return EXIT_PASS if summary["verdict"] == "pass" else EXIT_FAIL
 
 

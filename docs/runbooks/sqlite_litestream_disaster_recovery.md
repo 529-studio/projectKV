@@ -1,8 +1,8 @@
 # SQLite Litestream Replication & Disaster Recovery Runbook
 
-- **Issue:** #442, sprint 14 task 2 (S14-T2)
-- **Applies to:** `docker-compose.stg.yml`, `deploy/litestream/litestream.yml`, `tools/deploy/restore_drill.py`
-- **Last verified:** 2026-11-13 (see [the S14-T2 verification report](../reports/s14_t2_litestream_restore_drill.md))
+- **Issue:** #442, sprint 14 task 2 (S14-T2); #480, sprint 15 task 6 (S15-T6)
+- **Applies to:** `docker-compose.stg.yml`, `deploy/litestream/litestream.yml`, `tools/deploy/restore_drill.py`, `deploy/systemd/projectkv-restore-drill.{service,timer}`
+- **Last verified:** 2026-11-16 (see [the S14-T2 verification report](../reports/s14_t2_litestream_restore_drill.md) and S15-T6 weekly automated cron drill)
 
 ## 1. What this protects and what it does not
 
@@ -131,6 +131,54 @@ replicating and run the drill restore-only (section 4.2, first command).
 Exit code `0` means every check passed; `1` means the drill failed and the JSON
 summary names the failing checks. Treat a non-zero exit as a release blocker.
 
+### 4.3 Automated Weekly Cron & Webhook Alerting (S15-T6)
+
+An untested backup is only a hypothesis. Rather than relying on manual developer
+execution, staging hosts run the drill automatically every Sunday at 03:00 UTC
+via systemd and broadcast structured alerts to operational channels.
+
+#### 4.3.1 Systemd Service & Timer Installation
+
+1. Copy systemd unit definitions to the host:
+   ```bash
+   sudo cp deploy/systemd/projectkv-restore-drill.{service,timer} /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now projectkv-restore-drill.timer
+   ```
+2. Verify timer schedule:
+   ```bash
+   systemctl list-timers projectkv-restore-drill.timer
+   ```
+3. Test manual invocation of the systemd service:
+   ```bash
+   sudo systemctl start projectkv-restore-drill.service
+   sudo journalctl -u projectkv-restore-drill.service -n 50 --no-pager
+   ```
+
+#### 4.3.2 Webhook Alert Configuration
+
+The drill script dispatches structured JSON alerts upon completion:
+- Parameter: `--webhook-url <URL>` (or env `RESTORE_DRILL_WEBHOOK_URL`)
+- Optional Telegram chat ID: `--chat-id <ID>` (or env `RESTORE_DRILL_CHAT_ID`, `TELEGRAM_CHAT_ID`)
+- Retry policy: 3 attempts with exponential backoff on transient errors (HTTP 5xx, 429, socket timeouts); immediate fail on non-retryable 4xx client errors.
+
+Supported webhook receivers:
+- **Telegram Bot API**: `https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>`
+- **Slack / Discord**: Standard incoming webhook URLs (accepts `text` and `content` fields).
+- **Generic HTTP endpoints**: Receives top-level JSON with `event`, `status`, `rto`, `rpo`, `verifications`, and `counts`.
+
+Example alert message (monochromatic, zero emoji per Rule 1):
+```text
+[PROJECTKV RESTORE DRILL: SUCCESS]
+Mode: auto
+Verdict: PASS
+RTO: 0.85s (budget <= 60s) - PASS
+RPO: 0.10s (budget <= 10s) - PASS
+Verifications: foreign_key_check=ok, integrity_check=ok, quick_check=ok
+Counts: camera_verdicts=6, flood_subscriptions=6, hotset_verdict_history=6
+Runbook: docs/runbooks/sqlite_litestream_disaster_recovery.md
+```
+
 ## 5. Incident procedure: restore staging
 
 Do not restore over a live database while both the backend and Litestream are
@@ -220,5 +268,9 @@ running. Two writers and a replicating sidecar will produce a torn state.
 - Replication config: [`deploy/litestream/litestream.yml`](../../deploy/litestream/litestream.yml)
 - Compose stack: [`docker-compose.stg.yml`](../../docker-compose.stg.yml)
 - Drill tool: [`tools/deploy/restore_drill.py`](../../tools/deploy/restore_drill.py)
+- Systemd service unit: [`deploy/systemd/projectkv-restore-drill.service`](../../deploy/systemd/projectkv-restore-drill.service)
+- Systemd timer unit: [`deploy/systemd/projectkv-restore-drill.timer`](../../deploy/systemd/projectkv-restore-drill.timer)
 - Verification report: [S14-T2 restore drill](../reports/s14_t2_litestream_restore_drill.md)
-- Lesson: [Litestream R2 replication and restore drills](../lessons/442-litestream-r2-replication-and-restore-drill.md)
+- Lessons:
+  - [Litestream R2 replication and restore drills](../lessons/442-litestream-r2-replication-and-restore-drill.md)
+  - [Automated restore drill webhook and cron](../lessons/480-automated-restore-drill-webhook.md)
