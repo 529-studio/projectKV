@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from io import BytesIO
@@ -717,6 +718,193 @@ def build_flood_assessment(
     }
 
 
+# Known arterial corridor keywords for priority queue scheduling (S15-T5 / ADR-012 D1).
+DEFAULT_CORRIDOR_KEYWORDS: Tuple[str, ...] = (
+    "cong_hoa",
+    "cong-hoa",
+    "vo_van_kiet",
+    "vo-van-kiet",
+    "dien_bien_phu",
+    "dien-bien-phu",
+    "truong_chinh",
+    "truong-chinh",
+    "xa_lo_ha_noi",
+    "xa-lo-ha-noi",
+    "corridor",
+    "hotset",
+    "arterial",
+)
+
+
+def is_corridor_request(
+    camera_id: str,
+    headers: Any,
+    configured_corridors: Optional[Sequence[str]] = None,
+) -> bool:
+    """Determine whether an inference request is for an arterial corridor camera."""
+    # 1. Explicit priority / corridor headers
+    if headers:
+        corridor_hdr = headers.get("X-Corridor")
+        if corridor_hdr and corridor_hdr.strip().lower() not in ("0", "false", "no"):
+            return True
+        priority_hdr = (headers.get("X-Priority") or "").strip().lower()
+        if priority_hdr in ("high", "critical", "corridor", "hotset", "1"):
+            return True
+        hotset_hdr = (headers.get("X-Hotset") or "").strip().lower()
+        if hotset_hdr in ("true", "1", "yes"):
+            return True
+
+    # 2. Camera ID matching
+    cid = camera_id.lower().strip()
+    if not cid:
+        return False
+
+    if configured_corridors:
+        for c in configured_corridors:
+            if c and c.lower() in cid:
+                return True
+
+    for kw in DEFAULT_CORRIDOR_KEYWORDS:
+        if kw in cid:
+            return True
+
+    return False
+
+
+def parse_capture_timestamp(headers: Any) -> Optional[float]:
+    """Extract and parse frame capture timestamp from request headers."""
+    if not headers:
+        return None
+    raw_ts = (
+        headers.get("X-Capture-Timestamp")
+        or headers.get("X-Frame-Timestamp")
+        or headers.get("X-OSD-Timestamp")
+        or headers.get("X-Timestamp")
+    )
+    if not raw_ts:
+        return None
+    raw_ts = raw_ts.strip()
+    try:
+        return float(raw_ts)
+    except ValueError:
+        pass
+    try:
+        from datetime import datetime
+        dt = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
+        return dt.timestamp()
+    except Exception:
+        return None
+
+
+class InferenceQueueManager:
+    """Adaptive inference queue manager with backpressure and load shedding (S15-T5).
+
+    Tracks active and queued inference requests, enforces backpressure when queue
+    depth exceeds max_queue_depth, prioritizes hotset arterial corridor cameras,
+    drops stale frames, and dynamically signals resolution downscaling under heavy load.
+    """
+
+    def __init__(
+        self,
+        max_queue_depth: int = 10,
+        high_load_threshold: int = 5,
+        max_frame_staleness_seconds: float = 60.0,
+        concurrency_limit: int = 4,
+    ) -> None:
+        self.max_queue_depth = max_queue_depth
+        self.high_load_threshold = high_load_threshold
+        self.max_frame_staleness_seconds = max_frame_staleness_seconds
+        self.concurrency_limit = concurrency_limit
+        self._lock = threading.Lock()
+        self._active_count = 0
+        self._queued_count = 0
+        self._shed_count = 0
+        self._processed_count = 0
+        self._semaphore = threading.Semaphore(concurrency_limit)
+
+    def check_admissibility(self, is_corridor: bool) -> Tuple[bool, str]:
+        with self._lock:
+            in_flight = self._active_count + self._queued_count
+            if in_flight >= self.max_queue_depth and not is_corridor:
+                self._shed_count += 1
+                return False, "queue_full_backpressure"
+            self._queued_count += 1
+            return True, "admitted"
+
+    def acquire_slot(self, timeout: float = 5.0) -> bool:
+        acquired = self._semaphore.acquire(timeout=timeout)
+        with self._lock:
+            self._queued_count = max(0, self._queued_count - 1)
+            if acquired:
+                self._active_count += 1
+            else:
+                self._shed_count += 1
+        return acquired
+
+    def release_slot(self) -> None:
+        with self._lock:
+            self._active_count = max(0, self._active_count - 1)
+            self._processed_count += 1
+        self._semaphore.release()
+
+    def abort_admission(self) -> None:
+        with self._lock:
+            self._queued_count = max(0, self._queued_count - 1)
+
+    def record_shed(self) -> None:
+        with self._lock:
+            self._shed_count += 1
+
+    def should_downscale(self) -> bool:
+        with self._lock:
+            return (self._active_count + self._queued_count) >= self.high_load_threshold
+
+    @property
+    def queue_depth(self) -> int:
+        with self._lock:
+            return self._active_count + self._queued_count
+
+    def stats(self) -> Dict[str, Any]:
+        with self._lock:
+            return {
+                "active_inferences": self._active_count,
+                "queued_inferences": self._queued_count,
+                "total_in_flight": self._active_count + self._queued_count,
+                "max_queue_depth": self.max_queue_depth,
+                "high_load_threshold": self.high_load_threshold,
+                "concurrency_limit": self.concurrency_limit,
+                "max_frame_staleness_seconds": self.max_frame_staleness_seconds,
+                "shed_count": self._shed_count,
+                "processed_count": self._processed_count,
+                "adaptive_downscale_active": (self._active_count + self._queued_count) >= self.high_load_threshold,
+            }
+
+    def reset(self) -> None:
+        """Reset counters and slots (for test isolation)."""
+        with self._lock:
+            self._active_count = 0
+            self._queued_count = 0
+            self._shed_count = 0
+            self._processed_count = 0
+        self._semaphore = threading.Semaphore(self.concurrency_limit)
+
+
+CV_QUEUE_MAX = int(os.environ.get("CV_QUEUE_MAX", 10))
+CV_HIGH_LOAD_THRESHOLD = int(os.environ.get("CV_HIGH_LOAD_THRESHOLD", 5))
+CV_MAX_STALENESS_SECONDS = float(os.environ.get("CV_MAX_STALENESS_SECONDS", 60.0))
+CV_INFERENCE_CONCURRENCY = int(os.environ.get("CV_INFERENCE_CONCURRENCY", 4))
+CV_CORRIDOR_CAMERAS = tuple(
+    c.strip() for c in os.environ.get("CV_CORRIDOR_CAMERAS", "").split(",") if c.strip()
+)
+
+queue_manager = InferenceQueueManager(
+    max_queue_depth=CV_QUEUE_MAX,
+    high_load_threshold=CV_HIGH_LOAD_THRESHOLD,
+    max_frame_staleness_seconds=CV_MAX_STALENESS_SECONDS,
+    concurrency_limit=CV_INFERENCE_CONCURRENCY,
+)
+
+
 class CVServer(ThreadingHTTPServer):
     """Multi-threaded HTTP server with resilient socket disconnect handling."""
     daemon_threads = True
@@ -766,6 +954,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                 "model_loaded": compiled_model is not None,
                 "resolution_mode": resolution_mode,
                 "input_shape": compiled_input_shape,
+                "queue_stats": queue_manager.stats(),
             })
             return
 
@@ -801,456 +990,565 @@ class CVRequestHandler(BaseHTTPRequestHandler):
             # The loader never raises, so a bad file cannot take the endpoint down.
             calibration_registry.reload_if_changed()
             camera_id = (self.headers.get("X-Camera-ID") or "").strip()
+            is_corridor = is_corridor_request(camera_id, self.headers, CV_CORRIDOR_CAMERAS)
 
-            content_type = self.headers.get("Content-Type", "")
-            regions: List[Dict[str, Any]] = []
-            image_bytes = post_data
+            # S15-T5: Frame staleness detection and load shedding
+            capture_ts = parse_capture_timestamp(self.headers)
+            if capture_ts is not None:
+                age_seconds = time.time() - capture_ts
+                if age_seconds > queue_manager.max_frame_staleness_seconds:
+                    if not is_corridor:
+                        queue_manager.record_shed()
+                        logger.warning(
+                            "Load shedding: dropped stale frame for camera %s (age=%.1fs > %.1fs)",
+                            camera_id,
+                            age_seconds,
+                            queue_manager.max_frame_staleness_seconds,
+                        )
+                        self._send_json(429, {
+                            "status": "shed",
+                            "reason": "stale_frame_dropped",
+                            "camera_id": camera_id,
+                            "age_seconds": round(age_seconds, 2),
+                        })
+                        return
 
-            # Ingest multipart/form-data containing frame and optional meta (ADR-012 D1)
-            if "multipart/form-data" in content_type:
-                try:
-                    from email.parser import BytesParser
-                    from email.policy import default
+            # S15-T5: Queue backpressure and admission control
+            admitted, shed_reason = queue_manager.check_admissibility(is_corridor=is_corridor)
+            if not admitted:
+                logger.warning(
+                    "Load shedding: queue backpressure shed request for camera %s (queue_depth=%d)",
+                    camera_id,
+                    queue_manager.queue_depth,
+                )
+                self._send_json(429, {
+                    "status": "shed",
+                    "reason": shed_reason,
+                    "camera_id": camera_id,
+                    "queue_depth": queue_manager.queue_depth,
+                })
+                return
 
-                    msg = BytesParser(policy=default).parsebytes(
-                        b"Content-Type: " + content_type.encode("latin1", errors="replace") + b"\r\n\r\n" + post_data
-                    )
-                    found_image = False
-                    for part in msg.iter_parts():
-                        name = part.get_param("name", header="content-disposition")
-                        if name in ("frame", "image", "file", "snapshot") or (not found_image and part.get_filename()):
-                            payload = part.get_payload(decode=True)
-                            if payload:
-                                image_bytes = payload
-                                found_image = True
-                        elif name in ("meta", "metadata", "regions"):
-                            raw_meta = part.get_payload(decode=True)
-                            if raw_meta:
-                                try:
-                                    meta_json = json.loads(raw_meta.decode("utf-8"))
-                                    if isinstance(meta_json, dict) and "regions" in meta_json:
-                                        regions = meta_json["regions"]
-                                    elif isinstance(meta_json, list):
-                                        regions = meta_json
-                                except Exception as meta_exc:
-                                    logger.warning("Failed to parse multipart meta JSON: %s", meta_exc)
-                except Exception as mp_exc:
-                    logger.warning("Failed to parse multipart payload: %s", mp_exc)
+            slot_acquired = queue_manager.acquire_slot(timeout=5.0)
+            if not slot_acquired:
+                logger.warning(
+                    "Load shedding: queue timeout acquiring inference slot for camera %s",
+                    camera_id,
+                )
+                self._send_json(503, {
+                    "status": "shed",
+                    "reason": "queue_timeout",
+                    "camera_id": camera_id,
+                })
+                return
 
-            # If model is loaded and image decoding is available, execute inference
-            if compiled_model is not None and PIL_AVAILABLE:
-                try:
-                    image = Image.open(BytesIO(image_bytes)).convert("RGB")
-                    # Target resolution with load-shedding support (Issue #379 / ADR-012 §1.2 F5).
-                    # The decision lives in resolve_input_resolution() so it is unit-testable.
-                    mode, model_shape = model_input_metadata(compiled_model)
-                    target_w, target_h = resolve_input_resolution(
-                        self.headers.get("X-Target-Resolution"),
-                        os.environ.get("CV_INPUT_RESOLUTION"),
-                        model_shape,
-                    )
-                    # A static graph can only execute the shape in its IR. Letterbox
-                    # straight to the size that will really be fed: an intermediate
-                    # resize to the requested size would distort the aspect ratio
-                    # without changing what the model sees.
-                    actual_w, actual_h = resolve_feed_resolution(
-                        target_w, target_h, mode, model_shape
-                    )
-                    image_letterboxed, scale, pad_x, pad_y = letterbox(
-                        image, target_size=(actual_w, actual_h)
-                    )
+            try:
+                self._process_predict(camera_id, is_corridor, post_data, start_t)
+            finally:
+                queue_manager.release_slot()
+            return
 
-                    input_tensor = np.expand_dims(np.array(image_letterboxed).transpose((2, 0, 1)), axis=0).astype(np.float32) / 255.0
+        self._send_json(404, {"error": "not found"})
 
-                    infer_request = compiled_model.create_infer_request()
-                    results = infer_request.infer({0: input_tensor})
+    def _process_predict(
+        self, camera_id: str, is_corridor: bool, post_data: bytes, start_t: float
+    ) -> None:
+        content_type = self.headers.get("Content-Type", "")
+        regions: List[Dict[str, Any]] = []
+        image_bytes = post_data
 
-                    output_data = None
-                    proto_data = None
-                    if isinstance(results, dict):
-                        output_data = results.get(0) or results.get("output0")
-                        proto_data = results.get(1) or results.get("output1")
-                        if output_data is None and len(results) > 0:
-                            vals = list(results.values())
-                            output_data = vals[0]
-                            if len(vals) > 1:
-                                proto_data = vals[1]
-                    elif hasattr(results, "__getitem__"):
-                        try:
-                            output_data = results[0]
-                            if len(results) > 1:
-                                proto_data = results[1]
-                        except Exception:
-                            pass
-                    if output_data is None and results is not None:
-                        output_data = results
+        # Ingest multipart/form-data containing frame and optional meta (ADR-012 D1)
+        if "multipart/form-data" in content_type:
+            try:
+                from email.parser import BytesParser
+                from email.policy import default
 
-                    latency = (time.perf_counter() - start_t) * 1000
+                msg = BytesParser(policy=default).parsebytes(
+                    b"Content-Type: " + content_type.encode("latin1", errors="replace") + b"\r\n\r\n" + post_data
+                )
+                found_image = False
+                for part in msg.iter_parts():
+                    name = part.get_param("name", header="content-disposition")
+                    if name in ("frame", "image", "file", "snapshot") or (not found_image and part.get_filename()):
+                        payload = part.get_payload(decode=True)
+                        if payload:
+                            image_bytes = payload
+                            found_image = True
+                    elif name in ("meta", "metadata", "regions"):
+                        raw_meta = part.get_payload(decode=True)
+                        if raw_meta:
+                            try:
+                                meta_json = json.loads(raw_meta.decode("utf-8"))
+                                if isinstance(meta_json, dict) and "regions" in meta_json:
+                                    regions = meta_json["regions"]
+                                elif isinstance(meta_json, list):
+                                    regions = meta_json
+                            except Exception as meta_exc:
+                                logger.warning("Failed to parse multipart meta JSON: %s", meta_exc)
+            except Exception as mp_exc:
+                logger.warning("Failed to parse multipart payload: %s", mp_exc)
 
-                    vehicle_counts = {
-                        "motorcycle": 0,
-                        "car": 0,
-                        "bus": 0,
-                        "truck": 0,
-                        "container": 0,
-                    }
+        # If model is loaded and image decoding is available, execute inference
+        if compiled_model is not None and PIL_AVAILABLE:
+            try:
+                image = Image.open(BytesIO(image_bytes)).convert("RGB")
+                # Target resolution with load-shedding support (Issue #379 / ADR-012 §1.2 F5 / S15-T5).
+                # The decision lives in resolve_input_resolution() so it is unit-testable.
+                mode, model_shape = model_input_metadata(compiled_model)
+                target_w, target_h = resolve_input_resolution(
+                    self.headers.get("X-Target-Resolution"),
+                    os.environ.get("CV_INPUT_RESOLUTION"),
+                    model_shape,
+                )
+                load_shed_downscaled = False
+                if queue_manager.should_downscale() and mode == "dynamic":
+                    target_w, target_h = 320, 320
+                    load_shed_downscaled = True
+                # A static graph can only execute the shape in its IR. Letterbox
+                # straight to the size that will really be fed: an intermediate
+                # resize to the requested size would distort the aspect ratio
+                # without changing what the model sees.
+                actual_w, actual_h = resolve_feed_resolution(
+                    target_w, target_h, mode, model_shape
+                )
+                image_letterboxed, scale, pad_x, pad_y = letterbox(
+                    image, target_size=(actual_w, actual_h)
+                )
 
-                    CONF_THRESH = 0.25
-                    IOU_THRESH = 0.45
-                    vehicles = 0
-                    kept_motorcycles = []
-                    kept_vehicles: List[Tuple[str, np.ndarray]] = []
-                    water_ratio = 0.0
-                    max_delta_sub = 0.0
-                    depth_estimated_cm = 0.0
-                    submerged_mc = 0
-                    puddle_count = 0
-                    model_tag = f"yolov8n_openvino_{actual_w}"
-                    road_mask = None
-                    water_mask = None
+                input_tensor = np.expand_dims(np.array(image_letterboxed).transpose((2, 0, 1)), axis=0).astype(np.float32) / 255.0
 
-                    if output_data is not None and hasattr(output_data, "shape"):
-                        if output_data.ndim == 3:
-                            if output_data.shape[1] > output_data.shape[2]:
-                                data = output_data[0].T
-                            else:
-                                data = output_data[0]
+                infer_request = compiled_model.create_infer_request()
+                results = infer_request.infer({0: input_tensor})
+
+                output_data = None
+                proto_data = None
+                if isinstance(results, dict):
+                    output_data = results.get(0) or results.get("output0")
+                    proto_data = results.get(1) or results.get("output1")
+                    if output_data is None and len(results) > 0:
+                        vals = list(results.values())
+                        output_data = vals[0]
+                        if len(vals) > 1:
+                            proto_data = vals[1]
+                elif hasattr(results, "__getitem__"):
+                    try:
+                        output_data = results[0]
+                        if len(results) > 1:
+                            proto_data = results[1]
+                    except Exception:
+                        pass
+                if output_data is None and results is not None:
+                    output_data = results
+
+                latency = (time.perf_counter() - start_t) * 1000
+
+                vehicle_counts = {
+                    "motorcycle": 0,
+                    "car": 0,
+                    "bus": 0,
+                    "truck": 0,
+                    "container": 0,
+                }
+
+                CONF_THRESH = 0.25
+                IOU_THRESH = 0.45
+                vehicles = 0
+                kept_motorcycles = []
+                kept_vehicles: List[Tuple[str, np.ndarray]] = []
+                water_ratio = 0.0
+                max_delta_sub = 0.0
+                depth_estimated_cm = 0.0
+                submerged_mc = 0
+                puddle_count = 0
+                model_tag = f"yolov8n_openvino_{actual_w}"
+                road_mask = None
+                water_mask = None
+
+                if output_data is not None and hasattr(output_data, "shape"):
+                    if output_data.ndim == 3:
+                        if output_data.shape[1] > output_data.shape[2]:
+                            data = output_data[0].T
                         else:
-                            data = output_data
-
-                        num_channels = data.shape[0] if data.ndim == 2 else 0
-
-                        if data.ndim == 2 and num_channels == 42:
-                            # Fine-tuned 6-class YOLOv8n-seg model (ADR-009):
-                            # Classes: 0: roadway, 1: water_puddle, 2: motorcycle, 3: car, 4: bus, 5: truck
-                            # Rows: 0..3 box, 4..9 classes, 10..41 (32 mask coeffs)
-                            model_tag = f"yolov8n_seg_openvino_{actual_w}"
-                            seg_classes = {
-                                "motorcycle": 6,
-                                "car": 7,
-                                "bus": 8,
-                                "truck": 9,
-                            }
-                            for cls_name, row_idx in seg_classes.items():
-                                scores = data[row_idx, :]
-                                valid_mask = scores > CONF_THRESH
-                                if np.any(valid_mask):
-                                    valid_indices = np.where(valid_mask)[0]
-                                    candidate_boxes = np.column_stack([
-                                        data[0, valid_indices],
-                                        data[1, valid_indices],
-                                        data[2, valid_indices],
-                                        data[3, valid_indices],
-                                    ])
-                                    candidate_scores = scores[valid_indices]
-                                    keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
-                                    vehicle_counts[cls_name] = len(keep)
-                                    for k in keep:
-                                        kept_vehicles.append((cls_name, candidate_boxes[k]))
-                                    if cls_name == "motorcycle" and len(keep) > 0:
-                                        kept_motorcycles = candidate_boxes[keep]
-                                else:
-                                    vehicle_counts[cls_name] = 0
-
-                            vehicle_counts["container"] = 0
-                            vehicles = sum(vehicle_counts.values())
-
-                            # Segmentation mask decoding & triangulation
-                            if proto_data is not None:
-                                # Roadway mask (class 0, row 4)
-                                road_scores = data[4, :]
-                                valid_road = road_scores > CONF_THRESH
-                                if np.any(valid_road):
-                                    road_indices = np.where(valid_road)[0]
-                                    road_coeffs = data[10:42, road_indices].T
-                                    road_masks = decode_mask_prototypes(road_coeffs, proto_data, binarize_thresh=0.5)
-                                    road_mask = np.any(road_masks, axis=0)
-
-                                # Water puddle mask (class 1, row 5)
-                                water_scores = data[5, :]
-                                valid_water = water_scores > CONF_THRESH
-                                if np.any(valid_water):
-                                    water_indices = np.where(valid_water)[0]
-                                    puddle_count = len(water_indices)
-                                    water_coeffs = data[10:42, water_indices].T
-                                    water_masks = decode_mask_prototypes(water_coeffs, proto_data, binarize_thresh=0.5)
-                                    water_mask = np.any(water_masks, axis=0)
-                                else:
-                                    water_mask = np.zeros((104, 104), dtype=bool)
-
-                                water_ratio = calculate_water_ratio(water_mask, road_mask)
-                                if len(kept_motorcycles) > 0 and water_mask is not None:
-                                    max_delta_sub, depth_estimated_cm, submerged_mc = calculate_motorcycle_submersion(
-                                        np.array(kept_motorcycles), water_mask, target_img_size=(actual_w, actual_h)
-                                    )
-
-                        elif data.ndim == 2 and num_channels >= 12:
-                            # Standard COCO 80-class model:
-                            # Vehicle classes: 2: car (row 6), 3: motorcycle (row 7), 5: bus (row 9), 7: truck (row 11)
-                            coco_vehicle_rows = {
-                                "car": 6,
-                                "motorcycle": 7,
-                                "bus": 9,
-                                "truck": 11,
-                            }
-                            for cls_name, row_idx in coco_vehicle_rows.items():
-                                scores = data[row_idx, :]
-                                valid_mask = scores > CONF_THRESH
-                                if np.any(valid_mask):
-                                    valid_indices = np.where(valid_mask)[0]
-                                    candidate_boxes = np.column_stack([
-                                        data[0, valid_indices],
-                                        data[1, valid_indices],
-                                        data[2, valid_indices],
-                                        data[3, valid_indices],
-                                    ])
-                                    candidate_scores = scores[valid_indices]
-                                    keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
-                                    vehicle_counts[cls_name] = len(keep)
-                                    for k in keep:
-                                        kept_vehicles.append((cls_name, candidate_boxes[k]))
-                                    if cls_name == "motorcycle" and len(keep) > 0:
-                                        kept_motorcycles = candidate_boxes[keep]
-                                else:
-                                    vehicle_counts[cls_name] = 0
-
-                            vehicle_counts["container"] = 0
-                            vehicles = sum(vehicle_counts.values())
-
-                        elif data.ndim == 2 and num_channels == 9:
-                            # Legacy DatapolisX 5-class model: 0: motorcycle, 1: car, 2: bus, 3: truck, 4: container
-                            legacy_vehicle_rows = {
-                                "motorcycle": 4,
-                                "car": 5,
-                                "bus": 6,
-                                "truck": 7,
-                                "container": 8,
-                            }
-                            for cls_name, row_idx in legacy_vehicle_rows.items():
-                                scores = data[row_idx, :]
-                                valid_mask = scores > CONF_THRESH
-                                if np.any(valid_mask):
-                                    valid_indices = np.where(valid_mask)[0]
-                                    candidate_boxes = np.column_stack([
-                                        data[0, valid_indices],
-                                        data[1, valid_indices],
-                                        data[2, valid_indices],
-                                        data[3, valid_indices],
-                                    ])
-                                    candidate_scores = scores[valid_indices]
-                                    keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
-                                    vehicle_counts[cls_name] = len(keep)
-                                    for k in keep:
-                                        kept_vehicles.append((cls_name, candidate_boxes[k]))
-                                else:
-                                    vehicle_counts[cls_name] = 0
-
-                            vehicles = sum(vehicle_counts.values())
-                        else:
-                            vehicles = int(np.sum(output_data > 0.5))
-                            vehicle_counts["car"] = vehicles
+                            data = output_data[0]
                     else:
-                        vehicles = 0
+                        data = output_data
 
-                    # §2.1/§2.4 frame geometry: per-bike observations, the pool's
-                    # projected area and its top edge, and the measured depth through
-                    # whatever reference the frame actually contains.
-                    motorcycle_boxes = (
-                        np.array(kept_motorcycles) if len(kept_motorcycles) > 0 else None
+                    num_channels = data.shape[0] if data.ndim == 2 else 0
+
+                    if data.ndim == 2 and num_channels == 42:
+                        # Fine-tuned 6-class YOLOv8n-seg model (ADR-009):
+                        # Classes: 0: roadway, 1: water_puddle, 2: motorcycle, 3: car, 4: bus, 5: truck
+                        # Rows: 0..3 box, 4..9 classes, 10..41 (32 mask coeffs)
+                        model_tag = f"yolov8n_seg_openvino_{actual_w}"
+                        seg_classes = {
+                            "motorcycle": 6,
+                            "car": 7,
+                            "bus": 8,
+                            "truck": 9,
+                        }
+                        for cls_name, row_idx in seg_classes.items():
+                            scores = data[row_idx, :]
+                            valid_mask = scores > CONF_THRESH
+                            if np.any(valid_mask):
+                                valid_indices = np.where(valid_mask)[0]
+                                candidate_boxes = np.column_stack([
+                                    data[0, valid_indices],
+                                    data[1, valid_indices],
+                                    data[2, valid_indices],
+                                    data[3, valid_indices],
+                                ])
+                                candidate_scores = scores[valid_indices]
+                                keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
+                                vehicle_counts[cls_name] = len(keep)
+                                for k in keep:
+                                    kept_vehicles.append((cls_name, candidate_boxes[k]))
+                                if cls_name == "motorcycle" and len(keep) > 0:
+                                    kept_motorcycles = candidate_boxes[keep]
+                            else:
+                                vehicle_counts[cls_name] = 0
+
+                        vehicle_counts["container"] = 0
+                        vehicles = sum(vehicle_counts.values())
+
+                        # Segmentation mask decoding & triangulation
+                        if proto_data is not None:
+                            # Roadway mask (class 0, row 4)
+                            road_scores = data[4, :]
+                            valid_road = road_scores > CONF_THRESH
+                            if np.any(valid_road):
+                                road_indices = np.where(valid_road)[0]
+                                road_coeffs = data[10:42, road_indices].T
+                                road_masks = decode_mask_prototypes(road_coeffs, proto_data, binarize_thresh=0.5)
+                                road_mask = np.any(road_masks, axis=0)
+
+                            # Water puddle mask (class 1, row 5)
+                            water_scores = data[5, :]
+                            valid_water = water_scores > CONF_THRESH
+                            if np.any(valid_water):
+                                water_indices = np.where(valid_water)[0]
+                                puddle_count = len(water_indices)
+                                water_coeffs = data[10:42, water_indices].T
+                                water_masks = decode_mask_prototypes(water_coeffs, proto_data, binarize_thresh=0.5)
+                                water_mask = np.any(water_masks, axis=0)
+                            else:
+                                water_mask = np.zeros((104, 104), dtype=bool)
+
+                            water_ratio = calculate_water_ratio(water_mask, road_mask)
+                            if len(kept_motorcycles) > 0 and water_mask is not None:
+                                max_delta_sub, depth_estimated_cm, submerged_mc = calculate_motorcycle_submersion(
+                                    np.array(kept_motorcycles), water_mask, target_img_size=(actual_w, actual_h)
+                                )
+
+                    elif data.ndim == 2 and num_channels >= 12:
+                        # Standard COCO 80-class model:
+                        # Vehicle classes: 2: car (row 6), 3: motorcycle (row 7), 5: bus (row 9), 7: truck (row 11)
+                        coco_vehicle_rows = {
+                            "car": 6,
+                            "motorcycle": 7,
+                            "bus": 9,
+                            "truck": 11,
+                        }
+                        for cls_name, row_idx in coco_vehicle_rows.items():
+                            scores = data[row_idx, :]
+                            valid_mask = scores > CONF_THRESH
+                            if np.any(valid_mask):
+                                valid_indices = np.where(valid_mask)[0]
+                                candidate_boxes = np.column_stack([
+                                    data[0, valid_indices],
+                                    data[1, valid_indices],
+                                    data[2, valid_indices],
+                                    data[3, valid_indices],
+                                ])
+                                candidate_scores = scores[valid_indices]
+                                keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
+                                vehicle_counts[cls_name] = len(keep)
+                                for k in keep:
+                                    kept_vehicles.append((cls_name, candidate_boxes[k]))
+                                if cls_name == "motorcycle" and len(keep) > 0:
+                                    kept_motorcycles = candidate_boxes[keep]
+                            else:
+                                vehicle_counts[cls_name] = 0
+
+                        vehicle_counts["container"] = 0
+                        vehicles = sum(vehicle_counts.values())
+
+                    elif data.ndim == 2 and num_channels == 9:
+                        # Legacy DatapolisX 5-class model: 0: motorcycle, 1: car, 2: bus, 3: truck, 4: container
+                        legacy_vehicle_rows = {
+                            "motorcycle": 4,
+                            "car": 5,
+                            "bus": 6,
+                            "truck": 7,
+                            "container": 8,
+                        }
+                        for cls_name, row_idx in legacy_vehicle_rows.items():
+                            scores = data[row_idx, :]
+                            valid_mask = scores > CONF_THRESH
+                            if np.any(valid_mask):
+                                valid_indices = np.where(valid_mask)[0]
+                                candidate_boxes = np.column_stack([
+                                    data[0, valid_indices],
+                                    data[1, valid_indices],
+                                    data[2, valid_indices],
+                                    data[3, valid_indices],
+                                ])
+                                candidate_scores = scores[valid_indices]
+                                keep = nms_cpu(candidate_boxes, candidate_scores, iou_thresh=IOU_THRESH)
+                                vehicle_counts[cls_name] = len(keep)
+                                for k in keep:
+                                    kept_vehicles.append((cls_name, candidate_boxes[k]))
+                            else:
+                                vehicle_counts[cls_name] = 0
+
+                        vehicles = sum(vehicle_counts.values())
+                    else:
+                        vehicles = int(np.sum(output_data > 0.5))
+                        vehicle_counts["car"] = vehicles
+                else:
+                    vehicles = 0
+
+                # §2.1/§2.4 frame geometry: per-bike observations, the pool's
+                # projected area and its top edge, and the measured depth through
+                # whatever reference the frame actually contains.
+                motorcycle_boxes = (
+                    np.array(kept_motorcycles) if len(kept_motorcycles) > 0 else None
+                )
+                motorcycle_observations = collect_motorcycle_observations(
+                    motorcycle_boxes, water_mask, target_img_size=(actual_w, actual_h)
+                )
+                pool_area_px, pool_top_y = measure_water_pool(
+                    water_mask, target_img_size=(actual_w, actual_h)
+                )
+                # A motorcycle box is only a ruler when the segmentation head
+                # produced a water mask to measure against it. A detection-only
+                # model (or a frame with no water proto) has `water_mask is None`,
+                # and treating its bikes as a reference would publish a
+                # "0.0 cm, MEASURED, MOTORCYCLE_110CM" reading that was never
+                # measured (AC10/AC13).
+                has_motorcycle_reference = (
+                    motorcycle_boxes is not None
+                    and water_mask is not None
+                    and getattr(water_mask, "size", 0) > 0
+                )
+                calib_entry = (
+                    calibration_registry.entry_for(camera_id) if camera_id else None
+                )
+                scale_multiplier = (
+                    calib_entry.scale_multiplier if calib_entry else 1.0
+                )
+                water_present = (
+                    water_mask is not None
+                    and getattr(water_mask, "size", 0) > 0
+                    and (pool_area_px > 0 or water_ratio > 0)
+                )
+                has_curb_reference = bool(
+                    calib_entry is not None
+                    and (
+                        (calib_entry.curb_px is not None and calib_entry.curb_px > 0)
+                        or (calib_entry.curb_polygon is not None and len(calib_entry.curb_polygon) >= 2)
                     )
-                    motorcycle_observations = collect_motorcycle_observations(
-                        motorcycle_boxes, water_mask, target_img_size=(actual_w, actual_h)
+                    and water_present
+                )
+                has_camera_override = (
+                    (has_motorcycle_reference or has_curb_reference)
+                    and scale_multiplier != 1.0
+                )
+                hazard_calibration_ref = hc.resolve_calibration_ref(
+                    has_motorcycle_reference=has_motorcycle_reference,
+                    has_curb_reference=has_curb_reference,
+                    has_camera_override=has_camera_override,
+                )
+
+                hazard_depth_cm: Optional[float] = None
+                if has_motorcycle_reference:
+                    hazard_depth_cm = hc.estimate_depth_cm(max_delta_sub, scale_multiplier)
+                elif has_curb_reference and calib_entry is not None:
+                    # Dynamic curb reference depth calculation (S15-T5 / §2.1):
+                    rows = (
+                        np.where(np.any(water_mask, axis=1))[0]
+                        if water_mask is not None
+                        else np.array([])
                     )
-                    pool_area_px, pool_top_y = measure_water_pool(
-                        water_mask, target_img_size=(actual_w, actual_h)
+                    if rows.size > 0:
+                        h_grid = water_mask.shape[0]
+                        water_depth_px = float(rows[-1] - rows[0]) * (actual_h / float(h_grid))
+                    else:
+                        water_depth_px = 0.0
+                    curb_px_ref = (
+                        calib_entry.curb_px
+                        if (calib_entry.curb_px and calib_entry.curb_px > 0)
+                        else 90.0
                     )
-                    # A motorcycle box is only a ruler when the segmentation head
-                    # produced a water mask to measure against it. A detection-only
-                    # model (or a frame with no water proto) has `water_mask is None`,
-                    # and treating its bikes as a reference would publish a
-                    # "0.0 cm, MEASURED, MOTORCYCLE_110CM" reading that was never
-                    # measured (AC10/AC13).
-                    has_motorcycle_reference = (
-                        motorcycle_boxes is not None
-                        and water_mask is not None
-                        and getattr(water_mask, "size", 0) > 0
+                    hazard_depth_cm = hc.estimate_depth_from_curb_cm(
+                        water_depth_px, curb_px_ref, scale_multiplier
                     )
-                    scale_multiplier = (
-                        calibration_registry.multiplier_for(camera_id) if camera_id else 1.0
-                    )
-                    has_camera_override = (
-                        has_motorcycle_reference and scale_multiplier != 1.0
-                    )
-                    hazard_calibration_ref = hc.resolve_calibration_ref(
-                        has_motorcycle_reference=has_motorcycle_reference,
-                        # Curb segments are not segmented yet; the ladder keeps the
-                        # source resolvable so the loader can switch it on later.
-                        has_curb_reference=False,
-                        has_camera_override=has_camera_override,
-                    )
-                    hazard_depth_cm: Optional[float] = (
-                        hc.estimate_depth_cm(max_delta_sub, scale_multiplier)
-                        if has_motorcycle_reference
-                        else None
+                    depth_estimated_cm = hazard_depth_cm
+                    logger.info(
+                        "Camera %s using curb reference: calibration_ref=%s, depth=%.1f cm (curb_px=%.1f, scale=%.2f)",
+                        camera_id,
+                        hazard_calibration_ref,
+                        hazard_depth_cm,
+                        curb_px_ref,
+                        scale_multiplier,
                     )
 
-                    traffic_severity = "CLEAR"
-                    if vehicles > 35:
-                        traffic_severity = "CONGESTED"
-                    elif vehicles > 20:
-                        traffic_severity = "HEAVY"
-                    elif vehicles > 8:
-                        traffic_severity = "MODERATE"
+                traffic_severity = "CLEAR"
+                if vehicles > 35:
+                    traffic_severity = "CONGESTED"
+                elif vehicles > 20:
+                    traffic_severity = "HEAVY"
+                elif vehicles > 8:
+                    traffic_severity = "MODERATE"
 
-                    flood_verdict, flood_conf = triangulate_flood_verdict(
+                flood_verdict, flood_conf = triangulate_flood_verdict(
+                    water_ratio=water_ratio,
+                    max_delta_sub=max_delta_sub,
+                    depth_estimated_cm=depth_estimated_cm,
+                    motorcycles_observed=vehicle_counts["motorcycle"],
+                    pool_area_px=pool_area_px,
+                    observations=motorcycle_observations,
+                    pool_top_y=pool_top_y,
+                )
+
+                # Physical hazard layer (§2.1-§2.5). Depth is measured only when a
+                # reference object is in the frame; otherwise it stays None and the
+                # level can only come from avoidance. The latch holds a drop for one
+                # frame so a single passing vehicle cannot erase a pool.
+                hazard_assessment = hc.assess_hazard(
+                    depth_cm=hazard_depth_cm,
+                    calibration_ref=hazard_calibration_ref,
+                    water_ratio=water_ratio,
+                    pool_area_px=pool_area_px,
+                    motorcycles_observed=vehicle_counts["motorcycle"],
+                    observations=motorcycle_observations,
+                    pool_top_y=pool_top_y,
+                    logger=logger,
+                )
+                published_assessment = hazard_assessment
+                if camera_id:
+                    # §2.5: latch state is per camera. A headerless caller has no
+                    # identity to key on, so it must not share one bucket. The latch
+                    # returns the *held* assessment when a drop is suppressed, so the
+                    # published level keeps its own basis, depth, confidence and
+                    # calibration reference instead of the drop frame's.
+                    published_assessment = hazard_latch.apply(camera_id, hazard_assessment)
+
+                # Directional polygon assignment & water reconciliation (ADR-012 D1)
+                region_results: List[Dict[str, Any]] = []
+                if regions:
+                    for reg in regions:
+                        reg_id = reg.get("region_id", "")
+                        direction = reg.get("direction", "")
+                        poly = reg.get("polygon", [])
+                        share = reg.get("capacity_share", 0.5)
+
+                        reg_counts = {
+                            "motorcycle": 0,
+                            "car": 0,
+                            "bus": 0,
+                            "truck": 0,
+                            "container": 0,
+                        }
+                        for cls_name, box in kept_vehicles:
+                            cx, cy, w, h = box[0], box[1], box[2], box[3]
+                            norm_cx, norm_by = box_polygon_anchor(
+                                cx, cy, w, h, actual_w, actual_h
+                            )
+                            if point_in_polygon(norm_cx, norm_by, poly):
+                                reg_counts[cls_name] = reg_counts.get(cls_name, 0) + 1
+
+                        reg_water_ratio = 0.0
+                        if water_mask is not None and water_mask.size > 0:
+                            reg_mask = rasterize_polygon_mask(poly, water_mask.shape)
+                            if road_mask is not None and road_mask.size == water_mask.size:
+                                reg_road = np.logical_and(road_mask, reg_mask)
+                                reg_road_sum = float(np.sum(reg_road))
+                                if reg_road_sum > 0:
+                                    reg_water = np.logical_and(water_mask, reg_road)
+                                    reg_water_ratio = float(np.sum(reg_water)) / reg_road_sum
+                            elif np.sum(reg_mask) > 0:
+                                reg_water = np.logical_and(water_mask, reg_mask)
+                                reg_water_ratio = float(np.sum(reg_water)) / float(np.sum(reg_mask))
+
+                        region_results.append({
+                            "region_id": reg_id,
+                            "direction": direction,
+                            "capacity_share": share,
+                            "vehicle_counts": reg_counts,
+                            "vehicles_detected": sum(reg_counts.values()),
+                            "water_ratio": round(reg_water_ratio, 4),
+                        })
+
+                response_payload = {
+                    "service": "projectkv-cv-engine",
+                    "vehicles_detected": vehicles,
+                    "vehicle_counts": vehicle_counts,
+                    "traffic_severity": traffic_severity,
+                    "flood_severity": flood_verdict,
+                    "water_ratio": round(water_ratio, 4),
+                    "depth_estimated_cm": round(depth_estimated_cm, 1),
+                    # §5.1 additive hazard contract. An unmeasured depth is null,
+                    # never 0.0: 0 means "dry, verified" (AC13).
+                    "flood_depth_cm": (
+                        None
+                        if published_assessment.depth_cm is None
+                        else round(published_assessment.depth_cm, 1)
+                    ),
+                    "flood_hazard_level": published_assessment.level,
+                    "flood_hazard_basis": published_assessment.basis,
+                    "flood_depth_confidence": published_assessment.depth_confidence,
+                    "calibration_ref": published_assessment.calibration_ref,
+                    "confidence": round(float(flood_conf if flood_verdict != "CLEAR" else 0.88), 2),
+                    "latency_ms": round(latency, 2),
+                    "model": model_tag,
+                    "input_resolution": [actual_w, actual_h],
+                    "flood_assessment": build_flood_assessment(
+                        verdict=flood_verdict,
                         water_ratio=water_ratio,
                         max_delta_sub=max_delta_sub,
                         depth_estimated_cm=depth_estimated_cm,
                         motorcycles_observed=vehicle_counts["motorcycle"],
-                        pool_area_px=pool_area_px,
-                        observations=motorcycle_observations,
-                        pool_top_y=pool_top_y,
-                    )
+                        motorcycles_submerged=submerged_mc,
+                        puddle_polygon_count=puddle_count,
+                        hazard=published_assessment,
+                    ),
+                }
+                if region_results:
+                    response_payload["regions"] = region_results
+                if load_shed_downscaled:
+                    response_payload["load_shedding_downscale"] = True
 
-                    # Physical hazard layer (§2.1-§2.5). Depth is measured only when a
-                    # reference object is in the frame; otherwise it stays None and the
-                    # level can only come from avoidance. The latch holds a drop for one
-                    # frame so a single passing vehicle cannot erase a pool.
-                    hazard_assessment = hc.assess_hazard(
-                        depth_cm=hazard_depth_cm,
-                        calibration_ref=hazard_calibration_ref,
-                        water_ratio=water_ratio,
-                        pool_area_px=pool_area_px,
-                        motorcycles_observed=vehicle_counts["motorcycle"],
-                        observations=motorcycle_observations,
-                        pool_top_y=pool_top_y,
-                        logger=logger,
-                    )
-                    published_assessment = hazard_assessment
-                    if camera_id:
-                        # §2.5: latch state is per camera. A headerless caller has no
-                        # identity to key on, so it must not share one bucket. The latch
-                        # returns the *held* assessment when a drop is suppressed, so the
-                        # published level keeps its own basis, depth, confidence and
-                        # calibration reference instead of the drop frame's.
-                        published_assessment = hazard_latch.apply(camera_id, hazard_assessment)
+                self._send_json(200, response_payload)
+                return
+            except Exception as exc:
+                logger.error("Inference execution error: %s", exc)
+                self._send_json(500, {"error": f"inference failed: {str(exc)}"})
+                return
 
-                    # Directional polygon assignment & water reconciliation (ADR-012 D1)
-                    region_results: List[Dict[str, Any]] = []
-                    if regions:
-                        for reg in regions:
-                            reg_id = reg.get("region_id", "")
-                            direction = reg.get("direction", "")
-                            poly = reg.get("polygon", [])
-                            share = reg.get("capacity_share", 0.5)
-
-                            reg_counts = {
-                                "motorcycle": 0,
-                                "car": 0,
-                                "bus": 0,
-                                "truck": 0,
-                                "container": 0,
-                            }
-                            for cls_name, box in kept_vehicles:
-                                cx, cy, w, h = box[0], box[1], box[2], box[3]
-                                norm_cx, norm_by = box_polygon_anchor(
-                                    cx, cy, w, h, actual_w, actual_h
-                                )
-                                if point_in_polygon(norm_cx, norm_by, poly):
-                                    reg_counts[cls_name] = reg_counts.get(cls_name, 0) + 1
-
-                            reg_water_ratio = 0.0
-                            if water_mask is not None and water_mask.size > 0:
-                                reg_mask = rasterize_polygon_mask(poly, water_mask.shape)
-                                if road_mask is not None and road_mask.size == water_mask.size:
-                                    reg_road = np.logical_and(road_mask, reg_mask)
-                                    reg_road_sum = float(np.sum(reg_road))
-                                    if reg_road_sum > 0:
-                                        reg_water = np.logical_and(water_mask, reg_road)
-                                        reg_water_ratio = float(np.sum(reg_water)) / reg_road_sum
-                                elif np.sum(reg_mask) > 0:
-                                    reg_water = np.logical_and(water_mask, reg_mask)
-                                    reg_water_ratio = float(np.sum(reg_water)) / float(np.sum(reg_mask))
-
-                            region_results.append({
-                                "region_id": reg_id,
-                                "direction": direction,
-                                "capacity_share": share,
-                                "vehicle_counts": reg_counts,
-                                "vehicles_detected": sum(reg_counts.values()),
-                                "water_ratio": round(reg_water_ratio, 4),
-                            })
-
-                    response_payload = {
-                        "service": "projectkv-cv-engine",
-                        "vehicles_detected": vehicles,
-                        "vehicle_counts": vehicle_counts,
-                        "traffic_severity": traffic_severity,
-                        "flood_severity": flood_verdict,
-                        "water_ratio": round(water_ratio, 4),
-                        "depth_estimated_cm": round(depth_estimated_cm, 1),
-                        # §5.1 additive hazard contract. An unmeasured depth is null,
-                        # never 0.0: 0 means "dry, verified" (AC13).
-                        "flood_depth_cm": (
-                            None
-                            if published_assessment.depth_cm is None
-                            else round(published_assessment.depth_cm, 1)
-                        ),
-                        "flood_hazard_level": published_assessment.level,
-                        "flood_hazard_basis": published_assessment.basis,
-                        "flood_depth_confidence": published_assessment.depth_confidence,
-                        "calibration_ref": published_assessment.calibration_ref,
-                        "confidence": round(float(flood_conf if flood_verdict != "CLEAR" else 0.88), 2),
-                        "latency_ms": round(latency, 2),
-                        "model": model_tag,
-                        "input_resolution": [actual_w, actual_h],
-                        "flood_assessment": build_flood_assessment(
-                            verdict=flood_verdict,
-                            water_ratio=water_ratio,
-                            max_delta_sub=max_delta_sub,
-                            depth_estimated_cm=depth_estimated_cm,
-                            motorcycles_observed=vehicle_counts["motorcycle"],
-                            motorcycles_submerged=submerged_mc,
-                            puddle_polygon_count=puddle_count,
-                            hazard=published_assessment,
-                        ),
-                    }
-                    if region_results:
-                        response_payload["regions"] = region_results
-
-                    self._send_json(200, response_payload)
-                    return
-                except Exception as exc:
-                    logger.error("Inference execution error: %s", exc)
-                    self._send_json(500, {"error": f"inference failed: {str(exc)}"})
-                    return
-
-            # Standby mode: no model loaded — return 503 to prevent Go client from
-            # treating this as a real inference result (ADR-004 §14 Finding 1).
-            latency = (time.perf_counter() - start_t) * 1000
-            standby_payload = {
-                "source": "standby_dummy",
-                "confidence": 0.0,
-                "latency_ms": round(latency, 2),
-                "mode": "standby_ready",
-                "note": "OpenVINO engine ready. Model weights mountable at runtime."
-            }
-            if regions:
-                standby_payload["regions"] = [
-                    {
-                        "region_id": r.get("region_id", ""),
-                        "direction": r.get("direction", ""),
-                        "capacity_share": r.get("capacity_share", 0.5),
-                        "vehicle_counts": {"motorcycle": 0, "car": 0, "bus": 0, "truck": 0, "container": 0},
-                        "vehicles_detected": 0,
-                        "water_ratio": 0.0,
-                    }
-                    for r in regions
-                ]
-            self._send_json(503, standby_payload)
-            return
-
-        self._send_json(404, {"error": "not found"})
+        # Standby mode: no model loaded — return 503 to prevent Go client from
+        # treating this as a real inference result (ADR-004 §14 Finding 1).
+        latency = (time.perf_counter() - start_t) * 1000
+        standby_payload = {
+            "source": "standby_dummy",
+            "confidence": 0.0,
+            "latency_ms": round(latency, 2),
+            "mode": "standby_ready",
+            "note": "OpenVINO engine ready. Model weights mountable at runtime."
+        }
+        if regions:
+            standby_payload["regions"] = [
+                {
+                    "region_id": r.get("region_id", ""),
+                    "direction": r.get("direction", ""),
+                    "capacity_share": r.get("capacity_share", 0.5),
+                    "vehicle_counts": {"motorcycle": 0, "car": 0, "bus": 0, "truck": 0, "container": 0},
+                    "vehicles_detected": 0,
+                    "water_ratio": 0.0,
+                }
+                for r in regions
+            ]
+        self._send_json(503, standby_payload)
+        return
 
     def log_message(self, format, *args):
         # Silence routine health check access logs to keep terminal noise low

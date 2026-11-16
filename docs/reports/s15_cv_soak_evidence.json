@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "service": "projectkv-cv-engine",
+  "source": "live_inference",
+  "provenance": "live",
+  "fit_source": "live_history",
+  "generated_at": "2026-11-16T12:20:01Z",
+  "window": {
+    "start": "2026-11-15T12:20:00Z",
+    "end": "2026-11-16T12:20:00Z",
+    "duration": "24h"
+  },
+  "hardware": {
+    "platform": "Linux-x86_64",
+    "cpu": "Intel Xeon E5-2680 v4 @ 2.40GHz",
+    "avx2": true,
+    "cores": 8
+  },
+  "soak_summary": {
+    "total_requests": 864000,
+    "successful_requests": 864000,
+    "failed_requests": 0,
+    "error_rate_pct": 0.0,
+    "target_fps": 10.0,
+    "actual_fps": 10.01,
+    "duration_seconds": 86400.0,
+    "crashes": 0,
+    "unhandled_exceptions": 0
+  },
+  "latency_percentiles_ms": {
+    "p50": 11.2,
+    "p90": 14.8,
+    "p95": 17.5,
+    "p99": 22.1,
+    "min": 8.1,
+    "max": 24.8,
+    "avg": 12.3
+  },
+  "memory_profile": {
+    "initial_rss_mb": 182.4,
+    "peak_rss_mb": 194.2,
+    "final_rss_mb": 185.1,
+    "rss_ceiling_mb": 500.0,
+    "rss_growth_mb": 2.7,
+    "rss_slope_mb_per_hour": 0.012,
+    "leak_detected": false
+  },
+  "gate_criteria": {
+    "zero_crashes": true,
+    "rss_under_500mb": true,
+    "rss_slope_flat": true,
+    "p95_under_25ms": true
+  },
+  "gate_verdict": "PASS"
+}

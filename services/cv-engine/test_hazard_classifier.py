@@ -917,6 +917,42 @@ class TestCalibrationLoader(unittest.TestCase):
             registry.reload_if_changed()
         self.assertEqual(registry.multiplier_for("cam_dbp_01"), 1.0)
 
+    def test_curb_geometry_loaded_from_landmarks(self):
+        entry_data = valid_entry()
+        entry_data["landmarks"] = {
+            "curb_px": 90.0,
+            "curb_cm": 15.0,
+            "curb_polygon": [[10.0, 50.0], [10.0, 140.0], [25.0, 140.0], [25.0, 50.0]],
+        }
+        write_calibration(
+            self.path,
+            {"version": 1, "cameras": {"cam_curb_01": entry_data}},
+        )
+        registry = self._registry().load()
+        self.assertTrue(registry.has_curb_reference("cam_curb_01"))
+        self.assertFalse(registry.has_curb_reference("cam_uncalibrated"))
+        entry = registry.entry_for("cam_curb_01")
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.curb_px, 90.0)
+        self.assertEqual(entry.curb_cm, 15.0)
+        self.assertEqual(len(entry.curb_polygon), 4)
+
+    def test_curb_polygon_derives_curb_px_when_omitted(self):
+        entry_data = valid_entry()
+        entry_data["landmarks"] = {
+            "curb_cm": 15.0,
+            "curb_polygon": [[0.0, 100.0], [100.0, 100.0], [100.0, 180.0], [0.0, 180.0]],
+        }
+        write_calibration(
+            self.path,
+            {"version": 1, "cameras": {"cam_curb_02": entry_data}},
+        )
+        registry = self._registry().load()
+        self.assertTrue(registry.has_curb_reference("cam_curb_02"))
+        entry = registry.entry_for("cam_curb_02")
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.curb_px, 80.0)
+
 
 class TestUpstreamReferenceIsNotADryRoad(unittest.TestCase):
     """#401 — a bike stopping outside the water measures the bike, not the pool.

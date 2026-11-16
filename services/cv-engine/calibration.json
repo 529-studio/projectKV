@@ -1,4 +1,25 @@
 {
   "version": 1,
-  "cameras": {}
+  "cameras": {
+    "cam_cong_hoa_01": {
+      "scale_multiplier": 1.0,
+      "measured_by": "operator-s15",
+      "measured_at": "2026-11-16",
+      "frame_ref": "data/proofs/proofs/2026-11-08/cam_cong_hoa_01.jpg",
+      "landmarks": {
+        "curb_px": 90.0,
+        "curb_cm": 15.0
+      }
+    },
+    "cam_vo_van_kiet_01": {
+      "scale_multiplier": 1.05,
+      "measured_by": "operator-s15",
+      "measured_at": "2026-11-16",
+      "frame_ref": "data/proofs/proofs/2026-11-08/cam_vo_van_kiet_01.jpg",
+      "landmarks": {
+        "curb_px": 94.0,
+        "curb_cm": 15.0
+      }
+    }
+  }
 }
