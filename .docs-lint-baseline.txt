@@ -14,7 +14,6 @@ doc-budget	docs/reports/eval_report_d6_real.md
 doc-budget	docs/reports/eval_report_d6_sprint6.md
 doc-budget	docs/reports/project-status-scorecard-2026-10-30.md
 english	docs/reports/bench_solution1_report.md
-file-size	apps/web/public/warded-dockUI.jpg
 file-size	tools/geo-enrich/data/phuong_boundaries.geojson
 links	docs/lessons/L20-vpn-spof-graceful-degradation-decoupling-cloud-daily.md	runbook_dev_box_failover.md
 links	docs/reports/project-status-scorecard-2026-10-30.md	reports/eval_report_d6_sprint6.md
