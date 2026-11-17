@@ -15,9 +15,9 @@ ProjectKV provides a real-time, zero-click urban traffic and flood condition exp
 
 | Service | Technology | Port | Host & Node Role | Primary Responsibilities |
 |---|---|:---:|---|---|
-| **Web Client** (`apps/web`) | Next.js 15 (App Router), React 19, Tailwind CSS, Leaflet | `3001` | `edge host` (Portainer Endpoint 3) | Map visualization, discrete camera marker dots with dynamic arterial saturation coloring (Green/Yellow/Red dots), H3 hex overlays, offline camera toggle, horizontal drag-to-scroll pinned camera dock, bilingual UI (`vi` default with full diacritics, `en` secondary). |
-| **Backend API** (`services/go-server`) | Go 1.24, Gin, SQLite (WAL mode) | `3000` | `edge host` (Portainer Endpoint 3) | Snapshot proxy cache with 15s in-memory TTL, camera catalog, hotset scheduler (30s cycle, `internal/hotset`), autonomous harvester & Cloudflare R2 archiver (`internal/harvester`), PCU Saturation Index calculator, Telegram flood alert dispatcher (`internal/notify`), SSE (`/api/live/stream`), WebSockets (`/ws/live`), Weather forecast (`/api/weather`), Swagger docs. |
-| **CV Engine** (`services/cv-engine`) | Python 3.11, ThreadingHTTPServer, OpenVINO IR runtime, YOLOv8n FP16 | `8000` | `inference worker` worker (Portainer Endpoint 4) | Automated vehicle detection (`POST /predict`), class counting (motorcycle, car, bus, truck), `GET /healthz` healthchecks, multi-threaded request processing, 2 vCPU / 2 GB RAM capped. |
+| **Web Client** (`apps/web`) | Next.js 15, React 19, Tailwind CSS, Leaflet | `3001` | `edge host` | Map visualization, arterial saturation dots, H3 hex overlays, pinned camera dock, bilingual UI (`vi`/`en`). |
+| **Backend API** (`services/go-server`) | Go 1.24, Gin, SQLite (WAL mode) | `3000` | `edge host` | Snapshot proxy cache (15s TTL), camera catalog, hotset scheduler, R2 archiver, PCU calculator, Telegram alerts, SSE, WebSockets. |
+| **CV Engine** (`services/cv-engine`) | Python 3.11, OpenVINO IR, YOLOv8n FP16 | `8000` | `inference worker` | Vehicle detection (`POST /predict`), class counting, `GET /healthz`, 2 vCPU / 2 GB RAM capped. |
 
 ---
 
