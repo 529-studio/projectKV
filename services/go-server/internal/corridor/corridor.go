@@ -125,6 +125,37 @@ func (s *Service) GetStatus(roadKey string) (*CorridorStatus, bool) {
 		return nil, false
 	}
 
+	return s.aggregateStatus(target, matchingCameras), true
+}
+
+// GetStatusSummary returns a map of all corridor statuses by road key.
+func (s *Service) GetStatusSummary() map[string]CorridorStatus {
+	allCameras := s.cameras.All()
+	cameraMap := make(map[string][]camera.Camera)
+	for _, c := range allCameras {
+		keys := make(map[string]struct{})
+		if c.RoadKey != "" {
+			keys[strings.ToLower(c.RoadKey)] = struct{}{}
+		}
+		for _, k := range c.RoadKeys {
+			if k != "" {
+				keys[strings.ToLower(k)] = struct{}{}
+			}
+		}
+		for k := range keys {
+			cameraMap[k] = append(cameraMap[k], c)
+		}
+	}
+
+	summaries := make(map[string]CorridorStatus)
+	for roadKey, cameras := range cameraMap {
+		status := s.aggregateStatus(roadKey, cameras)
+		summaries[roadKey] = *status
+	}
+	return summaries
+}
+
+func (s *Service) aggregateStatus(roadKey string, matchingCameras []camera.Camera) *CorridorStatus {
 	// Index latest verdicts by camera ID
 	latestVerdicts := s.verdicts.GetLatest()
 	verdictMap := make(map[string]hotset.Verdict, len(latestVerdicts))
@@ -272,7 +303,7 @@ func (s *Service) GetStatus(roadKey string) (*CorridorStatus, bool) {
 	}
 
 	return &CorridorStatus{
-		RoadKey:               target,
+		RoadKey:               roadKey,
 		WorstSeverity:         worstSeverity,
 		WorstFloodSeverity:    worstFloodSev,
 		MaxDepthCm:            maxDepthCm,
@@ -281,7 +312,7 @@ func (s *Service) GetStatus(roadKey string) (*CorridorStatus, bool) {
 		TotalCameras:          total,
 		VerifiedCameras:       verifiedCount,
 		Cameras:               cameraVerdicts,
-	}, true
+	}
 }
 
 // ListRoads returns all distinct road keys across the catalog with camera counts,

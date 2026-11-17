@@ -343,6 +343,21 @@ func TestHandler_HTTPRoutes(t *testing.T) {
 		t.Errorf("expected road_key=vo_van_kiet, got %s", st.RoadKey)
 	}
 
+	// 1.5 GET /api/roads/status-summary -> 200
+	reqSum := httptest.NewRequest(http.MethodGet, "/api/roads/status-summary", nil)
+	wSum := httptest.NewRecorder()
+	r.ServeHTTP(wSum, reqSum)
+	if wSum.Code != http.StatusOK {
+		t.Errorf("expected 200 for /api/roads/status-summary, got %d", wSum.Code)
+	}
+	var sumMap map[string]CorridorStatus
+	if err := json.Unmarshal(wSum.Body.Bytes(), &sumMap); err != nil {
+		t.Fatalf("failed to unmarshal JSON summary: %v", err)
+	}
+	if _, ok := sumMap["vo_van_kiet"]; !ok {
+		t.Errorf("expected vo_van_kiet in summary map")
+	}
+
 	// 2. GET /api/roads/unknown/status -> 404
 	req404 := httptest.NewRequest(http.MethodGet, "/api/roads/unknown_road_xyz/status", nil)
 	w404 := httptest.NewRecorder()

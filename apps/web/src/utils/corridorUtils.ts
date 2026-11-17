@@ -29,6 +29,11 @@ export const getCorridorStatusUrl = (roadKey: string): string => {
   return `${base}/api/roads/${encodeURIComponent(roadKey)}/status`;
 };
 
+export const getCorridorStatusSummaryUrl = (): string => {
+  const base = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) || '';
+  return `${base}/api/roads/status-summary`;
+};
+
 /**
  * Converts a corridor display name or raw road name into its canonical road_key.
  * e.g. "Võ Văn Kiệt" -> "vo_van_kiet", "Đại lộ Võ Văn Kiệt" -> "vo_van_kiet"
@@ -141,6 +146,28 @@ export async function fetchCorridorStatus(roadKey: string): Promise<CorridorStat
     return data;
   } catch (err) {
     console.warn('[corridorUtils] Failed to fetch status for road:', key, err);
+    return null;
+  }
+}
+
+/**
+ * Fetches all corridor statuses in a single request.
+ */
+export async function fetchCorridorStatusSummary(): Promise<Record<string, CorridorStatus> | null> {
+  try {
+    const res = await fetch(getCorridorStatusSummaryUrl());
+    if (!res.ok) {
+      throw new Error(`Failed to fetch corridor status summary: ${res.status}`);
+    }
+    const data: Record<string, CorridorStatus> = await res.json();
+    
+    // Update individual caches
+    for (const [key, status] of Object.entries(data)) {
+      setCachedCorridorStatus(key, status);
+    }
+    return data;
+  } catch (err) {
+    console.warn('[corridorUtils] Failed to fetch status summary:', err);
     return null;
   }
 }

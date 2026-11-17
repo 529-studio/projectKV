@@ -20,6 +20,7 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/roads", h.ListRoads)
 	rg.GET("/roads/:road_key/status", h.GetStatus)
+	rg.GET("/roads/status-summary", h.GetStatusSummary)
 	rg.GET("/roads/:road_key/route", h.GetRoute)
 	rg.GET("/corridors/overview", h.GetCorridorsOverview)
 }
@@ -41,6 +42,17 @@ func (h *Handler) GetStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, status)
+}
+
+// GetStatusSummary godoc
+// @Summary Get aggregated status for all corridors
+// @Description Returns a map of corridor statuses for all known road keys.
+// @Tags Corridor
+// @Produce json
+// @Success 200 {object} map[string]CorridorStatus
+// @Router /api/roads/status-summary [get]
+func (h *Handler) GetStatusSummary(c *gin.Context) {
+	c.JSON(http.StatusOK, h.service.GetStatusSummary())
 }
 
 // ListRoads godoc
