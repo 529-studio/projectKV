@@ -58,6 +58,7 @@ type routerConfig struct {
 func setupRouter(p routerConfig) *gin.Engine {
 	cfg := p.cfg
 	router := gin.Default()
+	router.Use(middleware.SecurityHeaders())
 	router.Use(middleware.CORSMiddleware(cfg.AllowedOrigins...))
 	router.Use(gzip.Gzip(gzip.DefaultCompression,
 		gzip.WithExcludedPaths([]string{"/api/snapshot", "/api/cameras/snapshot", "/api/live/stream", "/ws"}),
@@ -87,18 +88,20 @@ func setupRouter(p routerConfig) *gin.Engine {
 	}
 
 	// Swagger documentation UI
-	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
-	router.GET("/swagger", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
-	})
-	router.GET("/swagger/*any", func(c *gin.Context) {
-		param := c.Param("any")
-		if param == "" || param == "/" {
+	if cfg.AppEnv != "production" {
+		swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
+		router.GET("/swagger", func(c *gin.Context) {
 			c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
-			return
-		}
-		swaggerHandler(c)
-	})
+		})
+		router.GET("/swagger/*any", func(c *gin.Context) {
+			param := c.Param("any")
+			if param == "" || param == "/" {
+				c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+				return
+			}
+			swaggerHandler(c)
+		})
+	}
 
 	// Telegram bot webhook (S12-T4 / Issue #402). RegisterRoutes is a no-op
 	// unless the handler is enabled, and the explicit token check closes the one
