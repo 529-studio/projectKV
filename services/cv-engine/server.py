@@ -392,6 +392,22 @@ class ORTModel:
             if observed_generation != self._generation:
                 return
             session, providers = open_ort_session(self.model_path)
+            if (
+                (os.environ.get("CV_REQUIRE_CUDA") or "").strip() == "1"
+                and "CUDAExecutionProvider" not in providers
+            ):
+                # Rebuilding on CPU would keep the service "working" while the GPU
+                # deployment silently loses the GPU. Only a fresh container has been
+                # proven to clear a dead CUDA context, so exit loudly and let the
+                # restart policy recreate it. os._exit is required here: this runs on
+                # a request thread, where sys.exit only ends that thread.
+                logger.critical(
+                    "Session rebuild resolved only %s while CV_REQUIRE_CUDA=1; "
+                    "exiting so the container restarts with a fresh CUDA context",
+                    providers,
+                )
+                logging.shutdown()
+                os._exit(1)
             self.session = session
             self.providers = list(providers)
             self.input_name = session.get_inputs()[0].name
