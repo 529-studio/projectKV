@@ -674,9 +674,9 @@ export default function Home() {
         </div>
 
         {/* OVERLAY STACK */}
-        <div className="absolute inset-0 pointer-events-none z-[800] flex flex-col justify-end">
-          <div className="pointer-events-auto flex flex-col-reverse">
-            {/* BOTTOM DOCK (comes first in flex-col-reverse for stacking order) */}
+        <div className="absolute inset-x-0 bottom-0 pointer-events-none z-[800] flex flex-col items-start justify-end p-4">
+          <div className="pointer-events-auto flex flex-col-reverse gap-4 w-[380px] max-w-full">
+            {/* BOTTOM DOCK */}
             <PinnedDock 
               pinnedCameras={pinnedCameras} 
               onUnpin={togglePin} 
@@ -692,15 +692,13 @@ export default function Home() {
             
             {/* CORRIDOR OVERVIEW CARD */}
             {selectedCorridor && corridorRoute?.summary && (
-              <div className="mb-4 ml-4">
-                <CorridorOverviewCard
-                  summary={corridorRoute.summary}
-                  corridorCameras={corridorCameras}
-                  onClose={() => setSelectedCorridor(null)}
-                  onCameraClick={handleSelectCamera}
-                  lang={lang}
-                />
-              </div>
+              <CorridorOverviewCard
+                summary={corridorRoute.summary}
+                corridorCameras={corridorCameras}
+                onClose={() => setSelectedCorridor(null)}
+                onCameraClick={handleSelectCamera}
+                lang={lang}
+              />
             )}
           </div>
         </div>
