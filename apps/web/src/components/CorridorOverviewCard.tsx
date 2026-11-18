@@ -83,7 +83,7 @@ export default function CorridorOverviewCard({
       aria-label={lang === 'vi' ? 'Tổng quan trục đường' : 'Corridor Overview'}
       className="fixed left-3 right-3 sm:right-auto sm:left-4 z-40 max-w-sm sm:w-[380px] bg-zinc-950/95 backdrop-blur-md border border-zinc-800 rounded-lg shadow-2xl font-mono text-white transition-all duration-200"
       style={{
-        bottom: 'calc(var(--safe-bottom, 0px) + 120px)',
+        bottom: 'calc(var(--safe-bottom, 0px) + 140px)',
       }}
     >
       {/* Header bar */}
