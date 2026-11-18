@@ -9,7 +9,7 @@ export const OTHER_WARDS_KEY = '__OTHER_WARDS__';
 export const OUTSIDE_HCMC_KEY = OTHER_WARDS_KEY;
 
 import { FLOOD_I18N } from '../utils/floodUtils';
-import { useCorridor, useCorridorSummary } from '../hooks/useCorridor';
+import { useCorridor, useCorridorSummary, type CorridorStatus } from '../hooks/useCorridor';
 import { formatObservationAge, getCorridorWorstVerdict } from '../utils/corridorUtils';
 import { CORRIDOR_I18N } from '../config/constants';
 import type { VerdictLike } from '../utils/hazardUtils';
@@ -97,7 +97,7 @@ function CorridorDetailHeader({
 }: {
   roadKey?: string | null;
   lang: 'vi' | 'en';
-  summaryData?: Record<string, any> | null;
+  summaryData?: Record<string, CorridorStatus> | null;
 }) {
   const { status, loading } = useCorridor(roadKey || null);
   const statusToUse = summaryData && roadKey ? summaryData[roadKey] : status;
