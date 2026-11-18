@@ -9,7 +9,7 @@ export const OTHER_WARDS_KEY = '__OTHER_WARDS__';
 export const OUTSIDE_HCMC_KEY = OTHER_WARDS_KEY;
 
 import { FLOOD_I18N } from '../utils/floodUtils';
-import { useCorridor } from '../hooks/useCorridor';
+import { useCorridor, useCorridorSummary, type CorridorStatus } from '../hooks/useCorridor';
 import { formatObservationAge, getCorridorWorstVerdict } from '../utils/corridorUtils';
 import { CORRIDOR_I18N } from '../config/constants';
 import type { VerdictLike } from '../utils/hazardUtils';
@@ -90,22 +90,32 @@ export {
   type CityCorridorGroup,
 };
 
-function CorridorDetailHeader({ roadKey, lang }: { roadKey?: string | null; lang: 'vi' | 'en' }) {
+function CorridorDetailHeader({
+  roadKey,
+  lang,
+  summaryData,
+}: {
+  roadKey?: string | null;
+  lang: 'vi' | 'en';
+  summaryData?: Record<string, CorridorStatus> | null;
+}) {
   const { status, loading } = useCorridor(roadKey || null);
+  const statusToUse = summaryData && roadKey ? summaryData[roadKey] : status;
+  const loadingToUse = !summaryData && loading;
 
   if (!roadKey) return null;
 
   return (
     <div className="flex items-center justify-between px-2.5 py-1 bg-zinc-950/90 border-b border-zinc-800/60 font-mono text-[9.5px] text-zinc-400 select-none">
-      {loading ? (
+      {loadingToUse ? (
         <span className="text-zinc-500 animate-pulse">{lang === 'vi' ? 'Đang tải thông tin...' : 'Loading status...'}</span>
-      ) : status ? (
+      ) : statusToUse ? (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-zinc-300 font-semibold">{CORRIDOR_I18N.COVERAGE[lang](status.coverage_pct)}</span>
+          <span className="text-zinc-300 font-semibold">{CORRIDOR_I18N.COVERAGE[lang](statusToUse.coverage_pct)}</span>
           <span className="text-zinc-600">•</span>
           <span>
-            {status.oldest_observation_age_s != null
-              ? CORRIDOR_I18N.OLDEST[lang](formatObservationAge(status.oldest_observation_age_s, lang) || '')
+            {statusToUse.oldest_observation_age_s != null
+              ? CORRIDOR_I18N.OLDEST[lang](formatObservationAge(statusToUse.oldest_observation_age_s, lang) || '')
               : CORRIDOR_I18N.UNKNOWN[lang]}
           </span>
         </div>
@@ -139,6 +149,8 @@ export default function PhuongTreeFilter({
   className = '',
   autoFocusSearch = false,
 }: PhuongTreeFilterProps) {
+  const { data: summaryData } = useCorridorSummary();
+  // ... rest of the component
   const [internalLang, setInternalLang] = useState<'vi' | 'en'>('vi');
   const lang = controlledLang ?? internalLang;
   const setLang = onLangChange ?? setInternalLang;
@@ -397,6 +409,8 @@ export default function PhuongTreeFilter({
       setExpandedPhuongs(prev => new Set(prev).add(selectedPhuong));
     }
   }, [selectedPhuong]);
+  
+  // (Pass summaryData down to CorridorDetailHeader)
 
   const togglePhuongExpand = (key: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -1005,7 +1019,7 @@ export default function PhuongTreeFilter({
                         transition={{ duration: 0.18, ease: 'easeInOut' }}
                         className="overflow-hidden bg-black/40 border-t border-zinc-800/60 ml-6 my-0.5 space-y-0.5"
                       >
-                        <CorridorDetailHeader roadKey={corrRoadKey} lang={lang} />
+                        <CorridorDetailHeader roadKey={corrRoadKey} lang={lang} summaryData={summaryData} />
                         <div className="py-1 space-y-0.5">
                           {corr.cameras.map(cam => (
                             <div
@@ -1187,7 +1201,7 @@ export default function PhuongTreeFilter({
                                       transition={{ duration: 0.15, ease: 'easeInOut' }}
                                       className="overflow-hidden bg-black/40 border-l border-zinc-800/80 ml-8 my-0.5 space-y-0.5"
                                     >
-                                      <CorridorDetailHeader roadKey={wardCorrRoadKey} lang={lang} />
+                                      <CorridorDetailHeader roadKey={wardCorrRoadKey} lang={lang} summaryData={summaryData} />
                                       {corr.cameras.map(cam => (
                                         <div
                                           key={cam.id}
