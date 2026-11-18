@@ -564,6 +564,18 @@ class _FakeInferRequest:
         return _FakeResults({0: np.zeros((1, 42, 8400), dtype=np.float32)})
 
 
+class _FakeORTSession:
+    """Only the session surface ORTInferenceResult's caller needs: run() and the feed record."""
+
+    def __init__(self, output):
+        self.output = np.asarray(output, dtype=np.float32)
+        self.recorded_feeds = []
+
+    def run(self, _output_names, feeds):
+        self.recorded_feeds.append({k: tuple(np.asarray(v).shape) for k, v in feeds.items()})
+        return [self.output]
+
+
 class _FakeCompiledModel:
     def __init__(self, output=None, shape=(1, 3, 416, 416)):
         self.output = output
@@ -905,6 +917,56 @@ class TestPredictPayload(unittest.TestCase):
             self.assertGreater(payload.get("flood_depth_cm", 0.0), 0.0)
         finally:
             server.calibration_registry._entries.pop("cam_curb_water", None)
+
+
+    def test_ort_backend_payload_matches_openvino_parser(self):
+        # The ORT session is adapted to the handler's contract by ORTModel, which must
+        # hand the untouched (1, 84, N) channel-first output to the same parser the
+        # OpenVINO path uses. If the adapter reshaped or transposed the tensor, the
+        # class rows would shift and the counts below would silently differ.
+        mock_output = np.zeros((1, 84, 2100), dtype=np.float32)
+        for det_idx, (row, cx) in enumerate(((6, 100.0), (6, 200.0), (7, 300.0))):
+            mock_output[0, 0, det_idx] = cx
+            mock_output[0, 1, det_idx] = 160.0
+            mock_output[0, 2, det_idx] = 40.0
+            mock_output[0, 3, det_idx] = 40.0
+            mock_output[0, row, det_idx] = 0.9
+
+        # Reference: the existing OpenVINO-shaped fake with the same raw output.
+        self._use_model(shape=(1, 3, 320, 320), output={0: mock_output})
+        _, openvino_payload = self._post_predict()
+
+        session = _FakeORTSession(mock_output)
+        server.compiled_model = server.ORTModel(
+            session, "images", [1, 3, 320, 320], ["CPUExecutionProvider"]
+        )
+        status, ort_payload = self._post_predict()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(ort_payload["vehicle_counts"], openvino_payload["vehicle_counts"])
+        self.assertEqual(ort_payload["vehicle_counts"]["car"], 2)
+        self.assertEqual(ort_payload["vehicle_counts"]["motorcycle"], 1)
+        self.assertEqual(ort_payload["input_resolution"], [320, 320])
+        # The adapter must feed the single named input a float32 NCHW tensor.
+        self.assertEqual(session.recorded_feeds[0]["images"], (1, 3, 320, 320))
+
+
+class TestBackendSelection(unittest.TestCase):
+    """CV_BACKEND parsing contract: only the two documented values select a backend."""
+
+    def test_defaults_to_openvino_when_unset_or_empty(self):
+        self.assertEqual(server.resolve_backend(None), "openvino")
+        self.assertEqual(server.resolve_backend(""), "openvino")
+        self.assertEqual(server.resolve_backend("   "), "openvino")
+
+    def test_accepts_documented_values_case_insensitively(self):
+        self.assertEqual(server.resolve_backend("openvino"), "openvino")
+        self.assertEqual(server.resolve_backend("ORT"), "ort")
+
+    def test_unknown_value_warns_and_falls_back(self):
+        with self.assertLogs("cv-engine", level="WARNING") as logs:
+            self.assertEqual(server.resolve_backend("tensorrt"), "openvino")
+        self.assertIn("tensorrt", "\n".join(logs.output))
 
 
 class TestBoxPolygonAnchor(unittest.TestCase):

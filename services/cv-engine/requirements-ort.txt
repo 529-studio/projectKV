@@ -1,0 +1,23 @@
+# ONNX Runtime GPU path (CV_BACKEND=ort). Kept separate from requirements.txt so the
+# OpenVINO-only image stays small and the CUDA wheels are installed only where the
+# ORT runtime is wanted. `onnxruntime-gpu` is a distinct wheel from `onnxruntime`;
+# installing both shadows one another, so only this one is present in the image.
+# `onnxruntime-gpu` 1.24+ is built against CUDA 13 (it dlopen()s libcublasLt.so.13),
+# which the CUDA 12 wheels below cannot satisfy and which needs a newer driver than
+# the inference hosts run. 1.23 is the last CUDA 12 line, so it is pinned: the
+# provider must be able to load, and a silent CUDA-to-CPU downgrade would defeat the
+# point of this backend.
+onnxruntime-gpu==1.23.*
+
+# The CUDA 12 / cuDNN 9 shared libraries `onnxruntime-gpu` dlopen()s. The pip wheels
+# place them under site-packages/nvidia/<lib>/lib, which the Dockerfile puts on
+# LD_LIBRARY_PATH. Versions are the CUDA 12 line ORT 1.20+ is built against.
+nvidia-cuda-runtime-cu12==12.*
+nvidia-cublas-cu12==12.*
+nvidia-cudnn-cu12==9.*
+nvidia-cufft-cu12==11.*
+nvidia-curand-cu12==10.*
+nvidia-cuda-nvrtc-cu12==12.*
+# cublas links against nvJitLink; the Dockerfile puts its directory on
+# LD_LIBRARY_PATH, so pin it here instead of relying on a transitive install.
+nvidia-nvjitlink-cu12==12.*

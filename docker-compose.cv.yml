@@ -13,6 +13,13 @@ services:
       - PORT=8000
       - MODEL_DIR=/app/models/yolov8n_openvino_320
       - PYTHONUNBUFFERED=1
+      # Inference backend. `ort` (ONNX Runtime, CUDA first with CPU fallback) is the
+      # default here because this host has a GPU; set CV_BACKEND=openvino to serve
+      # the IR at MODEL_DIR through the Intel CPU plugin instead. Both paths are
+      # present in the same image, so switching is a restart, not a rebuild.
+      - CV_BACKEND=${CV_BACKEND:-ort}
+      # Explicit ORT weight path: ORT mode never scans the models directory.
+      - CV_ONNX_MODEL=${CV_ONNX_MODEL:-/app/models/yolov8n.onnx}
       # The IR at MODEL_DIR is baked at 320x320. Without this pin the service falls
       # back to its 416 px default whenever the compiled input shape is unreadable,
       # and the CPU plugin then rejects every inference with a PowerStatic Eltwise
