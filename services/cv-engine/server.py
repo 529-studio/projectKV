@@ -408,6 +408,17 @@ def load_ort_model() -> None:
         )
         return
 
+    require_cuda = (os.environ.get("CV_REQUIRE_CUDA") or "").strip() == "1"
+    if require_cuda and not os.path.exists("/dev/nvidia0"):
+        # With pip CUDA libraries present but no device node, ORT can die inside the
+        # CUDA provider with a segfault instead of raising, which still crash-loops the
+        # container but for no diagnosable reason. Check the device first.
+        logger.critical(
+            "CV_REQUIRE_CUDA=1 but /dev/nvidia0 is missing; the device reservation "
+            "did not reach the container. Refusing to serve on CPU."
+        )
+        sys.exit(1)
+
     requested = ["CUDAExecutionProvider", "CPUExecutionProvider"]
     start_t = time.perf_counter()
     logger.info("Loading ONNX Runtime model from %s (providers=%s)...", model_path, requested)
@@ -432,6 +443,16 @@ def load_ort_model() -> None:
                 "CUDAExecutionProvider is unavailable; ONNX Runtime is executing on %s",
                 providers,
             )
+            # A GPU deployment that quietly executes on CPU is indistinguishable from a
+            # working one at the HTTP layer: /healthz stays 200 and /predict works, just
+            # slower. When CUDA is required, exit instead so the restart loop and the
+            # deploy health gate both show the failure.
+            if (os.environ.get("CV_REQUIRE_CUDA") or "").strip() == "1":
+                logger.critical(
+                    "CV_REQUIRE_CUDA=1 but the session resolved only %s; refusing to serve on CPU",
+                    providers,
+                )
+                sys.exit(1)
         input_name = session.get_inputs()[0].name
         shape = ort_input_shape(session)
         compiled_model = ORTModel(session, input_name, shape, providers)

@@ -1,23 +1,12 @@
-# ONNX Runtime GPU path (CV_BACKEND=ort). Kept separate from requirements.txt so the
-# OpenVINO-only image stays small and the CUDA wheels are installed only where the
-# ORT runtime is wanted. `onnxruntime-gpu` is a distinct wheel from `onnxruntime`;
-# installing both shadows one another, so only this one is present in the image.
-# `onnxruntime-gpu` 1.24+ is built against CUDA 13 (it dlopen()s libcublasLt.so.13),
-# which the CUDA 12 wheels below cannot satisfy and which needs a newer driver than
-# the inference hosts run. 1.23 is the last CUDA 12 line, so it is pinned: the
-# provider must be able to load, and a silent CUDA-to-CPU downgrade would defeat the
-# point of this backend.
-onnxruntime-gpu==1.23.*
-
-# The CUDA 12 / cuDNN 9 shared libraries `onnxruntime-gpu` dlopen()s. The pip wheels
-# place them under site-packages/nvidia/<lib>/lib, which the Dockerfile puts on
-# LD_LIBRARY_PATH. Versions are the CUDA 12 line ORT 1.20+ is built against.
-nvidia-cuda-runtime-cu12==12.*
-nvidia-cublas-cu12==12.*
-nvidia-cudnn-cu12==9.*
-nvidia-cufft-cu12==11.*
-nvidia-curand-cu12==10.*
-nvidia-cuda-nvrtc-cu12==12.*
-# cublas links against nvJitLink; the Dockerfile puts its directory on
-# LD_LIBRARY_PATH, so pin it here instead of relying on a transitive install.
-nvidia-nvjitlink-cu12==12.*
+# ONNX Runtime GPU path (CV_BACKEND=ort). `onnxruntime-gpu` is a distinct wheel from
+# `onnxruntime`; installing both shadows one another, so only this one is present.
+#
+# Version pin is load-bearing. The runtime stage is `nvidia/cuda:12.4.1-cudnn-runtime`,
+# which is the newest CUDA line the inference host's driver 550 supports, and the only
+# combination verified end-to-end on its Pascal GPU (sm_6.1):
+#   * 1.19.2 with CUDA 12.4 / cuDNN 9 executes the full YOLOv8n graph (p50 4.45 ms);
+#   * 1.23.x runs on CUDA 12.8 and failed the first Conv with cuDNN 209
+#     "no kernel image is available for execution on the device";
+#   * the pip `nvidia-*-cu12` wheels are NOT used. Pinning them to 12.* resolved to the
+#     12.8 build and reproduced the same Conv failure with 1.19.2 on a slim base.
+onnxruntime-gpu==1.19.2
