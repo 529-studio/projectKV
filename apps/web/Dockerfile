@@ -19,6 +19,8 @@ FROM nginx:1.27-alpine
 RUN apk update && apk upgrade --no-cache
 
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+# Relative include in nginx.conf resolves against the nginx prefix (/etc/nginx)
+COPY apps/web/nginx_security_headers.conf /etc/nginx/nginx_security_headers.conf
 COPY --from=builder /app/web/out /usr/share/nginx/html
 
 EXPOSE 80
