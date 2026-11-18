@@ -30,6 +30,43 @@ logger = logging.getLogger("cv-engine")
 PORT = int(os.environ.get("CV_PORT", os.environ.get("MODEL_PORT", 8000)))
 MODEL_DIR = os.environ.get("MODEL_DIR", "/app/models/yolov8n_openvino_320")
 
+# Inference backend selection. `openvino` is the production default and must keep
+# working unchanged; `ort` runs the identical YOLOv8n graph through ONNX Runtime,
+# preferring CUDA and falling back to CPU. The switch only chooses how the graph is
+# executed — preprocessing, post-processing and the HTTP contract are shared.
+SUPPORTED_BACKENDS: Tuple[str, ...] = ("openvino", "ort")
+DEFAULT_BACKEND = "openvino"
+
+
+def resolve_backend(raw: Optional[str]) -> str:
+    """Return the backend named by ``CV_BACKEND``, defaulting to OpenVINO.
+
+    An unrecognised value must never silently become the new serving path: it is
+    logged and the documented default is used instead, so a typo cannot change what
+    the inference host runs.
+    """
+    candidate = (raw or "").strip().lower()
+    if not candidate:
+        return DEFAULT_BACKEND
+    if candidate in SUPPORTED_BACKENDS:
+        return candidate
+    logger.warning(
+        "Ignoring CV_BACKEND=%r: allowed values are %s; falling back to %s",
+        raw,
+        ", ".join(SUPPORTED_BACKENDS),
+        DEFAULT_BACKEND,
+    )
+    return DEFAULT_BACKEND
+
+
+CV_BACKEND = resolve_backend(os.environ.get("CV_BACKEND"))
+# Explicit ORT weight path. ORT mode never scans for a `.onnx` file: the class row
+# layout the post-processor indexes into depends on which model was exported, so a
+# guess could silently serve a graph with the wrong channel count.
+CV_ONNX_MODEL = (os.environ.get("CV_ONNX_MODEL") or "").strip() or os.path.join(
+    MODEL_DIR, "yolov8n.onnx"
+)
+
 # Attempt to import optional OpenVINO and imaging libraries
 OPENVINO_AVAILABLE = False
 PIL_AVAILABLE = False
@@ -41,6 +78,10 @@ compiled_model = None
 # is loaded yet. The handler reads these instead of assuming every model is dynamic.
 resolution_mode = "unknown"
 compiled_input_shape = None
+# Providers the ORT session actually resolved, in execution order. Empty when no
+# ORT session is loaded. Reported by /info so an operator can see whether CUDA was
+# really available instead of inferring it from the requested list.
+ort_providers: List[str] = []
 
 try:
     import openvino as ov
@@ -256,17 +297,208 @@ def select_model_xml(model_dir: str) -> Optional[str]:
     return os.path.join(model_dir, xml_files[0])
 
 
+class ORTInferenceResult:
+    """Read-only view of the ORT output arrays under the keys the handler probes.
+
+    The handler unwraps results through ``.get(0)``/``[0]`` and tests
+    ``len()``. A raw ``dict`` of ndarrays is not equivalent: the handler's
+    ``results.get(0) or results.get("output0")`` chain would evaluate an ndarray's
+    truth value and raise. This mapping supplies the same lookups without that
+    behaviour, so the untouched post-processing path receives the raw output.
+    """
+
+    def __init__(self, outputs: Sequence["np.ndarray"]) -> None:
+        self._outputs = list(outputs)
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        if isinstance(key, int) and 0 <= key < len(self._outputs):
+            return self._outputs[key]
+        return default
+
+    def __getitem__(self, key: Any) -> Any:
+        if isinstance(key, slice):
+            return self._outputs[key]
+        return self._outputs[int(key)]
+
+    def __len__(self) -> int:
+        return len(self._outputs)
+
+
+class ORTInferRequest:
+    """Single-shot inference handle mirroring ``CompiledModel.create_infer_request``."""
+
+    def __init__(self, model: "ORTModel") -> None:
+        self._model = model
+
+    def infer(self, feeds: Dict[Any, "np.ndarray"]) -> ORTInferenceResult:
+        tensor = feeds.get(0)
+        if tensor is None and len(feeds) == 1:
+            tensor = next(iter(feeds.values()))
+        if tensor is None:
+            raise ValueError("ORT infer() requires the image tensor under key 0")
+        outputs = self._model.session.run(None, {self._model.input_name: tensor})
+        return ORTInferenceResult(outputs)
+
+
+class ORTModel:
+    """Duck-types the subset of the OpenVINO compiled model the handler uses.
+
+    Resolution metadata lives on the object, not only in module globals, so the
+    handler can describe the graph it is actually feeding without a second code
+    path: ``model_input_metadata()`` already prefers these attributes.
+    """
+
+    def __init__(
+        self,
+        session: Any,
+        input_name: str,
+        input_shape: Sequence[Optional[int]],
+        providers: Sequence[str],
+    ) -> None:
+        self.session = session
+        self.input_name = input_name
+        self.input_shape: List[Optional[int]] = list(input_shape)
+        self.providers: List[str] = list(providers)
+        self.resolution_mode = (
+            "dynamic" if spatial_dims_are_dynamic(self.input_shape) else "static"
+        )
+
+    def create_infer_request(self) -> ORTInferRequest:
+        return ORTInferRequest(self)
+
+
+def ort_input_shape(session: Any) -> List[Optional[int]]:
+    """Return the session's NCHW input shape, with symbolic dims as ``None``."""
+    model_input = session.get_inputs()[0]
+    shape: List[Optional[int]] = []
+    for dim in model_input.shape:
+        if isinstance(dim, int):
+            shape.append(dim)
+        else:
+            try:
+                shape.append(int(dim))
+            except (TypeError, ValueError):
+                shape.append(None)
+    return shape
+
+
+def load_ort_model() -> None:
+    """Create the ORT session at ``CV_ONNX_MODEL`` and publish the serving contract.
+
+    Providers are requested CUDA-first with CPU as the guaranteed fallback; ORT drops
+    an unavailable provider and logs it, so the service still starts on a host without
+    an NVIDIA GPU. The providers that actually resolved are stored and reported by
+    ``/info`` rather than the requested list, which cannot distinguish the two.
+    """
+    global compiled_model, resolution_mode, compiled_input_shape, ort_providers
+
+    # Imported lazily: the OpenVINO path must not pay ORT's import cost or fail on a
+    # host image that only carries the Intel runtime.
+    try:
+        import onnxruntime as ort
+    except ImportError as exc:
+        logger.error("CV_BACKEND=ort but onnxruntime is not installed: %s", exc)
+        return
+
+    model_path = CV_ONNX_MODEL
+    if not os.path.isfile(model_path):
+        logger.warning(
+            "CV_BACKEND=ort but the ONNX model %s does not exist; running in standby mode.",
+            model_path,
+        )
+        return
+
+    require_cuda = (os.environ.get("CV_REQUIRE_CUDA") or "").strip() == "1"
+    if require_cuda and not os.path.exists("/dev/nvidia0"):
+        # With pip CUDA libraries present but no device node, ORT can die inside the
+        # CUDA provider with a segfault instead of raising, which still crash-loops the
+        # container but for no diagnosable reason. Check the device first.
+        logger.critical(
+            "CV_REQUIRE_CUDA=1 but /dev/nvidia0 is missing; the device reservation "
+            "did not reach the container. Refusing to serve on CPU."
+        )
+        sys.exit(1)
+
+    requested = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    start_t = time.perf_counter()
+    logger.info("Loading ONNX Runtime model from %s (providers=%s)...", model_path, requested)
+    try:
+        try:
+            session = ort.InferenceSession(model_path, providers=requested)
+        except Exception as cuda_exc:
+            # Some CUDA EP failures surface at session creation instead of degrading
+            # quietly (a missing cuDNN, for instance). Retrying on CPU keeps the
+            # service starting on a host whose GPU runtime is broken; the warning
+            # records why the request did not get CUDA.
+            logger.warning(
+                "ORT session with the CUDA provider failed (%s); retrying with CPUExecutionProvider only",
+                cuda_exc,
+            )
+            session = ort.InferenceSession(
+                model_path, providers=["CPUExecutionProvider"]
+            )
+        providers = list(session.get_providers())
+        if "CUDAExecutionProvider" not in providers:
+            logger.warning(
+                "CUDAExecutionProvider is unavailable; ONNX Runtime is executing on %s",
+                providers,
+            )
+            # A GPU deployment that quietly executes on CPU is indistinguishable from a
+            # working one at the HTTP layer: /healthz stays 200 and /predict works, just
+            # slower. When CUDA is required, exit instead so the restart loop and the
+            # deploy health gate both show the failure.
+            if (os.environ.get("CV_REQUIRE_CUDA") or "").strip() == "1":
+                logger.critical(
+                    "CV_REQUIRE_CUDA=1 but the session resolved only %s; refusing to serve on CPU",
+                    providers,
+                )
+                sys.exit(1)
+        input_name = session.get_inputs()[0].name
+        shape = ort_input_shape(session)
+        compiled_model = ORTModel(session, input_name, shape, providers)
+        compiled_input_shape = list(shape)
+        resolution_mode = compiled_model.resolution_mode
+        ort_providers = providers
+        duration = (time.perf_counter() - start_t) * 1000
+        logger.info(
+            "ONNX Runtime session created in %.1f ms (providers=%s, input=%s %s, mode=%s)",
+            duration,
+            providers,
+            input_name,
+            shape,
+            resolution_mode,
+        )
+    except Exception as exc:
+        logger.error("Failed to create ONNX Runtime session for %s: %s", model_path, exc)
+
+
 def load_model():
+    """Load the weights for the configured backend; standby state on failure.
+
+    Both backends publish the same three module globals the handler reads
+    (``compiled_model``, ``resolution_mode``, ``compiled_input_shape``), so routing
+    and post-processing never branch on the backend. A failed load clears them first:
+    a reload must not leave the handler describing a model that is no longer loaded.
+    """
+    global compiled_model, resolution_mode, compiled_input_shape, ort_providers
+
+    compiled_model = None
+    compiled_input_shape = None
+    resolution_mode = "unknown"
+    ort_providers = []
+
+    if CV_BACKEND == "ort":
+        load_ort_model()
+        return
+
+    load_openvino_model()
+
+
+def load_openvino_model():
     """Attempt to load and compile OpenVINO model if model files exist."""
     global compiled_model, resolution_mode, compiled_input_shape
     if not OPENVINO_AVAILABLE or not core:
         return
-
-    # Reset the serving contract before every load attempt so a failed reload cannot
-    # leave the handler describing a model that is no longer loaded.
-    compiled_model = None
-    compiled_input_shape = None
-    resolution_mode = "unknown"
 
     model_xml = select_model_xml(MODEL_DIR)
     if not model_xml:
@@ -948,9 +1180,12 @@ class CVRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, {
                 "service": "projectkv-cv-engine",
                 "version": "1.0.0",
+                "backend": CV_BACKEND,
+                "providers": list(ort_providers) if CV_BACKEND == "ort" else [],
                 "openvino_available": OPENVINO_AVAILABLE,
                 "available_devices": devices,
                 "model_dir": MODEL_DIR,
+                "onnx_model": CV_ONNX_MODEL if CV_BACKEND == "ort" else None,
                 "model_loaded": compiled_model is not None,
                 "resolution_mode": resolution_mode,
                 "input_shape": compiled_input_shape,
@@ -1160,7 +1395,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                 depth_estimated_cm = 0.0
                 submerged_mc = 0
                 puddle_count = 0
-                model_tag = f"yolov8n_openvino_{actual_w}"
+                model_tag = f"yolov8n_{CV_BACKEND}_{actual_w}"
                 road_mask = None
                 water_mask = None
 
@@ -1179,7 +1414,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                         # Fine-tuned 6-class YOLOv8n-seg model (ADR-009):
                         # Classes: 0: roadway, 1: water_puddle, 2: motorcycle, 3: car, 4: bus, 5: truck
                         # Rows: 0..3 box, 4..9 classes, 10..41 (32 mask coeffs)
-                        model_tag = f"yolov8n_seg_openvino_{actual_w}"
+                        model_tag = f"yolov8n_seg_{CV_BACKEND}_{actual_w}"
                         seg_classes = {
                             "motorcycle": 6,
                             "car": 7,
@@ -1533,7 +1768,7 @@ class CVRequestHandler(BaseHTTPRequestHandler):
             "confidence": 0.0,
             "latency_ms": round(latency, 2),
             "mode": "standby_ready",
-            "note": "OpenVINO engine ready. Model weights mountable at runtime."
+            "note": f"{CV_BACKEND} engine ready. Model weights mountable at runtime."
         }
         if regions:
             standby_payload["regions"] = [
