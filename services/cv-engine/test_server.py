@@ -1196,5 +1196,57 @@ class TestInferenceQueueAndLoadShedding(unittest.TestCase):
         self.assertGreater(len(corridor_latencies), 0)
 
 
+@unittest.skipUnless(HAS_CV_DEPS, "numpy required")
+class ORTSessionRecoveryTest(unittest.TestCase):
+    """A dead CUDA context must be rebuilt once, and only CUDA failures trigger it."""
+
+    class _Session:
+        def __init__(self, error):
+            self.error = error
+            self.calls = 0
+
+        def run(self, outputs, feeds):
+            self.calls += 1
+            if self.calls == 1 and self.error is not None:
+                raise self.error
+            return [np.zeros((1, 84, 2100), dtype=np.float32)]
+
+    class _Model:
+        input_name = "images"
+        generation = 0
+
+        def __init__(self, session):
+            self.session = session
+            self.reloads = 0
+
+        def reload_session(self, observed_generation):
+            self.reloads += 1
+            self.generation += 1
+            self.session = ORTSessionRecoveryTest._Session(None)
+
+    def _request(self, error):
+        model = self._Model(self._Session(error))
+        return server.ORTInferRequest(model), model
+
+    def test_cuda_failure_rebuilds_once_and_retries(self):
+        request, model = self._request(
+            RuntimeError("CUBLAS failure 1: CUBLAS_STATUS_NOT_INITIALIZED")
+        )
+        result = request.infer({0: np.zeros((1, 3, 320, 320), dtype=np.float32)})
+        self.assertEqual(model.reloads, 1)
+        self.assertEqual(len(result), 1)
+
+    def test_non_cuda_failure_propagates_without_reload(self):
+        request, model = self._request(ValueError("invalid tensor"))
+        with self.assertRaises(ValueError):
+            request.infer({0: np.zeros((1, 3, 320, 320), dtype=np.float32)})
+        self.assertEqual(model.reloads, 0)
+
+    def test_cuda_marker_detection(self):
+        self.assertTrue(server.is_cuda_runtime_failure(RuntimeError("cuDNN failure 5003")))
+        self.assertTrue(server.is_cuda_runtime_failure(RuntimeError("CUDA driver reset")))
+        self.assertFalse(server.is_cuda_runtime_failure(ValueError("shape mismatch")))
+
+
 if __name__ == "__main__":
     unittest.main()

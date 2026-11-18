@@ -336,7 +336,22 @@ class ORTInferRequest:
             tensor = next(iter(feeds.values()))
         if tensor is None:
             raise ValueError("ORT infer() requires the image tensor under key 0")
-        outputs = self._model.session.run(None, {self._model.input_name: tensor})
+        generation = self._model.generation
+        try:
+            outputs = self._model.session.run(None, {self._model.input_name: tensor})
+        except Exception as exc:
+            # A CUDA context can die while the process keeps running (driver reset,
+            # GPU power event, long-idle clock change). The session then answers 500
+            # to every request until the container is restarted. Rebuild it once and
+            # retry; non-CUDA errors propagate unchanged.
+            if not is_cuda_runtime_failure(exc):
+                raise
+            logger.warning(
+                "CUDA inference failed (%s); rebuilding the ONNX Runtime session and retrying once",
+                exc,
+            )
+            self._model.reload_session(generation)
+            outputs = self._model.session.run(None, {self._model.input_name: tensor})
         return ORTInferenceResult(outputs)
 
 
@@ -354,14 +369,58 @@ class ORTModel:
         input_name: str,
         input_shape: Sequence[Optional[int]],
         providers: Sequence[str],
+        model_path: str = "",
     ) -> None:
         self.session = session
         self.input_name = input_name
         self.input_shape: List[Optional[int]] = list(input_shape)
         self.providers: List[str] = list(providers)
+        self.model_path = model_path
         self.resolution_mode = (
             "dynamic" if spatial_dims_are_dynamic(self.input_shape) else "static"
         )
+        self._reload_lock = threading.Lock()
+        self._generation = 0
+
+    @property
+    def generation(self) -> int:
+        return self._generation
+
+    def reload_session(self, observed_generation: int) -> None:
+        """Replace a dead session once, even when several request threads race."""
+        with self._reload_lock:
+            if observed_generation != self._generation:
+                return
+            session, providers = open_ort_session(self.model_path)
+            if (
+                (os.environ.get("CV_REQUIRE_CUDA") or "").strip() == "1"
+                and "CUDAExecutionProvider" not in providers
+            ):
+                # Rebuilding on CPU would keep the service "working" while the GPU
+                # deployment silently loses the GPU. Only a fresh container has been
+                # proven to clear a dead CUDA context, so exit loudly and let the
+                # restart policy recreate it. os._exit is required here: this runs on
+                # a request thread, where sys.exit only ends that thread.
+                logger.critical(
+                    "Session rebuild resolved only %s while CV_REQUIRE_CUDA=1; "
+                    "exiting so the container restarts with a fresh CUDA context",
+                    providers,
+                )
+                logging.shutdown()
+                os._exit(1)
+            self.session = session
+            self.providers = list(providers)
+            self.input_name = session.get_inputs()[0].name
+            self.input_shape = list(ort_input_shape(session))
+            self.resolution_mode = (
+                "dynamic" if spatial_dims_are_dynamic(self.input_shape) else "static"
+            )
+            self._generation += 1
+            logger.info(
+                "ONNX Runtime session rebuilt (providers=%s, input_shape=%s)",
+                self.providers,
+                self.input_shape,
+            )
 
     def create_infer_request(self) -> ORTInferRequest:
         return ORTInferRequest(self)
@@ -380,6 +439,32 @@ def ort_input_shape(session: Any) -> List[Optional[int]]:
             except (TypeError, ValueError):
                 shape.append(None)
     return shape
+
+
+# Markers that identify a failure in the CUDA execution stack rather than a bad
+# request. Used to decide whether rebuilding the session can help.
+CUDA_FAILURE_MARKERS: Tuple[str, ...] = ("cublas", "cudnn", "cuda")
+
+
+def is_cuda_runtime_failure(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return any(marker in text for marker in CUDA_FAILURE_MARKERS)
+
+
+def open_ort_session(model_path: str) -> Tuple[Any, Sequence[str]]:
+    """Create the CUDA-first ORT session, degrading to CPU only at creation time."""
+    import onnxruntime as ort
+
+    requested = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    try:
+        session = ort.InferenceSession(model_path, providers=requested)
+    except Exception as cuda_exc:
+        logger.warning(
+            "ORT session with the CUDA provider failed (%s); retrying with CPUExecutionProvider only",
+            cuda_exc,
+        )
+        session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+    return session, list(session.get_providers())
 
 
 def load_ort_model() -> None:
@@ -401,13 +486,6 @@ def load_ort_model() -> None:
         return
 
     model_path = CV_ONNX_MODEL
-    if not os.path.isfile(model_path):
-        logger.warning(
-            "CV_BACKEND=ort but the ONNX model %s does not exist; running in standby mode.",
-            model_path,
-        )
-        return
-
     require_cuda = (os.environ.get("CV_REQUIRE_CUDA") or "").strip() == "1"
     if require_cuda and not os.path.exists("/dev/nvidia0"):
         # With pip CUDA libraries present but no device node, ORT can die inside the
@@ -418,26 +496,30 @@ def load_ort_model() -> None:
             "did not reach the container. Refusing to serve on CPU."
         )
         sys.exit(1)
+    if not os.path.isfile(model_path):
+        # A GPU deployment with no model would sit in standby answering /healthz 200
+        # while every /predict fails, which reads as "deployed" to the health gate.
+        if require_cuda:
+            logger.critical(
+                "CV_REQUIRE_CUDA=1 but the ONNX model %s does not exist; refusing to "
+                "serve standby",
+                model_path,
+            )
+            sys.exit(1)
+        logger.warning(
+            "CV_BACKEND=ort but the ONNX model %s does not exist; running in standby mode.",
+            model_path,
+        )
+        return
 
-    requested = ["CUDAExecutionProvider", "CPUExecutionProvider"]
     start_t = time.perf_counter()
-    logger.info("Loading ONNX Runtime model from %s (providers=%s)...", model_path, requested)
+    logger.info(
+        "Loading ONNX Runtime model from %s (providers=%s)...",
+        model_path,
+        ["CUDAExecutionProvider", "CPUExecutionProvider"],
+    )
     try:
-        try:
-            session = ort.InferenceSession(model_path, providers=requested)
-        except Exception as cuda_exc:
-            # Some CUDA EP failures surface at session creation instead of degrading
-            # quietly (a missing cuDNN, for instance). Retrying on CPU keeps the
-            # service starting on a host whose GPU runtime is broken; the warning
-            # records why the request did not get CUDA.
-            logger.warning(
-                "ORT session with the CUDA provider failed (%s); retrying with CPUExecutionProvider only",
-                cuda_exc,
-            )
-            session = ort.InferenceSession(
-                model_path, providers=["CPUExecutionProvider"]
-            )
-        providers = list(session.get_providers())
+        session, providers = open_ort_session(model_path)
         if "CUDAExecutionProvider" not in providers:
             logger.warning(
                 "CUDAExecutionProvider is unavailable; ONNX Runtime is executing on %s",
@@ -455,7 +537,7 @@ def load_ort_model() -> None:
                 sys.exit(1)
         input_name = session.get_inputs()[0].name
         shape = ort_input_shape(session)
-        compiled_model = ORTModel(session, input_name, shape, providers)
+        compiled_model = ORTModel(session, input_name, shape, providers, model_path)
         compiled_input_shape = list(shape)
         resolution_mode = compiled_model.resolution_mode
         ort_providers = providers
