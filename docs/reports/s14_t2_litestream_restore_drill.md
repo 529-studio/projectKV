@@ -17,7 +17,7 @@ does and does not prove).
 
 | File | Change |
 |---|---|
-| `deploy/litestream/litestream.yml` | New. Streams `/app/data/camera-view.db` to `s3://${R2_BUCKET_NAME}/db-replicas/camera-view.db`, `sync-interval: 1s`, `snapshot-interval: 24h`, `retention: 72h`, credentials by `${...}` reference only |
+| `deploy/litestream/litestream.yml` | New. Streams `/app/data/camera-view.db` to `s3://${R2_BUCKET_NAME}/db-replicas/camera-view.db`, `sync-interval: 1s`, `snapshot-interval: 24h`, `retention: 48h`, credentials by `${...}` reference only |
 | `docker-compose.stg.yml` | New `warded-init-vol` (root, one-shot, `mkdir`/`chown 10001:10001`/`chmod 775`); new `warded-litestream` sidecar (pinned `0.3.13`, UID 10001, read-only rootfs, `cap_drop: [ALL]`); `depends_on: warded-init-vol: service_completed_successfully` on backend, forecast cron and Litestream |
 | `tools/ci/check_deploy_manifests.py` | New `check_litestream_config` and `check_compose_ha_stack` validators (db/replica path, 1s sync, env-only credentials, pinned image, read-only config mount, init gating, init command contents) |
 | `tools/ci/check_deploy_manifests_test.py` | Fixtures extended; 14 new violation tests (20 total) |

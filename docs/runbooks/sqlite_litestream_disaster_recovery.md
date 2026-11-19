@@ -42,10 +42,10 @@ warded-backend (10001:10001)          warded-litestream (10001:10001)
 |---|---|---|
 | `warded-init-vol` | `alpine:3.20`, `user: "0:0"`, `restart: "no"` | Creates `/app/data/{locks,forecast,proofs}` and `chown 10001:10001` / `chmod 775` on a fresh volume, then exits |
 | `warded-litestream` | `litestream/litestream:0.3.13`, `user: "10001:10001"`, `read_only: true` | `litestream replicate -config /etc/litestream.yml` |
-| `deploy/litestream/litestream.yml` | mounted read-only at `/etc/litestream.yml` | Database path, R2 bucket/prefix, endpoint, credentials by reference, `sync-interval: 1s`, `snapshot-interval: 24h`, `retention: 72h` |
+| `deploy/litestream/litestream.yml` | mounted read-only at `/etc/litestream.yml` | Database path, R2 bucket/prefix, endpoint, credentials by reference, `sync-interval: 1s`, `snapshot-interval: 24h`, `retention: 48h` |
 | `tools/deploy/restore_drill.py` | repository tool | Restores into a sandbox and proves the restore is usable |
 
-> `[INFO]` Retention is `72h` (shortened from `168h` on 2026-11-19) so the replica stays inside the 10 GB R2 free tier: the WAL accounts for roughly 1 GiB/day, so a 7-day window consumed 7 GiB on its own. Recovery of the newest state is unaffected (it replays to the latest segment); only the start point of a point-in-time restore is limited to the last three days. Three daily snapshots remain, above Litestream's two-snapshot minimum.
+> `[INFO]` Retention is `48h` (shortened from `168h` on 2026-11-19) so the replica stays inside the 10 GB R2 free tier. Measured on 2026-11-19: 6,313 MiB of WAL in one week (~1.2 GiB/day, driven by the 30-second hotset verdict writer) plus 1,057 MiB of daily snapshots, so a 7-day window alone consumed 7.08 GiB of the 10 GB budget. Recovery of the newest state is unaffected (it replays to the latest segment); only the start point of a point-in-time restore moves to two days back. At least two snapshots are always retained, which is Litestream's minimum.
 
 `warded-backend` and `warded-forecast-cron` both wait on
 `warded-init-vol: condition: service_completed_successfully`. Without that gate a
@@ -230,7 +230,7 @@ running. Two writers and a replicating sidecar will produce a torn state.
    ```
    Litestream starts a new generation (new snapshot) when it does not recognise
    the restored file. Keep the previous generation until the new snapshot is
-   visible in the bucket; `retention: 72h` removes old generations later.
+   visible in the bucket; `retention: 48h` removes old generations later.
 7. **Record the outcome.** Write the incident, the recovered timestamp and the
    measured RPO into the sprint report, and rerun `make restore-drill`.
 
