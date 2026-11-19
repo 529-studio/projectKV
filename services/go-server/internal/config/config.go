@@ -48,6 +48,7 @@ type Config struct {
 	HarvesterRainCooldownMinutes  int
 	HarvesterConcurrency          int
 	HarvesterCatchupMinutes       int
+	SnapshotFetchTimeoutSeconds   int
 	AllowedOrigins                []string
 	CFAccessAudience              string
 	CFAccessCertsURL              string
@@ -334,6 +335,7 @@ func LoadFromEnv() (*Config, error) {
 		HarvesterRainCooldownMinutes:  parseEnvInt("HARVESTER_RAIN_COOLDOWN_MINUTES", 60, 1),
 		HarvesterConcurrency:          parseEnvInt("HARVESTER_CONCURRENCY", 15, 1),
 		HarvesterCatchupMinutes:       parseEnvInt("HARVESTER_CATCHUP_MINUTES", 120, 0),
+		SnapshotFetchTimeoutSeconds:   parseEnvInt("SNAPSHOT_FETCH_TIMEOUT_SECONDS", 5, 1),
 	}
 
 	cfg.SnapshotUpstreamBaseURL = parseEnvString("SNAPSHOT_UPSTREAM_BASE_URL", "")
@@ -432,6 +434,7 @@ type ServerConfig struct {
 	HarvesterRainCooldownMinutes  int           // default: 60 (HARVESTER_RAIN_COOLDOWN_MINUTES)
 	HarvesterConcurrency          int           // default: 15 (HARVESTER_CONCURRENCY)
 	HarvesterCatchupMinutes       int           // default: 120 (HARVESTER_CATCHUP_MINUTES; 0 disables boot-time catch-up)
+	SnapshotFetchTimeoutSeconds   int           // default: 5 (SNAPSHOT_FETCH_TIMEOUT_SECONDS; per-camera snapshot fetch budget)
 	AllowedOrigins                []string
 	CFAccessAudience              string
 	CFAccessCertsURL              string
@@ -597,6 +600,7 @@ func LoadConfig() *ServerConfig {
 	harvesterRainCooldownMinutes := parseEnvInt("HARVESTER_RAIN_COOLDOWN_MINUTES", 60, 1)
 	harvesterConcurrency := parseEnvInt("HARVESTER_CONCURRENCY", 15, 1)
 	harvesterCatchupMinutes := parseEnvInt("HARVESTER_CATCHUP_MINUTES", 120, 0)
+	snapshotFetchTimeoutSeconds := parseEnvInt("SNAPSHOT_FETCH_TIMEOUT_SECONDS", 5, 1)
 
 	return &ServerConfig{
 		Port:                          port,
@@ -657,6 +661,7 @@ func LoadConfig() *ServerConfig {
 		HarvesterRainCooldownMinutes:  harvesterRainCooldownMinutes,
 		HarvesterConcurrency:          harvesterConcurrency,
 		HarvesterCatchupMinutes:       harvesterCatchupMinutes,
+		SnapshotFetchTimeoutSeconds:   snapshotFetchTimeoutSeconds,
 		AllowedOrigins:                allowedOrigins,
 		CFAccessAudience:              cfAccessAudience,
 		CFAccessCertsURL:              cfAccessCertsURL,

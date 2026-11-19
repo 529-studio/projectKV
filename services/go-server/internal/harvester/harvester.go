@@ -114,6 +114,7 @@ func New(cfg Config, deps Dependencies) (*Coordinator, error) {
 	}
 
 	pipeline := NewPipeline(deps.Fetcher, deps.Predictor, deps.Storage, cfg.Concurrency, loc)
+	pipeline.SetSnapshotFetchTimeout(cfg.SnapshotFetchTimeout)
 
 	c := &Coordinator{
 		cfg:           cfg,
