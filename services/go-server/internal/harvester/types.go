@@ -91,13 +91,14 @@ type StorageUploader interface {
 
 // Config defines the configuration parameters for the harvester subsystem.
 type Config struct {
-	Enabled             bool
-	ScheduleHours       string        // e.g. "07:30,12:00,17:30" or "7,12,17"
-	RainCooldownMinutes int           // e.g. 60
-	Concurrency         int           // e.g. 15
-	WatcherInterval     time.Duration // default: 5m (can be set lower in tests)
-	TimeLocation        *time.Location
-	CatchupWindow       time.Duration // fire slots missed by a late boot or restart (default: 2h; 0 disables)
+	Enabled              bool
+	ScheduleHours        string        // e.g. "07:30,12:00,17:30" or "7,12,17"
+	RainCooldownMinutes  int           // e.g. 60
+	Concurrency          int           // e.g. 15
+	WatcherInterval      time.Duration // default: 5m (can be set lower in tests)
+	TimeLocation         *time.Location
+	CatchupWindow        time.Duration // fire slots missed by a late boot or restart (default: 2h; 0 disables)
+	SnapshotFetchTimeout time.Duration // per-camera snapshot fetch budget (default: DefaultSnapshotFetchTimeout)
 }
 
 // Dependencies contains the injected implementations for the harvester.

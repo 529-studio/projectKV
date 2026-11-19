@@ -3,6 +3,7 @@ package forecast_test
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -325,4 +326,95 @@ func TestReloader_EnvironmentVariables(t *testing.T) {
 			t.Fatalf("expected reload interval 45s, got %v", got)
 		}
 	})
+}
+
+// logCapture is a minimal slog.Handler that records formatted records so tests
+// can assert on emission counts without a log backend.
+type logCapture struct {
+	mu      sync.Mutex
+	records []string
+}
+
+func (h *logCapture) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *logCapture) Handle(_ context.Context, r slog.Record) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.records = append(h.records, r.Level.String()+" "+r.Message)
+	return nil
+}
+
+func (h *logCapture) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h *logCapture) WithGroup(string) slog.Handler      { return h }
+
+func (h *logCapture) reset() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.records = nil
+}
+
+func (h *logCapture) count(entry string) int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	n := 0
+	for _, rec := range h.records {
+		if rec == entry {
+			n++
+		}
+	}
+	return n
+}
+
+func TestReloader_AbsentArtifactLogsOnceThenReloadsWhenPresent(t *testing.T) {
+	tmpDir := t.TempDir()
+	artPath := filepath.Join(tmpDir, "prototype_v1.json")
+
+	capture := &logCapture{}
+	prev := slog.Default()
+	slog.SetDefault(slog.New(capture))
+	defer slog.SetDefault(prev)
+
+	svc := forecast.NewService(nil, nil, forecast.WithModelPath(artPath))
+	capture.reset()
+
+	const absentNotice = "INFO forecast: model artifact absent, using embedded artifact"
+	const absentWarn = "WARN forecast: failed to stat model artifact"
+
+	// Repeated polls while the configured path is absent must not warn every tick.
+	for i := 0; i < 6; i++ {
+		if _, err := svc.ReloadIfModified(); err == nil {
+			t.Fatalf("poll %d: expected stat error for absent artifact", i)
+		}
+	}
+	if got := capture.count(absentNotice); got != 1 {
+		t.Fatalf("absent-artifact INFO: got %d records, want 1", got)
+	}
+	if got := capture.count(absentWarn); got != 0 {
+		t.Fatalf("absent-artifact WARN: got %d records, want 0", got)
+	}
+
+	// A file appearing later must still be hot-reloaded.
+	writeAtomic(t, artPath, makeTestArtifactJSON("v2", 0.02))
+	reloaded, err := svc.ReloadIfModified()
+	if err != nil {
+		t.Fatalf("unexpected error after artifact appeared: %v", err)
+	}
+	if !reloaded {
+		t.Fatal("expected reload once the artifact appears")
+	}
+	if got := svc.Model().Version; got != "v2" {
+		t.Fatalf("version after reload: got %q, want %q", got, "v2")
+	}
+
+	// A file removed after a successful load must still be reported.
+	if err := os.Remove(artPath); err != nil {
+		t.Fatalf("remove artifact: %v", err)
+	}
+	capture.reset()
+	if _, err := svc.ReloadIfModified(); err == nil {
+		t.Fatal("expected stat error after artifact removal")
+	}
+	if got := capture.count(absentWarn); got != 1 {
+		t.Fatalf("removal WARN: got %d records, want 1", got)
+	}
 }

@@ -1019,11 +1019,12 @@ func initHarvesterCoordinator(
 	harvesterRainCams := harvester.FilterFloodCorridorCameras(allHarvesterCameras)
 
 	harvesterCfg := harvester.Config{
-		Enabled:             cfg.HarvesterEnabled,
-		ScheduleHours:       cfg.HarvesterScheduleHours,
-		RainCooldownMinutes: cfg.HarvesterRainCooldownMinutes,
-		Concurrency:         cfg.HarvesterConcurrency,
-		CatchupWindow:       time.Duration(cfg.HarvesterCatchupMinutes) * time.Minute,
+		Enabled:              cfg.HarvesterEnabled,
+		ScheduleHours:        cfg.HarvesterScheduleHours,
+		RainCooldownMinutes:  cfg.HarvesterRainCooldownMinutes,
+		Concurrency:          cfg.HarvesterConcurrency,
+		CatchupWindow:        time.Duration(cfg.HarvesterCatchupMinutes) * time.Minute,
+		SnapshotFetchTimeout: time.Duration(cfg.SnapshotFetchTimeoutSeconds) * time.Second,
 	}
 
 	var weatherProv harvester.WeatherProvider

@@ -617,6 +617,40 @@ func TestLoadConfig_HarvesterWhitespaceAndQuotes(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_SnapshotFetchTimeout(t *testing.T) {
+	t.Run("default_when_unset", func(t *testing.T) {
+		t.Setenv("SNAPSHOT_FETCH_TIMEOUT_SECONDS", "")
+		cfg := config.LoadConfig()
+		if cfg.SnapshotFetchTimeoutSeconds != 5 {
+			t.Errorf("expected SnapshotFetchTimeoutSeconds=5, got %d", cfg.SnapshotFetchTimeoutSeconds)
+		}
+	})
+
+	t.Run("custom_value_with_quotes", func(t *testing.T) {
+		t.Setenv("SNAPSHOT_FETCH_TIMEOUT_SECONDS", " \"10\" ")
+		cfg := config.LoadConfig()
+		if cfg.SnapshotFetchTimeoutSeconds != 10 {
+			t.Errorf("expected SnapshotFetchTimeoutSeconds=10, got %d", cfg.SnapshotFetchTimeoutSeconds)
+		}
+	})
+
+	t.Run("non_positive_falls_back_to_default", func(t *testing.T) {
+		t.Setenv("SNAPSHOT_FETCH_TIMEOUT_SECONDS", "0")
+		cfg := config.LoadConfig()
+		if cfg.SnapshotFetchTimeoutSeconds != 5 {
+			t.Errorf("expected SnapshotFetchTimeoutSeconds=5 for non-positive input, got %d", cfg.SnapshotFetchTimeoutSeconds)
+		}
+	})
+
+	t.Run("invalid_format_falls_back_to_default", func(t *testing.T) {
+		t.Setenv("SNAPSHOT_FETCH_TIMEOUT_SECONDS", "ten")
+		cfg := config.LoadConfig()
+		if cfg.SnapshotFetchTimeoutSeconds != 5 {
+			t.Errorf("expected SnapshotFetchTimeoutSeconds=5 for invalid input, got %d", cfg.SnapshotFetchTimeoutSeconds)
+		}
+	})
+}
+
 func TestLoadConfig_SanitizationAndQuotedVariables(t *testing.T) {
 	envVars := map[string]string{
 		"PORT":                             " \"3005\" ",

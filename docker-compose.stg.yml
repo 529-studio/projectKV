@@ -79,6 +79,9 @@ services:
       - HARVESTER_CONCURRENCY=${HARVESTER_CONCURRENCY:-15}
       - HARVESTER_RAIN_COOLDOWN_MINUTES=${HARVESTER_RAIN_COOLDOWN_MINUTES:-60}
       - HARVESTER_CATCHUP_MINUTES=${HARVESTER_CATCHUP_MINUTES:-120}
+      # Per-camera snapshot fetch budget. The upstream camera CDN is slow enough
+      # that the 5s built-in default produces recurring harvest timeouts.
+      - SNAPSHOT_FETCH_TIMEOUT_SECONDS=${SNAPSHOT_FETCH_TIMEOUT_SECONDS:-10}
       # Telegram alert bot (Issue #402 / S12-T4). Empty values leave the inbound
       # webhook unmounted (404) and keep dispatch in simulation mode.
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}

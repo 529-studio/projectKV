@@ -104,6 +104,14 @@ type Service struct {
 	reloadInterval time.Duration
 	lastStatWarn   time.Time
 
+	// loadedFromDisk reports whether an on-disk artifact ever replaced the
+	// embedded one. While false, an absent model path is the expected steady
+	// state and is reported once at INFO rather than as a recurring WARN.
+	loadedFromDisk bool
+	// absentNoticeLogged records that the one-shot absent-path notice was
+	// already emitted for the current absence.
+	absentNoticeLogged bool
+
 	// reloadMu serialises the stat -> load -> swap sequence so a ticker tick
 	// and a manual call cannot load the same file twice.
 	reloadMu sync.Mutex
@@ -184,6 +192,13 @@ func WithModelPath(path string) Option {
 
 		art, err := LoadArtifact(path)
 		if err != nil {
+			// A configured-but-absent artifact is the expected steady state when
+			// the refit pipeline does not run: the embedded artifact serves
+			// traffic and ReloadIfModified picks the file up when it appears.
+			if errors.Is(err, ErrArtifactNotFound) {
+				slog.Info("forecast: model artifact absent at startup, using embedded artifact", "path", path)
+				return
+			}
 			slog.Error("forecast: failed to load model artifact from path", "path", path, "error", err)
 			return
 		}
@@ -191,6 +206,8 @@ func WithModelPath(path string) Option {
 		s.mu.Lock()
 		s.artifact = art
 		s.model = art.DefaultMetadata()
+		s.loadedFromDisk = true
+		s.absentNoticeLogged = false
 		if statErr == nil {
 			s.lastMtime = fi.ModTime()
 			s.lastSize = fi.Size()
@@ -335,6 +352,18 @@ func (s *Service) ReloadIfModified() (bool, error) {
 	preFi, err := os.Stat(path)
 	if err != nil {
 		s.mu.Lock()
+		if errors.Is(err, os.ErrNotExist) && !s.loadedFromDisk {
+			// The path is configured but intentionally absent: the embedded
+			// artifact serves traffic. Keep polling for a file that may appear
+			// later, but report the steady state once at INFO instead of a
+			// WARN on every tick.
+			if !s.absentNoticeLogged {
+				slog.Info("forecast: model artifact absent, using embedded artifact", "path", path)
+				s.absentNoticeLogged = true
+			}
+			s.mu.Unlock()
+			return false, fmt.Errorf("forecast: stat model artifact %q: %w", path, err)
+		}
 		now := time.Now()
 		// Log warn only on first occurrence or every 5 minutes to avoid log spam (MJ-6)
 		if s.lastStatWarn.IsZero() || now.Sub(s.lastStatWarn) > 5*time.Minute {
@@ -368,6 +397,8 @@ func (s *Service) ReloadIfModified() (bool, error) {
 	s.lastMtime = postFi.ModTime()
 	s.lastSize = postFi.Size()
 	s.lastStatWarn = time.Time{}
+	s.loadedFromDisk = true
+	s.absentNoticeLogged = false
 	meta := s.model
 	s.mu.Unlock()
 
