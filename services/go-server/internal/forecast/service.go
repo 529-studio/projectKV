@@ -192,6 +192,13 @@ func WithModelPath(path string) Option {
 
 		art, err := LoadArtifact(path)
 		if err != nil {
+			// A configured-but-absent artifact is the expected steady state when
+			// the refit pipeline does not run: the embedded artifact serves
+			// traffic and ReloadIfModified picks the file up when it appears.
+			if errors.Is(err, ErrArtifactNotFound) {
+				slog.Info("forecast: model artifact absent at startup, using embedded artifact", "path", path)
+				return
+			}
 			slog.Error("forecast: failed to load model artifact from path", "path", path, "error", err)
 			return
 		}
