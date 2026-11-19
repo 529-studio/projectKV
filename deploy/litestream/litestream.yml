@@ -27,4 +27,4 @@ dbs:
         # A full snapshot every 24h bounds restore replay time; seven daily
         # snapshots of retention bound the replica's storage growth.
         snapshot-interval: 24h
-        retention: 72h
+        retention: 48h
