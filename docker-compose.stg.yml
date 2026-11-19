@@ -275,7 +275,7 @@ services:
                 secret-access-key: $${LITESTREAM_SECRET_ACCESS_KEY}
                 sync-interval: 1s
                 snapshot-interval: 24h
-                retention: 168h
+                retention: 72h
         LITESTREAM_CONFIG
         exec litestream replicate -config /tmp/litestream.yml
     environment:
