@@ -4,7 +4,7 @@ import {
   getVehicleProfile,
   evaluateVehicleHazard,
 } from './vehicleHazardUtils.ts';
-import { VEHICLE_PROFILES } from '../types/vehicle.ts';
+import type { VehicleType } from '../types/vehicle.ts';
 
 describe('S17-T3 / Issue #510: Vehicle Clearance Profiles & Dynamic Hazard Evaluation', () => {
   test('Scenario 1: Profile retrieval and safe fallback', () => {
@@ -14,7 +14,7 @@ describe('S17-T3 / Issue #510: Vehicle Clearance Profiles & Dynamic Hazard Evalu
     assert.equal(getVehicleProfile('suv').id, 'suv');
 
     // Unknown or null should fall back to default scooter
-    assert.equal(getVehicleProfile('tank' as any).id, 'scooter');
+    assert.equal(getVehicleProfile('tank' as unknown as VehicleType).id, 'scooter');
     assert.equal(getVehicleProfile(null).id, 'scooter');
     assert.equal(getVehicleProfile(undefined).id, 'scooter');
   });

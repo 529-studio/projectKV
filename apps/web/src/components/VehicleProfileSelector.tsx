@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   VEHICLE_PROFILES,
   type VehicleType,
-  type VehicleProfile,
 } from '../types/vehicle.ts';
 
 interface VehicleProfileSelectorProps {
