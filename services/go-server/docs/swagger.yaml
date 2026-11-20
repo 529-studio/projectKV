@@ -257,6 +257,8 @@ definitions:
         type: string
       total_cameras:
         type: integer
+      vehicle:
+        $ref: '#/definitions/corridor.VehicleType'
       verified_cameras:
         type: integer
       worst_flood_severity:
@@ -328,6 +330,18 @@ definitions:
       total:
         type: integer
     type: object
+  corridor.VehicleType:
+    enum:
+    - scooter
+    - motorbike
+    - sedan
+    - suv
+    type: string
+    x-enum-varnames:
+    - VehicleScooter
+    - VehicleMotorbike
+    - VehicleSedan
+    - VehicleSUV
   feedback.ErrorResponse:
     properties:
       error:
@@ -926,6 +940,97 @@ definitions:
         description: '"Phường", "Xã", "Thị trấn"'
         type: string
     type: object
+  tide.AffectedRoad:
+    properties:
+      display_name:
+        type: string
+      estimated_depth_cm:
+        type: number
+      hazard_label:
+        additionalProperties:
+          type: string
+        type: object
+      hazard_level:
+        description: '"CAUTION" | "IMPASSABLE"'
+        type: string
+      road_key:
+        type: string
+      ward_district:
+        type: string
+    type: object
+  tide.CommuterAdvisory:
+    properties:
+      guidance:
+        additionalProperties:
+          type: string
+        type: object
+      headline:
+        additionalProperties:
+          type: string
+        type: object
+      peak_rain_mm:
+        type: number
+      peak_rain_time:
+        type: string
+      peak_tide_level_m:
+        type: number
+      peak_tide_station:
+        type: string
+      peak_tide_time_window:
+        description: e.g. "17:30 - 18:30"
+        type: string
+    type: object
+  tide.HourlyForecastItem:
+    properties:
+      affected_roads:
+        items:
+          $ref: '#/definitions/tide.AffectedRoad'
+        type: array
+      commuter_risk:
+        description: '"CLEAR" | "CAUTION" | "DANGER"'
+        type: string
+      commuter_risk_label:
+        additionalProperties:
+          type: string
+        type: object
+      hour_offset:
+        type: integer
+      rain_mm:
+        type: number
+      rain_probability_percent:
+        type: integer
+      tide_alert_label:
+        additionalProperties:
+          type: string
+        type: object
+      tide_alert_level:
+        description: '"NORMAL" | "LEVEL_1" | "LEVEL_2" | "LEVEL_3"'
+        type: string
+      tide_level_nha_be_m:
+        type: number
+      tide_level_phu_an_m:
+        type: number
+      time:
+        type: string
+      time_formatted:
+        description: e.g. "17:00"
+        type: string
+      weather_desc:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  tide.HourlyForecastResponse:
+    properties:
+      advisory:
+        $ref: '#/definitions/tide.CommuterAdvisory'
+      generated_at:
+        type: string
+      timeline:
+        items:
+          $ref: '#/definitions/tide.HourlyForecastItem'
+        type: array
+    type: object
   weather.HourlyForecast:
     properties:
       precipitation_probability_percent:
@@ -1280,6 +1385,11 @@ paths:
     get:
       description: Returns list of all arterial commuter corridors with real-time
         passability verdicts, travel delay in seconds, and peak flood depth.
+      parameters:
+      - description: Vehicle clearance profile (scooter, motorbike, sedan, suv)
+        in: query
+        name: vehicle
+        type: string
       produces:
       - application/json
       responses:
@@ -1346,6 +1456,28 @@ paths:
       summary: Snapshot of all active crowdsourced user flood reports
       tags:
       - Flood
+  /api/forecast/hourly:
+    get:
+      description: Returns 6-hour timeline combining astronomical tide predictions
+        (Phú An and Nhà Bè stations) with rain volume and probability, highlighting
+        affected low-lying roads and commuter advisories.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tide.HourlyForecastResponse'
+        "500":
+          description: Internal error generating forecast
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Combined hourly tidal surge and convective rain forecast
+      tags:
+      - Forecast
+      - Tide
   /api/health:
     get:
       description: Liveness and readiness probe reporting system, schema and cv-engine
@@ -1422,6 +1554,10 @@ paths:
         name: road_key
         required: true
         type: string
+      - description: Vehicle clearance profile (scooter, motorbike, sedan, suv)
+        in: query
+        name: vehicle
+        type: string
       produces:
       - application/json
       responses:
@@ -1464,6 +1600,21 @@ paths:
               type: string
             type: object
       summary: Get corridor traffic status
+      tags:
+      - Corridor
+  /api/roads/status-summary:
+    get:
+      description: Returns a map of corridor statuses for all known road keys.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/corridor.CorridorStatus'
+            type: object
+      summary: Get aggregated status for all corridors
       tags:
       - Corridor
   /api/snapshot/{id}:

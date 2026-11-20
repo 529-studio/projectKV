@@ -25,6 +25,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
 	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
 	"github.com/529-studio/projectKV/services/go-server/internal/telegrambot"
+	"github.com/529-studio/projectKV/services/go-server/internal/tide"
 	"github.com/529-studio/projectKV/services/go-server/internal/tilecache"
 	"github.com/529-studio/projectKV/services/go-server/internal/weather"
 	"github.com/529-studio/projectKV/services/go-server/internal/ws"
@@ -172,6 +173,9 @@ func main() {
 	weatherHandler := weather.NewHandler(weatherService)
 	startWeatherSamplerJob(appCtx, weather.NewSampler(weatherService, &weatherStoreAdapter{repo: weatherRepo}, slog.Default()), 10*time.Minute)
 
+	tideService := tide.NewService(&tideWeatherAdapter{service: weatherService})
+	tideHandler := tide.NewHandler(tideService)
+
 	// 7. Live Hubs (WS + SSE) & Hex Spatial Aggregators
 	wsHub := ws.NewHub()
 	defer wsHub.Close()
@@ -224,7 +228,7 @@ func main() {
 	router := setupRouter(routerConfig{
 		cfg: cfg, camCatalogHandler: camCatalogHandler, proxyHandler: proxyHandler,
 		hotsetHandler: hotsetHandler, corridorHandler: corridorHandler, forecastHandler: forecastHandler,
-		weatherHandler: weatherHandler, tileHandler: tileHandler, floodHandler: floodHandler,
+		weatherHandler: weatherHandler, tideHandler: tideHandler, tileHandler: tileHandler, floodHandler: floodHandler,
 		subHandler: subHandler, archiverHandler: archiverHandler, harvesterCoord: harvesterCoord,
 		feedbackHandler: feedbackHandler, wsHub: wsHub, liveHub: liveHub, botHandler: botHandler,
 		webhookEnabled: webhookEnabled, healthHandler: httpserver.NewHealthHandler(healthChecker),

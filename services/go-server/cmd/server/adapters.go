@@ -32,6 +32,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
 	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
 	"github.com/529-studio/projectKV/services/go-server/internal/telegrambot"
+	"github.com/529-studio/projectKV/services/go-server/internal/tide"
 	"github.com/529-studio/projectKV/services/go-server/internal/weather"
 )
 
@@ -586,6 +587,33 @@ func (a *harvesterWeatherAdapter) GetWeather(ctx context.Context) (*harvester.We
 		RainfallMm:  w.RainMm,
 		WeatherCode: w.WeatherCode,
 	}, nil
+}
+
+// tideWeatherAdapter adapts *weather.Service to tide.WeatherReader (Modulith Rule 1).
+type tideWeatherAdapter struct {
+	service *weather.Service
+}
+
+func (a *tideWeatherAdapter) GetHourlyRainForecast(ctx context.Context) ([]tide.RainForecast, error) {
+	if a.service == nil {
+		return nil, fmt.Errorf("tide weather adapter: service is nil")
+	}
+	w, err := a.service.GetWeather(ctx)
+	if err != nil || w == nil {
+		return nil, err
+	}
+	out := make([]tide.RainForecast, len(w.Hourly))
+	for i, h := range w.Hourly {
+		out[i] = tide.RainForecast{
+			Time:                     h.Time,
+			PrecipitationProbability: h.PrecipitationProbability,
+			RainMm:                   h.RainMm,
+			WeatherCode:              h.WeatherCode,
+			WeatherDescVi:            h.WeatherDescVi,
+			WeatherDescEn:            h.WeatherDescEn,
+		}
+	}
+	return out, nil
 }
 
 // weatherStoreAdapter adapts *store.WeatherRepo to weather.Persister (ADR-012 D3).

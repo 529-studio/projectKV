@@ -413,6 +413,14 @@
                     "Corridor"
                 ],
                 "summary": "Get operational overview of all arterial corridors",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Vehicle clearance profile (scooter, motorbike, sedan, suv)",
+                        "name": "vehicle",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -495,6 +503,36 @@
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/live.UserReportSummary"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/forecast/hourly": {
+            "get": {
+                "description": "Returns 6-hour timeline combining astronomical tide predictions (Phú An and Nhà Bè stations) with rain volume and probability, highlighting affected low-lying roads and commuter advisories.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Forecast",
+                    "Tide"
+                ],
+                "summary": "Combined hourly tidal surge and convective rain forecast",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/tide.HourlyForecastResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error generating forecast",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
                             }
                         }
                     }
@@ -592,6 +630,29 @@
                 }
             }
         },
+        "/api/roads/status-summary": {
+            "get": {
+                "description": "Returns a map of corridor statuses for all known road keys.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Corridor"
+                ],
+                "summary": "Get aggregated status for all corridors",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/definitions/corridor.CorridorStatus"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/roads/{road_key}/route": {
             "get": {
                 "description": "Returns pre-computed GeoJSON FeatureCollection containing LineString and camera Points along with cumulative flood hazard, travel delay, and passability verdict.",
@@ -609,6 +670,12 @@
                         "name": "road_key",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Vehicle clearance profile (scooter, motorbike, sedan, suv)",
+                        "name": "vehicle",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1863,6 +1930,9 @@
                 "total_cameras": {
                     "type": "integer"
                 },
+                "vehicle": {
+                    "$ref": "#/definitions/corridor.VehicleType"
+                },
                 "verified_cameras": {
                     "type": "integer"
                 },
@@ -1963,6 +2033,21 @@
                     "type": "integer"
                 }
             }
+        },
+        "corridor.VehicleType": {
+            "type": "string",
+            "enum": [
+                "scooter",
+                "motorbike",
+                "sedan",
+                "suv"
+            ],
+            "x-enum-varnames": [
+                "VehicleScooter",
+                "VehicleMotorbike",
+                "VehicleSedan",
+                "VehicleSUV"
+            ]
         },
         "feedback.ErrorResponse": {
             "type": "object",
@@ -2831,6 +2916,142 @@
                 "type": {
                     "description": "\"Phường\", \"Xã\", \"Thị trấn\"",
                     "type": "string"
+                }
+            }
+        },
+        "tide.AffectedRoad": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string"
+                },
+                "estimated_depth_cm": {
+                    "type": "number"
+                },
+                "hazard_label": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "hazard_level": {
+                    "description": "\"CAUTION\" | \"IMPASSABLE\"",
+                    "type": "string"
+                },
+                "road_key": {
+                    "type": "string"
+                },
+                "ward_district": {
+                    "type": "string"
+                }
+            }
+        },
+        "tide.CommuterAdvisory": {
+            "type": "object",
+            "properties": {
+                "guidance": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "headline": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "peak_rain_mm": {
+                    "type": "number"
+                },
+                "peak_rain_time": {
+                    "type": "string"
+                },
+                "peak_tide_level_m": {
+                    "type": "number"
+                },
+                "peak_tide_station": {
+                    "type": "string"
+                },
+                "peak_tide_time_window": {
+                    "description": "e.g. \"17:30 - 18:30\"",
+                    "type": "string"
+                }
+            }
+        },
+        "tide.HourlyForecastItem": {
+            "type": "object",
+            "properties": {
+                "affected_roads": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tide.AffectedRoad"
+                    }
+                },
+                "commuter_risk": {
+                    "description": "\"CLEAR\" | \"CAUTION\" | \"DANGER\"",
+                    "type": "string"
+                },
+                "commuter_risk_label": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "hour_offset": {
+                    "type": "integer"
+                },
+                "rain_mm": {
+                    "type": "number"
+                },
+                "rain_probability_percent": {
+                    "type": "integer"
+                },
+                "tide_alert_label": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "tide_alert_level": {
+                    "description": "\"NORMAL\" | \"LEVEL_1\" | \"LEVEL_2\" | \"LEVEL_3\"",
+                    "type": "string"
+                },
+                "tide_level_nha_be_m": {
+                    "type": "number"
+                },
+                "tide_level_phu_an_m": {
+                    "type": "number"
+                },
+                "time": {
+                    "type": "string"
+                },
+                "time_formatted": {
+                    "description": "e.g. \"17:00\"",
+                    "type": "string"
+                },
+                "weather_desc": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "tide.HourlyForecastResponse": {
+            "type": "object",
+            "properties": {
+                "advisory": {
+                    "$ref": "#/definitions/tide.CommuterAdvisory"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "timeline": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tide.HourlyForecastItem"
+                    }
                 }
             }
         },
