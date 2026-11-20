@@ -1,6 +1,6 @@
 /**
- * forecast.ts - DTO Types for Short-Horizon Congestion Forecasting (ADR-012 §D5, S10-T6)
- * Strictly matches Go backend contract from services/go-server/internal/forecast/model.go
+ * forecast.ts - DTO Types for Congestion and Hourly Tidal/Rain Forecasting (ADR-012 §D5, S10-T6, S17-T2)
+ * Strictly matches Go backend contract from services/go-server/internal/forecast/ and /internal/tide/
  */
 
 export type AvailabilityStatus =
@@ -104,3 +104,66 @@ export interface ForecastErrorResponse {
 export type ForecastResult =
   | { success: true; data: ForecastMultiResponse }
   | { success: false; error: ForecastErrorResponse; status: number };
+
+// ============================================================================
+// S17-T2 / Issue #511: Hourly Tidal Surge & Convective Rain Forecast Types
+// ============================================================================
+
+export interface AffectedRoad {
+  road_key: string;
+  display_name: string;
+  ward_district: string;
+  estimated_depth_cm: number;
+  hazard_level: 'CAUTION' | 'IMPASSABLE';
+  hazard_label: {
+    vi: string;
+    en: string;
+  };
+}
+
+export interface HourlyForecastItem {
+  hour_offset: number;
+  time: string;
+  time_formatted: string;
+  rain_probability_percent: number;
+  rain_mm: number;
+  weather_desc: {
+    vi: string;
+    en: string;
+  };
+  tide_level_phu_an_m: number;
+  tide_level_nha_be_m: number;
+  tide_alert_level: 'NORMAL' | 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3';
+  tide_alert_label: {
+    vi: string;
+    en: string;
+  };
+  affected_roads: AffectedRoad[];
+  commuter_risk: 'CLEAR' | 'CAUTION' | 'DANGER';
+  commuter_risk_label: {
+    vi: string;
+    en: string;
+  };
+}
+
+export interface CommuterAdvisory {
+  peak_tide_time_window: string;
+  peak_tide_level_m: number;
+  peak_tide_station: string;
+  peak_rain_time: string;
+  peak_rain_mm: number;
+  headline: {
+    vi: string;
+    en: string;
+  };
+  guidance: {
+    vi: string;
+    en: string;
+  };
+}
+
+export interface HourlyForecastResponse {
+  generated_at: string;
+  advisory: CommuterAdvisory;
+  timeline: HourlyForecastItem[];
+}

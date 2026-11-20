@@ -40,6 +40,7 @@ import { isCameraOffline, isWaterwayCamera } from '../utils/cameraFilterUtils';
 import { extractCorridor } from '../utils/phuongFormatters';
 import { toRoadKey } from '../utils/corridorUtils';
 import { useCorridorRoute } from '../hooks/useCorridorRoute';
+import { useHourlyForecast } from '../hooks/useHourlyForecast';
 import type { VehicleType } from '../types/vehicle';
 import { getStoredVehicleProfile, setStoredVehicleProfile } from '../utils/vehicleHazardUtils';
 
@@ -48,6 +49,7 @@ const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: fals
 const CorridorRouteLayer = dynamic(() => import('../components/CorridorRouteLayer'), { ssr: false });
 const CorridorOverviewCard = dynamic(() => import('../components/CorridorOverviewCard'), { ssr: false });
 const VehicleProfileSelector = dynamic(() => import('../components/VehicleProfileSelector'), { ssr: false });
+const HourlyTimelineScrubber = dynamic(() => import('../components/HourlyTimelineScrubber'), { ssr: false });
 
 /** A fix younger than this is reused instead of starting a new GPS request (AC2). */
 const NEAR_ME_FIX_MAX_AGE_MS = 60_000;
@@ -119,6 +121,10 @@ export default function Home() {
   // S17-T2 / S17-T3 (Issue #507): Corridor polyline visibility and card dismissal state
   const [showCorridorRoute, setShowCorridorRoute] = useState(true);
   const [isCorridorCardDismissed, setIsCorridorCardDismissed] = useState(false);
+
+  // S17-T2 / Issue #511: Hourly tidal & convective rain timeline scrubber state
+  const [selectedHourOffset, setSelectedHourOffset] = useState<number>(0);
+  const { forecast: hourlyForecast } = useHourlyForecast();
 
   // Offline cameras filter default & persistence (S7-T2 / Issue #247)
   const [hideOfflineCameras, setHideOfflineCameras] = useState(true);
@@ -800,6 +806,16 @@ export default function Home() {
               />
             </div>
           )}
+
+          {/* S17-T2 / Issue #511: Hourly Tidal & Convective Rain Timeline Scrubber */}
+          <div className="w-full px-3 pb-2">
+            <HourlyTimelineScrubber
+              forecast={hourlyForecast}
+              selectedHour={selectedHourOffset}
+              onSelectHour={setSelectedHourOffset}
+              lang={lang}
+            />
+          </div>
 
           {/* BOTTOM DOCK */}
           <PinnedDock 

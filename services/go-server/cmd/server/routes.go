@@ -28,6 +28,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
 	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
 	"github.com/529-studio/projectKV/services/go-server/internal/telegrambot"
+	"github.com/529-studio/projectKV/services/go-server/internal/tide"
 	"github.com/529-studio/projectKV/services/go-server/internal/tilecache"
 	"github.com/529-studio/projectKV/services/go-server/internal/weather"
 	"github.com/529-studio/projectKV/services/go-server/internal/ws"
@@ -41,6 +42,7 @@ type routerConfig struct {
 	corridorHandler   *corridor.Handler
 	forecastHandler   *forecast.Handler
 	weatherHandler    *weather.Handler
+	tideHandler       *tide.Handler
 	tileHandler       *tilecache.Handler
 	floodHandler      *flood.Handler
 	subHandler        *subscription.Handler
@@ -154,6 +156,10 @@ func setupRouter(p routerConfig) *gin.Engine {
 		// Live weather forecast & radar metadata endpoints (Issue #120)
 		if p.weatherHandler != nil {
 			p.weatherHandler.RegisterRoutes(api)
+		}
+		// Hourly tidal surge & convective rain forecast (Issue #511 / S17-T2)
+		if p.tideHandler != nil {
+			p.tideHandler.RegisterRoutes(api)
 		}
 		// Map tile proxy and local disk cache
 		if p.tileHandler != nil {
