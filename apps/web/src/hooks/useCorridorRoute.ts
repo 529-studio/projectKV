@@ -3,26 +3,33 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_ENDPOINTS, getApiUrl } from '../config/constants.ts';
 import type { CorridorRouteResponse, CorridorRouteSummary } from '../types/corridor.ts';
+import type { VehicleType } from '../types/vehicle.ts';
 
 export const CORRIDOR_ROUTE_CACHE_TTL_MS = 30_000;
 
 const routeCache = new Map<string, { data: CorridorRouteResponse; timestamp: number }>();
 let overviewCache: { data: CorridorRouteSummary[]; timestamp: number } | null = null;
 
-export function getCachedCorridorRoute(roadKey: string): CorridorRouteResponse | null {
+function makeCacheKey(roadKey: string, vehicle?: string | null): string {
   const normKey = roadKey.trim().toLowerCase();
-  const entry = routeCache.get(normKey);
+  const v = (vehicle || 'scooter').trim().toLowerCase();
+  return `${normKey}:${v}`;
+}
+
+export function getCachedCorridorRoute(roadKey: string, vehicle?: string | null): CorridorRouteResponse | null {
+  const cacheKey = makeCacheKey(roadKey, vehicle);
+  const entry = routeCache.get(cacheKey);
   if (!entry) return null;
   if (Date.now() - entry.timestamp > CORRIDOR_ROUTE_CACHE_TTL_MS) {
-    routeCache.delete(normKey);
+    routeCache.delete(cacheKey);
     return null;
   }
   return entry.data;
 }
 
-export function setCachedCorridorRoute(roadKey: string, data: CorridorRouteResponse): void {
-  const normKey = roadKey.trim().toLowerCase();
-  routeCache.set(normKey, { data, timestamp: Date.now() });
+export function setCachedCorridorRoute(roadKey: string, data: CorridorRouteResponse, vehicle?: string | null): void {
+  const cacheKey = makeCacheKey(roadKey, vehicle);
+  routeCache.set(cacheKey, { data, timestamp: Date.now() });
 }
 
 export function clearCorridorRouteCache(): void {
@@ -31,24 +38,27 @@ export function clearCorridorRouteCache(): void {
 }
 
 /**
- * Fetches GeoJSON route and cumulative hazard summary for a corridor road key.
+ * Fetches GeoJSON route and cumulative hazard summary for a corridor road key and vehicle type.
  */
-export async function fetchCorridorRoute(roadKey: string): Promise<CorridorRouteResponse | null> {
+export async function fetchCorridorRoute(roadKey: string, vehicle?: string | null): Promise<CorridorRouteResponse | null> {
   const normKey = roadKey.trim().toLowerCase();
   if (!normKey) return null;
 
-  const cached = getCachedCorridorRoute(normKey);
+  const cached = getCachedCorridorRoute(normKey, vehicle);
   if (cached) return cached;
 
   try {
-    const url = getApiUrl(API_ENDPOINTS.ROAD_ROUTE(normKey));
+    let url = getApiUrl(API_ENDPOINTS.ROAD_ROUTE(normKey));
+    if (vehicle) {
+      url += `?vehicle=${encodeURIComponent(vehicle)}`;
+    }
     const res = await fetch(url);
     if (!res.ok) {
       if (res.status === 404) return null;
       throw new Error(`Failed to fetch route for ${normKey}: ${res.status}`);
     }
     const data: CorridorRouteResponse = await res.json();
-    setCachedCorridorRoute(normKey, data);
+    setCachedCorridorRoute(normKey, data, vehicle);
     return data;
   } catch (err) {
     console.warn('[useCorridorRoute] Error fetching route for corridor:', normKey, err);
@@ -59,13 +69,16 @@ export async function fetchCorridorRoute(roadKey: string): Promise<CorridorRoute
 /**
  * Fetches high-level status across all 10 canonical commuter arterial corridors.
  */
-export async function fetchCorridorsOverview(): Promise<CorridorRouteSummary[]> {
+export async function fetchCorridorsOverview(vehicle?: string | null): Promise<CorridorRouteSummary[]> {
   if (overviewCache && Date.now() - overviewCache.timestamp <= CORRIDOR_ROUTE_CACHE_TTL_MS) {
     return overviewCache.data;
   }
 
   try {
-    const url = getApiUrl(API_ENDPOINTS.CORRIDORS_OVERVIEW);
+    let url = getApiUrl(API_ENDPOINTS.CORRIDORS_OVERVIEW);
+    if (vehicle) {
+      url += `?vehicle=${encodeURIComponent(vehicle)}`;
+    }
     const res = await fetch(url);
     if (!res.ok) {
       throw new Error(`Failed to fetch corridors overview: ${res.status}`);
@@ -80,18 +93,21 @@ export async function fetchCorridorsOverview(): Promise<CorridorRouteSummary[]> 
 }
 
 /**
- * React hook for fetching and caching corridor GeoJSON route and metrics.
+ * React hook for fetching and caching corridor GeoJSON route and metrics with vehicle clearance adaptation.
  */
-export function useCorridorRoute(roadKey: string | null) {
+export function useCorridorRoute(roadKey: string | null, vehicleType?: VehicleType) {
   const [route, setRoute] = useState<CorridorRouteResponse | null>(() =>
-    roadKey ? getCachedCorridorRoute(roadKey) : null
+    roadKey ? getCachedCorridorRoute(roadKey, vehicleType) : null
   );
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
   const activeRoadKeyRef = useRef<string | null>(roadKey);
+  const activeVehicleRef = useRef<string | undefined>(vehicleType);
 
   useEffect(() => {
     activeRoadKeyRef.current = roadKey;
+    activeVehicleRef.current = vehicleType;
+
     if (!roadKey) {
       setRoute(null);
       setLoading(false);
@@ -99,7 +115,7 @@ export function useCorridorRoute(roadKey: string | null) {
       return;
     }
 
-    const cached = getCachedCorridorRoute(roadKey);
+    const cached = getCachedCorridorRoute(roadKey, vehicleType);
     if (cached) {
       setRoute(cached);
       setLoading(false);
@@ -111,14 +127,14 @@ export function useCorridorRoute(roadKey: string | null) {
     setLoading(true);
     setError(null);
 
-    fetchCorridorRoute(roadKey)
+    fetchCorridorRoute(roadKey, vehicleType)
       .then((data) => {
-        if (!isMounted || activeRoadKeyRef.current !== roadKey) return;
+        if (!isMounted || activeRoadKeyRef.current !== roadKey || activeVehicleRef.current !== vehicleType) return;
         setRoute(data);
         setLoading(false);
       })
       .catch((err) => {
-        if (!isMounted || activeRoadKeyRef.current !== roadKey) return;
+        if (!isMounted || activeRoadKeyRef.current !== roadKey || activeVehicleRef.current !== vehicleType) return;
         setError(err instanceof Error ? err : new Error(String(err)));
         setLoading(false);
       });
@@ -126,14 +142,14 @@ export function useCorridorRoute(roadKey: string | null) {
     return () => {
       isMounted = false;
     };
-  }, [roadKey]);
+  }, [roadKey, vehicleType]);
 
   const refetch = useCallback(() => {
     if (!roadKey) return;
-    const normKey = roadKey.trim().toLowerCase();
-    routeCache.delete(normKey);
+    const cacheKey = makeCacheKey(roadKey, vehicleType);
+    routeCache.delete(cacheKey);
     setLoading(true);
-    fetchCorridorRoute(normKey)
+    fetchCorridorRoute(roadKey, vehicleType)
       .then((data) => {
         setRoute(data);
         setLoading(false);
@@ -142,7 +158,7 @@ export function useCorridorRoute(roadKey: string | null) {
         setError(err instanceof Error ? err : new Error(String(err)));
         setLoading(false);
       });
-  }, [roadKey]);
+  }, [roadKey, vehicleType]);
 
   return { route, loading, error, refetch };
 }

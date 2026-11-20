@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import type { CorridorRouteSummary } from '../types/corridor.ts';
 import type { Camera } from '../hooks/useCameras.ts';
+import type { VehicleType } from '../types/vehicle.ts';
+import { evaluateVehicleHazard } from '../utils/vehicleHazardUtils.ts';
 import { normalizeBotUsername } from '../utils/subscriptionUtils.ts';
 import { getApiUrl, API_ENDPOINTS } from '../config/constants.ts';
 
@@ -14,6 +16,7 @@ interface CorridorOverviewCardProps {
   lang?: 'vi' | 'en';
   showPolyline?: boolean;
   onTogglePolyline?: () => void;
+  vehicleType?: VehicleType;
 }
 
 export default function CorridorOverviewCard({
@@ -24,6 +27,7 @@ export default function CorridorOverviewCard({
   lang = 'vi',
   showPolyline = true,
   onTogglePolyline,
+  vehicleType = 'scooter',
 }: CorridorOverviewCardProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -33,12 +37,22 @@ export default function CorridorOverviewCard({
   const freeFlowMinutes = Math.round(summary.free_flow_seconds / 60);
   const delayMinutes = Math.round(summary.delay_seconds / 60);
 
-  // Verdict translation and visual badge styling
+  // Evaluate dynamic vehicle-specific passability verdict
+  const vehicleEval = evaluateVehicleHazard({
+    maxDepthCm: summary.max_depth_cm,
+    worstSeverity: summary.worst_severity,
+    worstFloodSeverity: summary.worst_flood_severity,
+    maxHazardLevel: summary.max_hazard_level,
+    vehicleType,
+    hasVerifiedCameras: summary.verified_cameras > 0,
+  });
+
+  // Verdict translation and visual badge styling adapted to vehicle clearance
   const getVerdictBadge = () => {
-    switch (summary.passability_verdict) {
+    switch (vehicleEval.verdict) {
       case 'PASSABLE':
         return {
-          label: lang === 'vi' ? 'THÔNG THOÁNG' : 'PASSABLE',
+          label: vehicleEval.label[lang],
           bg: 'bg-emerald-950/80',
           border: 'border-emerald-600',
           text: 'text-emerald-300',
@@ -46,7 +60,7 @@ export default function CorridorOverviewCard({
         };
       case 'CAUTION':
         return {
-          label: lang === 'vi' ? 'CẢNH BÁO XE GẦM THẤP' : 'CAUTION (LOW CLEARANCE)',
+          label: vehicleEval.label[lang],
           bg: 'bg-amber-950/80',
           border: 'border-amber-600',
           text: 'text-amber-300',
@@ -54,7 +68,7 @@ export default function CorridorOverviewCard({
         };
       case 'IMPASSABLE':
         return {
-          label: lang === 'vi' ? 'NGUY CƠ CHẾT MÁY / THỦY KÍCH' : 'IMPASSABLE (DEEP FLOOD)',
+          label: vehicleEval.label[lang],
           bg: 'bg-rose-950/80',
           border: 'border-rose-600',
           text: 'text-rose-300',
@@ -63,7 +77,7 @@ export default function CorridorOverviewCard({
       case 'UNKNOWN':
       default:
         return {
-          label: lang === 'vi' ? 'CHƯA ĐỦ DỮ LIỆU' : 'UNKNOWN',
+          label: vehicleEval.label[lang],
           bg: 'bg-zinc-900',
           border: 'border-zinc-700',
           text: 'text-zinc-400',
@@ -198,14 +212,28 @@ export default function CorridorOverviewCard({
         <div className="p-3 space-y-3">
           {/* Passability Verdict Badge */}
           <div
-            className={`flex items-center justify-between px-3 py-2 rounded border ${badge.bg} ${badge.border}`}
+            className={`flex flex-col gap-1 px-3 py-2 rounded border ${badge.bg} ${badge.border}`}
           >
-            <span className="text-[11px] text-zinc-300 font-medium">
-              {lang === 'vi' ? 'Khả năng lưu thông:' : 'Passability:'}
-            </span>
-            <span className={`text-xs font-bold tracking-wider ${badge.text}`}>
-              {badge.label}
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-zinc-300 font-medium">
+                {lang === 'vi' ? 'Khả năng lưu thông:' : 'Passability:'}
+              </span>
+              <span className={`text-xs font-bold tracking-wider ${badge.text}`}>
+                {badge.label}
+              </span>
+            </div>
+            <div className="text-[10px] text-zinc-400 font-mono flex items-center justify-between border-t border-zinc-800/60 pt-1 mt-0.5">
+              <span>
+                {lang === 'vi' ? 'Phương tiện: ' : 'Vehicle: '}
+                <strong className="text-zinc-200">{vehicleEval.profile.shortLabel[lang]}</strong>
+              </span>
+              <span>
+                {lang === 'vi' ? 'Ngưỡng ngập xe: ' : 'Stall limit: '}
+                <strong className={vehicleEval.verdict === 'IMPASSABLE' ? 'text-rose-400 font-bold' : 'text-zinc-300'}>
+                  ≥{vehicleEval.profile.impassableDepthCm}cm
+                </strong>
+              </span>
+            </div>
           </div>
 
           {/* Key Metrics Grid */}

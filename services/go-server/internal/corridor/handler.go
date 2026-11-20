@@ -73,12 +73,14 @@ func (h *Handler) ListRoads(c *gin.Context) {
 // @Tags Corridor
 // @Produce json
 // @Param road_key path string true "Road Key identifier (e.g. vo_van_kiet, mai_chi_tho)"
+// @Param vehicle query string false "Vehicle clearance profile (scooter, motorbike, sedan, suv)"
 // @Success 200 {object} map[string]interface{}
 // @Failure 404 {object} map[string]string "Corridor not found"
 // @Router /api/roads/{road_key}/route [get]
 func (h *Handler) GetRoute(c *gin.Context) {
 	roadKey := c.Param("road_key")
-	geoJSON, summary, ok := h.service.GetRoute(roadKey)
+	vType := NormalizeVehicleType(c.Query("vehicle"))
+	geoJSON, summary, ok := h.service.GetRoute(roadKey, vType)
 	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "corridor route not found"})
 		return
@@ -94,9 +96,11 @@ func (h *Handler) GetRoute(c *gin.Context) {
 // @Description Returns list of all arterial commuter corridors with real-time passability verdicts, travel delay in seconds, and peak flood depth.
 // @Tags Corridor
 // @Produce json
+// @Param vehicle query string false "Vehicle clearance profile (scooter, motorbike, sedan, suv)"
 // @Success 200 {array} corridor.CorridorRouteSummary
 // @Router /api/corridors/overview [get]
 func (h *Handler) GetCorridorsOverview(c *gin.Context) {
-	overview := h.service.GetCorridorsOverview()
+	vType := NormalizeVehicleType(c.Query("vehicle"))
+	overview := h.service.GetCorridorsOverview(vType)
 	c.JSON(http.StatusOK, overview)
 }

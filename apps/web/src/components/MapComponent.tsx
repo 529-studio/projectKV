@@ -974,7 +974,7 @@ export default function MapComponent({
       <div ref={containerRef} className="w-full h-full z-0 absolute inset-0 bg-[#09090b]" />
 
       {/* Desktop (md+) unified deconflicted header toolbar: spans left-14 to right-3, guarantees left & right never collide (Issue #452) */}
-      <div className="hidden md:flex absolute top-3.5 left-14 right-3 z-[800] items-start justify-between gap-3 pointer-events-none">
+      <div className="hidden md:flex absolute top-3.5 left-14 right-3 z-[850] items-start justify-between gap-3 pointer-events-none">
         {/* Left side: Lens switchers & camera filter, plus active filter chip */}
         <div className="flex flex-col items-start gap-2 min-w-0 max-w-[calc(100%-380px)]">
           <div className="flex flex-wrap items-center gap-2 pointer-events-auto">

@@ -40,11 +40,14 @@ import { isCameraOffline, isWaterwayCamera } from '../utils/cameraFilterUtils';
 import { extractCorridor } from '../utils/phuongFormatters';
 import { toRoadKey } from '../utils/corridorUtils';
 import { useCorridorRoute } from '../hooks/useCorridorRoute';
+import type { VehicleType } from '../types/vehicle';
+import { getStoredVehicleProfile, setStoredVehicleProfile } from '../utils/vehicleHazardUtils';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
 const CorridorRouteLayer = dynamic(() => import('../components/CorridorRouteLayer'), { ssr: false });
 const CorridorOverviewCard = dynamic(() => import('../components/CorridorOverviewCard'), { ssr: false });
+const VehicleProfileSelector = dynamic(() => import('../components/VehicleProfileSelector'), { ssr: false });
 
 /** A fix younger than this is reused instead of starting a new GPS request (AC2). */
 const NEAR_ME_FIX_MAX_AGE_MS = 60_000;
@@ -100,6 +103,18 @@ export default function Home() {
   const [selectedPhuong, setSelectedPhuong] = useState<string | null>(null);
   const [selectedCorridor, setSelectedCorridor] = useState<string | null>(null);
   const [lang, setLang] = useState<'vi' | 'en'>('vi');
+
+  // S17-T3 / Issue #510: Vehicle clearance profile state
+  const [vehicleType, setVehicleType] = useState<VehicleType>('scooter');
+
+  useEffect(() => {
+    setVehicleType(getStoredVehicleProfile());
+  }, []);
+
+  const handleVehicleChange = useCallback((newVehicle: VehicleType) => {
+    setVehicleType(newVehicle);
+    setStoredVehicleProfile(newVehicle);
+  }, []);
 
   // S17-T2 / S17-T3 (Issue #507): Corridor polyline visibility and card dismissal state
   const [showCorridorRoute, setShowCorridorRoute] = useState(true);
@@ -309,7 +324,7 @@ export default function Home() {
     return selectedCorridor ? toRoadKey(selectedCorridor) : null;
   }, [selectedCorridor]);
 
-  const { route: corridorRoute } = useCorridorRoute(activeRoadKey);
+  const { route: corridorRoute } = useCorridorRoute(activeRoadKey, vehicleType);
 
   const corridorCameras = useMemo(() => {
     if (!selectedCorridor) return [];
@@ -636,7 +651,7 @@ export default function Home() {
 
       {/* MAP WORKSPACE */}
       <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-zinc-950">
-        <div className="flex-1 w-full h-full relative z-0">
+        <div className="flex-1 w-full h-full relative">
           <MapComponent
             cameras={displayCameras}
             verdicts={verdicts}
@@ -668,6 +683,12 @@ export default function Home() {
             }
             weatherControl={
               <div className="flex items-center gap-2">
+                {/* S17-T3 / Issue #510: vehicle clearance profile selector (desktop) */}
+                <VehicleProfileSelector
+                  currentVehicle={vehicleType}
+                  onVehicleChange={handleVehicleChange}
+                  lang={lang}
+                />
                 {/* S12-T4 / Issue #402: citizen alert subscription entry point (desktop) */}
                 <button
                   type="button"
@@ -775,6 +796,7 @@ export default function Home() {
                 lang={lang}
                 showPolyline={showCorridorRoute}
                 onTogglePolyline={() => setShowCorridorRoute(prev => !prev)}
+                vehicleType={vehicleType}
               />
             </div>
           )}
@@ -861,6 +883,15 @@ export default function Home() {
               <path d="M10.5 20a2 2 0 0 0 3 0" />
             </svg>
           </button>
+
+          {/* S17-T3 / Issue #510: vehicle clearance profile selector (mobile) */}
+          <div className="shrink-0">
+            <VehicleProfileSelector
+              currentVehicle={vehicleType}
+              onVehicleChange={handleVehicleChange}
+              lang={lang}
+            />
+          </div>
 
           {/* Mobile Weather Widget Trigger */}
           <div className="shrink-0">
