@@ -678,7 +678,7 @@ export default function Home() {
         <div className="absolute inset-x-0 bottom-0 pointer-events-none z-[800] flex flex-col">
           {/* CORRIDOR OVERVIEW CARD */}
           {selectedCorridor && corridorRoute?.summary && (
-            <div className="w-full px-3 pb-3 sm:px-4 sm:pb-4">
+            <div className="w-full px-3 pb-3">
               <CorridorOverviewCard
                 summary={corridorRoute.summary}
                 corridorCameras={corridorCameras}
