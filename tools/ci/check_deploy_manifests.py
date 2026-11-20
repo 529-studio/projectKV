@@ -387,7 +387,8 @@ def check_backup_sidecar(compose_path: Path) -> list[Violation]:
         violations.append(
             Violation(compose_path, "backup_security", "Expected capabilities drop: [ALL]")
         )
-    if not re.search(r'group_add:\s*\n(?:\s*-\s*"?[^"\n]+"?\n)*?\s*-\s*"?10001"?\s*$', block, re.MULTILINE):
+    group_add_section = re.search(r"^    group_add:\n((?:      -[^\n]*\n)+)", block, re.MULTILINE)
+    if not group_add_section or not re.search(r'^      -\s*"?10001"?\s*$', group_add_section.group(1), re.MULTILINE):
         violations.append(
             Violation(
                 compose_path,
