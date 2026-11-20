@@ -407,7 +407,7 @@ jobs:
               + (if $be and ((map(select(.name == "BE_IMAGE_TAG")) | length) == 0) then [{"name":"BE_IMAGE_TAG","value":$t}] else [] end)
               + (if $fe and ((map(select(.name == "FE_IMAGE_TAG")) | length) == 0) then [{"name":"FE_IMAGE_TAG","value":$t}] else [] end)')
 
-            assert_stack_env "$ENV_JSON" docker-compose.stg.yml "R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_NAME CV_ENGINE_URL R2_ENDPOINT"
+            assert_stack_env "$ENV_JSON" docker-compose.stg.yml "R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_NAME CV_ENGINE_URL"
 
             PAYLOAD=$(jq -n \
               --arg file "$STACK_FILE" \

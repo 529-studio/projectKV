@@ -140,9 +140,10 @@ jobs:
         run: |
           make lint-deploy
           make test-deploy
-          # Hermetic simulator path: builds a real WAL-mode SQLite database,
-          # restores it and enforces the RTO/RPO budgets in CI.
-          make restore-drill EXTRA="--cycles 3 --sync-interval 0.2"
+          # Hermetic path: builds a real WAL-mode SQLite database, snapshots it
+          # through the SQLite backup API exactly like warded-backup, restores
+          # it and enforces the RTO/RPO budgets in CI.
+          make restore-drill EXTRA="--cycles 3"
 
       - name: Verify Tools Syntax
         run: |

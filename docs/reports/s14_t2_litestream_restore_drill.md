@@ -332,5 +332,5 @@ CI now runs `make lint-deploy`, `make test-deploy` and a hermetic
 4. **The sidecar is not a backup.** It replicates to one bucket; bucket loss is
    still data loss. An independent archive remains future work.
 
-See the runbook for the operating procedure:
-[`docs/runbooks/sqlite_litestream_disaster_recovery.md`](../runbooks/sqlite_litestream_disaster_recovery.md).
+See the current operating procedure (the Litestream runbook was retired):
+[`docs/runbooks/sqlite_backup_restore.md`](../runbooks/sqlite_backup_restore.md).

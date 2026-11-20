@@ -248,7 +248,7 @@ tensors (`--allow-untrained-head` stays `UNVERIFIED`). Evidence:
 
 * **Evidence Integrity Gate**: Run `make evidence-lint` (`tools/ci/check_evidence_integrity.py`) and `make test-ci` to enforce anti-spoofing, temporal invariants, and synthetic data prohibition across all release artifacts (ADR-013 D1).
 * **Forecast Pipeline**: Run `make test-forecast` for suite, `make train-forecast` to refit, and `make train-forecast-daemon` for daemon scheduling. Provenance: [`docs/reports/forecast_prototype_v1.md`](docs/reports/forecast_prototype_v1.md).
-* **Database Disaster Recovery**: `make restore-drill` restores SQLite from the Litestream R2 replica and enforces integrity plus RTO <= 60s / RPO <= 10s. See [`docs/runbooks/sqlite_litestream_disaster_recovery.md`](docs/runbooks/sqlite_litestream_disaster_recovery.md).
+* **Database Backup & Recovery**: `warded-backup` runs daily `sqlite3 .backup` to `r2:homelab-backup/warded/` (14d retention). See [`docs/runbooks/sqlite_backup_restore.md`](docs/runbooks/sqlite_backup_restore.md).
 
 ## 3. Key Highlights
 
@@ -315,8 +315,9 @@ tensors (`--allow-untrained-head` stays `UNVERIFIED`). Evidence:
 | `HARVESTER_RAIN_COOLDOWN_MINUTES` | `60` | Sliding window cooldown for rain watcher triggers (in minutes) |
 | `HARVESTER_CONCURRENCY` | `15` | Worker pool concurrency for frame ingestion & R2 streaming |
 | `HARVESTER_CATCHUP_MINUTES` | `120` | Boot-time catch-up window: slots missed by a late start or restart fire once at startup (0 disables) |
-| `LITESTREAM_ACCESS_KEY_ID` | `""` | R2 key for the replication sidecar; falls back to `R2_ACCESS_KEY_ID` |
-| `LITESTREAM_SECRET_ACCESS_KEY` | `""` | R2 secret for replication; falls back to `R2_SECRET_ACCESS_KEY` |
+| `BACKUP_BUCKET_NAME` | `homelab-backup` | R2 backup bucket (prefix `warded/`) |
+| `BACKUP_KEEP_DAYS` | `14` | Retention days (`rclone delete`) |
+| `BACKUP_CPU_LIMIT` / `BACKUP_MEMORY_LIMIT` | `0.10` / `128M` | Backup sidecar cgroup limits |
 
 #### CV Model Service (`services/cv-engine`)
 

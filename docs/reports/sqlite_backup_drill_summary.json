@@ -1,0 +1,17 @@
+{
+  "mode": "auto",
+  "started_at": "2026-11-20T05:14:18Z",
+  "cycles": 3,
+  "rto_seconds": 0.001,
+  "rto_budget_seconds": 60.0,
+  "integrity": "ok",
+  "rows": 200,
+  "checksum": "8f97c9a46a82e542c39c3709d5ff9f45ffbc63043da67ff9f3fbee47aeba91c5",
+  "rpo_seconds": null,
+  "archive": "warded-20261120.sqlite3.gz",
+  "verdict": "pass",
+  "errors": [],
+  "notes": [
+    "live drill skipped: rclone R2 remote is not configured: missing RCLONE_CONFIG_R2_TYPE, RCLONE_CONFIG_R2_ACCESS_KEY_ID, RCLONE_CONFIG_R2_SECRET_ACCESS_KEY"
+  ]
+}
