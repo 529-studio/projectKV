@@ -24,12 +24,17 @@ LATENCY_REPEATS ?= 3
 # S13-T1 soak evidence destination for the containerised gate.
 SOAK_OUT ?= docs/reports/s13_t1_latency_avx2.json
 
-# S14-T2 SQLite restore drill (Issue #442). Default auto mode is hermetic: it
-# uses Litestream only when RESTORE_DRILL_REPLICA_URL or EXTRA=--replica-url is
-# supplied explicitly, so this target never reaches a production bucket by
-# accident. MODE=live requires the litestream binary.
+# SQLite daily-backup restore drill (Issue #442, retargeted at the .backup
+# archives in the Phase 3 migration). `auto` restores the newest
+# `r2:<bucket>/warded/warded-*.sqlite3.gz` when rclone and its
+# RCLONE_CONFIG_R2_* environment are configured; otherwise it prints
+# `[INFO] live drill skipped: <reason>` and drills a hermetic snapshot instead.
+# Force one path with:
+#   make restore-drill RESTORE_DRILL_MODE=hermetic
+#   make restore-drill RESTORE_DRILL_MODE=live
 RESTORE_DRILL_MODE ?= auto
-RESTORE_DRILL_OUT ?= docs/reports/s14_t2_restore_drill_summary.json
+RESTORE_DRILL_OUT ?= docs/reports/sqlite_backup_drill_summary.json
+RESTORE_DRILL_BUCKET ?= $(if $(BACKUP_BUCKET_NAME),$(BACKUP_BUCKET_NAME),homelab-backup)
 
 # Dataset v3 materializer (S12-T5 §2.4).
 DATASET_DATES ?=
@@ -67,7 +72,7 @@ help:
 	@echo "  make lint-deploy     - Lint and validate deployment manifests and invariants (S12-T1)"
 	@echo "  make test-ci         - Run unit tests for evidence integrity gate"
 	@echo "  make test-deploy     - Run unit tests for the deploy lint and restore drill (S14-T2)"
-	@echo "  make restore-drill   - Restore SQLite from a Litestream replica and verify RTO/RPO (S14-T2)"
+	@echo "  make restore-drill   - Restore a warded-YYYYMMDD.sqlite3.gz backup and verify RTO/RPO"
 	@echo "  make test-eval       - Run unit tests for eval benchmark harness"
 	@echo "  make test-seg        - Run unit tests for SAM pre-labeling toolchain (S9-T2)"
 	@echo "  make test-forecast   - Run unit tests for the congestion forecast toolchain (S9-T6)"
@@ -201,8 +206,11 @@ lint-deploy:
 test-deploy:
 	python3 -m unittest discover -s tools/deploy -p "*test*.py"
 
+# Drill the daily SQLite `.backup` archives: hermetic by default, live only
+# when rclone can reach the bucket. EXTRA passes tool flags through, e.g.
+#   make restore-drill EXTRA="--cycles 3"
 restore-drill:
-	python3 tools/deploy/restore_drill.py --mode $(RESTORE_DRILL_MODE) --out $(RESTORE_DRILL_OUT) $(EXTRA)
+	python3 tools/deploy/restore_drill.py --mode $(RESTORE_DRILL_MODE) --out $(RESTORE_DRILL_OUT) --bucket $(RESTORE_DRILL_BUCKET) $(EXTRA)
 
 export-seg:
 	python3 tools/eval/export_yolo_seg.py --labels-dir tools/eval/labels_gold_standard --output-dir data/yolo_seg --verify

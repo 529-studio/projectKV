@@ -116,7 +116,55 @@ rclone lsl r2:homelab-backup/warded/
 Expect one object per day named `warded-YYYYMMDD.sqlite3.gz`. A missing object for
 today is a backup failure, not a slow day.
 
-## 5. Restore procedure
+## 5. Verifying a backup
+
+`tools/deploy/restore_drill.py` proves the archive is restorable before you need
+it. It writes a JSON summary (`docs/reports/sqlite_backup_drill_summary.json`)
+and exits non-zero when a budget is missed.
+
+```bash
+make restore-drill EXTRA="--cycles 3"
+cat docs/reports/sqlite_backup_drill_summary.json | python3 -m json.tool
+```
+
+Three modes, standard library only:
+
+| Mode | What it does | Network |
+|---|---|---|
+| `hermetic` | Creates a WAL-mode SQLite database, snapshots it with the SQLite backup API exactly like the sidecar, gzips it, restores it in a sandbox, then checks `PRAGMA integrity_check`, row count, a table checksum and that every row committed before the snapshot is present. Run it with `make restore-drill RESTORE_DRILL_MODE=hermetic` | none |
+| `live` | Lists `r2:<bucket>/warded/` with `rclone`, downloads the newest `warded-*.sqlite3.gz`, restores it and reports its age in hours | bucket read only |
+| `auto` (default) | Runs `live` when `rclone` is on `PATH` and `RCLONE_CONFIG_R2_*` is configured; otherwise prints `[INFO] live drill skipped: <reason>` and runs the hermetic drill, so the snapshot/restore path is still exercised | may read the bucket |
+
+Read the summary by field:
+
+| Field | Healthy value |
+|---|---|
+| `verdict` | `pass`; a `skipped` summary only happens when no drill could run at all |
+| `integrity` | `ok`, meaning `PRAGMA integrity_check` returned `ok` after the restore |
+| `rows` | Row count of the sample table in the restored database; for a live drill, compare it with the source table |
+| `checksum` | SHA-256 over the sample table rows; the hermetic drill compares it with the pre-snapshot value |
+| `rto_seconds` | Restore wall time (gunzip, open, integrity check, table read); must stay inside `rto_budget_seconds` (default 60 s) |
+| `rpo_seconds` | Archive age; must stay inside `min_age_hours` (default 24 h) |
+| `archive` | Local archive name or `r2:<bucket>/warded/<object>` actually verified |
+| `notes` | Why the live phase was skipped when `auto` fell back to the hermetic drill |
+
+The RTO budget is a local-restore budget, not a service-level promise: it
+measures the time to turn the archive into a verified file. Cutting the file
+over and restarting the writers are operator steps and are not timed.
+
+Run the live drill on the staging host, where the bucket credentials already
+exist:
+
+```bash
+make restore-drill RESTORE_DRILL_MODE=live RESTORE_DRILL_BUCKET=homelab-backup
+```
+
+A `verdict: fail` with an `integrity` or `row count` error means the archive
+itself is damaged; restore from the previous day and investigate the sidecar
+logs for the night that produced it. A `verdict: fail` with an RPO error means
+no fresh archive reached the bucket; check `docker logs warded-backup`.
+
+## 6. Restore procedure
 
 The restore is destructive only to the file you replace, and it needs the
 writers stopped: SQLite allows one writer, and a running backend will keep
@@ -190,7 +238,7 @@ writing into a file you are about to swap.
    measured data loss (restore time minus archive time) into the sprint report
    and delete `camera-view.db.corrupt` once the restore is confirmed good.
 
-## 6. Failure modes
+## 7. Failure modes
 
 | Symptom | Cause | Action |
 |---|---|---|
@@ -202,7 +250,7 @@ writing into a file you are about to swap.
 | No object for today, container healthy | The backup slot has not been reached yet | Compare the log timestamp to the 03:15 slot before treating it as a failure |
 | `database disk image is malformed` after a restore | Old `-wal` / `-shm` left in place over the restored file | Repeat the swap and remove both sidecars in the same step |
 
-## 7. Operating limits
+## 8. Operating limits
 
 - **One writer.** Never run two backends against the same volume, and stop the
   writers before replacing the file.
@@ -224,10 +272,11 @@ writing into a file you are about to swap.
 - **One archive is one copy.** A lost or corrupted bucket is a lost backup set;
   treat bucket deletion as a data-loss event.
 
-## 8. References
+## 9. References
 
 - Compose stack: [`docker-compose.stg.yml`](../../docker-compose.stg.yml)
 - Validator: [`tools/ci/check_deploy_manifests.py`](../../tools/ci/check_deploy_manifests.py)
+- Restore drill: [`tools/deploy/restore_drill.py`](../../tools/deploy/restore_drill.py)
 - Plan: `self-infras/plans/2026-11-20-phase3-two-site-tunnels.md`
 - Superseded runbook (removed with the streaming sidecar):
   `docs/runbooks/sqlite_litestream_disaster_recovery.md` in git history
