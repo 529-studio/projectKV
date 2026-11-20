@@ -2,6 +2,7 @@ package corridor
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -513,5 +514,95 @@ func TestGetCorridorsOverview(t *testing.T) {
 	}
 	if !foundVoVanKiet {
 		t.Errorf("expected vo_van_kiet in corridors overview")
+	}
+}
+
+// testHaversineKm calculates great-circle distance between two (lon, lat) points in kilometers.
+func testHaversineKm(lon1, lat1, lon2, lat2 float64) float64 {
+	const r = 6371.0
+	phi1 := lat1 * math.Pi / 180.0
+	phi2 := lat2 * math.Pi / 180.0
+	dphi := (lat2 - lat1) * math.Pi / 180.0
+	dlam := (lon2 - lon1) * math.Pi / 180.0
+	a := math.Sin(dphi/2)*math.Sin(dphi/2) + math.Cos(phi1)*math.Cos(phi2)*math.Sin(dlam/2)*math.Sin(dlam/2)
+	return 2 * r * math.Asin(math.Sqrt(a))
+}
+
+// TestArterialCorridors_GeometryInvariants enforces physical road continuity, bounds sanity, and absence of zig-zags.
+func TestArterialCorridors_GeometryInvariants(t *testing.T) {
+	if len(ArterialCorridors) == 0 {
+		t.Fatalf("ArterialCorridors map is empty")
+	}
+
+	// HCMC urban bounding box
+	const (
+		minLon = 106.30
+		maxLon = 107.00
+		minLat = 10.30
+		maxLat = 11.20
+		// Max allowed gap between two consecutive points on an arterial road (km)
+		maxSegmentKm = 4.5
+		// Max allowed reversal angle between adjacent segments (degrees)
+		maxReversalAngleDeg = 110.0
+	)
+
+	for key, corridor := range ArterialCorridors {
+		t.Run(key, func(t *testing.T) {
+			coords := corridor.Coordinates
+			if len(coords) < 2 {
+				t.Fatalf("corridor %s must have at least 2 points, got %d", key, len(coords))
+			}
+
+			var totalPolylineKm float64
+			for i := 0; i < len(coords); i++ {
+				lon, lat := coords[i][0], coords[i][1]
+				if lon < minLon || lon > maxLon || lat < minLat || lat > maxLat {
+					t.Errorf("corridor %s point %d (lon=%.6f, lat=%.6f) out of HCMC bounds [%.2f..%.2f, %.2f..%.2f]",
+						key, i, lon, lat, minLon, maxLon, minLat, maxLat)
+				}
+
+				if i > 0 {
+					prevLon, prevLat := coords[i-1][0], coords[i-1][1]
+					segDist := testHaversineKm(prevLon, prevLat, lon, lat)
+					totalPolylineKm += segDist
+					if segDist > maxSegmentKm {
+						t.Errorf("corridor %s segment %d->%d distance %.2f km exceeds max allowed %.2f km",
+							key, i-1, i, segDist, maxSegmentKm)
+					}
+				}
+
+				if i > 0 && i < len(coords)-1 {
+					prevLon, prevLat := coords[i-1][0], coords[i-1][1]
+					nextLon, nextLat := coords[i+1][0], coords[i+1][1]
+					v1x, v1y := lon-prevLon, lat-prevLat
+					v2x, v2y := nextLon-lon, nextLat-lat
+					dot := v1x*v2x + v1y*v2y
+					m1 := math.Hypot(v1x, v1y)
+					m2 := math.Hypot(v2x, v2y)
+					if m1 > 0 && m2 > 0 {
+						cosTheta := dot / (m1 * m2)
+						if cosTheta < -1.0 {
+							cosTheta = -1.0
+						} else if cosTheta > 1.0 {
+							cosTheta = 1.0
+						}
+						angleDeg := math.Acos(cosTheta) * 180.0 / math.Pi
+						if angleDeg > maxReversalAngleDeg {
+							t.Errorf("corridor %s point %d has zig-zag reversal angle %.1f° > %.1f° at (%.6f, %.6f)",
+								key, i, angleDeg, maxReversalAngleDeg, lon, lat)
+						}
+					}
+				}
+			}
+
+			// Validate total polyline distance against declared LengthKm (within 50% - 150%)
+			if corridor.LengthKm > 0 {
+				ratio := totalPolylineKm / corridor.LengthKm
+				if ratio < 0.50 || ratio > 1.50 {
+					t.Errorf("corridor %s polyline sum %.2f km deviates excessively from declared length %.2f km (ratio=%.2f)",
+						key, totalPolylineKm, corridor.LengthKm, ratio)
+				}
+			}
+		})
 	}
 }
