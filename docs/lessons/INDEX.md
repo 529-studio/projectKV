@@ -98,10 +98,10 @@ is the only part an agent should read by default.
 | 92 | Issue-Keyed Lessons & Webhook Routes | Name files after issue; fail-closed webhook without secret; rate-limit. | [402](402-telegram-bot-and-web-subscription.md) |
 | 93 | Real Provenance vs Orphaned Labels | Exact timestamp & hash join; purge dead labels; retraining gate. | [411](411-dataset-v3-provenance-and-avx2-evidence.md) |
 | 94 | SSE Sanitizer Buffering & Flusher | Streaming content bypasses body buffering; explicit Flusher check. | [420](420-sse-streaming-sanitizer-buffering.md) |
-| 95 | Decompose Monolithic Go Composition Root | Factor main.go into adapters, jobs, routes (<250 lines); test go run. | [425](425-decompose-monolithic-cmd-server-main.md) |
+| 95 | Decompose Monolithic Go Composition Root | Factor main.go into adapters, jobs, routes; test go run. | [425](425-decompose-monolithic-cmd-server-main.md) |
 | 96 | Moore Boundary Tracing & Jacob's Criterion | State tracking (pixel, backtrack); 8-connected merge; restores SAM yield. | [438](438-moore-boundary-tracing-jacobs-criterion.md) |
 | 97 | Dead Camera Isolation & Health Metrics | Isolate 404/5xx feeds from breaker; export 24h health metrics. | [441](441-feed-error-breaker-isolation-and-health-observability.md) |
-| 98 | Litestream R2 Replication & Restore Drill | Backups are hypotheses until drill restores SQLite DB; verify tables. | [442](442-litestream-r2-replication-and-restore-drill.md) |
+| 98 | Litestream R2 Replication & Restore Drill | Backups are hypotheses until drill restores SQLite DB; verify. | [442](442-litestream-r2-replication-and-restore-drill.md) |
 | 99 | Map Clustering & Worst-Severity Bubble-Up | Cluster markers bubble up deepest hazard; fallback tiles avoid failure. | [443](443-commuter-map-clustering-and-hazard-depth.md) |
 | 100 | Forecast Weather Parity & Skill Gating | Mirror Go feature store in Python; require valid skill gating. | [444](444-forecast-weather-parity-and-skill-gating.md) |
 | 101 | Cluster Deconfliction & Toolbar Hierarchy | Repel overlapping clusters; dedicate separate row for toolbars. | [452](452-map-cluster-collision-and-toolbar-deconfliction.md) |
@@ -110,11 +110,12 @@ is the only part an agent should read by default.
 | 104 | Leaflet Zoom Lifecycle & Reactive Split | Rebuild clusters on zoomend; leap +2 on macro cluster click. | [460](460-macro-cluster-zoomend-reactive-trigger.md) |
 | 105 | Lore Verifiable Memory Setup | Ingest git commits into Lore ontology; configure agy/opencode MCP. | [463](463-lore-verifiable-memory-setup-opencode-agy.md) |
 | 106 | Doppler Radar Virga Gating & Modal Status | Never suppress convective cores (>=30 dBZ); label THÔNG THOÁNG. | [465](465-radar-virga-suppression-and-traffic-label.md) |
-| 107 | Arterial Corridor Hazard & GeoJSON | Aggregate camera congestion along arteries; linestring GeoJSON; in-memory cache. | [475](475-arterial-corridor-hazard-and-route-geojson.md) |
-| 108 | Commuter Route Polylines & Cards | Render arterial route polylines; Leaflet click deconfliction; bilingual cards. | [476](476-commuter-route-polyline-and-card.md) |
-| 109 | Mobile Ergonomics & Viewport dvh | Dynamic 100dvh avoids address bar shift; >=48px touch targets; drawer snapping. | [477](477-mobile-ergonomics-and-safe-area.md) |
-| 110 | Telegram Corridor Hazard Alerts | Corridor-level alert subscriptions; 15-min debounce; proactive health alerts. | [478](478-telegram-corridor-hazard-alerts.md) |
-| 111 | Adaptive CV Load Shedding & Soak | Shed stale frames (>60s) with 429; dynamic 320px downscale; 24h soak profiling. | [479](479-cv-engine-load-shedding-soak.md) |
-| 112 | Automated DR Drills & Webhooks | Weekly Sunday 03:00 UTC systemd cron; universal webhook alerting; 4xx fast-fail. | [480](480-automated-restore-drill-webhook.md) |
-| 113 | Resilient Address Search Sanitizer | Strip house/alley numbers ("34/55/67") client-side; match street catalog. | [484](484-resilient-address-search-sanitizer.md) |
+| 107 | Arterial Corridor Hazard & GeoJSON | Aggregate camera congestion along arteries; GeoJSON; in-memory cache. | [475](475-arterial-corridor-hazard-and-route-geojson.md) |
+| 108 | Commuter Route Polylines & Cards | Render arterial route polylines; Leaflet deconfliction; bilingual cards. | [476](476-commuter-route-polyline-and-card.md) |
+| 109 | Mobile Ergonomics & Viewport dvh | Dynamic 100dvh avoids bar shift; >=48px touch targets; drawer snap. | [477](477-mobile-ergonomics-and-safe-area.md) |
+| 110 | Telegram Corridor Hazard Alerts | Corridor subscriptions; 15-min debounce; proactive health alerts. | [478](478-telegram-corridor-hazard-alerts.md) |
+| 111 | Adaptive CV Load Shedding & Soak | Shed stale frames (>60s) with 429; 320px downscale; 24h soak profiling. | [479](479-cv-engine-load-shedding-soak.md) |
+| 112 | Automated DR Drills & Webhooks | Weekly Sunday 03:00 UTC cron; universal webhook alerting; 4xx fast-fail. | [480](480-automated-restore-drill-webhook.md) |
+| 113 | Resilient Address Search Sanitizer | Strip house/alley numbers ("34/55/67"); match street catalog. | [484](484-resilient-address-search-sanitizer.md) |
+| 114 | Overlay Stacks & Shared Flow | Overlays need shared flow to reserve space; no magic offsets. | [494](494-corridor-card-overlay-stack.md) |
 > Numbering note: Lesson 54 does not exist; numbers are preserved as cited.
