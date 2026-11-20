@@ -673,30 +673,36 @@ export default function Home() {
           </MapComponent>
         </div>
 
-        {/* CORRIDOR OVERVIEW CARD */}
-        {selectedCorridor && corridorRoute?.summary && (
-          <CorridorOverviewCard
-            summary={corridorRoute.summary}
-            corridorCameras={corridorCameras}
-            onClose={() => setSelectedCorridor(null)}
+        {/* OVERLAY STACK — card and dock are siblings in one column,
+            so the card is pushed above the dock instead of guessing an offset. */}
+        <div className="absolute inset-x-0 bottom-0 pointer-events-none z-[800] flex flex-col">
+          {/* CORRIDOR OVERVIEW CARD */}
+          {selectedCorridor && corridorRoute?.summary && (
+            <div className="w-full px-3 pb-3">
+              <CorridorOverviewCard
+                summary={corridorRoute.summary}
+                corridorCameras={corridorCameras}
+                onClose={() => setSelectedCorridor(null)}
+                onCameraClick={handleSelectCamera}
+                lang={lang}
+              />
+            </div>
+          )}
+
+          {/* BOTTOM DOCK */}
+          <PinnedDock 
+            pinnedCameras={pinnedCameras} 
+            onUnpin={togglePin} 
+            onClear={handleClearPins}
+            onReorder={handleReorderPins}
             onCameraClick={handleSelectCamera}
             lang={lang}
+            verdicts={verdicts}
+            floodVerdicts={floodVerdicts}
+            pinNotice={pinNotice}
+            appEnv={appEnv}
           />
-        )}
-        
-        {/* BOTTOM DOCK */}
-        <PinnedDock 
-          pinnedCameras={pinnedCameras} 
-          onUnpin={togglePin} 
-          onClear={handleClearPins}
-          onReorder={handleReorderPins}
-          onCameraClick={handleSelectCamera}
-          lang={lang}
-          verdicts={verdicts}
-          floodVerdicts={floodVerdicts}
-          pinNotice={pinNotice}
-          appEnv={appEnv}
-        />
+        </div>
 
         {/* FLOATING STATUS PILL — Non-blocking background AI sync notification */}
         <TrafficSyncBanner

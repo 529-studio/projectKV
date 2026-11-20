@@ -81,10 +81,7 @@ export default function CorridorOverviewCard({
   return (
     <section
       aria-label={lang === 'vi' ? 'Tổng quan trục đường' : 'Corridor Overview'}
-      className="fixed left-3 right-3 sm:right-auto sm:left-4 z-40 max-w-sm sm:w-[380px] bg-zinc-950/95 backdrop-blur-md border border-zinc-800 rounded-lg shadow-2xl font-mono text-white transition-all duration-200"
-      style={{
-        bottom: 'calc(var(--safe-bottom, 0px) + 64px)',
-      }}
+      className="relative pointer-events-auto w-full sm:w-[380px] bg-zinc-950/95 backdrop-blur-md border border-zinc-800 rounded-lg shadow-2xl font-mono text-white transition-all duration-200"
     >
       {/* Header bar */}
       <div className="flex items-center justify-between p-3 border-b border-zinc-800/80">
