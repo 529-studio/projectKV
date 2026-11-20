@@ -673,25 +673,12 @@ export default function Home() {
           </MapComponent>
         </div>
 
-        {/* OVERLAY STACK */}
-        <div className="absolute inset-x-0 bottom-0 pointer-events-none z-[800] flex flex-col items-start justify-end p-4">
-          <div className="pointer-events-auto flex flex-col-reverse gap-4 w-[380px] max-w-full">
-            {/* BOTTOM DOCK */}
-            <PinnedDock 
-              pinnedCameras={pinnedCameras} 
-              onUnpin={togglePin} 
-              onClear={handleClearPins}
-              onReorder={handleReorderPins}
-              onCameraClick={handleSelectCamera}
-              lang={lang}
-              verdicts={verdicts}
-              floodVerdicts={floodVerdicts}
-              pinNotice={pinNotice}
-              appEnv={appEnv}
-            />
-            
-            {/* CORRIDOR OVERVIEW CARD */}
-            {selectedCorridor && corridorRoute?.summary && (
+        {/* OVERLAY STACK — card and dock are siblings in one column,
+            so the card is pushed above the dock instead of guessing an offset. */}
+        <div className="absolute inset-x-0 bottom-0 pointer-events-none z-[800] flex flex-col">
+          {/* CORRIDOR OVERVIEW CARD */}
+          {selectedCorridor && corridorRoute?.summary && (
+            <div className="w-full px-3 pb-3 sm:px-4 sm:pb-4">
               <CorridorOverviewCard
                 summary={corridorRoute.summary}
                 corridorCameras={corridorCameras}
@@ -699,8 +686,22 @@ export default function Home() {
                 onCameraClick={handleSelectCamera}
                 lang={lang}
               />
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* BOTTOM DOCK */}
+          <PinnedDock 
+            pinnedCameras={pinnedCameras} 
+            onUnpin={togglePin} 
+            onClear={handleClearPins}
+            onReorder={handleReorderPins}
+            onCameraClick={handleSelectCamera}
+            lang={lang}
+            verdicts={verdicts}
+            floodVerdicts={floodVerdicts}
+            pinNotice={pinNotice}
+            appEnv={appEnv}
+          />
         </div>
 
         {/* FLOATING STATUS PILL — Non-blocking background AI sync notification */}

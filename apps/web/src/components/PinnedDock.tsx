@@ -698,7 +698,7 @@ export default function PinnedDock({
       {/* =======================================================
           DESKTOP VIEW (md+): Horizontal strip or Full-width Grid
          ======================================================= */}
-      <div className="hidden md:block absolute bottom-0 left-0 right-0 z-[800] bg-zinc-950/95 border-t border-zinc-800 shadow-2xl backdrop-blur-md transition-all">
+      <div className="hidden md:block w-full pointer-events-auto z-[800] bg-zinc-950/95 border-t border-zinc-800 shadow-2xl backdrop-blur-md transition-all">
         {/* Notice Banner (Pin Cap Feedback) */}
         {pinNotice && (
           <div className="px-3 py-1 bg-amber-950/90 border-b border-amber-800 text-amber-200 text-xs font-mono flex items-center justify-between">
@@ -848,14 +848,14 @@ export default function PinnedDock({
       {/* =======================================================
           MOBILE VIEW (<md): Floating Collapsed Pill + Slide-up Drawer
          ======================================================= */}
-      <div className="md:hidden">
+      <div className="md:hidden w-full pointer-events-none">
         {/* 1. Collapsed Floating Pill (shown when not expanded) */}
         {!isMobileExpanded && (
           <motion.div
-            initial={{ opacity: 0, y: 10, x: '-50%', scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
-            exit={{ opacity: 0, y: 10, x: '-50%', scale: 0.95 }}
-            className="fixed bottom-[calc(0.875rem+env(safe-area-inset-bottom,0px))] left-1/2 z-[820] pointer-events-auto select-none"
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="w-fit mx-auto mb-[calc(0.875rem+env(safe-area-inset-bottom,0px))] z-[820] pointer-events-auto select-none"
           >
             <button
               type="button"
@@ -891,7 +891,7 @@ export default function PinnedDock({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="fixed inset-0 z-[840] bg-black/60 md:hidden"
+                className="fixed inset-0 z-[840] bg-black/60 md:hidden pointer-events-auto"
                 onClick={() => setIsMobileExpanded(false)}
               />
 
@@ -902,7 +902,7 @@ export default function PinnedDock({
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ duration: 0.26, ease: 'easeOut' }}
-                className="fixed bottom-0 left-0 right-0 z-[850] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden pb-[calc(1rem+env(safe-area-inset-bottom,0px))] max-h-[60vh]"
+                className="fixed bottom-0 left-0 right-0 z-[850] bg-zinc-950 border-t border-zinc-700 rounded-t-xl shadow-2xl flex flex-col md:hidden pointer-events-auto pb-[calc(1rem+env(safe-area-inset-bottom,0px))] max-h-[60vh]"
               >
                 {/* Drag handle */}
                 <div className="pt-2 pb-1 flex justify-center shrink-0">
