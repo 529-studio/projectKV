@@ -74,6 +74,7 @@ interface MapComponentProps {
   weatherControl?: React.ReactNode;
   legendControl?: React.ReactNode;
   hasPinnedCameras?: boolean;
+  filterExtraControl?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -100,6 +101,7 @@ export default function MapComponent({
   weatherControl,
   legendControl,
   hasPinnedCameras = false,
+  filterExtraControl,
   children,
 }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
@@ -108,7 +110,6 @@ export default function MapComponent({
   const cameraRendererRef = useRef<L.Canvas | null>(null);
   const nearMeLayerRef = useRef<L.LayerGroup | null>(null);
   const nearMeLayerMapRef = useRef<L.Map | null>(null);
-  const prevFilteredRef = useRef(false);
   const hexOverlayEnabledRef = useRef(hexOverlayEnabled);
   const isFilteredRef = useRef(isFiltered);
   const activeTooltipMarkerRef = useRef<L.CircleMarker | null>(null);
@@ -501,18 +502,6 @@ export default function MapComponent({
       mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     }
   }, [cameras, isFiltered, filteredCameraIds]);
-
-  // When filter is cleared, smoothly return to default network view
-  useEffect(() => {
-    if (prevFilteredRef.current && !isFiltered && mapRef.current) {
-      mapRef.current.flyTo(
-        MAP_CONFIG.DEFAULT_CENTER as L.LatLngTuple,
-        MAP_CONFIG.DEFAULT_ZOOM,
-        { duration: 0.8 }
-      );
-    }
-    prevFilteredRef.current = isFiltered;
-  }, [isFiltered]);
 
   useEffect(() => {
     if (!mapRef.current || !markersLayerRef.current) return;
@@ -1004,6 +993,7 @@ export default function MapComponent({
                   {activeFilterLabel}
                 </span>
               </div>
+              {filterExtraControl}
               {onFilterClear && (
                 <button
                   type="button"
@@ -1045,6 +1035,7 @@ export default function MapComponent({
                 {activeFilterLabel}
               </span>
             </div>
+            {filterExtraControl}
             {onFilterClear && (
               <button
                 type="button"

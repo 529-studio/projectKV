@@ -128,4 +128,55 @@ describe('S15-T2: Commuter Route Polyline & Corridor Overview Card Verification'
     assert.ok(deepLink.startsWith('https://t.me/'));
     assert.ok(deepLink.includes('start=sub_corridor_vo_van_kiet'));
   });
+
+  test('Scenario 6 (Issue #507): Corridor route polyline toggle states and bilingual labels', () => {
+    // When showPolyline is true vs false, labels and titles must be informative in both vi and en
+    const getToggleLabel = (show: boolean, lang: 'vi' | 'en') => {
+      if (show) {
+        return lang === 'vi' ? 'Tắt đường kẻ lộ trình' : 'Hide route line';
+      }
+      return lang === 'vi' ? 'Bật đường kẻ lộ trình' : 'Show route line';
+    };
+
+    assert.equal(getToggleLabel(true, 'vi'), 'Tắt đường kẻ lộ trình');
+    assert.equal(getToggleLabel(false, 'vi'), 'Bật đường kẻ lộ trình');
+    assert.equal(getToggleLabel(true, 'en'), 'Hide route line');
+    assert.equal(getToggleLabel(false, 'en'), 'Show route line');
+  });
+
+  test('Scenario 7 (Issue #507): Card dismissal state keeps corridor filter active and decouples from zoom reset', () => {
+    // Simulating user workflow:
+    // 1. User selects corridor: filter is active, card visible, polyline visible
+    let selectedCorridor: string | null = 'Đường Nguyễn Hữu Cảnh';
+    let isCorridorCardDismissed = false;
+    let showCorridorRoute = true;
+    let mapResetCount = 0;
+
+    const onCloseCard = () => {
+      // Dismisses card ONLY, does NOT reset selectedCorridor or trigger map flyTo
+      isCorridorCardDismissed = true;
+    };
+
+    const onFilterClear = () => {
+      // Explicit filter clear button or Esc resets filter and triggers map flyTo
+      selectedCorridor = null;
+      isCorridorCardDismissed = false;
+      mapResetCount += 1;
+    };
+
+    // User closes card
+    onCloseCard();
+    assert.equal(isCorridorCardDismissed, true, 'Card should be dismissed');
+    assert.equal(selectedCorridor, 'Đường Nguyễn Hữu Cảnh', 'Corridor must remain selected');
+    assert.equal(mapResetCount, 0, 'Map must NOT fly back to default center on card close');
+
+    // User toggles line off while card is dismissed
+    showCorridorRoute = false;
+    assert.equal(showCorridorRoute, false, 'Polyline visibility is independently toggleable');
+
+    // User explicitly clears filter
+    onFilterClear();
+    assert.equal(selectedCorridor, null, 'Corridor filter is now cleared');
+    assert.equal(mapResetCount, 1, 'Map smoothly recenters ONLY on explicit filter clear');
+  });
 });

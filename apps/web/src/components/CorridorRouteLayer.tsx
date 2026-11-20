@@ -9,6 +9,7 @@ interface CorridorRouteLayerProps {
   routeData: CorridorRouteResponse | null;
   onCameraClick?: (camId: string) => void;
   lang?: 'vi' | 'en';
+  showPolyline?: boolean;
 }
 
 export default function CorridorRouteLayer({
@@ -16,6 +17,7 @@ export default function CorridorRouteLayer({
   routeData,
   onCameraClick,
   lang = 'vi',
+  showPolyline = true,
 }: CorridorRouteLayerProps) {
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
   const activeRoadKeyRef = useRef<string | null>(null);
@@ -46,8 +48,9 @@ export default function CorridorRouteLayer({
     activeRoadKeyRef.current = summary.road_key;
 
     let corridorPolyline: L.Polyline | null = null;
+    let initialFitBounds: L.LatLngBounds | null = null;
 
-    // 1. Render LineString corridor route
+    // 1. Render LineString corridor route (if polyline visibility is enabled)
     for (const feature of geojson.features) {
       if (feature.geometry.type === 'LineString') {
         const coords = (feature.geometry.coordinates as [number, number][]).map(
@@ -57,16 +60,6 @@ export default function CorridorRouteLayer({
         if (coords.length < 2) continue;
 
         const color = summary.status_color || '#22c55e';
-
-        // Outer glow polyline for high-contrast sunlight readability
-        const glowLine = L.polyline(coords, {
-          pane: 'corridorRoutePane',
-          color,
-          weight: 12,
-          opacity: 0.35,
-          lineCap: 'round',
-          lineJoin: 'round',
-        });
 
         // Core solid polyline
         const coreLine = L.polyline(coords, {
@@ -78,50 +71,64 @@ export default function CorridorRouteLayer({
           lineJoin: 'round',
         });
 
-        const estMinutes = Math.round(summary.estimated_seconds / 60);
-        const freeFlowMinutes = Math.round(summary.free_flow_seconds / 60);
-        const delayMinutes = Math.round(summary.delay_seconds / 60);
+        initialFitBounds = coreLine.getBounds();
 
-        const tooltipContent = `
-          <div class="font-mono text-xs text-white bg-zinc-950 p-2 rounded border border-zinc-800 shadow-xl min-w-[200px]">
-            <div class="font-bold text-sm tracking-wide mb-1 text-zinc-100">${summary.display_name}</div>
-            <div class="text-[11px] text-zinc-400 mb-1.5">${summary.description}</div>
-            <div class="flex items-center justify-between text-[11px] mb-1">
-              <span class="text-zinc-400">${lang === 'vi' ? 'Độ dài:' : 'Length:'}</span>
-              <span class="font-semibold text-zinc-200">${summary.length_km.toFixed(1)} km</span>
+        if (showPolyline) {
+          // Outer glow polyline for high-contrast sunlight readability
+          const glowLine = L.polyline(coords, {
+            pane: 'corridorRoutePane',
+            color,
+            weight: 12,
+            opacity: 0.35,
+            lineCap: 'round',
+            lineJoin: 'round',
+          });
+
+          const estMinutes = Math.round(summary.estimated_seconds / 60);
+          const freeFlowMinutes = Math.round(summary.free_flow_seconds / 60);
+          const delayMinutes = Math.round(summary.delay_seconds / 60);
+
+          const tooltipContent = `
+            <div class="font-mono text-xs text-white bg-zinc-950 p-2 rounded border border-zinc-800 shadow-xl min-w-[200px]">
+              <div class="font-bold text-sm tracking-wide mb-1 text-zinc-100">${summary.display_name}</div>
+              <div class="text-[11px] text-zinc-400 mb-1.5">${summary.description}</div>
+              <div class="flex items-center justify-between text-[11px] mb-1">
+                <span class="text-zinc-400">${lang === 'vi' ? 'Độ dài:' : 'Length:'}</span>
+                <span class="font-semibold text-zinc-200">${summary.length_km.toFixed(1)} km</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px] mb-1">
+                <span class="text-zinc-400">${lang === 'vi' ? 'Dự kiến:' : 'Est. time:'}</span>
+                <span class="font-semibold text-zinc-200">${estMinutes} ${lang === 'vi' ? 'phút' : 'min'} (${freeFlowMinutes}m std)</span>
+              </div>
+              ${
+                delayMinutes > 0
+                  ? `<div class="flex items-center justify-between text-[11px] mb-1 text-amber-400">
+                      <span>${lang === 'vi' ? 'Chậm trễ:' : 'Delay:'}</span>
+                      <span class="font-bold">+${delayMinutes} ${lang === 'vi' ? 'phút' : 'min'}</span>
+                    </div>`
+                  : ''
+              }
+              ${
+                summary.max_depth_cm && summary.max_depth_cm > 0
+                  ? `<div class="flex items-center justify-between text-[11px] mt-1 pt-1 border-t border-zinc-800 text-rose-400">
+                      <span>${lang === 'vi' ? 'Ngập đỉnh:' : 'Peak flood:'}</span>
+                      <span class="font-bold">${summary.max_depth_cm.toFixed(0)} cm</span>
+                    </div>`
+                  : ''
+              }
             </div>
-            <div class="flex items-center justify-between text-[11px] mb-1">
-              <span class="text-zinc-400">${lang === 'vi' ? 'Dự kiến:' : 'Est. time:'}</span>
-              <span class="font-semibold text-zinc-200">${estMinutes} ${lang === 'vi' ? 'phút' : 'min'} (${freeFlowMinutes}m std)</span>
-            </div>
-            ${
-              delayMinutes > 0
-                ? `<div class="flex items-center justify-between text-[11px] mb-1 text-amber-400">
-                    <span>${lang === 'vi' ? 'Chậm trễ:' : 'Delay:'}</span>
-                    <span class="font-bold">+${delayMinutes} ${lang === 'vi' ? 'phút' : 'min'}</span>
-                  </div>`
-                : ''
-            }
-            ${
-              summary.max_depth_cm && summary.max_depth_cm > 0
-                ? `<div class="flex items-center justify-between text-[11px] mt-1 pt-1 border-t border-zinc-800 text-rose-400">
-                    <span>${lang === 'vi' ? 'Ngập đỉnh:' : 'Peak flood:'}</span>
-                    <span class="font-bold">${summary.max_depth_cm.toFixed(0)} cm</span>
-                  </div>`
-                : ''
-            }
-          </div>
-        `;
+          `;
 
-        coreLine.bindTooltip(tooltipContent, {
-          sticky: true,
-          direction: 'top',
-          className: 'corridor-tooltip',
-        });
+          coreLine.bindTooltip(tooltipContent, {
+            sticky: true,
+            direction: 'top',
+            className: 'corridor-tooltip',
+          });
 
-        layerGroup.addLayer(glowLine);
-        layerGroup.addLayer(coreLine);
-        corridorPolyline = coreLine;
+          layerGroup.addLayer(glowLine);
+          layerGroup.addLayer(coreLine);
+          corridorPolyline = coreLine;
+        }
       }
     }
 
@@ -168,9 +175,9 @@ export default function CorridorRouteLayer({
     }
 
     // 3. Smoothly animate and fit viewport bounds on initial corridor selection
-    if (corridorPolyline && isNewCorridor) {
-      const bounds = corridorPolyline.getBounds();
-      if (bounds.isValid()) {
+    if (isNewCorridor) {
+      const bounds = initialFitBounds || (corridorPolyline ? corridorPolyline.getBounds() : null);
+      if (bounds && bounds.isValid()) {
         map.fitBounds(bounds, {
           padding: [60, 60],
           maxZoom: 15,
@@ -182,7 +189,7 @@ export default function CorridorRouteLayer({
     return () => {
       layerGroup.clearLayers();
     };
-  }, [map, routeData, onCameraClick, lang]);
+  }, [map, routeData, onCameraClick, lang, showPolyline]);
 
   return null;
 }
