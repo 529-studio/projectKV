@@ -358,10 +358,15 @@ func (s *Service) ListRoads() RoadsResponse {
 }
 
 // GetRoute returns the GeoJSON FeatureCollection and route summary for a named arterial corridor.
-func (s *Service) GetRoute(roadKey string) (*GeoJSONFeatureCollection, *CorridorRouteSummary, bool) {
+func (s *Service) GetRoute(roadKey string, vehicle ...VehicleType) (*GeoJSONFeatureCollection, *CorridorRouteSummary, bool) {
 	status, ok := s.GetStatus(roadKey)
 	if !ok || status == nil {
 		return nil, nil, false
+	}
+
+	vType := VehicleScooter
+	if len(vehicle) > 0 && vehicle[0] != "" {
+		vType = vehicle[0]
 	}
 
 	def, hasDef := LookupCorridor(roadKey)
@@ -395,7 +400,7 @@ func (s *Service) GetRoute(roadKey string) (*GeoJSONFeatureCollection, *Corridor
 		}
 	}
 
-	summary := s.calculateRouteSummary(def, status)
+	summary := s.calculateRouteSummary(def, status, vType)
 
 	var features []GeoJSONFeature
 
@@ -470,8 +475,8 @@ func (s *Service) GetRoute(roadKey string) (*GeoJSONFeatureCollection, *Corridor
 	}, summary, true
 }
 
-// calculateRouteSummary computes travel duration, flood delay penalty, and passability verdict.
-func (s *Service) calculateRouteSummary(def *CorridorDefinition, status *CorridorStatus) *CorridorRouteSummary {
+// calculateRouteSummary computes travel duration, flood delay penalty, and passability verdict based on vehicle clearance.
+func (s *Service) calculateRouteSummary(def *CorridorDefinition, status *CorridorStatus, vehicle VehicleType) *CorridorRouteSummary {
 	var (
 		maxDepthCm      *float64
 		maxHazardLvl    *int
@@ -545,12 +550,23 @@ func (s *Service) calculateRouteSummary(def *CorridorDefinition, status *Corrido
 		statusColor string
 	)
 
-	if (maxDepthCm != nil && *maxDepthCm > 20.0) || (maxHazardLvl != nil && *maxHazardLvl >= 3) || worstFloodSev == "FLOODED_DEEP" {
+	thresholds, ok := VehicleThresholds[vehicle]
+	if !ok {
+		thresholds = VehicleThresholds[VehicleScooter]
+	}
+
+	isDepthImpassable := maxDepthCm != nil && *maxDepthCm >= thresholds.ImpassableDepthCm
+	isDepthCaution := maxDepthCm != nil && *maxDepthCm >= thresholds.CautionDepthCm
+	isFallbackImpassable := maxDepthCm == nil && ((maxHazardLvl != nil && *maxHazardLvl >= 3) || worstFloodSev == "FLOODED_DEEP")
+	isFallbackCaution := maxDepthCm == nil && ((maxHazardLvl != nil && *maxHazardLvl >= 2) || worstFloodSev == "FLOODED_SHALLOW")
+	isTrafficCongested := status.WorstSeverity == "CONGESTED" || status.WorstSeverity == "HEAVY"
+
+	if isDepthImpassable || isFallbackImpassable {
 		passability = PassabilityImpassable
 		statusColor = "#ef4444" // Red: danger / engine drowning risk
-	} else if (maxDepthCm != nil && *maxDepthCm >= 10.0) || (maxHazardLvl != nil && *maxHazardLvl >= 2) || status.WorstSeverity == "CONGESTED" || status.WorstSeverity == "HEAVY" || worstFloodSev == "FLOODED_SHALLOW" {
+	} else if isDepthCaution || isFallbackCaution || isTrafficCongested {
 		passability = PassabilityCaution
-		statusColor = "#eab308" // Yellow: caution / low scooter warning / congested
+		statusColor = "#eab308" // Yellow: caution / low clearance warning / congested
 	} else if status.VerifiedCameras > 0 {
 		passability = PassabilityPassable
 		statusColor = "#22c55e" // Green: passable / normal flow
@@ -578,11 +594,17 @@ func (s *Service) calculateRouteSummary(def *CorridorDefinition, status *Corrido
 		VerifiedCameras:    status.VerifiedCameras,
 		CoveragePct:        status.CoveragePct,
 		ChokepointCount:    chokepointCount,
+		Vehicle:            vehicle,
 	}
 }
 
 // GetCorridorsOverview returns the operational route summary for all registered arterial corridors.
-func (s *Service) GetCorridorsOverview() []CorridorRouteSummary {
+func (s *Service) GetCorridorsOverview(vehicle ...VehicleType) []CorridorRouteSummary {
+	vType := VehicleScooter
+	if len(vehicle) > 0 && vehicle[0] != "" {
+		vType = vehicle[0]
+	}
+
 	orderedKeys := []string{
 		"vo_van_kiet",
 		"mai_chi_tho",
@@ -618,10 +640,11 @@ func (s *Service) GetCorridorsOverview() []CorridorRouteSummary {
 				WorstFloodSeverity: "UNKNOWN",
 				PassabilityVerdict: PassabilityUnknown,
 				StatusColor:        "#71717a",
+				Vehicle:            vType,
 			})
 			continue
 		}
-		summary := s.calculateRouteSummary(&def, status)
+		summary := s.calculateRouteSummary(&def, status, vType)
 		summaries = append(summaries, *summary)
 	}
 

@@ -606,3 +606,74 @@ func TestArterialCorridors_GeometryInvariants(t *testing.T) {
 		})
 	}
 }
+
+func TestVehicleClearanceProfiles(t *testing.T) {
+	// 1. Normalization tests
+	if NormalizeVehicleType("scooter") != VehicleScooter {
+		t.Errorf("expected scooter, got %s", NormalizeVehicleType("scooter"))
+	}
+	if NormalizeVehicleType("motorbike") != VehicleMotorbike || NormalizeVehicleType("xe_so") != VehicleMotorbike {
+		t.Errorf("expected motorbike normalization")
+	}
+	if NormalizeVehicleType("sedan") != VehicleSedan || NormalizeVehicleType("car") != VehicleSedan {
+		t.Errorf("expected sedan normalization")
+	}
+	if NormalizeVehicleType("suv") != VehicleSUV || NormalizeVehicleType("ban_tai") != VehicleSUV {
+		t.Errorf("expected suv normalization")
+	}
+	if NormalizeVehicleType("unknown_profile") != VehicleScooter {
+		t.Errorf("expected fallback to scooter")
+	}
+
+	// 2. Dynamic divergence test at 22.0 cm flood
+	now := time.Now()
+	floodDepth := 22.0
+	cameras := sampleCameras()
+	verdicts := []hotset.Verdict{
+		{
+			CameraID:      "cam-1",
+			Severity:      "CLEAR",
+			FloodSeverity: "FLOODED_SHALLOW",
+			FloodDepthCm:  &floodDepth,
+			ObservedAt:    now.Add(-10 * time.Second),
+			Source:        "onnx",
+		},
+	}
+
+	camProv := &mockCameraProvider{cameras: cameras}
+	verdProv := &mockVerdictProvider{verdicts: verdicts}
+	svc := NewService(camProv, verdProv, "production", 180*time.Second)
+
+	// Scooter: 22cm >= 20cm => IMPASSABLE
+	_, scooterSummary, ok := svc.GetRoute("vo_van_kiet", VehicleScooter)
+	if !ok || scooterSummary.PassabilityVerdict != PassabilityImpassable {
+		t.Errorf("expected scooter to be IMPASSABLE at 22cm, got %s", scooterSummary.PassabilityVerdict)
+	}
+	if scooterSummary.StatusColor != "#ef4444" {
+		t.Errorf("expected red for scooter, got %s", scooterSummary.StatusColor)
+	}
+
+	// Motorbike: 22cm is between 15cm and 28cm => CAUTION
+	_, motorbikeSummary, ok := svc.GetRoute("vo_van_kiet", VehicleMotorbike)
+	if !ok || motorbikeSummary.PassabilityVerdict != PassabilityCaution {
+		t.Errorf("expected motorbike to be CAUTION at 22cm, got %s", motorbikeSummary.PassabilityVerdict)
+	}
+	if motorbikeSummary.StatusColor != "#eab308" {
+		t.Errorf("expected amber for motorbike, got %s", motorbikeSummary.StatusColor)
+	}
+
+	// Sedan: 22cm is between 15cm and 25cm => CAUTION
+	_, sedanSummary, ok := svc.GetRoute("vo_van_kiet", VehicleSedan)
+	if !ok || sedanSummary.PassabilityVerdict != PassabilityCaution {
+		t.Errorf("expected sedan to be CAUTION at 22cm, got %s", sedanSummary.PassabilityVerdict)
+	}
+
+	// SUV: 22cm < 25cm => PASSABLE
+	_, suvSummary, ok := svc.GetRoute("vo_van_kiet", VehicleSUV)
+	if !ok || suvSummary.PassabilityVerdict != PassabilityPassable {
+		t.Errorf("expected SUV to be PASSABLE at 22cm, got %s", suvSummary.PassabilityVerdict)
+	}
+	if suvSummary.StatusColor != "#22c55e" {
+		t.Errorf("expected green for SUV, got %s", suvSummary.StatusColor)
+	}
+}

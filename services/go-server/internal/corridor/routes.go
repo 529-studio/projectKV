@@ -105,13 +105,14 @@ var ArterialCorridors = map[string]CorridorDefinition{
 		Coordinates: [][2]float64{
 			{106.706235, 10.782632},
 			{106.707914, 10.784623},
+			{106.711800, 10.787600},
 			{106.715097, 10.789203},
 			{106.716428, 10.789145},
 			{106.716954, 10.788797},
 			{106.718182, 10.791126},
-			{106.71808, 10.795078},
-			{106.72073, 10.797497},
-			{106.721127, 10.797818},
+			{106.719800, 10.792500},
+			{106.721400, 10.794200},
+			{106.722800, 10.796500},
 			{106.723707, 10.799131},
 		},
 	},
@@ -278,6 +279,56 @@ const (
 	PassabilityUnknown    PassabilityVerdict = "UNKNOWN"    // CHƯA ĐỦ DỮ LIỆU
 )
 
+// VehicleType represents the commuter vehicle profile for hazard threshold evaluation (Issue #510).
+type VehicleType string
+
+const (
+	VehicleScooter   VehicleType = "scooter"
+	VehicleMotorbike VehicleType = "motorbike"
+	VehicleSedan     VehicleType = "sedan"
+	VehicleSUV       VehicleType = "suv"
+)
+
+// VehicleClearanceThresholds defines depth boundaries in cm for each vehicle category.
+type VehicleClearanceThresholds struct {
+	CautionDepthCm    float64
+	ImpassableDepthCm float64
+}
+
+// VehicleThresholds maps each vehicle category to its empirical physical immersion limits.
+var VehicleThresholds = map[VehicleType]VehicleClearanceThresholds{
+	VehicleScooter: {
+		CautionDepthCm:    10.0,
+		ImpassableDepthCm: 20.0,
+	},
+	VehicleMotorbike: {
+		CautionDepthCm:    15.0,
+		ImpassableDepthCm: 28.0,
+	},
+	VehicleSedan: {
+		CautionDepthCm:    15.0,
+		ImpassableDepthCm: 25.0,
+	},
+	VehicleSUV: {
+		CautionDepthCm:    25.0,
+		ImpassableDepthCm: 40.0,
+	},
+}
+
+// NormalizeVehicleType parses and normalizes input vehicle string, defaulting safely to VehicleScooter.
+func NormalizeVehicleType(v string) VehicleType {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "motorbike", "motorcycle", "xe_so", "xe_con":
+		return VehicleMotorbike
+	case "sedan", "car", "o_to":
+		return VehicleSedan
+	case "suv", "truck", "ban_tai":
+		return VehicleSUV
+	default:
+		return VehicleScooter
+	}
+}
+
 // CorridorRouteSummary provides aggregated travel duration, cumulative hazard index, and passability verdict.
 type CorridorRouteSummary struct {
 	RoadKey            string             `json:"road_key"`
@@ -298,6 +349,7 @@ type CorridorRouteSummary struct {
 	VerifiedCameras    int                `json:"verified_cameras"`
 	CoveragePct        float64            `json:"coverage_pct"`
 	ChokepointCount    int                `json:"chokepoint_count"`
+	Vehicle            VehicleType        `json:"vehicle,omitempty"`
 }
 
 // GeoJSONGeometry models the geometry of a GeoJSON feature.
