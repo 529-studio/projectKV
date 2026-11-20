@@ -27,6 +27,8 @@ VALID_BACKUP_SERVICE = """
     image: alpine:3.20
     container_name: warded-backup
     restart: unless-stopped
+    group_add:
+      - "10001"
     networks:
       - core-network
     depends_on:
@@ -267,6 +269,13 @@ Persistent=true
         )
         violations = cdm.check_backup_sidecar(self.compose_path)
         self.assertTrue(any(v.rule == "backup_limits" for v in violations))
+
+    def test_backup_missing_group_add_flagged(self) -> None:
+        self.compose_path.write_text(
+            self.compose_path.read_text().replace('    group_add:\n      - "10001"\n', "")
+        )
+        violations = cdm.check_backup_sidecar(self.compose_path)
+        self.assertTrue(any(v.rule == "backup_group_add" for v in violations))
 
     def test_backup_missing_data_volume_flagged(self) -> None:
         self.compose_path.write_text(

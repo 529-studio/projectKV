@@ -387,6 +387,14 @@ def check_backup_sidecar(compose_path: Path) -> list[Violation]:
         violations.append(
             Violation(compose_path, "backup_security", "Expected capabilities drop: [ALL]")
         )
+    if not re.search(r'group_add:\s*\n(?:\s*-\s*"?[^"\n]+"?\n)*?\s*-\s*"?10001"?\s*$', block, re.MULTILINE):
+        violations.append(
+            Violation(
+                compose_path,
+                "backup_group_add",
+                "Expected group_add containing 10001 so UID 0 with cap_drop: [ALL] can access 10001-owned WAL files",
+            )
+        )
     if not re.search(r"no-new-privileges:true", block):
         violations.append(
             Violation(compose_path, "backup_security", "Expected security_opt no-new-privileges:true")

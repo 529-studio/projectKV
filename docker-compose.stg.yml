@@ -98,13 +98,6 @@ services:
         limits:
           cpus: "${BE_CPU_LIMIT:-0.50}"
           memory: "${BE_MEMORY_LIMIT:-256M}"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=${DOCKER_NETWORK:-core-network}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded}-be.rule=Host(`${DOMAIN_NAME:-warded.529studio.site}`) && (PathPrefix(`/api`) || PathPrefix(`/ws`) || PathPrefix(`/health`) || PathPrefix(`/swagger`))"
-      - "traefik.http.routers.${ROUTER_NAME:-warded}-be.entrypoints=${TRAEFIK_ENTRYPOINT:-web}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded}-be.priority=100"
-      - "traefik.http.services.${ROUTER_NAME:-warded}-be.loadbalancer.server.port=${BE_PORT:-3000}"
 
   warded-frontend:
     image: ${FE_IMAGE_NAME:-ghcr.io/529-studio/projectkv-frontend}:${FE_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
@@ -120,13 +113,6 @@ services:
         limits:
           cpus: "${FE_CPU_LIMIT:-0.25}"
           memory: "${FE_MEMORY_LIMIT:-64M}"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=${DOCKER_NETWORK:-core-network}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded}-fe.rule=Host(`${DOMAIN_NAME:-warded.529studio.site}`)"
-      - "traefik.http.routers.${ROUTER_NAME:-warded}-fe.entrypoints=${TRAEFIK_ENTRYPOINT:-web}"
-      - "traefik.http.routers.${ROUTER_NAME:-warded}-fe.priority=1"
-      - "traefik.http.services.${ROUTER_NAME:-warded}-fe.loadbalancer.server.port=80"
 
   warded-model:
     profiles: ["model-local"]
@@ -145,8 +131,6 @@ services:
         limits:
           cpus: "${MODEL_CPU_LIMIT:-1.00}"
           memory: "${MODEL_MEMORY_LIMIT:-512M}"
-    labels:
-      - "traefik.enable=false"
     security_opt:
       - no-new-privileges:true
     volumes:
@@ -249,6 +233,8 @@ services:
     image: alpine:3.20
     container_name: ${BACKUP_CONTAINER_NAME:-warded-backup}
     restart: unless-stopped
+    group_add:
+      - "10001"
     # Runs as root with a writable rootfs on purpose: `apk add sqlite rclone
     # tzdata` writes to /lib/apk/db and /usr, which neither a non-root UID nor a
     # read-only rootfs allows. The blast radius is contained by cap_drop: [ALL],
