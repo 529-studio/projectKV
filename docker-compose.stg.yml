@@ -1,10 +1,11 @@
 services:
   # One-shot volume ownership repair (Issue #442 / S14-T2). A freshly created
-  # Docker volume is owned by root, while the forecast cron and Litestream
-  # sidecar run as 10001:10001. Without this the forecast refit fails to write
-  # its state and Litestream cannot read the WAL. The backend also gates on it so
-  # the volume is in a known state before any service touches it. It runs as root
-  # only long enough to mkdir/chown/chmod, then exits.
+  # Docker volume is owned by root, while the forecast cron and backup sidecar
+  # run as 10001:10001. Without this the forecast refit fails to write its state
+  # or its lock, and the backup sidecar cannot open the database. The backend
+  # also gates on it so the volume is in a known state before any service
+  # touches it. It runs as root only long enough to mkdir/chown/chmod, then
+  # exits.
   warded-init-vol:
     image: alpine:3.20
     container_name: ${INIT_VOL_CONTAINER_NAME:-warded-init-vol}
@@ -238,63 +239,89 @@ services:
     cap_drop:
       - ALL
 
-  # Continuous SQLite replication to Cloudflare R2 (Issue #442 / S14-T2).
-  # Litestream tails camera-view.db's WAL and ships committed frames to
-  # s3://${R2_BUCKET_NAME}/db-replicas/camera-view.db every second. The config is
-  # mounted read-only; credentials arrive only as environment variables.
-  warded-litestream:
-    image: litestream/litestream:0.3.13
-    container_name: ${LITESTREAM_CONTAINER_NAME:-warded-litestream}
+  # Daily SQLite backup to Cloudflare R2. This replaces the removed streaming
+  # replication sidecar: tailing the WAL every second meant continuous R2 Class A
+  # operations on a Celeron-class host, and it bought an RPO the product does not
+  # need. A 24h RPO is accepted, and `sqlite3 .backup` is WAL-safe: it snapshots
+  # through the SQLite backup API, so committed frames still sitting in the WAL
+  # are captured without a raw file copy that would race the writer.
+  warded-backup:
+    image: alpine:3.20
+    container_name: ${BACKUP_CONTAINER_NAME:-warded-backup}
     restart: unless-stopped
-    user: "10001:10001"
+    # Runs as root with a writable rootfs on purpose: `apk add sqlite rclone
+    # tzdata` writes to /lib/apk/db and /usr, which neither a non-root UID nor a
+    # read-only rootfs allows. The blast radius is contained by cap_drop: [ALL],
+    # no-new-privileges, no published port, and the fact that the only writable
+    # mounts are the staging volume and a 32 MB /tmp tmpfs.
     networks:
       - core-network
     depends_on:
       warded-init-vol:
         condition: service_completed_successfully
     volumes:
+      # Read-write at the mount level because SQLite opens the database file
+      # itself; this container never writes into /app/data.
       - warded-stg-data:/app/data
-    # The Portainer stack directory holds only this compose file, so a relative
-    # host path like ./deploy/litestream/litestream.yml does not exist there and
-    # Docker silently creates it as a directory, which makes Litestream fail
-    # every start with "read /etc/litestream.yml: is a directory". The config is
-    # therefore rendered into the /tmp tmpfs at startup from the same
-    # environment; deploy/litestream/litestream.yml stays the canonical
-    # reference for CLI restores and the restore drill.
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        cat > /tmp/litestream.yml <<'LITESTREAM_CONFIG'
-        dbs:
-          - path: /app/data/camera-view.db
-            replicas:
-              - type: s3
-                name: r2
-                bucket: ${R2_BUCKET_NAME}
-                path: db-replicas/camera-view.db
-                endpoint: ${R2_ENDPOINT}
-                region: ${R2_REGION:-auto}
-                access-key-id: $${LITESTREAM_ACCESS_KEY_ID}
-                secret-access-key: $${LITESTREAM_SECRET_ACCESS_KEY}
-                sync-interval: 1s
-                snapshot-interval: 24h
-                retention: 48h
-        LITESTREAM_CONFIG
-        exec litestream replicate -config /tmp/litestream.yml
+      # Snapshot and archive staging. A tmpfs cannot hold them: camera-view.db is
+      # ~389 MB and tmpfs is RAM, counted against the 128M memory limit.
+      - warded-backup-staging:/backup
     environment:
       - TZ=${TZ:-Asia/Ho_Chi_Minh}
+      # rclone keeps its scratch state in HOME.
       - HOME=/tmp
-      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-warded-proofs}
-      # Required, never defaulted to empty: a missing endpoint would make the
-      # S3 client talk to AWS and hand it R2 credentials.
-      - R2_ENDPOINT=${R2_ENDPOINT:?R2_ENDPOINT must be provided for Litestream replication}
-      - R2_REGION=${R2_REGION:-auto}
-      # LITESTREAM_* wins; the R2 credentials are the documented fallback.
-      - LITESTREAM_ACCESS_KEY_ID=${LITESTREAM_ACCESS_KEY_ID:-${R2_ACCESS_KEY_ID:-}}
-      - LITESTREAM_SECRET_ACCESS_KEY=${LITESTREAM_SECRET_ACCESS_KEY:-${R2_SECRET_ACCESS_KEY:-}}
-    read_only: true
+      - RCLONE_CONFIG_R2_TYPE=s3
+      - RCLONE_CONFIG_R2_PROVIDER=Cloudflare
+      - RCLONE_CONFIG_R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - RCLONE_CONFIG_R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      # Bucket-scoped endpoint: a wrong account cannot silently reach AWS S3.
+      - RCLONE_CONFIG_R2_ENDPOINT=https://${R2_ACCOUNT_ID:-bb67574163a065e4aad475fb3aa6bb92}.r2.cloudflarestorage.com
+      - RCLONE_CONFIG_R2_REGION=${R2_REGION:-auto}
+      - BACKUP_BUCKET_NAME=${BACKUP_BUCKET_NAME:-homelab-backup}
+      - KEEP_DAYS=${BACKUP_KEEP_DAYS:-14}
+    entrypoint: ["/bin/sh", "-c"]
+    # No `set -e`: a failed night must log and wait for the next one, not
+    # crash-loop. The R2 quota watchdog is the detection path for a stalled
+    # backup, so the loop always survives to try again.
+    command:
+      - |
+        set -u
+        while ! apk add --no-cache sqlite rclone tzdata >/dev/null 2>&1; do
+          echo "[ERR] apk add sqlite rclone tzdata failed; retrying in 300s" >&2
+          sleep 300
+        done
+        echo "[INFO] sqlite, rclone and tzdata installed; TZ=$$TZ"
+        while true; do
+          wait_s=$(date +%H:%M:%S | awk -F: '{ t = $1 * 3600 + $2 * 60 + $3; target = 3 * 3600 + 15 * 60; printf "%d", (t < target) ? target - t : 86400 - t + target }')
+          echo "[INFO] sleeping $${wait_s}s until the next 03:15 $$TZ backup"
+          sleep "$$wait_s"
+          stamp=$(date +%Y%m%d)
+          snapshot=/backup/camera-view.db
+          archive="/backup/warded-$${stamp}.sqlite3.gz"
+          echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S %Z') starting backup of camera-view.db"
+          rm -f "$$snapshot"
+          if ! sqlite3 /app/data/camera-view.db ".backup '$$snapshot'"; then
+            echo "[ERR] sqlite3 .backup failed for /app/data/camera-view.db" >&2
+          elif ! gzip -c "$$snapshot" > "$$archive"; then
+            echo "[ERR] gzip failed for $$archive" >&2
+          elif ! rclone copyto "$$archive" "r2:$${BACKUP_BUCKET_NAME}/warded/$(basename "$$archive")"; then
+            echo "[ERR] rclone upload failed for $$archive to r2:$${BACKUP_BUCKET_NAME}/warded/" >&2
+          else
+            echo "[INFO] uploaded $$archive to r2:$${BACKUP_BUCKET_NAME}/warded/"
+            if rclone delete --min-age "$${KEEP_DAYS}d" "r2:$${BACKUP_BUCKET_NAME}/warded/"; then
+              echo "[INFO] retention applied: objects older than $${KEEP_DAYS}d deleted"
+            else
+              echo "[ERR] rclone retention delete failed; the upload itself is intact" >&2
+            fi
+          fi
+          rm -f "$$snapshot" "$$archive"
+          echo "[INFO] backup cycle finished"
+          # Step past the 03:15 minute so the next wait computes a full day even
+          # when the cycle finished inside the same second it started.
+          sleep 61
+        done
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -302,14 +329,16 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "${LITESTREAM_CPU_LIMIT:-0.25}"
-          memory: "${LITESTREAM_MEMORY_LIMIT:-128M}"
+          cpus: "${BACKUP_CPU_LIMIT:-0.10}"
+          memory: "${BACKUP_MEMORY_LIMIT:-128M}"
 
 volumes:
   warded-stg-data:
     name: ${DATA_VOLUME_NAME:-warded-stg_warded-stg-data}
   warded-model-weights:
     name: ${MODEL_VOLUME_NAME:-warded-stg_warded-model-weights}
+  warded-backup-staging:
+    name: ${BACKUP_VOLUME_NAME:-warded-backup-staging}
 
 networks:
   core-network:

@@ -1,5 +1,7 @@
-# Dedicated Docker Compose configuration for the CV Engine on the inference worker host
-# Deployed via the container management API configured in CI (see docker-publish.yml)
+# Dedicated Docker Compose configuration for the CV Engine on the GPU host.
+# Deployed via the container management API configured in CI (see docker-publish.yml).
+# The engine publishes no host port: consumers such as warded-backend reach it as
+# http://warded-cv-engine:8000 over core-network, the same network both stacks join.
 
 services:
   warded-cv-engine:
@@ -7,8 +9,8 @@ services:
     container_name: ${MODEL_CONTAINER_NAME:-warded-cv-engine}
     restart: unless-stopped
     pull_policy: ${PULL_POLICY:-always}
-    ports:
-      - "8000:8000"
+    networks:
+      - core-network
     environment:
       - PORT=8000
       - MODEL_DIR=/app/models/yolov8n_openvino_320
@@ -49,3 +51,8 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+networks:
+  core-network:
+    name: ${DOCKER_NETWORK:-core-network}
+    external: true
