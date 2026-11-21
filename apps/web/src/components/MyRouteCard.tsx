@@ -106,13 +106,13 @@ export default function MyRouteCard({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* DIRECTION SWITCH BUTTON */}
+          {/* DIRECTION SWITCH BUTTON (>=48px touch target) */}
           <button
             type="button"
             onClick={onToggleDirection}
             aria-label={COMMUTE_I18N.SWITCH_DIRECTION[lang]}
             title={isToWork ? COMMUTE_I18N.DIRECTION_TO_HOME[lang] : COMMUTE_I18N.DIRECTION_TO_WORK[lang]}
-            className="px-2 py-1 text-[11px] rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-zinc-100 flex items-center gap-1 transition-colors cursor-pointer"
+            className="min-h-[48px] min-w-[48px] px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-zinc-100 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
             <svg
               className="w-3.5 h-3.5 text-zinc-400"
@@ -127,13 +127,13 @@ export default function MyRouteCard({
             <span>{isToWork ? (lang === 'vi' ? 'Đi làm' : 'To work') : (lang === 'vi' ? 'Về nhà' : 'To home')}</span>
           </button>
 
-          {/* SETUP / CHANGE ROUTE */}
+          {/* SETUP / CHANGE ROUTE (>=48px touch target) */}
           <button
             type="button"
             onClick={onOpenSetup}
             aria-label={COMMUTE_I18N.CHANGE_ROUTE[lang]}
             title={COMMUTE_I18N.CHANGE_ROUTE[lang]}
-            className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            className="min-w-[48px] min-h-[48px] flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
           >
             <svg
               className="w-4 h-4"
@@ -148,12 +148,12 @@ export default function MyRouteCard({
             </svg>
           </button>
 
-          {/* COLLAPSE TOGGLE */}
+          {/* COLLAPSE TOGGLE (>=48px touch target) */}
           <button
             type="button"
             onClick={() => setIsCollapsed(prev => !prev)}
-            aria-label={isCollapsed ? 'Mở rộng thẻ lộ trình' : 'Thu gọn thẻ lộ trình'}
-            className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            aria-label={isCollapsed ? (lang === 'vi' ? 'Mở rộng thẻ lộ trình' : 'Expand commute card') : (lang === 'vi' ? 'Thu gọn thẻ lộ trình' : 'Collapse commute card')}
+            className="min-w-[48px] min-h-[48px] flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
           >
             <svg
               className={`w-4 h-4 transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`}
@@ -167,12 +167,12 @@ export default function MyRouteCard({
             </svg>
           </button>
 
-          {/* CLOSE BUTTON */}
+          {/* CLOSE BUTTON (>=48px touch target) */}
           <button
             type="button"
             onClick={onClose}
-            aria-label="Đóng lộ trình"
-            className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            aria-label={lang === 'vi' ? 'Đóng thẻ lộ trình' : 'Close commute card'}
+            className="min-w-[48px] min-h-[48px] flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
           >
             <svg
               className="w-4 h-4"
@@ -299,7 +299,7 @@ export default function MyRouteCard({
                 <button
                   type="button"
                   onClick={() => onSelectDetour(evaluation.detour!.detour_corridor_key)}
-                  className="px-2.5 py-1 text-[11px] font-medium rounded bg-emerald-600 hover:bg-emerald-500 text-white shrink-0 transition-colors cursor-pointer shadow"
+                  className="min-h-[48px] px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shrink-0 transition-colors cursor-pointer shadow flex items-center justify-center"
                 >
                   {COMMUTE_I18N.VIEW_DETOUR[lang]}
                 </button>
@@ -319,7 +319,7 @@ export default function MyRouteCard({
                   onSubscribeRoute(primaryCorridor);
                 }
               }}
-              className="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
+              className="min-h-[48px] inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-medium transition-colors py-2 cursor-pointer"
             >
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
