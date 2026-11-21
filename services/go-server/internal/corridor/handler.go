@@ -2,6 +2,7 @@ package corridor
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +24,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/roads/status-summary", h.GetStatusSummary)
 	rg.GET("/roads/:road_key/route", h.GetRoute)
 	rg.GET("/corridors/overview", h.GetCorridorsOverview)
+	rg.GET("/corridors/commute-eval", h.EvaluateCommute)
 }
 
 // GetStatus godoc
@@ -103,4 +105,40 @@ func (h *Handler) GetCorridorsOverview(c *gin.Context) {
 	vType := NormalizeVehicleType(c.Query("vehicle"))
 	overview := h.service.GetCorridorsOverview(vType)
 	c.JSON(http.StatusOK, overview)
+}
+
+// EvaluateCommute godoc
+// @Summary Evaluate multi-corridor commuter journey
+// @Description Calculates aggregated passability verdict, trip duration, delay, worst hazard bottleneck, and alternative bypass recommendations for commuter corridors.
+// @Tags Corridor
+// @Produce json
+// @Param corridors query string true "Comma-separated corridor keys (e.g. nguyen_huu_canh,dien_bien_phu)"
+// @Param vehicle query string false "Vehicle clearance profile (scooter, motorbike, sedan, suv)"
+// @Success 200 {object} corridor.CommuteEvaluationResponse
+// @Failure 400 {object} map[string]string "Bad Request"
+// @Router /api/corridors/commute-eval [get]
+func (h *Handler) EvaluateCommute(c *gin.Context) {
+	rawCorridors := c.Query("corridors")
+	if strings.TrimSpace(rawCorridors) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "corridors query parameter is required (comma-separated corridor keys)"})
+		return
+	}
+
+	parts := strings.Split(rawCorridors, ",")
+	corridorKeys := make([]string, 0, len(parts))
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			corridorKeys = append(corridorKeys, trimmed)
+		}
+	}
+
+	if len(corridorKeys) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no valid corridor keys provided"})
+		return
+	}
+
+	vType := NormalizeVehicleType(c.Query("vehicle"))
+	result := h.service.EvaluateCommute(corridorKeys, vType)
+	c.JSON(http.StatusOK, result)
 }

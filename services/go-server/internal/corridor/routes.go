@@ -371,6 +371,44 @@ type GeoJSONFeatureCollection struct {
 	Features []GeoJSONFeature `json:"features"`
 }
 
+// CommuteHazardBottleneck isolates the single most severe hazard along a commuter journey.
+type CommuteHazardBottleneck struct {
+	CameraID         string   `json:"camera_id"`
+	Name             string   `json:"name"`
+	Severity         string   `json:"severity"`
+	FloodSeverity    string   `json:"flood_severity"`
+	FloodDepthCm     *float64 `json:"flood_depth_cm,omitempty"`
+	FloodHazardLevel *int     `json:"flood_hazard_level,omitempty"`
+	CorridorKey      string   `json:"corridor_key"`
+	CorridorName     string   `json:"corridor_name"`
+	Description      string   `json:"description"`
+}
+
+// DetourSuggestion represents a recommended alternative bypass corridor when the primary route is impassable or hazardous.
+type DetourSuggestion struct {
+	OriginalCorridorKey string             `json:"original_corridor_key"`
+	DetourCorridorKey   string             `json:"detour_corridor_key"`
+	DetourCorridorName  string             `json:"detour_corridor_name"`
+	PassabilityVerdict  PassabilityVerdict `json:"passability_verdict"`
+	MaxDepthCm          *float64           `json:"max_depth_cm,omitempty"`
+	DelaySeconds        int                `json:"delay_seconds"`
+	Reason              string             `json:"reason"`
+}
+
+// CommuteEvaluationResponse aggregates safety passability, travel duration, delays, worst bottleneck, and detour options for a multi-corridor journey.
+type CommuteEvaluationResponse struct {
+	PassabilityVerdict PassabilityVerdict       `json:"passability_verdict"`
+	StatusColor        string                   `json:"status_color"`
+	TotalDistanceKm    float64                  `json:"total_distance_km"`
+	FreeFlowSeconds    int                      `json:"free_flow_seconds"`
+	EstimatedSeconds   int                      `json:"estimated_seconds"`
+	DelaySeconds       int                      `json:"delay_seconds"`
+	WorstBottleneck    *CommuteHazardBottleneck `json:"worst_bottleneck,omitempty"`
+	Detour             *DetourSuggestion        `json:"detour,omitempty"`
+	Corridors          []CorridorRouteSummary   `json:"corridors"`
+	Vehicle            VehicleType              `json:"vehicle"`
+}
+
 // LookupCorridor finds a registered arterial corridor definition by roadKey or alias.
 func LookupCorridor(key string) (*CorridorDefinition, bool) {
 	norm := normalizeCorridorKey(key)
