@@ -298,7 +298,7 @@ def synthesize_polygons_from_metadata(labels_meta: Dict[str, Any]) -> List[Tuple
     depth_anchor = str(labels_meta.get("waterline_depth", "DRY")).upper()
     submersion_anchor = str(labels_meta.get("flood_submersion_anchor", "dry")).lower()
 
-    if flood_status == "DEEP" or depth_anchor in ("TIRE_HALF_SUBMERGED", "IMPASSABLE") or "over_15cm" in submersion_anchor:
+    if flood_status == "DEEP" or depth_anchor in ("TIRE_HALF_SUBMERGED", "IMPASSABLE") or "over_15cm" in submersion_anchor or "over_30cm" in submersion_anchor:
         # Deep inundation covering large portion of roadway surface
         puddle_poly = [0.15, 0.95, 0.85, 0.95, 0.62, 0.48, 0.38, 0.48]
         results.append((1, puddle_poly))

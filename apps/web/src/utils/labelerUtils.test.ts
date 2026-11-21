@@ -14,6 +14,7 @@ import {
   hasAutoPolygons,
   POLYGON_PROVENANCE_SAM,
   MAX_ANNOTATIONS_PER_LABEL,
+  SUBMERSION_LEVELS,
   type LabelFilterStatus,
   type LabelPayload,
   type LabelState,
@@ -23,20 +24,67 @@ import {
 } from './labelerUtils.ts';
 
 describe('Labeler Utilities & Hotkeys (Issue #214 / S7-T8 Directional Taxonomy)', () => {
-  test('handleHotkey maps numbers to flood levels and physical depth anchors', () => {
+  test('handleHotkey maps numbers 1-5 to wheel submersion levels and physical depth anchors', () => {
     const s1: LabelState = { flood_level: 'none', traffic_level: 'clear', weather: 'clear', time_of_day: 'day' };
 
     const r1 = handleHotkey('1', s1);
     assert.equal(r1.state.flood_level, 'none');
     assert.equal(r1.state.flood_submersion_anchor, 'dry');
+    assert.equal(r1.state.waterline_depth, 'DRY');
+    assert.equal(r1.state.submersion_depth_cm, 0);
 
     const r2 = handleHotkey('2', s1);
-    assert.equal(r2.state.flood_level, 'puddle');
-    assert.equal(r2.state.flood_submersion_anchor, 'tire_base_under_10cm');
+    assert.equal(r2.state.flood_level, 'none');
+    assert.equal(r2.state.flood_submersion_anchor, 'wet_asphalt_no_standing');
+    assert.equal(r2.state.waterline_depth, 'WET_SURFACE');
+    assert.equal(r2.state.submersion_depth_cm, 0);
 
     const r3 = handleHotkey('3', s1);
-    assert.equal(r3.state.flood_level, 'deep');
-    assert.equal(r3.state.flood_submersion_anchor, 'exhaust_hub_over_15cm');
+    assert.equal(r3.state.flood_level, 'puddle');
+    assert.equal(r3.state.flood_submersion_anchor, 'tire_base_under_10cm');
+    assert.equal(r3.state.waterline_depth, 'TIRE_QUARTER_SUBMERGED');
+    assert.equal(r3.state.submersion_depth_cm, 8);
+
+    const r4 = handleHotkey('4', s1);
+    assert.equal(r4.state.flood_level, 'deep');
+    assert.equal(r4.state.flood_submersion_anchor, 'exhaust_hub_over_15cm');
+    assert.equal(r4.state.waterline_depth, 'TIRE_HALF_SUBMERGED');
+    assert.equal(r4.state.submersion_depth_cm, 18);
+
+    const r5 = handleHotkey('5', s1);
+    assert.equal(r5.state.flood_level, 'deep');
+    assert.equal(r5.state.flood_submersion_anchor, 'wheel_submerged_over_30cm');
+    assert.equal(r5.state.waterline_depth, 'IMPASSABLE');
+    assert.equal(r5.state.submersion_depth_cm, 35);
+  });
+
+  test('handleHotkey triggers auto_advance action when rapidMode is enabled', () => {
+    const s1: LabelState = { flood_level: 'none', traffic_level: 'clear', weather: 'clear', time_of_day: 'day' };
+
+    const rRapid = handleHotkey('3', s1, { rapidMode: true });
+    assert.equal(rRapid.action, 'auto_advance');
+    assert.equal(rRapid.state.waterline_depth, 'TIRE_QUARTER_SUBMERGED');
+    assert.equal(rRapid.state.submersion_depth_cm, 8);
+
+    const rNormal = handleHotkey('3', s1, { rapidMode: false });
+    assert.equal(rNormal.action, undefined);
+  });
+
+  test('SUBMERSION_LEVELS covers all 5 physical depth tiers with bilingual text and zero emojis', () => {
+    const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u;
+    assert.equal(SUBMERSION_LEVELS.length, 5);
+
+    for (const lvl of SUBMERSION_LEVELS) {
+      assert.ok(lvl.key);
+      assert.ok(lvl.waterline);
+      assert.ok(lvl.anchor);
+      assert.ok(lvl.color);
+      assert.ok(lvl.labelVi && !emojiRegex.test(lvl.labelVi));
+      assert.ok(lvl.labelEn && !emojiRegex.test(lvl.labelEn));
+      assert.ok(lvl.descVi && !emojiRegex.test(lvl.descVi));
+      assert.ok(lvl.descEn && !emojiRegex.test(lvl.descEn));
+      assert.equal(typeof lvl.depthCm, 'number');
+    }
   });
 
   test('handleHotkey maps q/w/e/r to Direction A and global traffic level', () => {
