@@ -3,6 +3,7 @@
 package corridor
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -649,6 +650,234 @@ func (s *Service) GetCorridorsOverview(vehicle ...VehicleType) []CorridorRouteSu
 	}
 
 	return summaries
+}
+
+// CorridorDetourPairs defines canonical arterial detour pairings in Ho Chi Minh City.
+var CorridorDetourPairs = map[string][]string{
+	"nguyen_huu_canh":     {"dien_bien_phu"},
+	"dien_bien_phu":       {"nguyen_huu_canh", "pham_van_dong"},
+	"cach_mang_thang_tam": {"nam_ky_khoi_nghia"},
+	"nam_ky_khoi_nghia":   {"cach_mang_thang_tam"},
+	"cong_hoa":            {"pham_van_dong", "cach_mang_thang_tam"},
+	"pham_van_dong":       {"cong_hoa", "dien_bien_phu"},
+	"vo_van_kiet":         {"nguyen_van_linh"},
+	"nguyen_van_linh":     {"vo_van_kiet"},
+	"mai_chi_tho":         {"dien_bien_phu"},
+}
+
+// passabilityRank maps verdict to integer severity rank: IMPASSABLE (3) > CAUTION (2) > UNKNOWN (1) > PASSABLE (0).
+func passabilityRank(v PassabilityVerdict) int {
+	switch v {
+	case PassabilityImpassable:
+		return 3
+	case PassabilityCaution:
+		return 2
+	case PassabilityUnknown:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// EvaluateCommute calculates aggregated trip hazard, duration, delay, worst bottleneck, and detour options for a set of corridors.
+func (s *Service) EvaluateCommute(corridorKeys []string, vehicle VehicleType) *CommuteEvaluationResponse {
+	if vehicle == "" {
+		vehicle = VehicleScooter
+	}
+	vehicle = NormalizeVehicleType(string(vehicle))
+
+	var (
+		summaries        []CorridorRouteSummary
+		totalDistanceKm  float64
+		freeFlowSeconds  int
+		estimatedSeconds int
+		delaySeconds     int
+		worstVerdict     = PassabilityPassable
+		worstStatusColor = "#22c55e"
+		worstBottleneck  *CommuteHazardBottleneck
+		impassableKeys   []string
+		seenKeys         = make(map[string]bool)
+	)
+
+	// Retrieve threshold for vehicle clearance
+	thresholds, ok := VehicleThresholds[vehicle]
+	if !ok {
+		thresholds = VehicleThresholds[VehicleScooter]
+	}
+
+	for _, rawKey := range corridorKeys {
+		normKey := normalizeCorridorKey(rawKey)
+		if normKey == "" || seenKeys[normKey] {
+			continue
+		}
+		seenKeys[normKey] = true
+
+		def, ok := ArterialCorridors[normKey]
+		if !ok {
+			continue
+		}
+
+		status, hasStatus := s.GetStatus(normKey)
+		var summary *CorridorRouteSummary
+		if !hasStatus || status == nil {
+			ffSec := int(math.Round((def.LengthKm / def.FreeFlowSpeedKmh) * 3600))
+			summary = &CorridorRouteSummary{
+				RoadKey:            def.Key,
+				DisplayName:        def.DisplayName,
+				Description:        def.Description,
+				LengthKm:           def.LengthKm,
+				FreeFlowSpeedKmh:   def.FreeFlowSpeedKmh,
+				FreeFlowSeconds:    ffSec,
+				EstimatedSeconds:   ffSec,
+				DelaySeconds:       0,
+				WorstSeverity:      "UNKNOWN",
+				WorstFloodSeverity: "UNKNOWN",
+				PassabilityVerdict: PassabilityUnknown,
+				StatusColor:        "#71717a",
+				Vehicle:            vehicle,
+			}
+		} else {
+			summary = s.calculateRouteSummary(&def, status, vehicle)
+
+			// Scan individual cameras in this corridor to identify bottleneck
+			for _, cam := range status.Cameras {
+				if cam.Stale {
+					continue
+				}
+
+				// Check if this camera is a more severe bottleneck than current worst
+				isBetterCandidate := false
+				if worstBottleneck == nil {
+					isBetterCandidate = true
+				} else {
+					// 1. Water depth priority
+					camDepth := 0.0
+					if cam.FloodDepthCm != nil {
+						camDepth = *cam.FloodDepthCm
+					}
+					worstDepth := 0.0
+					if worstBottleneck.FloodDepthCm != nil {
+						worstDepth = *worstBottleneck.FloodDepthCm
+					}
+
+					if camDepth > worstDepth {
+						isBetterCandidate = true
+					} else if camDepth == worstDepth {
+						// 2. Flood severity rank
+						if floodRank(cam.FloodSeverity) > floodRank(worstBottleneck.FloodSeverity) {
+							isBetterCandidate = true
+						} else if floodRank(cam.FloodSeverity) == floodRank(worstBottleneck.FloodSeverity) {
+							// 3. Traffic severity rank
+							if severityRank(cam.Severity) > severityRank(worstBottleneck.Severity) {
+								isBetterCandidate = true
+							}
+						}
+					}
+				}
+
+				if isBetterCandidate && (cam.FloodDepthCm != nil || cam.Severity == "CONGESTED" || cam.Severity == "HEAVY" || floodRank(cam.FloodSeverity) >= 2) {
+					desc := ""
+					if cam.FloodDepthCm != nil && *cam.FloodDepthCm >= thresholds.ImpassableDepthCm {
+						desc = fmt.Sprintf("Đoạn ngập sâu nhất: %s: %.0f cm (Nguy cơ chết máy)", cam.Name, *cam.FloodDepthCm)
+					} else if cam.FloodDepthCm != nil && *cam.FloodDepthCm >= thresholds.CautionDepthCm {
+						desc = fmt.Sprintf("Đoạn ngập sâu nhất: %s: %.0f cm (Cảnh báo xe gầm thấp)", cam.Name, *cam.FloodDepthCm)
+					} else if cam.FloodDepthCm != nil && *cam.FloodDepthCm > 0 {
+						desc = fmt.Sprintf("Đoạn đọng nước: %s: %.0f cm", cam.Name, *cam.FloodDepthCm)
+					} else if cam.Severity == "CONGESTED" || cam.Severity == "HEAVY" {
+						desc = fmt.Sprintf("Ùn tắc nghiêm trọng tại: %s", cam.Name)
+					}
+
+					worstBottleneck = &CommuteHazardBottleneck{
+						CameraID:         cam.CameraID,
+						Name:             cam.Name,
+						Severity:         cam.Severity,
+						FloodSeverity:    cam.FloodSeverity,
+						FloodDepthCm:     cam.FloodDepthCm,
+						FloodHazardLevel: cam.FloodHazardLevel,
+						CorridorKey:      def.Key,
+						CorridorName:     def.DisplayName,
+						Description:      desc,
+					}
+				}
+			}
+		}
+
+		summaries = append(summaries, *summary)
+		totalDistanceKm += summary.LengthKm
+		freeFlowSeconds += summary.FreeFlowSeconds
+		estimatedSeconds += summary.EstimatedSeconds
+		delaySeconds += summary.DelaySeconds
+
+		if passabilityRank(summary.PassabilityVerdict) > passabilityRank(worstVerdict) {
+			worstVerdict = summary.PassabilityVerdict
+			worstStatusColor = summary.StatusColor
+		}
+
+		if summary.PassabilityVerdict == PassabilityImpassable || summary.PassabilityVerdict == PassabilityCaution {
+			impassableKeys = append(impassableKeys, def.Key)
+		}
+	}
+
+	// Detour determination: if journey is Impassable or Caution, seek a passable alternative
+	var detour *DetourSuggestion
+	if len(impassableKeys) > 0 {
+		for _, badKey := range impassableKeys {
+			pairs, exists := CorridorDetourPairs[badKey]
+			if !exists {
+				continue
+			}
+
+			badDef, _ := ArterialCorridors[badKey]
+			for _, candidateKey := range pairs {
+				// Avoid suggesting a corridor that is already part of the user's route
+				if seenKeys[candidateKey] {
+					continue
+				}
+
+				candDef, ok := ArterialCorridors[candidateKey]
+				if !ok {
+					continue
+				}
+
+				candStatus, hasStatus := s.GetStatus(candidateKey)
+				var candSummary *CorridorRouteSummary
+				if !hasStatus || candStatus == nil {
+					continue
+				}
+				candSummary = s.calculateRouteSummary(&candDef, candStatus, vehicle)
+
+				// A viable detour must be PASSABLE, or strictly safer than the original corridor
+				if candSummary.PassabilityVerdict == PassabilityPassable {
+					detour = &DetourSuggestion{
+						OriginalCorridorKey: badKey,
+						DetourCorridorKey:   candDef.Key,
+						DetourCorridorName:  candDef.DisplayName,
+						PassabilityVerdict:  candSummary.PassabilityVerdict,
+						MaxDepthCm:          candSummary.MaxDepthCm,
+						DelaySeconds:        candSummary.DelaySeconds,
+						Reason:              fmt.Sprintf("Tránh tuyến %s (%s); %s thông thoáng và an toàn.", badDef.DisplayName, badKey, candDef.DisplayName),
+					}
+					break
+				}
+			}
+			if detour != nil {
+				break
+			}
+		}
+	}
+
+	return &CommuteEvaluationResponse{
+		PassabilityVerdict: worstVerdict,
+		StatusColor:        worstStatusColor,
+		TotalDistanceKm:    math.Round(totalDistanceKm*10) / 10,
+		FreeFlowSeconds:    freeFlowSeconds,
+		EstimatedSeconds:   estimatedSeconds,
+		DelaySeconds:       delaySeconds,
+		WorstBottleneck:    worstBottleneck,
+		Detour:             detour,
+		Corridors:          summaries,
+		Vehicle:            vehicle,
+	}
 }
 
 func floodRank(s string) int {

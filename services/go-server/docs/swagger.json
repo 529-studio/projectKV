@@ -403,6 +403,50 @@
                 }
             }
         },
+        "/api/corridors/commute-eval": {
+            "get": {
+                "description": "Calculates aggregated passability verdict, trip duration, delay, worst hazard bottleneck, and alternative bypass recommendations for commuter corridors.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Corridor"
+                ],
+                "summary": "Evaluate multi-corridor commuter journey",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Comma-separated corridor keys (e.g. nguyen_huu_canh,dien_bien_phu)",
+                        "name": "corridors",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Vehicle clearance profile (scooter, motorbike, sedan, suv)",
+                        "name": "vehicle",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/corridor.CommuteEvaluationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/corridors/overview": {
             "get": {
                 "description": "Returns list of all arterial commuter corridors with real-time passability verdicts, travel delay in seconds, and peak flood depth.",
@@ -1881,6 +1925,76 @@
                 }
             }
         },
+        "corridor.CommuteEvaluationResponse": {
+            "type": "object",
+            "properties": {
+                "corridors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/corridor.CorridorRouteSummary"
+                    }
+                },
+                "delay_seconds": {
+                    "type": "integer"
+                },
+                "detour": {
+                    "$ref": "#/definitions/corridor.DetourSuggestion"
+                },
+                "estimated_seconds": {
+                    "type": "integer"
+                },
+                "free_flow_seconds": {
+                    "type": "integer"
+                },
+                "passability_verdict": {
+                    "$ref": "#/definitions/corridor.PassabilityVerdict"
+                },
+                "status_color": {
+                    "type": "string"
+                },
+                "total_distance_km": {
+                    "type": "number"
+                },
+                "vehicle": {
+                    "$ref": "#/definitions/corridor.VehicleType"
+                },
+                "worst_bottleneck": {
+                    "$ref": "#/definitions/corridor.CommuteHazardBottleneck"
+                }
+            }
+        },
+        "corridor.CommuteHazardBottleneck": {
+            "type": "object",
+            "properties": {
+                "camera_id": {
+                    "type": "string"
+                },
+                "corridor_key": {
+                    "type": "string"
+                },
+                "corridor_name": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "flood_depth_cm": {
+                    "type": "number"
+                },
+                "flood_hazard_level": {
+                    "type": "integer"
+                },
+                "flood_severity": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                }
+            }
+        },
         "corridor.CorridorRouteSummary": {
             "type": "object",
             "properties": {
@@ -1978,6 +2092,32 @@
                 },
                 "worst_severity": {
                     "description": "\"CLEAR\" | \"MODERATE\" | \"HEAVY\" | \"CONGESTED\" | \"UNKNOWN\"",
+                    "type": "string"
+                }
+            }
+        },
+        "corridor.DetourSuggestion": {
+            "type": "object",
+            "properties": {
+                "delay_seconds": {
+                    "type": "integer"
+                },
+                "detour_corridor_key": {
+                    "type": "string"
+                },
+                "detour_corridor_name": {
+                    "type": "string"
+                },
+                "max_depth_cm": {
+                    "type": "number"
+                },
+                "original_corridor_key": {
+                    "type": "string"
+                },
+                "passability_verdict": {
+                    "$ref": "#/definitions/corridor.PassabilityVerdict"
+                },
+                "reason": {
                     "type": "string"
                 }
             }

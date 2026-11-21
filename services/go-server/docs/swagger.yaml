@@ -224,6 +224,52 @@ definitions:
       stale:
         type: boolean
     type: object
+  corridor.CommuteEvaluationResponse:
+    properties:
+      corridors:
+        items:
+          $ref: '#/definitions/corridor.CorridorRouteSummary'
+        type: array
+      delay_seconds:
+        type: integer
+      detour:
+        $ref: '#/definitions/corridor.DetourSuggestion'
+      estimated_seconds:
+        type: integer
+      free_flow_seconds:
+        type: integer
+      passability_verdict:
+        $ref: '#/definitions/corridor.PassabilityVerdict'
+      status_color:
+        type: string
+      total_distance_km:
+        type: number
+      vehicle:
+        $ref: '#/definitions/corridor.VehicleType'
+      worst_bottleneck:
+        $ref: '#/definitions/corridor.CommuteHazardBottleneck'
+    type: object
+  corridor.CommuteHazardBottleneck:
+    properties:
+      camera_id:
+        type: string
+      corridor_key:
+        type: string
+      corridor_name:
+        type: string
+      description:
+        type: string
+      flood_depth_cm:
+        type: number
+      flood_hazard_level:
+        type: integer
+      flood_severity:
+        type: string
+      name:
+        type: string
+      severity:
+        type: string
+    type: object
   corridor.CorridorRouteSummary:
     properties:
       chokepoint_count:
@@ -290,6 +336,23 @@ definitions:
         type: string
       worst_severity:
         description: '"CLEAR" | "MODERATE" | "HEAVY" | "CONGESTED" | "UNKNOWN"'
+        type: string
+    type: object
+  corridor.DetourSuggestion:
+    properties:
+      delay_seconds:
+        type: integer
+      detour_corridor_key:
+        type: string
+      detour_corridor_name:
+        type: string
+      max_depth_cm:
+        type: number
+      original_corridor_key:
+        type: string
+      passability_verdict:
+        $ref: '#/definitions/corridor.PassabilityVerdict'
+      reason:
         type: string
     type: object
   corridor.PassabilityVerdict:
@@ -1381,6 +1444,37 @@ paths:
       summary: Get system analysis configuration
       tags:
       - System
+  /api/corridors/commute-eval:
+    get:
+      description: Calculates aggregated passability verdict, trip duration, delay,
+        worst hazard bottleneck, and alternative bypass recommendations for commuter
+        corridors.
+      parameters:
+      - description: Comma-separated corridor keys (e.g. nguyen_huu_canh,dien_bien_phu)
+        in: query
+        name: corridors
+        required: true
+        type: string
+      - description: Vehicle clearance profile (scooter, motorbike, sedan, suv)
+        in: query
+        name: vehicle
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/corridor.CommuteEvaluationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Evaluate multi-corridor commuter journey
+      tags:
+      - Corridor
   /api/corridors/overview:
     get:
       description: Returns list of all arterial commuter corridors with real-time

@@ -41,6 +41,7 @@ import { extractCorridor } from '../utils/phuongFormatters';
 import { toRoadKey } from '../utils/corridorUtils';
 import { useCorridorRoute } from '../hooks/useCorridorRoute';
 import { useHourlyForecast } from '../hooks/useHourlyForecast';
+import { useCommuteRoute } from '../hooks/useCommuteRoute';
 import type { VehicleType } from '../types/vehicle';
 import { getStoredVehicleProfile, setStoredVehicleProfile } from '../utils/vehicleHazardUtils';
 
@@ -50,6 +51,8 @@ const CorridorRouteLayer = dynamic(() => import('../components/CorridorRouteLaye
 const CorridorOverviewCard = dynamic(() => import('../components/CorridorOverviewCard'), { ssr: false });
 const VehicleProfileSelector = dynamic(() => import('../components/VehicleProfileSelector'), { ssr: false });
 const HourlyTimelineScrubber = dynamic(() => import('../components/HourlyTimelineScrubber'), { ssr: false });
+const MyRouteCard = dynamic(() => import('../components/MyRouteCard'), { ssr: false });
+const MyRouteSetupModal = dynamic(() => import('../components/MyRouteSetupModal'), { ssr: false });
 
 /** A fix younger than this is reused instead of starting a new GPS request (AC2). */
 const NEAR_ME_FIX_MAX_AGE_MS = 60_000;
@@ -339,6 +342,25 @@ export default function Home() {
       return corr === selectedCorridor || (activeRoadKey ? toRoadKey(corr) === activeRoadKey : false);
     });
   }, [displayCameras, selectedCorridor, activeRoadKey]);
+
+  // S17-T4 / Issue #512: Commuter personal route glance & avoidance
+  const {
+    config: commuteConfig,
+    evaluation: commuteEvaluation,
+    isSetupOpen: isCommuteSetupOpen,
+    setIsSetupOpen: setIsCommuteSetupOpen,
+    isDismissed: isCommuteDismissed,
+    setIsDismissed: setIsCommuteDismissed,
+    saveConfig: saveCommuteConfig,
+    clearConfig: clearCommuteConfig,
+    toggleDirection: toggleCommuteDirection,
+    selectPreset: selectCommutePreset,
+    presets: commutePresets,
+  } = useCommuteRoute({
+    vehicleType,
+    weather,
+    corridorSummaries: corridorRoute?.summary ? [corridorRoute.summary] : [],
+  });
 
   const handleSelectCameraById = useCallback(
     (camId: string) => {
@@ -689,6 +711,44 @@ export default function Home() {
             }
             weatherControl={
               <div className="flex items-center gap-2">
+                {/* S17-T4 / Issue #512: Commuter My-Route Trigger (desktop) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!commuteConfig) {
+                      setIsCommuteSetupOpen(true);
+                    } else {
+                      setIsCommuteDismissed(prev => !prev);
+                    }
+                  }}
+                  aria-label={lang === 'vi' ? 'Lộ trình của tôi' : 'My Commute Route'}
+                  title={lang === 'vi' ? 'Lộ trình của tôi (Đánh giá an toàn 3 giây)' : 'My Commute Route (3-sec glance)'}
+                  className="flex h-12 min-h-[48px] px-3 items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-950/95 text-zinc-200 shadow-2xl backdrop-blur-md transition-colors hover:border-zinc-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 active:bg-zinc-900 cursor-pointer text-xs font-medium"
+                >
+                  <svg
+                    className="h-4 w-4 shrink-0 text-cyan-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  <span className="hidden lg:inline">{lang === 'vi' ? 'Lộ trình' : 'Route'}</span>
+                  {commuteConfig && (
+                    <span
+                      className={`h-2 w-2 rounded-full shrink-0 ${
+                        commuteEvaluation?.status_color === '#ef4444'
+                          ? 'bg-rose-500 animate-pulse'
+                          : commuteEvaluation?.status_color === '#eab308'
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-500'
+                      }`}
+                    />
+                  )}
+                </button>
+
                 {/* S17-T3 / Issue #510: vehicle clearance profile selector (desktop) */}
                 <VehicleProfileSelector
                   currentVehicle={vehicleType}
@@ -807,6 +867,28 @@ export default function Home() {
             </div>
           )}
 
+          {/* S17-T4 / Issue #512: Commuter My-Route Card */}
+          {commuteConfig && !isCommuteDismissed && !selectedCorridor && (
+            <div className="w-full px-3 pb-3">
+              <MyRouteCard
+                config={commuteConfig}
+                evaluation={commuteEvaluation}
+                onClose={() => setIsCommuteDismissed(true)}
+                onOpenSetup={() => setIsCommuteSetupOpen(true)}
+                onToggleDirection={toggleCommuteDirection}
+                onSelectDetour={(detourKey) => {
+                  handleSelectCorridor(detourKey);
+                }}
+                onSubscribeRoute={() => {
+                  setSubscriptionTarget({ type: 'all', id: '' });
+                  setSubscriptionOpen(true);
+                }}
+                lang={lang}
+                vehicleType={vehicleType}
+              />
+            </div>
+          )}
+
           {/* S17-T2 / Issue #511: Hourly Tidal & Convective Rain Timeline Scrubber */}
           <div className="w-full px-3 pb-2">
             <HourlyTimelineScrubber
@@ -898,6 +980,43 @@ export default function Home() {
               <path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7" />
               <path d="M10.5 20a2 2 0 0 0 3 0" />
             </svg>
+          </button>
+
+          {/* S17-T4 / Issue #512: Commuter My-Route Trigger (mobile) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (!commuteConfig) {
+                setIsCommuteSetupOpen(true);
+              } else {
+                setIsCommuteDismissed(prev => !prev);
+              }
+            }}
+            aria-label={lang === 'vi' ? 'Lộ trình của tôi' : 'My Commute Route'}
+            title={lang === 'vi' ? 'Lộ trình của tôi' : 'My Commute Route'}
+            className="shrink-0 w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-lg bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-zinc-100 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer relative"
+          >
+            <svg
+              className="w-5 h-5 text-cyan-400"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+            {commuteConfig && (
+              <span
+                className={`absolute top-2 right-2 w-2 h-2 rounded-full ${
+                  commuteEvaluation?.status_color === '#ef4444'
+                    ? 'bg-rose-500 animate-pulse'
+                    : commuteEvaluation?.status_color === '#eab308'
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`}
+              />
+            )}
           </button>
 
           {/* S17-T3 / Issue #510: vehicle clearance profile selector (mobile) */}
@@ -1010,6 +1129,18 @@ export default function Home() {
       </main>
 
       {/* MODAL — global viewport overlay */}
+      {/* S17-T4 / Issue #512: Commuter My-Route Setup Modal */}
+      <MyRouteSetupModal
+        isOpen={isCommuteSetupOpen}
+        onClose={() => setIsCommuteSetupOpen(false)}
+        config={commuteConfig}
+        presets={commutePresets}
+        onSave={saveCommuteConfig}
+        onClear={clearCommuteConfig}
+        onSelectPreset={selectCommutePreset}
+        lang={lang}
+      />
+
       {/* S12-T4 / Issue #402: citizen subscription dialog. Opening it closes the
           Near-Me sheet (and vice versa) so two focus traps never coexist. */}
       <SubscriptionModal

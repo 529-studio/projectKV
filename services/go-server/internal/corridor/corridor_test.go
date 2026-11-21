@@ -677,3 +677,110 @@ func TestVehicleClearanceProfiles(t *testing.T) {
 		t.Errorf("expected green for SUV, got %s", suvSummary.StatusColor)
 	}
 }
+
+func TestEvaluateCommute_MultiCorridorAndDetour(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	now := time.Now()
+	floodDepth := 25.0 // 25cm flood on Nguyen Huu Canh
+
+	cams := []camera.Camera{
+		{
+			ID:          "cam-nhc-1",
+			DisplayName: "Nguyễn Hữu Cảnh - Ung Văn Khiêm",
+			RoadKey:     "nguyen_huu_canh",
+			RoadKeys:    []string{"nguyen_huu_canh"},
+		},
+		{
+			ID:          "cam-dbp-1",
+			DisplayName: "Điện Biên Phủ - Hàng Xanh",
+			RoadKey:     "dien_bien_phu",
+			RoadKeys:    []string{"dien_bien_phu"},
+		},
+	}
+
+	verdicts := []hotset.Verdict{
+		{
+			CameraID:      "cam-nhc-1",
+			Severity:      "CONGESTED",
+			FloodSeverity: "FLOODED_DEEP",
+			FloodDepthCm:  &floodDepth,
+			ObservedAt:    now.Add(-10 * time.Second),
+			Source:        "onnx",
+		},
+		{
+			CameraID:      "cam-dbp-1",
+			Severity:      "CLEAR",
+			FloodSeverity: "DRY",
+			ObservedAt:    now.Add(-10 * time.Second),
+			Source:        "onnx",
+		},
+	}
+
+	camProv := &mockCameraProvider{cameras: cams}
+	verdProv := &mockVerdictProvider{verdicts: verdicts}
+	svc := NewService(camProv, verdProv, "production", 180*time.Second)
+
+	// 1. Commute evaluating only Nguyen Huu Canh for Scooter
+	scooterEval := svc.EvaluateCommute([]string{"nguyen_huu_canh"}, VehicleScooter)
+	if scooterEval.PassabilityVerdict != PassabilityImpassable {
+		t.Errorf("expected scooter to be IMPASSABLE on Nguyen Huu Canh at 25cm, got %s", scooterEval.PassabilityVerdict)
+	}
+	if scooterEval.WorstBottleneck == nil {
+		t.Fatalf("expected worst bottleneck to be populated")
+	}
+	if scooterEval.WorstBottleneck.CameraID != "cam-nhc-1" {
+		t.Errorf("expected bottleneck cam-nhc-1, got %s", scooterEval.WorstBottleneck.CameraID)
+	}
+	if scooterEval.WorstBottleneck.FloodDepthCm == nil || *scooterEval.WorstBottleneck.FloodDepthCm != 25.0 {
+		t.Errorf("expected depth 25cm, got %v", scooterEval.WorstBottleneck.FloodDepthCm)
+	}
+
+	// Detour check: Nguyen Huu Canh impassable -> suggests Dien Bien Phu!
+	if scooterEval.Detour == nil {
+		t.Fatalf("expected detour suggestion to Dien Bien Phu, got nil")
+	}
+	if scooterEval.Detour.DetourCorridorKey != "dien_bien_phu" {
+		t.Errorf("expected detour key dien_bien_phu, got %s", scooterEval.Detour.DetourCorridorKey)
+	}
+	if scooterEval.Detour.PassabilityVerdict != PassabilityPassable {
+		t.Errorf("expected detour to be PASSABLE, got %s", scooterEval.Detour.PassabilityVerdict)
+	}
+
+	// 2. SUV on same route: 25cm is CAUTION (threshold 25cm), not IMPASSABLE (threshold 40cm)
+	suvEval := svc.EvaluateCommute([]string{"nguyen_huu_canh"}, VehicleSUV)
+	if suvEval.PassabilityVerdict != PassabilityCaution {
+		t.Errorf("expected SUV to be CAUTION on 25cm, got %s", suvEval.PassabilityVerdict)
+	}
+
+	// 3. HTTP handler test
+	handler := NewHandler(svc)
+	router := gin.New()
+	handler.RegisterRoutes(router.Group("/api"))
+
+	// Missing corridors -> 400
+	req400 := httptest.NewRequest(http.MethodGet, "/api/corridors/commute-eval", nil)
+	w400 := httptest.NewRecorder()
+	router.ServeHTTP(w400, req400)
+	if w400.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing corridors param, got %d", w400.Code)
+	}
+
+	// Valid corridors -> 200
+	req200 := httptest.NewRequest(http.MethodGet, "/api/corridors/commute-eval?corridors=nguyen_huu_canh&vehicle=scooter", nil)
+	w200 := httptest.NewRecorder()
+	router.ServeHTTP(w200, req200)
+	if w200.Code != http.StatusOK {
+		t.Errorf("expected 200 for valid corridors, got %d", w200.Code)
+	}
+
+	var httpResp CommuteEvaluationResponse
+	if err := json.Unmarshal(w200.Body.Bytes(), &httpResp); err != nil {
+		t.Fatalf("failed to unmarshal JSON response: %v", err)
+	}
+	if httpResp.PassabilityVerdict != PassabilityImpassable {
+		t.Errorf("expected IMPASSABLE from API, got %s", httpResp.PassabilityVerdict)
+	}
+	if httpResp.Detour == nil || httpResp.Detour.DetourCorridorKey != "dien_bien_phu" {
+		t.Errorf("expected detour to dien_bien_phu from API, got %+v", httpResp.Detour)
+	}
+}
