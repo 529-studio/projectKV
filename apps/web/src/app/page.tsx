@@ -850,7 +850,9 @@ export default function Home() {
 
         {/* OVERLAY STACK — card and dock are siblings in one column,
             so the card is pushed above the dock instead of guessing an offset. */}
-        <div className="absolute inset-x-0 bottom-0 pointer-events-none z-[800] flex flex-col">
+        <div className={`absolute inset-x-0 bottom-0 pointer-events-none z-[800] flex flex-col ${
+          pinnedCameras.length === 0 ? 'pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]' : ''
+        }`}>
           {/* CORRIDOR OVERVIEW CARD */}
           {selectedCorridor && corridorRoute?.summary && !isCorridorCardDismissed && (
             <div className="w-full px-3 pb-3">
@@ -922,7 +924,7 @@ export default function Home() {
         />
 
         {/* MOBILE FLOATING QUICK SEARCH & WEATHER HEADER (hidden on md+) */}
-        <div className="md:hidden absolute top-3 left-3 right-3 z-[810] pointer-events-auto flex items-center gap-2">
+        <div className="md:hidden absolute top-[calc(0.75rem+env(safe-area-inset-top,0px))] left-[calc(0.75rem+env(safe-area-inset-left,0px))] right-[calc(0.75rem+env(safe-area-inset-right,0px))] z-[810] pointer-events-auto flex items-center gap-2">
           <button
             type="button"
             onClick={() => {
@@ -1044,7 +1046,7 @@ export default function Home() {
             setShouldFocusSearch(true);
             setMobileDrawerOpen(true);
           }}
-          className={`md:hidden absolute right-3 z-[830] w-12 h-12 min-w-[48px] min-h-[48px] bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
+          className={`md:hidden absolute right-[calc(0.75rem+env(safe-area-inset-right,0px))] z-[830] w-12 h-12 min-w-[48px] min-h-[48px] bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-white rounded-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
             pinnedCameras.length > 0
               ? 'bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'
               : 'bottom-[calc(0.875rem+env(safe-area-inset-bottom,0px))]'
@@ -1076,7 +1078,7 @@ export default function Home() {
           title={NEAR_ME_I18N.BUTTON_LABEL[lang]}
           aria-haspopup="dialog"
           aria-expanded={nearMeOpen}
-          className={`md:hidden absolute left-3 z-[840] w-12 h-12 min-w-[48px] min-h-[48px] bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-zinc-100 rounded-lg flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 ${
+          className={`md:hidden absolute left-[calc(0.75rem+env(safe-area-inset-left,0px))] z-[840] w-12 h-12 min-w-[48px] min-h-[48px] bg-zinc-950/95 border border-zinc-700 hover:border-zinc-400 text-zinc-100 rounded-lg flex items-center justify-center shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 ${
             pinnedCameras.length > 0
               ? 'bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'
               : 'bottom-[calc(0.875rem+env(safe-area-inset-bottom,0px))]'
