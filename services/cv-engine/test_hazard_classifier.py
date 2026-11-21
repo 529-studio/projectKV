@@ -990,5 +990,40 @@ class TestUpstreamReferenceIsNotADryRoad(unittest.TestCase):
         self.assertEqual(hazard.depth_confidence, hc.CONFIDENCE_MEASURED)
 
 
+class TestSubmersionAnchorCalibration(unittest.TestCase):
+    """Issue #513: Discrete wheel submersion ground truth calibration & hazard mapping."""
+
+    def test_submersion_anchor_depth_mapping(self):
+        self.assertEqual(hc.depth_from_submersion_anchor("dry"), 0.0)
+        self.assertEqual(hc.depth_from_submersion_anchor("wet_asphalt_no_standing"), 0.0)
+        self.assertEqual(hc.depth_from_submersion_anchor("tire_base_under_10cm"), 8.0)
+        self.assertEqual(hc.depth_from_submersion_anchor("exhaust_hub_over_15cm"), 18.0)
+        self.assertEqual(hc.depth_from_submersion_anchor("wheel_submerged_over_30cm"), 35.0)
+        self.assertIsNone(hc.depth_from_submersion_anchor("unknown_anchor"))
+
+    def test_submersion_anchor_hazard_levels(self):
+        # <10cm -> Level 1 (Passable / safe)
+        self.assertEqual(hc.hazard_level_from_submersion_anchor("dry"), 1)
+        self.assertEqual(hc.hazard_level_from_submersion_anchor("wet_asphalt_no_standing"), 1)
+        self.assertEqual(hc.hazard_level_from_submersion_anchor("tire_base_under_10cm"), 1)
+        # 10..20cm -> Level 2 (Caution / exhaust pipe level)
+        self.assertEqual(hc.hazard_level_from_submersion_anchor("exhaust_hub_over_15cm"), 2)
+        # >=20cm -> Level 3 (Hazard / impassable)
+        self.assertEqual(hc.hazard_level_from_submersion_anchor("wheel_submerged_over_30cm"), 3)
+
+    def test_waterline_depth_mapping_and_hazard_levels(self):
+        self.assertEqual(hc.depth_from_waterline_depth("DRY"), 0.0)
+        self.assertEqual(hc.depth_from_waterline_depth("WET_SURFACE"), 0.0)
+        self.assertEqual(hc.depth_from_waterline_depth("TIRE_QUARTER_SUBMERGED"), 8.0)
+        self.assertEqual(hc.depth_from_waterline_depth("TIRE_HALF_SUBMERGED"), 18.0)
+        self.assertEqual(hc.depth_from_waterline_depth("IMPASSABLE"), 35.0)
+
+        self.assertEqual(hc.hazard_level_from_waterline_depth("DRY"), 1)
+        self.assertEqual(hc.hazard_level_from_waterline_depth("WET_SURFACE"), 1)
+        self.assertEqual(hc.hazard_level_from_waterline_depth("TIRE_QUARTER_SUBMERGED"), 1)
+        self.assertEqual(hc.hazard_level_from_waterline_depth("TIRE_HALF_SUBMERGED"), 2)
+        self.assertEqual(hc.hazard_level_from_waterline_depth("IMPASSABLE"), 3)
+
+
 if __name__ == "__main__":
     unittest.main()

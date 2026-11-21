@@ -128,6 +128,36 @@ DEPTH_CONFIDENCES: Tuple[str, ...] = (
 
 DEFAULT_SCALE_MULTIPLIER = 1.0
 
+#: Physical wheel submersion ground truth anchors (Issue #513)
+SUBMERSION_ANCHOR_DRY = "dry"
+SUBMERSION_ANCHOR_WET_ASPHALT = "wet_asphalt_no_standing"
+SUBMERSION_ANCHOR_TIRE_BASE = "tire_base_under_10cm"
+SUBMERSION_ANCHOR_EXHAUST_HUB = "exhaust_hub_over_15cm"
+SUBMERSION_ANCHOR_WHEEL_SUBMERGED = "wheel_submerged_over_30cm"
+
+WATERLINE_DEPTH_DRY = "DRY"
+WATERLINE_DEPTH_WET_SURFACE = "WET_SURFACE"
+WATERLINE_DEPTH_TIRE_QUARTER = "TIRE_QUARTER_SUBMERGED"
+WATERLINE_DEPTH_TIRE_HALF = "TIRE_HALF_SUBMERGED"
+WATERLINE_DEPTH_IMPASSABLE = "IMPASSABLE"
+WATERLINE_DEPTH_UNKNOWN = "UNKNOWN"
+
+SUBMERSION_ANCHOR_DEPTHS_CM: Dict[str, float] = {
+    SUBMERSION_ANCHOR_DRY: 0.0,
+    SUBMERSION_ANCHOR_WET_ASPHALT: 0.0,
+    SUBMERSION_ANCHOR_TIRE_BASE: 8.0,
+    SUBMERSION_ANCHOR_EXHAUST_HUB: 18.0,
+    SUBMERSION_ANCHOR_WHEEL_SUBMERGED: 35.0,
+}
+
+WATERLINE_DEPTH_TO_CM: Dict[str, float] = {
+    WATERLINE_DEPTH_DRY: 0.0,
+    WATERLINE_DEPTH_WET_SURFACE: 0.0,
+    WATERLINE_DEPTH_TIRE_QUARTER: 8.0,
+    WATERLINE_DEPTH_TIRE_HALF: 18.0,
+    WATERLINE_DEPTH_IMPASSABLE: 35.0,
+}
+
 #: Default operator calibration file, sibling to this module (§2.2).
 DEFAULT_CALIBRATION_PATH = Path(__file__).resolve().parent / "calibration.json"
 
@@ -218,6 +248,34 @@ def level_from_avoidance(
     ):
         return 3
     return None
+
+
+def depth_from_submersion_anchor(anchor: str) -> Optional[float]:
+    """Map a wheel submersion anchor string to physical depth in cm."""
+    norm = (anchor or "").strip().lower()
+    return SUBMERSION_ANCHOR_DEPTHS_CM.get(norm)
+
+
+def hazard_level_from_submersion_anchor(anchor: str) -> Optional[int]:
+    """Map a wheel submersion anchor string to hazard level (1..3)."""
+    depth = depth_from_submersion_anchor(anchor)
+    if depth is None:
+        return None
+    return level_from_depth(depth)
+
+
+def depth_from_waterline_depth(waterline: str) -> Optional[float]:
+    """Map a waterline depth classification string to physical depth in cm."""
+    norm = (waterline or "").strip().upper()
+    return WATERLINE_DEPTH_TO_CM.get(norm)
+
+
+def hazard_level_from_waterline_depth(waterline: str) -> Optional[int]:
+    """Map a waterline depth classification string to hazard level (1..3)."""
+    depth = depth_from_waterline_depth(waterline)
+    if depth is None:
+        return None
+    return level_from_depth(depth)
 
 
 # ---------------------------------------------------------------------------

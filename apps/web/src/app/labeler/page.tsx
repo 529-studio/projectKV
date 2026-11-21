@@ -16,11 +16,11 @@ import {
   validatePolygonAnnotations,
   hasAutoPolygons,
   POLYGON_CLASSES,
+  SUBMERSION_LEVELS,
+  type SubmersionLevelConfig,
   type LabelFilterStatus,
-  type FloodLevel,
   type TrafficLevel,
   type DirectionalTrafficLevel,
-  type FloodSubmersionAnchor,
   type QualityTag,
   type QueueReason,
   type Weather,
@@ -65,6 +65,9 @@ export default function LabelerPage() {
   const [activeSegClass, setActiveSegClass] = useState<PolygonClass>('roadway');
   const [activeSegDirection, setActiveSegDirection] = useState<PolygonDirection | ''>('');
   const [segError, setSegError] = useState<string | null>(null);
+  const [rapidMode, setRapidMode] = useState<boolean>(true);
+  const [sessionCount, setSessionCount] = useState<number>(0);
+  const [sessionStartTime] = useState<number>(() => Date.now());
 
   const { cameras } = useCameras();
   const cameraMap = useMemo(() => {
@@ -116,15 +119,39 @@ export default function LabelerPage() {
     };
   }, []);
 
-  // Load annotator nickname from localStorage
+  // Load annotator nickname and rapid mode preference from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedAnnotator = localStorage.getItem('labeler_annotator');
       if (storedAnnotator) {
         setAnnotator(storedAnnotator);
       }
+      const storedRapid = localStorage.getItem('warded_labeler_rapid_mode');
+      if (storedRapid !== null) {
+        setRapidMode(storedRapid === 'true');
+      }
     }
   }, []);
+
+  const toggleRapidMode = () => {
+    setRapidMode((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('warded_labeler_rapid_mode', String(next));
+      }
+      return next;
+    });
+  };
+
+  const sessionSpeed = useMemo(() => {
+    const elapsedMinutes = Math.max(0.1, (Date.now() - sessionStartTime) / 60000);
+    const framesPerMin = Math.round(sessionCount / elapsedMinutes);
+    const framesPerHour = Math.round((sessionCount / elapsedMinutes) * 60);
+    return {
+      framesPerMin,
+      framesPerHour,
+    };
+  }, [sessionCount, sessionStartTime]);
 
   const handleAnnotatorChange = (val: string) => {
     setAnnotator(val);
@@ -288,6 +315,8 @@ export default function LabelerPage() {
         traffic_dir_b: existing.traffic_dir_b,
         queue_reason: existing.queue_reason,
         flood_submersion_anchor: existing.flood_submersion_anchor,
+        waterline_depth: existing.waterline_depth,
+        submersion_depth_cm: existing.submersion_depth_cm,
         quality_tags: existing.quality_tags,
         weather: existing.weather,
         time_of_day: existing.time_of_day,
@@ -329,6 +358,18 @@ export default function LabelerPage() {
           : currentDraft.flood_level === 'puddle'
           ? 'tire_base_under_10cm'
           : 'dry'),
+      waterline_depth:
+        currentDraft.waterline_depth ||
+        existing?.waterline_depth ||
+        (currentDraft.flood_level === 'deep'
+          ? 'TIRE_HALF_SUBMERGED'
+          : currentDraft.flood_level === 'puddle'
+          ? 'TIRE_QUARTER_SUBMERGED'
+          : 'DRY'),
+      submersion_depth_cm:
+        currentDraft.submersion_depth_cm ??
+        existing?.submersion_depth_cm ??
+        (currentDraft.flood_level === 'deep' ? 18 : currentDraft.flood_level === 'puddle' ? 8 : 0),
       quality_tags: currentDraft.quality_tags || existing?.quality_tags || [],
       weather: currentDraft.weather || existing?.weather || 'clear',
       time_of_day: currentDraft.time_of_day || existing?.time_of_day || 'day',
@@ -410,7 +451,23 @@ export default function LabelerPage() {
         traffic_dir_a: currentDraft.traffic_dir_a || (currentDraft.traffic_level as DirectionalTrafficLevel) || 'clear',
         traffic_dir_b: currentDraft.traffic_dir_b || 'not_applicable',
         queue_reason: currentDraft.queue_reason || 'free_flow',
-        flood_submersion_anchor: currentDraft.flood_submersion_anchor || (currentDraft.flood_level === 'deep' ? 'exhaust_hub_over_15cm' : (currentDraft.flood_level === 'puddle' ? 'tire_base_under_10cm' : 'dry')),
+        flood_submersion_anchor:
+          currentDraft.flood_submersion_anchor ||
+          (currentDraft.flood_level === 'deep'
+            ? 'exhaust_hub_over_15cm'
+            : currentDraft.flood_level === 'puddle'
+            ? 'tire_base_under_10cm'
+            : 'dry'),
+        waterline_depth:
+          currentDraft.waterline_depth ||
+          (currentDraft.flood_level === 'deep'
+            ? 'TIRE_HALF_SUBMERGED'
+            : currentDraft.flood_level === 'puddle'
+            ? 'TIRE_QUARTER_SUBMERGED'
+            : 'DRY'),
+        submersion_depth_cm:
+          currentDraft.submersion_depth_cm ??
+          (currentDraft.flood_level === 'deep' ? 18 : currentDraft.flood_level === 'puddle' ? 8 : 0),
         quality_tags: currentDraft.quality_tags || [],
         weather: currentDraft.weather || 'clear',
         time_of_day: currentDraft.time_of_day || 'day',
@@ -481,6 +538,104 @@ export default function LabelerPage() {
     ]
   );
 
+  // Rapid wheel submersion classification (Issue #513)
+  const handleRapidSubmersionSelect = useCallback(
+    async (lvl: SubmersionLevelConfig, autoAdvance = rapidMode) => {
+      if (!currentSnapshot || !selectedDate) return;
+
+      const nextDraft: LabelState = {
+        ...currentDraft,
+        flood_level: lvl.floodLevel,
+        flood_submersion_anchor: lvl.anchor,
+        waterline_depth: lvl.waterline,
+        submersion_depth_cm: lvl.depthCm,
+        traffic_level: currentDraft.traffic_level || 'clear',
+        traffic_dir_a: currentDraft.traffic_dir_a || 'clear',
+        traffic_dir_b: currentDraft.traffic_dir_b || 'not_applicable',
+        queue_reason: currentDraft.queue_reason || 'free_flow',
+        weather: currentDraft.weather || 'clear',
+        time_of_day: currentDraft.time_of_day || 'day',
+        quality_tags: currentDraft.quality_tags || [],
+        notes: currentDraft.notes || '',
+      };
+
+      setCurrentDraft(nextDraft);
+
+      if (autoAdvance) {
+        const reviewer = annotator.trim() || 'rapid_labeler';
+        const payload: LabelPayload = {
+          date: selectedDate,
+          camera_id: currentSnapshot.camera_id,
+          snapshot_key: currentSnapshot.key,
+          annotator: reviewer,
+          flood_level: nextDraft.flood_level || 'none',
+          traffic_level: nextDraft.traffic_level || 'clear',
+          traffic_dir_a: nextDraft.traffic_dir_a || 'clear',
+          traffic_dir_b: nextDraft.traffic_dir_b || 'not_applicable',
+          queue_reason: nextDraft.queue_reason || 'free_flow',
+          flood_submersion_anchor: nextDraft.flood_submersion_anchor || 'dry',
+          waterline_depth: nextDraft.waterline_depth || 'DRY',
+          submersion_depth_cm: nextDraft.submersion_depth_cm ?? 0,
+          quality_tags: nextDraft.quality_tags || [],
+          weather: nextDraft.weather || 'clear',
+          time_of_day: nextDraft.time_of_day || 'day',
+          notes: nextDraft.notes || '',
+          annotations: nextDraft.annotations || labels[currentSnapshot.key]?.annotations,
+          timestamp: Math.floor(Date.now() / 1000),
+        };
+
+        setIsSaving(true);
+        try {
+          const res = await fetch(getApiUrl('/api/archiver/labels'), {
+            method: 'POST',
+            headers: buildAuthHeaders(devToken, { 'Content-Type': 'application/json' }),
+            credentials: 'include',
+            body: JSON.stringify(payload),
+          });
+
+          if (res.status === 401 || res.status === 403) {
+            clearStoredDevToken();
+            setIsAuthenticated(false);
+            setDevToken('');
+            setAuthError(t.devInvalidToken);
+            return;
+          }
+
+          if (res.ok) {
+            setLabels((prev) => ({
+              ...prev,
+              [currentSnapshot.key]: payload,
+            }));
+            setSaveStatus('saved');
+            setSessionCount((c) => c + 1);
+            if (currentIndex < filteredSnapshots.length - 1) {
+              setCurrentIndex((i) => i + 1);
+            }
+          } else {
+            setSaveStatus('error');
+          }
+        } catch (err) {
+          console.error('Failed to rapidly save submersion label', err);
+          setSaveStatus('error');
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    },
+    [
+      currentSnapshot,
+      selectedDate,
+      annotator,
+      currentDraft,
+      labels,
+      devToken,
+      currentIndex,
+      filteredSnapshots.length,
+      rapidMode,
+      t.devInvalidToken,
+    ]
+  );
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -499,8 +654,14 @@ export default function LabelerPage() {
         return;
       }
 
-      const res = handleHotkey(e.key, currentDraft, { shiftKey: e.shiftKey });
-      if (res.action === 'prev') {
+      const res = handleHotkey(e.key, currentDraft, { shiftKey: e.shiftKey, rapidMode });
+      if (res.action === 'auto_advance') {
+        e.preventDefault();
+        const lvl = SUBMERSION_LEVELS.find((l) => l.key === e.key);
+        if (lvl) {
+          handleRapidSubmersionSelect(lvl, true);
+        }
+      } else if (res.action === 'prev') {
         e.preventDefault();
         setCurrentIndex((i) => Math.max(0, i - 1));
       } else if (res.action === 'next') {
@@ -520,7 +681,7 @@ export default function LabelerPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentDraft, filteredSnapshots.length, saveCurrent, handleFastApprove]);
+  }, [currentDraft, filteredSnapshots.length, saveCurrent, handleFastApprove, handleRapidSubmersionSelect, rapidMode]);
 
   const handleExportJson = () => {
     const exportData = {
@@ -817,6 +978,28 @@ export default function LabelerPage() {
             </button>
           </div>
 
+          {/* Rapid Submersion Mode Toggle & Session Counter (Issue #513) */}
+          <div className="flex items-center gap-2 border border-zinc-800 rounded p-0.5 bg-black">
+            <button
+              type="button"
+              onClick={toggleRapidMode}
+              className={`px-2 py-1 rounded font-mono text-xs transition flex items-center gap-1.5 ${
+                rapidMode
+                  ? 'bg-zinc-100 text-black font-bold'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+              title={t.rapidModeToggle}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${rapidMode ? 'bg-black' : 'bg-zinc-600'}`} />
+              <span>{rapidMode ? t.rapidModeOn : t.rapidModeOff}</span>
+            </button>
+            {sessionCount > 0 && (
+              <span className="font-mono text-[11px] text-zinc-400 border-l border-zinc-800 pl-2 pr-1">
+                {t.rapidSessionCount}: <span className="text-zinc-100 font-bold">{sessionCount}</span> ({sessionSpeed.framesPerMin} {t.rapidFramesPerMin})
+              </span>
+            )}
+          </div>
+
           {/* Pagination for All Snapshots */}
           {filterStatus === 'all' && totalPages > 1 && (
             <div className="flex items-center gap-1 font-mono text-xs border border-zinc-800 rounded px-1.5 py-0.5 bg-black">
@@ -1086,64 +1269,64 @@ export default function LabelerPage() {
             )}
           </div>
 
-          {/* Dimension 1: Flood Level & Physical Anchor */}
+          {/* Dimension 1: Rapid Wheel Submersion Depth Classification (Keys 1-5) */}
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-              {t.floodLabel}
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { val: 'none' as FloodLevel, label: t.floodNone, anchor: 'dry' as FloodSubmersionAnchor },
-                { val: 'puddle' as FloodLevel, label: t.floodPuddle, anchor: 'tire_base_under_10cm' as FloodSubmersionAnchor },
-                { val: 'deep' as FloodLevel, label: t.floodDeep, anchor: 'exhaust_hub_over_15cm' as FloodSubmersionAnchor },
-              ].map((item) => (
-                <button
-                  key={item.val}
-                  type="button"
-                  onClick={() =>
-                    setCurrentDraft((d) => ({
-                      ...d,
-                      flood_level: item.val,
-                      flood_submersion_anchor: d.flood_submersion_anchor || item.anchor,
-                    }))
-                  }
-                  className={`text-xs px-2 py-2 rounded border font-mono transition text-left ${
-                    currentDraft.flood_level === item.val
-                      ? 'bg-zinc-100 text-black border-white font-bold'
-                      : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:border-zinc-600'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                {t.rapidSubmersionTitle}
+              </span>
+              <span className="text-[10px] font-mono text-zinc-500">
+                {rapidMode ? t.rapidModeOn : t.rapidModeOff}
+              </span>
             </div>
 
-            {/* Physical Flood Submersion Anchor */}
-            <div className="mt-1 flex flex-col gap-1 bg-zinc-950/60 border border-zinc-800/80 p-2 rounded">
-              <span className="text-[11px] font-mono text-zinc-400 font-medium">
-                {t.floodSubmersionLabel}
-              </span>
-              <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
-                {[
-                  { val: 'dry' as FloodSubmersionAnchor, label: t.anchorDry },
-                  { val: 'wet_asphalt_no_standing' as FloodSubmersionAnchor, label: t.anchorWetNoStanding },
-                  { val: 'tire_base_under_10cm' as FloodSubmersionAnchor, label: t.anchorTireBase },
-                  { val: 'exhaust_hub_over_15cm' as FloodSubmersionAnchor, label: t.anchorExhaustHub },
-                ].map((item) => (
+            <div className="flex flex-col gap-1.5">
+              {SUBMERSION_LEVELS.map((lvl) => {
+                const isSelected =
+                  currentDraft.waterline_depth === lvl.waterline ||
+                  currentDraft.flood_submersion_anchor === lvl.anchor;
+                return (
                   <button
-                    key={item.val}
+                    key={lvl.key}
                     type="button"
-                    onClick={() => setCurrentDraft((d) => ({ ...d, flood_submersion_anchor: item.val }))}
-                    className={`px-1.5 py-1 rounded border text-left truncate transition ${
-                      currentDraft.flood_submersion_anchor === item.val
-                        ? 'bg-zinc-200 text-zinc-950 border-white font-semibold'
-                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                    onClick={() => handleRapidSubmersionSelect(lvl, rapidMode)}
+                    className={`flex items-center justify-between p-2 rounded border text-xs font-mono transition text-left ${
+                      isSelected
+                        ? 'bg-zinc-100 text-black border-white font-bold shadow-sm'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-900/50'
                     }`}
                   >
-                    {item.label}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={`w-5 h-5 rounded flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                          isSelected ? 'bg-black text-white' : 'bg-zinc-800 text-zinc-200 border border-zinc-700'
+                        }`}
+                      >
+                        {lvl.key}
+                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="truncate">{locale === 'vi' ? lvl.labelVi : lvl.labelEn}</span>
+                        <span
+                          className={`text-[10px] truncate ${
+                            isSelected ? 'text-zinc-700 font-normal' : 'text-zinc-500'
+                          }`}
+                        >
+                          {locale === 'vi' ? lvl.descVi : lvl.descEn}
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0 ml-2 ${
+                        isSelected
+                          ? 'bg-black/10 text-black border border-black/20'
+                          : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                      }`}
+                    >
+                      {lvl.depthCm} cm
+                    </span>
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
           </div>
 

@@ -175,7 +175,9 @@ type LabelPayload struct {
 	TrafficDirA           string              `json:"traffic_dir_a,omitempty"`           // CLEAR, MODERATE, HEAVY, CONGESTED
 	TrafficDirB           string              `json:"traffic_dir_b,omitempty"`           // CLEAR, MODERATE, HEAVY, CONGESTED, NOT_APPLICABLE
 	QueueReason           string              `json:"queue_reason,omitempty"`            // free_flow, traffic_light, bottleneck, flood_barrier, accident
-	FloodSubmersionAnchor string              `json:"flood_submersion_anchor,omitempty"` // dry, wet_asphalt_no_standing, tire_base_under_10cm, exhaust_hub_over_15cm
+	FloodSubmersionAnchor string              `json:"flood_submersion_anchor,omitempty"` // dry, wet_asphalt_no_standing, tire_base_under_10cm, exhaust_hub_over_15cm, wheel_submerged_over_30cm
+	WaterlineDepth        string              `json:"waterline_depth,omitempty"`         // DRY, WET_SURFACE, TIRE_QUARTER_SUBMERGED, TIRE_HALF_SUBMERGED, IMPASSABLE, UNKNOWN
+	SubmersionDepthCm     *float64            `json:"submersion_depth_cm,omitempty"`     // physical calibrated water depth in cm
 	Weather               string              `json:"weather"`                           // clear/dry, rain, heavy_rain/fog
 	TimeOfDay             string              `json:"time_of_day"`                       // day, dusk, night
 	QualityTags           []string            `json:"quality_tags,omitempty"`            // rain_on_lens, night_glare, occluded, signal_noise
@@ -536,6 +538,55 @@ func (h *Handler) SaveLabel(c *gin.Context) {
 
 	if payload.Timestamp == 0 {
 		payload.Timestamp = time.Now().Unix()
+	}
+
+	// Canonicalize and calibrate wheel submersion physical depth (Issue #513)
+	if payload.WaterlineDepth != "" && payload.SubmersionDepthCm == nil {
+		switch strings.ToUpper(strings.TrimSpace(payload.WaterlineDepth)) {
+		case "DRY", "WET_SURFACE":
+			val := 0.0
+			payload.SubmersionDepthCm = &val
+		case "TIRE_QUARTER_SUBMERGED":
+			val := 8.0
+			payload.SubmersionDepthCm = &val
+		case "TIRE_HALF_SUBMERGED":
+			val := 18.0
+			payload.SubmersionDepthCm = &val
+		case "IMPASSABLE":
+			val := 35.0
+			payload.SubmersionDepthCm = &val
+		}
+	} else if payload.FloodSubmersionAnchor != "" && payload.SubmersionDepthCm == nil {
+		switch strings.ToLower(strings.TrimSpace(payload.FloodSubmersionAnchor)) {
+		case "dry", "wet_asphalt_no_standing":
+			val := 0.0
+			payload.SubmersionDepthCm = &val
+		case "tire_base_under_10cm":
+			val := 8.0
+			payload.SubmersionDepthCm = &val
+		case "exhaust_hub_over_15cm":
+			val := 18.0
+			payload.SubmersionDepthCm = &val
+		case "wheel_submerged_over_30cm":
+			val := 35.0
+			payload.SubmersionDepthCm = &val
+		}
+	}
+
+	// Backfill WaterlineDepth if FloodSubmersionAnchor is present
+	if payload.WaterlineDepth == "" && payload.FloodSubmersionAnchor != "" {
+		switch strings.ToLower(strings.TrimSpace(payload.FloodSubmersionAnchor)) {
+		case "dry":
+			payload.WaterlineDepth = "DRY"
+		case "wet_asphalt_no_standing":
+			payload.WaterlineDepth = "WET_SURFACE"
+		case "tire_base_under_10cm":
+			payload.WaterlineDepth = "TIRE_QUARTER_SUBMERGED"
+		case "exhaust_hub_over_15cm":
+			payload.WaterlineDepth = "TIRE_HALF_SUBMERGED"
+		case "wheel_submerged_over_30cm":
+			payload.WaterlineDepth = "IMPASSABLE"
+		}
 	}
 
 	cleanCam := path.Base(strings.TrimSpace(payload.CameraID))

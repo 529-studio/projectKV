@@ -542,3 +542,68 @@ func TestHandler_SaveLabel_DirectionalRoadwayPolygons(t *testing.T) {
 		}
 	}
 }
+
+// TestHandler_SaveLabel_WheelSubmersionCalibration verifies Issue #513:
+// wheel submersion ground truth levels (dry, wet, 10cm, 15cm, 30cm) calibrate
+// physical depth in cm and round-trip through GetLabels.
+func TestHandler_SaveLabel_WheelSubmersionCalibration(t *testing.T) {
+	router, _ := setupTestRouter(t)
+
+	cases := []struct {
+		anchor        string
+		waterline     string
+		expectedDepth float64
+		expectedWater string
+	}{
+		{"dry", "", 0.0, "DRY"},
+		{"wet_asphalt_no_standing", "", 0.0, "WET_SURFACE"},
+		{"tire_base_under_10cm", "", 8.0, "TIRE_QUARTER_SUBMERGED"},
+		{"exhaust_hub_over_15cm", "", 18.0, "TIRE_HALF_SUBMERGED"},
+		{"wheel_submerged_over_30cm", "", 35.0, "IMPASSABLE"},
+		{"", "IMPASSABLE", 35.0, "IMPASSABLE"},
+	}
+
+	for i, tc := range cases {
+		label := LabelPayload{
+			Date:                  "2026-10-15",
+			CameraID:              "cam_sub",
+			SnapshotKey:           "2026-10-15/cam_sub/1791560000_sample.jpg",
+			Annotator:             "annotator_rapid",
+			FloodLevel:            "deep",
+			TrafficLevel:          "moderate",
+			FloodSubmersionAnchor: tc.anchor,
+			WaterlineDepth:        tc.waterline,
+			Weather:               "clear",
+			TimeOfDay:             "day",
+			Timestamp:             int64(1791560000 + i),
+		}
+
+		body, _ := json.Marshal(label)
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/archiver/labels", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("case %d (%s): expected 200 OK, got %d: %s", i, tc.anchor, w.Code, w.Body.String())
+		}
+
+		var resp struct {
+			Status string       `json:"status"`
+			Label  LabelPayload `json:"label"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("case %d: failed to unmarshal save response: %v", i, err)
+		}
+
+		if resp.Label.SubmersionDepthCm == nil {
+			t.Fatalf("case %d: expected non-nil SubmersionDepthCm", i)
+		}
+		if *resp.Label.SubmersionDepthCm != tc.expectedDepth {
+			t.Errorf("case %d: expected depth %v, got %v", i, tc.expectedDepth, *resp.Label.SubmersionDepthCm)
+		}
+		if resp.Label.WaterlineDepth != tc.expectedWater {
+			t.Errorf("case %d: expected WaterlineDepth %q, got %q", i, tc.expectedWater, resp.Label.WaterlineDepth)
+		}
+	}
+}

@@ -1,11 +1,98 @@
 export type FloodLevel = 'none' | 'puddle' | 'deep';
 export type TrafficLevel = 'clear' | 'moderate' | 'heavy' | 'gridlock';
 export type DirectionalTrafficLevel = 'clear' | 'moderate' | 'heavy' | 'congested' | 'not_applicable';
+
+export type WaterlineDepth =
+  | 'DRY'
+  | 'WET_SURFACE'
+  | 'TIRE_QUARTER_SUBMERGED'
+  | 'TIRE_HALF_SUBMERGED'
+  | 'IMPASSABLE'
+  | 'UNKNOWN';
+
 export type FloodSubmersionAnchor =
   | 'dry'
   | 'wet_asphalt_no_standing'
   | 'tire_base_under_10cm'
-  | 'exhaust_hub_over_15cm';
+  | 'exhaust_hub_over_15cm'
+  | 'wheel_submerged_over_30cm';
+
+export interface SubmersionLevelConfig {
+  key: '1' | '2' | '3' | '4' | '5';
+  waterline: WaterlineDepth;
+  anchor: FloodSubmersionAnchor;
+  floodLevel: FloodLevel;
+  depthCm: number;
+  labelVi: string;
+  labelEn: string;
+  descVi: string;
+  descEn: string;
+  color: string;
+}
+
+export const SUBMERSION_LEVELS: readonly SubmersionLevelConfig[] = [
+  {
+    key: '1',
+    waterline: 'DRY',
+    anchor: 'dry',
+    floodLevel: 'none',
+    depthCm: 0,
+    labelVi: '1: Khô ráo',
+    labelEn: '1: Dry',
+    descVi: 'Mặt đường khô, 0 cm, xe lưu thông bình thường',
+    descEn: 'Dry asphalt, 0 cm, normal vehicle passage',
+    color: '#10b981',
+  },
+  {
+    key: '2',
+    waterline: 'WET_SURFACE',
+    anchor: 'wet_asphalt_no_standing',
+    floodLevel: 'none',
+    depthCm: 0,
+    labelVi: '2: Ướt mặt đường',
+    labelEn: '2: Wet Surface',
+    descVi: 'Mặt đường ướt phản chiếu, 0 cm, không đọng vũng',
+    descEn: 'Wet sheen reflection, 0 cm, no standing puddle',
+    color: '#06b6d4',
+  },
+  {
+    key: '3',
+    waterline: 'TIRE_QUARTER_SUBMERGED',
+    anchor: 'tire_base_under_10cm',
+    floodLevel: 'puddle',
+    depthCm: 8,
+    labelVi: '3: Mép vành bánh',
+    labelEn: '3: Tire Base (<10cm)',
+    descVi: 'Ngập dưới 10 cm, ngập mép vành bánh xe, an toàn mọi phương tiện',
+    descEn: 'Under 10 cm, tire contact patch, safe for all vehicles',
+    color: '#eab308',
+  },
+  {
+    key: '4',
+    waterline: 'TIRE_HALF_SUBMERGED',
+    anchor: 'exhaust_hub_over_15cm',
+    floodLevel: 'deep',
+    depthCm: 18,
+    labelVi: '4: Nửa bánh / Ống xả',
+    labelEn: '4: Half Wheel (15-25cm)',
+    descVi: 'Ngập 15-25 cm, ngang ống xả / trục xe máy, xe ga có nguy cơ chết máy',
+    descEn: '15-25 cm, exhaust pipe / wheel hub, scooter stall risk',
+    color: '#f97316',
+  },
+  {
+    key: '5',
+    waterline: 'IMPASSABLE',
+    anchor: 'wheel_submerged_over_30cm',
+    floodLevel: 'deep',
+    depthCm: 35,
+    labelVi: '5: Lút bánh / Chết máy',
+    labelEn: '5: Impassable (>30cm)',
+    descVi: 'Ngập trên 30 cm, lút bánh xe, chết máy hàng loạt, bất khả thông hành',
+    descEn: 'Over 30 cm, wheel fully submerged, widespread vehicle stall, impassable',
+    color: '#ef4444',
+  },
+] as const;
+
 export type QueueReason =
   | 'free_flow'
   | 'traffic_light'
@@ -23,6 +110,8 @@ export interface LabelState {
   traffic_dir_b?: DirectionalTrafficLevel;
   queue_reason?: QueueReason;
   flood_submersion_anchor?: FloodSubmersionAnchor;
+  waterline_depth?: WaterlineDepth;
+  submersion_depth_cm?: number;
   quality_tags?: QualityTag[];
   weather?: Weather;
   time_of_day?: TimeOfDay;
@@ -189,11 +278,12 @@ function round6(v: number): number {
 
 export interface HotkeyResult {
   state: LabelState;
-  action?: 'prev' | 'next' | 'save' | 'approve';
+  action?: 'prev' | 'next' | 'save' | 'approve' | 'auto_advance';
 }
 
 export interface HotkeyMeta {
   shiftKey?: boolean;
+  rapidMode?: boolean;
 }
 
 /**
@@ -222,20 +312,16 @@ export function handleHotkey(
     return { state: next, action: 'save' };
   }
 
-  // 1-3: Flood Level & Physical Submersion Anchor
-  if (key === '1') {
-    next.flood_level = 'none';
-    next.flood_submersion_anchor = 'dry';
-    return { state: next };
-  }
-  if (key === '2') {
-    next.flood_level = 'puddle';
-    next.flood_submersion_anchor = 'tire_base_under_10cm';
-    return { state: next };
-  }
-  if (key === '3') {
-    next.flood_level = 'deep';
-    next.flood_submersion_anchor = 'exhaust_hub_over_15cm';
+  // 1-5: Rapid Wheel Submersion Depth Classification (Issue #513)
+  const submersionMatch = SUBMERSION_LEVELS.find((l) => l.key === key);
+  if (submersionMatch) {
+    next.flood_level = submersionMatch.floodLevel;
+    next.flood_submersion_anchor = submersionMatch.anchor;
+    next.waterline_depth = submersionMatch.waterline;
+    next.submersion_depth_cm = submersionMatch.depthCm;
+    if (meta?.rapidMode) {
+      return { state: next, action: 'auto_advance' };
+    }
     return { state: next };
   }
 
@@ -479,15 +565,24 @@ export const LABELER_I18N = {
     segDeleteBtn: 'Xóa',
     segValidationError: 'Polygon không hợp lệ',
     loading: 'Đang tải danh sách ảnh...',
-    floodLabel: 'Mức độ ngập (Phím 1-3)',
-    floodNone: '1: Khô ráo',
-    floodPuddle: '2: Vũng nước / Mấp mé (<10cm)',
-    floodDeep: '3: Ngập sâu (Quá nửa bánh/ống xả >15cm)',
-    floodSubmersionLabel: 'Mỏ neo ngập vật lý',
-    anchorDry: 'Khô ráo / Không đọng nước',
-    anchorWetNoStanding: 'Ướt phản chiếu, không ngập',
-    anchorTireBase: 'Ngập mấp mé đế bánh xe (<10cm)',
-    anchorExhaustHub: 'Ngập trục bánh / ống bô (>15cm)',
+    floodLabel: 'Mức độ ngập & Trục neo bánh xe (Phím 1-5)',
+    rapidSubmersionTitle: 'Phân loại ngập nước siêu tốc (Phím 1-5)',
+    rapidModeToggle: 'Chế độ siêu tốc (tự chuyển ảnh)',
+    rapidModeOn: 'BẬT (1-5 tự lưu & chuyển ảnh)',
+    rapidModeOff: 'TẮT (Chỉ chọn mức ngập)',
+    rapidSessionCount: 'Đã phân loại',
+    rapidThroughput: 'Tốc độ',
+    rapidFramesPerMin: 'ảnh/phút',
+    rapidFramesPerHour: 'ảnh/giờ',
+    floodNone: '1: Khô ráo (0cm)',
+    floodPuddle: '3: Vũng nước / Mép vành (<10cm)',
+    floodDeep: '4: Nửa bánh / Ống xả (15-25cm)',
+    floodSubmersionLabel: 'Mỏ neo ngập vật lý (Phím 1-5)',
+    anchorDry: '1: Khô ráo (0cm)',
+    anchorWetNoStanding: '2: Ướt phản chiếu (0cm)',
+    anchorTireBase: '3: Mép vành bánh (<10cm)',
+    anchorExhaustHub: '4: Nửa bánh / Ống bô (15-25cm)',
+    anchorWheelSubmerged: '5: Lút bánh / Chết máy (>30cm)',
     trafficLabel: 'Mật độ giao thông (Phím q-r)',
     trafficClear: 'q: Thông thoáng',
     trafficModerate: 'w: Bình thường',
@@ -568,15 +663,24 @@ export const LABELER_I18N = {
     segDeleteBtn: 'Delete',
     segValidationError: 'Invalid polygon',
     loading: 'Loading snapshot catalog...',
-    floodLabel: 'Flood Level (Keys 1-3)',
-    floodNone: '1: None',
-    floodPuddle: '2: Shallow / Ankle-deep (<10cm)',
-    floodDeep: '3: Deep (Half-wheel/exhaust >15cm)',
-    floodSubmersionLabel: 'Physical Flood Depth Anchor',
-    anchorDry: 'Dry / No water pooling',
-    anchorWetNoStanding: 'Wet sheen / reflection, zero depth',
-    anchorTireBase: 'Tire contact patch submerged (<10cm)',
-    anchorExhaustHub: 'Wheel hub / exhaust submerged (>15cm)',
+    floodLabel: 'Flood Level & Wheel Submersion (Keys 1-5)',
+    rapidSubmersionTitle: 'Rapid Submersion Classification (Keys 1-5)',
+    rapidModeToggle: 'Rapid Mode (auto-advance)',
+    rapidModeOn: 'ON (1-5 auto-saves & advances)',
+    rapidModeOff: 'OFF (Select only)',
+    rapidSessionCount: 'Classified',
+    rapidThroughput: 'Throughput',
+    rapidFramesPerMin: 'frames/min',
+    rapidFramesPerHour: 'frames/hr',
+    floodNone: '1: Dry (0cm)',
+    floodPuddle: '3: Tire Base (<10cm)',
+    floodDeep: '4: Half Wheel / Exhaust (15-25cm)',
+    floodSubmersionLabel: 'Physical Flood Depth Anchor (Keys 1-5)',
+    anchorDry: '1: Dry asphalt (0cm)',
+    anchorWetNoStanding: '2: Wet sheen / surface (0cm)',
+    anchorTireBase: '3: Tire contact patch (<10cm)',
+    anchorExhaustHub: '4: Half wheel / Exhaust (15-25cm)',
+    anchorWheelSubmerged: '5: Wheel submerged / Stall (>30cm)',
     trafficLabel: 'Traffic Density (Keys q-r)',
     trafficClear: 'q: Clear',
     trafficModerate: 'w: Moderate',
