@@ -182,7 +182,7 @@ make dev-all
 | **Go Backend API** | `3000` | http://localhost:3000 | Core Gin HTTP REST server |
 | **Subscription API** | `3000` | http://localhost:3000/api/subscriptions | `POST`, `GET`, `DELETE` flood alert subscriptions |
 | **Swagger UI** | `3000` | http://localhost:3000/swagger/index.html | Interactive OpenAPI documentation |
-| **Backend Health** | `3000` | http://localhost:3000/health | `healthy`/`degraded`/`unhealthy` (503 if unhealthy); `/healthz` alias |
+| **Backend Health** | `3000` | http://localhost:3000/health | Readiness `healthy`/`degraded`/`unhealthy` (503 if unhealthy); `/healthz` is liveness, always 200 |
 | **CV Inference Engine** | `8000` | http://localhost:8000/healthz | Returns `{"status":"healthy","model":"yolov8n_openvino_320"}` |
 
 > [!NOTE]

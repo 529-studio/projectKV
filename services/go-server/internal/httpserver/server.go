@@ -16,9 +16,10 @@ import (
 // @description Ho Chi Minh City Traffic Camera & Flood Alert API
 // @BasePath /
 
-// Health status values surfaced by /health, /healthz and /api/health. The
-// overall status is the cv-engine status when a checker is wired, and healthy
-// otherwise (nothing downstream is required).
+// Health status values surfaced by the health endpoints. /health and
+// /api/health are readiness: the overall status is the cv-engine status when a
+// checker is wired, and healthy otherwise. /healthz is liveness: always
+// healthy while the process answers.
 const (
 	HealthStatusHealthy   = "healthy"
 	HealthStatusDegraded  = "degraded"
@@ -111,16 +112,34 @@ func NewHealthHandler(checker HealthChecker) *HealthHandler {
 }
 
 // Healthz godoc
-// @Summary Health check
-// @Description Liveness and readiness probe reporting system, schema and cv-engine readiness
+// @Summary Readiness check
+// @Description Readiness probe: 503 when the wired cv-engine is unhealthy, so a caller that needs inference sees the dependency failure
 // @Tags System
 // @Produce json
 // @Success 200 {object} map[string]any
 // @Failure 503 {object} map[string]any
-// @Router /healthz [get]
 // @Router /health [get]
 // @Router /api/health [get]
 func (h *HealthHandler) Healthz(c *gin.Context) {
+	h.respond(c, true)
+}
+
+// Livez godoc
+// @Summary Liveness check
+// @Description Liveness probe: always 200 while the process answers, reporting cv-engine state under "cv_engine" without failing the probe
+// @Tags System
+// @Produce json
+// @Success 200 {object} map[string]any
+// @Router /healthz [get]
+func (h *HealthHandler) Livez(c *gin.Context) {
+	h.respond(c, false)
+}
+
+// respond renders the health body. When readiness is false the status stays
+// healthy and the HTTP code stays 200 even if the cv-engine probe fails: the
+// container runtime healthcheck must not restart a backend whose optional
+// inference worker is down. The cv_engine block still carries the real state.
+func (h *HealthHandler) respond(c *gin.Context, readiness bool) {
 	cvEngine := CVEngineHealth{
 		Status:     HealthStatusHealthy,
 		Configured: h != nil && h.checker != nil,
@@ -144,8 +163,14 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 	}
 
 	code := http.StatusOK
-	if overall == HealthStatusUnhealthy {
+	if readiness && overall == HealthStatusUnhealthy {
 		code = http.StatusServiceUnavailable
+	}
+
+	// A liveness answer never reports an unhealthy overall status: the process
+	// is answering, which is exactly what the probe asks.
+	if !readiness {
+		overall = HealthStatusHealthy
 	}
 
 	c.JSON(code, gin.H{
@@ -161,10 +186,16 @@ func (h *HealthHandler) Healthz(c *gin.Context) {
 // that have not wired a cv-engine probe can register directly.
 var defaultHealthHandler = NewHealthHandler(nil)
 
-// Healthz serves the health check with no cv-engine probe wired. Prefer
+// Healthz serves the readiness check with no cv-engine probe wired. Prefer
 // NewHealthHandler(checker).Healthz when a checker is available.
 func Healthz(c *gin.Context) {
 	defaultHealthHandler.Healthz(c)
+}
+
+// Livez serves the liveness check with no cv-engine probe wired. Prefer
+// NewHealthHandler(checker).Livez when a checker is available.
+func Livez(c *gin.Context) {
+	defaultHealthHandler.Livez(c)
 }
 
 // Option configures NewServer.
@@ -174,8 +205,8 @@ type serverOptions struct {
 	healthChecker HealthChecker
 }
 
-// WithHealthChecker wires a cv-engine health checker into the /health,
-// /healthz and /api/health endpoints.
+// WithHealthChecker wires a cv-engine health checker into the health
+// endpoints: /health and /api/health are readiness, /healthz is liveness.
 func WithHealthChecker(checker HealthChecker) Option {
 	return func(o *serverOptions) {
 		o.healthChecker = checker
@@ -195,7 +226,7 @@ func NewServer(opts ...Option) *gin.Engine {
 	// Health check endpoints
 	r.GET("/health", health.Healthz)
 	r.HEAD("/health", health.Healthz)
-	r.GET("/healthz", health.Healthz)
+	r.GET("/healthz", health.Livez)
 	r.GET("/api/health", health.Healthz)
 
 	// Swagger documentation UI

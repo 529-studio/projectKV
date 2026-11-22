@@ -147,7 +147,9 @@ Makefile                # add: dev-go, build-go, test-go, lint-go targets; remov
 
 | Method | Path | Module | Purpose |
 |---|---|---|---|
-| GET | `/healthz` | httpserver | liveness/readiness probe |
+| GET | `/healthz` | httpserver | liveness probe: 200 while the process answers, `cv_engine` state informational only |
+| GET | `/health` | httpserver | readiness probe: 503 when the wired cv-engine is unhealthy |
+| GET | `/api/health` | httpserver | readiness alias used by the web client |
 | GET | `/api/cameras` | camera | full camera catalog (supports query params for the chained filter: zone, corridor) |
 | GET | `/api/cameras/:id` | camera | single camera metadata |
 | GET | `/api/zones` | camera | list of valid zone identifiers, used to validate subscription requests |
