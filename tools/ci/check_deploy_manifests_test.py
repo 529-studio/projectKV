@@ -58,12 +58,14 @@ VALID_BACKUP_SERVICE = """
           memory: 128M
 """
 
-VALID_CV_COMPOSE = """# CV engine on core-network, no published port.
+VALID_CV_COMPOSE = """# CV engine on core-network with parameterized Tailscale/loopback bind.
 services:
   warded-cv-engine:
     image: ghcr.io/529-studio/projectkv-model:stg-latest
     container_name: warded-cv-engine
     restart: unless-stopped
+    ports:
+      - "${CV_BIND_ADDR:-127.0.0.1}:8000:8000"
     networks:
       - core-network
     environment:
@@ -330,9 +332,26 @@ Persistent=true
     def test_cv_published_port_flagged(self) -> None:
         self.cv_compose_path.write_text(
             self.cv_compose_path.read_text().replace(
-                "    networks:\n      - core-network\n",
-                '    ports:\n      - "8000:8000"\n    networks:\n      - core-network\n',
-                1,
+                '"${CV_BIND_ADDR:-127.0.0.1}:8000:8000"',
+                '"8000:8000"',
+            )
+        )
+        violations = cdm.check_cv_compose(self.cv_compose_path)
+        self.assertTrue(any(v.rule == "cv_ports" for v in violations))
+
+        self.cv_compose_path.write_text(
+            VALID_CV_COMPOSE.replace(
+                '"${CV_BIND_ADDR:-127.0.0.1}:8000:8000"',
+                '"0.0.0.0:8000:8000"',
+            )
+        )
+        violations = cdm.check_cv_compose(self.cv_compose_path)
+        self.assertTrue(any(v.rule == "cv_ports" for v in violations))
+
+        self.cv_compose_path.write_text(
+            VALID_CV_COMPOSE.replace(
+                '    ports:\n      - "${CV_BIND_ADDR:-127.0.0.1}:8000:8000"\n',
+                "",
             )
         )
         violations = cdm.check_cv_compose(self.cv_compose_path)

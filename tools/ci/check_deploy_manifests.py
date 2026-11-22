@@ -9,8 +9,9 @@ Enforces structural and security invariants across deploy/ and compose manifests
 - docker-compose.stg.yml sidecars: forecast worker profile/user/read_only/healthcheck,
   the daily SQLite backup sidecar, and the volume-ownership init container. The
   removed streaming-replication sidecar must not come back.
-- docker-compose.cv.yml: the CV engine joins core-network and publishes no host
-  port, so consumers reach it by service name only.
+- docker-compose.cv.yml: the CV engine joins core-network and binds port 8000
+  strictly via parameterized ${CV_BIND_ADDR:-127.0.0.1}:8000:8000 (no wildcard
+  0.0.0.0 or bare 8000:8000 host bindings).
 
 Exit code 0 on pass, 1 on violations.
 """
@@ -412,11 +413,12 @@ def check_backup_sidecar(compose_path: Path) -> list[Violation]:
 
 
 def check_cv_compose(compose_path: Path) -> list[Violation]:
-    """Validate docker-compose.cv.yml reaches the engine over core-network only.
+    """Validate docker-compose.cv.yml binds 8000 via CV_BIND_ADDR and joins core-network.
 
-    The CV engine moved next to the stack that calls it, so a published host
-    port would be dead surface: consumers address `warded-cv-engine:8000` on the
-    shared external network.
+    Cross-node consumers (warded-backend on desk-srv-01) reach the GPU worker
+    over Tailscale, while local runs default to loopback. Bare wildcard port
+    bindings (8000:8000 or 0.0.0.0:8000:8000) are forbidden so the port cannot
+    be exposed on all interfaces by mistake.
     """
     violations: list[Violation] = []
     if not compose_path.exists():
@@ -424,12 +426,29 @@ def check_cv_compose(compose_path: Path) -> list[Violation]:
 
     text = compose_path.read_text(encoding="utf-8")
 
-    if re.search(r"^\s+ports:\s*$", text, re.MULTILINE):
+    if re.search(
+        r'^\s+-\s+["\']?(?:0\.0\.0\.0:|\[::\]:)?8000:8000["\']?\s*$',
+        text,
+        re.MULTILINE,
+    ):
         violations.append(
             Violation(
                 compose_path,
                 "cv_ports",
-                "The CV compose must not publish host ports; the engine is reached by service name",
+                "Wildcard CV port bindings (8000:8000 or 0.0.0.0:8000:8000) are prohibited; bind ${CV_BIND_ADDR:-127.0.0.1}:8000:8000",
+            )
+        )
+
+    if not re.search(
+        r'^\s+ports:\s*\n\s+-\s+["\']?\$\{CV_BIND_ADDR:-127\.0\.0\.1\}:8000:8000["\']?\s*$',
+        text,
+        re.MULTILINE,
+    ):
+        violations.append(
+            Violation(
+                compose_path,
+                "cv_ports",
+                "Expected ports binding ${CV_BIND_ADDR:-127.0.0.1}:8000:8000 so host exposure stays scoped to loopback or tailnet",
             )
         )
 
