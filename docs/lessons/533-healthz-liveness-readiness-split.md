@@ -2,7 +2,7 @@
 
 ## Trigger
 
-On 2026-11-22 `desk-srv-02` was powered off for several hours. `warded-backend` on `desk-srv-01` answered `503` on `/health`, `/healthz` and `/api/health` because the cv-engine probe (`CV_ENGINE_URL=http://100.64.107.57:8000`) could not connect. `Dockerfile` runs its `HEALTHCHECK` against `/healthz`, so the container went `(unhealthy)` even though the Go process, SQLite and every non-inference route were serving normally. The only way to keep the web, archiver and API surfaces up was a manual `ANALYZER=none` override on Stack 14.
+On 2026-11-22 a GPU inference node on a second host was powered off for several hours. `warded-backend` on the primary host answered `503` on `/health`, `/healthz` and `/api/health` because its cv-engine probe over the private mesh could not connect. `Dockerfile` runs its `HEALTHCHECK` against `/healthz`, so the container went `(unhealthy)` even though the Go process, SQLite and every non-inference route were serving normally. The only way to keep the web, archiver and API surfaces up was a manual `ANALYZER=none` override on the staging stack.
 
 ## Lesson
 

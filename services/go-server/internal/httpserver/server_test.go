@@ -171,7 +171,7 @@ func TestHealthEndpoints_LivenessIgnoresEngineState(t *testing.T) {
 		return CVEngineHealth{
 			Status:    HealthStatusUnhealthy,
 			Service:   "cv-engine",
-			Error:     "dial tcp 100.64.107.57:8000: i/o timeout",
+			Error:     "dial tcp 127.0.0.1:59999: i/o timeout",
 			CheckedAt: time.Now().UTC(),
 		}
 	}))
