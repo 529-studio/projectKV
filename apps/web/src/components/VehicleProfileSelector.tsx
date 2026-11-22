@@ -81,7 +81,7 @@ export default function VehicleProfileSelector({
       {isOpen && (
         <div
           role="listbox"
-          className="absolute right-0 top-full mt-1.5 w-72 sm:w-80 bg-zinc-950 border border-zinc-800 rounded-lg shadow-2xl z-[1200] py-1.5 font-sans overflow-hidden backdrop-blur-md"
+          className="absolute right-0 top-full mt-1.5 w-72 sm:w-80 max-w-[calc(100vw-1.5rem)] bg-zinc-950 border border-zinc-800 rounded-lg shadow-2xl z-[1200] py-1.5 font-sans overflow-hidden backdrop-blur-md"
         >
           <div className="px-3 py-2 border-b border-zinc-900 bg-zinc-900/40">
             <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">

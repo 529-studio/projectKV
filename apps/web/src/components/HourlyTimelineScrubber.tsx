@@ -60,7 +60,7 @@ export default function HourlyTimelineScrubber({
               <button
                 type="button"
                 onClick={() => onSelectHour(0)}
-                className="px-2 py-1 min-h-[36px] text-[11px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors cursor-pointer"
+                className="px-3 py-1.5 min-h-[48px] min-w-[48px] text-xs font-semibold rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors cursor-pointer flex items-center justify-center"
                 aria-label={lang === 'vi' ? 'Trở về hiện tại' : 'Reset to now'}
                 title={lang === 'vi' ? 'Trở về mốc thời gian hiện tại' : 'Reset to current time'}
               >
@@ -71,7 +71,7 @@ export default function HourlyTimelineScrubber({
             <button
               type="button"
               onClick={() => setIsExpanded(prev => !prev)}
-              className="p-1 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              className="p-2 min-w-[48px] min-h-[48px] flex items-center justify-center rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
               aria-label={
                 isExpanded
                   ? lang === 'vi'
@@ -108,7 +108,8 @@ export default function HourlyTimelineScrubber({
         <div
           role="tablist"
           aria-label={lang === 'vi' ? 'Chọn khung giờ dự báo' : 'Select forecast hour'}
-          className="flex items-stretch overflow-x-auto no-scrollbar divide-x divide-zinc-900 bg-zinc-900/30 p-1 gap-1"
+          className="flex items-stretch overflow-x-auto overscroll-x-contain touch-pan-x no-scrollbar divide-x divide-zinc-900 bg-zinc-900/30 p-1 gap-1"
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {timeline.map(item => {
             const isSelected = item.hour_offset === selectedHour;

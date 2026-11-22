@@ -85,7 +85,7 @@ export default function MyRouteSetupModal({
       role="dialog"
       aria-modal="true"
       aria-label={COMMUTE_I18N.TITLE[lang]}
-      className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in font-sans"
+      className="fixed inset-0 z-[1100] flex items-center justify-center p-3 sm:p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] bg-black/60 backdrop-blur-sm animate-fade-in font-sans"
     >
       <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* HEADER */}
@@ -102,7 +102,7 @@ export default function MyRouteSetupModal({
             type="button"
             onClick={onClose}
             aria-label={COMMUTE_I18N.CANCEL[lang]}
-            className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            className="min-w-[48px] min-h-[48px] flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
           >
             <svg
               className="w-4 h-4"
@@ -130,7 +130,7 @@ export default function MyRouteSetupModal({
                   key={p.id}
                   type="button"
                   onClick={() => onSelectPreset(p)}
-                  className="p-2.5 rounded-lg bg-zinc-900 hover:bg-zinc-800/90 border border-zinc-800 hover:border-zinc-700 text-left transition-all cursor-pointer group"
+                  className="min-h-[48px] p-2.5 rounded-lg bg-zinc-900 hover:bg-zinc-800/90 border border-zinc-800 hover:border-zinc-700 text-left transition-all cursor-pointer group flex flex-col justify-center"
                 >
                   <span className="text-xs font-medium text-zinc-200 group-hover:text-cyan-400 transition-colors block">
                     {p.title[lang]}
@@ -159,7 +159,7 @@ export default function MyRouteSetupModal({
                 value={homeName}
                 onChange={e => setHomeName(e.target.value)}
                 placeholder={lang === 'vi' ? 'Ví dụ: Landmark 81, Bình Thạnh' : 'e.g. Landmark 81'}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full min-h-[48px] px-3 py-2.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-500 transition-colors"
               />
             </div>
 
@@ -174,7 +174,7 @@ export default function MyRouteSetupModal({
                 value={workName}
                 onChange={e => setWorkName(e.target.value)}
                 placeholder={lang === 'vi' ? 'Ví dụ: Bến Nghé, Quận 1' : 'e.g. District 1 Center'}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full min-h-[48px] px-3 py-2.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-500 transition-colors"
               />
             </div>
 
@@ -189,7 +189,7 @@ export default function MyRouteSetupModal({
                   return (
                     <label
                       key={key}
-                      className={`flex items-center gap-2 p-1.5 rounded cursor-pointer text-[11px] transition-colors ${
+                      className={`min-h-[44px] flex items-center gap-2 px-2.5 py-2 rounded cursor-pointer text-[11px] transition-colors ${
                         isChecked ? 'bg-zinc-800 text-cyan-300' : 'text-zinc-400 hover:text-zinc-200'
                       }`}
                     >
@@ -232,7 +232,7 @@ export default function MyRouteSetupModal({
                 onClear();
                 onClose();
               }}
-              className="px-3 py-1.5 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded transition-colors cursor-pointer"
+              className="min-h-[48px] min-w-[48px] px-4 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
             >
               {COMMUTE_I18N.CLEAR[lang]}
             </button>
@@ -242,14 +242,14 @@ export default function MyRouteSetupModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-xs text-zinc-300 hover:text-white rounded hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="min-h-[48px] min-w-[48px] px-4 py-2 text-xs text-zinc-300 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer flex items-center justify-center"
             >
               {COMMUTE_I18N.CANCEL[lang]}
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="px-4 py-1.5 text-xs font-semibold rounded bg-cyan-600 hover:bg-cyan-500 text-white transition-colors cursor-pointer shadow"
+              className="min-h-[48px] min-w-[48px] px-5 py-2 text-xs font-semibold rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white transition-colors cursor-pointer shadow flex items-center justify-center"
             >
               {COMMUTE_I18N.SAVE_CONFIG[lang]}
             </button>
