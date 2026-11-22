@@ -1,7 +1,9 @@
-# Dedicated Docker Compose configuration for the CV Engine on the GPU host.
+# Dedicated Docker Compose configuration for the CV Engine on the GPU worker host.
 # Deployed via the container management API configured in CI (see docker-publish.yml).
-# The engine publishes no host port: consumers such as warded-backend reach it as
-# http://warded-cv-engine:8000 over core-network, the same network both stacks join.
+# The engine binds to CV_BIND_ADDR (loopback by default; the Tailscale IP in
+# production) so cross-node consumers such as warded-backend on desk-srv-01 reach
+# it over the tailnet without exposing port 8000 on 0.0.0.0, while same-host
+# callers can still address warded-cv-engine:8000 on core-network.
 
 services:
   warded-cv-engine:
@@ -9,6 +11,8 @@ services:
     container_name: ${MODEL_CONTAINER_NAME:-warded-cv-engine}
     restart: unless-stopped
     pull_policy: ${PULL_POLICY:-always}
+    ports:
+      - "${CV_BIND_ADDR:-127.0.0.1}:8000:8000"
     networks:
       - core-network
     environment:
