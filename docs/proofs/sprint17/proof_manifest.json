@@ -1,0 +1,72 @@
+{
+  "sprint": 17,
+  "theme": "Commuter Transformation & Real-World Citizen Adaptation",
+  "generated_at": "2026-11-22T07:00:00Z",
+  "evaluated_artifacts": [
+    {
+      "task": "S17-T1",
+      "issue": 510,
+      "pr": 516,
+      "title": "Vehicle Clearance Profiles & Dynamic Hazard Evaluation",
+      "proofs": [
+        "docs/proofs/510-vehicle-clearance/01_vehicle_profile_dropdown.png",
+        "docs/proofs/510-vehicle-clearance/02_scooter_clearance_hazard_caution.png",
+        "docs/proofs/510-vehicle-clearance/03_suv_clearance_hazard_passable.png"
+      ],
+      "verification": "Adaptive passability divergence at 22 cm flood depth (Scooter: IMPASSABLE, SUV: PASSABLE)"
+    },
+    {
+      "task": "S17-T2",
+      "issue": 511,
+      "pr": 517,
+      "title": "Hourly Tidal Harmonic Constituent Engine & Convective Rain Timeline Scrubber",
+      "proofs": [
+        "docs/proofs/511-timeline-scrubber/01_timeline_scrubber_normal_flow.png",
+        "docs/proofs/511-timeline-scrubber/02_timeline_scrubber_expanded_affected_roads.png",
+        "docs/proofs/511-timeline-scrubber/03_timeline_scrubber_mobile_dock_coexistence.png"
+      ],
+      "verification": "7 harmonic constituents (M2, S2, N2, K1, O1, M4, MS4) for Phu An & Nha Be; 12h forecast scrub"
+    },
+    {
+      "task": "S17-T3",
+      "issue": 512,
+      "pr": 518,
+      "title": "My-Route Personal Journey Glance, Local-First Storage & Detour Advice",
+      "proofs": [
+        "docs/proofs/512-my-route-glance/01_my_route_card_desktop.png",
+        "docs/proofs/512-my-route-glance/02_my_route_setup_modal_presets.png",
+        "docs/proofs/512-my-route-glance/03_my_route_detour_recommendation.png"
+      ],
+      "verification": "3-second glance evaluation, zero telemetry (localStorage), automated detour routing"
+    },
+    {
+      "task": "S17-T4",
+      "issue": 513,
+      "pr": 520,
+      "title": "20x High-Speed Submersion Keyboard Labeler & Physical Hazard Calibration",
+      "proofs": [
+        "docs/proofs/513-rapid-labeler/01_rapid_keyboard_labeler_panel.png",
+        "docs/proofs/513-rapid-labeler/02_single_key_submersion_classified.png",
+        "docs/proofs/513-rapid-labeler/03_auto_advance_throughput_counter.png"
+      ],
+      "verification": "Hotkeys 1-5, single-key auto-advance, physical depth calibration (0cm, 8cm, 18cm, 35cm)"
+    },
+    {
+      "task": "S17-T5",
+      "issue": 514,
+      "pr": 521,
+      "title": "Mobile Kiosk Touch Targets & Bottom Sheet Safe-Area Polish",
+      "proofs": [
+        "docs/proofs/514-mobile-ergonomics/01_mobile_dock_and_vehicle_touch_targets.png",
+        "docs/proofs/514-mobile-ergonomics/02_mobile_hourly_scrubber_safe_area.png",
+        "docs/proofs/514-mobile-ergonomics/03_mobile_my_route_card_ergonomics.png"
+      ],
+      "verification": "All mobile controls >= 48x48px; env(safe-area-inset) on top header, modals, and bottom stack"
+    }
+  ],
+  "gates_status": {
+    "unit_tests": "PASS (472/472 web tests, 100% Go tests)",
+    "docs_lint": "PASS (0 new violations)",
+    "evidence_integrity": "PASS (131/131 authentic artifacts)"
+  }
+}
