@@ -44,11 +44,15 @@ import { useHourlyForecast } from '../hooks/useHourlyForecast';
 import { useCommuteRoute } from '../hooks/useCommuteRoute';
 import type { VehicleType } from '../types/vehicle';
 import { getStoredVehicleProfile, setStoredVehicleProfile } from '../utils/vehicleHazardUtils';
+import { generateNavigationAlerts } from '../utils/navigationAlertUtils';
+import type { NavigationHazardAlert } from '../types/navigation';
+import type { CheckpointCamera } from '../types/corridor';
 
 const MapComponent = dynamic(() => import('../components/MapComponent'), { ssr: false });
 const HexOverlay = dynamic(() => import('../components/HexOverlay'), { ssr: false });
 const CorridorRouteLayer = dynamic(() => import('../components/CorridorRouteLayer'), { ssr: false });
 const CorridorOverviewCard = dynamic(() => import('../components/CorridorOverviewCard'), { ssr: false });
+const NavigationAlerts = dynamic(() => import('../components/NavigationAlerts'), { ssr: false });
 const VehicleProfileSelector = dynamic(() => import('../components/VehicleProfileSelector'), { ssr: false });
 const HourlyTimelineScrubber = dynamic(() => import('../components/HourlyTimelineScrubber'), { ssr: false });
 const MyRouteCard = dynamic(() => import('../components/MyRouteCard'), { ssr: false });
@@ -124,6 +128,8 @@ export default function Home() {
   // S17-T2 / S17-T3 (Issue #507): Corridor polyline visibility and card dismissal state
   const [showCorridorRoute, setShowCorridorRoute] = useState(true);
   const [isCorridorCardDismissed, setIsCorridorCardDismissed] = useState(false);
+  // S18-T1 / Issue #523: Turn-by-turn navigation hazard alerts toggle
+  const [showNavigationAlerts, setShowNavigationAlerts] = useState(false);
 
   // S17-T2 / Issue #511: Hourly tidal & convective rain timeline scrubber state
   const [selectedHourOffset, setSelectedHourOffset] = useState<number>(0);
@@ -370,6 +376,47 @@ export default function Home() {
       }
     },
     [cameras, handleSelectCamera]
+  );
+
+  // S18-T1 / Issue #523: Sequential Turn-by-Turn Navigation Hazard Alerts along polyline
+  const navigationAlerts = useMemo(() => {
+    if (!corridorRoute?.geojson?.features) return [];
+    const lineFeature = corridorRoute.geojson.features.find(f => f.geometry.type === 'LineString');
+    if (!lineFeature) return [];
+    const polylineCoords = lineFeature.geometry.coordinates as [number, number][];
+
+    const checkpoints: CheckpointCamera[] = corridorRoute.geojson.features
+      .filter(f => f.geometry.type === 'Point')
+      .map(f => {
+        const p = (f.properties || {}) as Record<string, unknown>;
+        const coords = f.geometry.coordinates as [number, number];
+        return {
+          camera_id: String(p.camera_id || ''),
+          name: String(p.name || ''),
+          severity: String(p.severity || 'CLEAR'),
+          flood_severity: p.flood_severity ? String(p.flood_severity) : undefined,
+          flood_depth_cm: typeof p.flood_depth_cm === 'number' ? p.flood_depth_cm : undefined,
+          stale: Boolean(p.stale),
+          coordinates: coords,
+        };
+      });
+
+    return generateNavigationAlerts({
+      polylineCoordinates: polylineCoords,
+      checkpoints,
+      vehicleType,
+      userPosition: geo.fix ? [geo.fix.longitude, geo.fix.latitude] : undefined,
+    });
+  }, [corridorRoute, vehicleType, geo.fix]);
+
+  const handleSelectNavigationAlert = useCallback(
+    (alert: NavigationHazardAlert) => {
+      if (map) {
+        map.flyTo([alert.coordinates[0], alert.coordinates[1]], 16, { animate: true });
+      }
+      handleSelectCameraById(alert.id);
+    },
+    [map, handleSelectCameraById]
   );
 
   // S17-T2 / S17-T3 (Issue #507): Controls embedded in MapComponent filter badge for corridor
@@ -864,6 +911,22 @@ export default function Home() {
                 lang={lang}
                 showPolyline={showCorridorRoute}
                 onTogglePolyline={() => setShowCorridorRoute(prev => !prev)}
+                vehicleType={vehicleType}
+                onToggleNavigationAlerts={() => setShowNavigationAlerts(prev => !prev)}
+                showNavigationAlerts={showNavigationAlerts}
+              />
+            </div>
+          )}
+
+          {/* S18-T1 / Issue #523: Sequential Turn-by-Turn Navigation Hazard Alerts */}
+          {showNavigationAlerts && navigationAlerts.length > 0 && selectedCorridor && (
+            <div className="w-full px-3 pb-3">
+              <NavigationAlerts
+                corridorName={corridorRoute?.summary?.display_name || selectedCorridor}
+                alerts={navigationAlerts}
+                onSelectAlert={handleSelectNavigationAlert}
+                onClose={() => setShowNavigationAlerts(false)}
+                lang={lang}
                 vehicleType={vehicleType}
               />
             </div>
