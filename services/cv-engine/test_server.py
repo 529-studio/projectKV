@@ -546,8 +546,9 @@ class _FakeResults:
 
 
 class _FakeInput:
-    def __init__(self, shape=(1, 3, 416, 416)):
+    def __init__(self, shape=(1, 3, 416, 416), name="images"):
         self.shape = tuple(shape)
+        self.name = name
 
 
 class _FakeInferRequest:
@@ -1201,46 +1202,123 @@ class ORTSessionRecoveryTest(unittest.TestCase):
     """A dead CUDA context must be rebuilt once, and only CUDA failures trigger it."""
 
     class _Session:
-        def __init__(self, error):
+        """Fake session that can fail once, and measures how many runs overlap."""
+
+        def __init__(self, error=None, on_run=None):
             self.error = error
+            self.on_run = on_run
             self.calls = 0
+            self._state = threading.Lock()
+            self.active = 0
+            self.max_active = 0
+
+        def get_inputs(self):
+            return [_FakeInput((1, 3, 320, 320))]
 
         def run(self, outputs, feeds):
-            self.calls += 1
-            if self.calls == 1 and self.error is not None:
-                raise self.error
-            return [np.zeros((1, 84, 2100), dtype=np.float32)]
+            with self._state:
+                self.calls += 1
+                call = self.calls
+                self.active += 1
+                self.max_active = max(self.max_active, self.active)
+            try:
+                if call == 1 and self.error is not None:
+                    raise self.error
+                if self.on_run is not None:
+                    self.on_run()
+                return [np.zeros((1, 84, 2100), dtype=np.float32)]
+            finally:
+                with self._state:
+                    self.active -= 1
 
-    class _Model:
-        input_name = "images"
-        generation = 0
+    def _model(self, session, providers=None):
+        model = server.ORTModel(
+            session,
+            "images",
+            [1, 3, 320, 320],
+            providers or ["CUDAExecutionProvider", "CPUExecutionProvider"],
+        )
+        # The rebuild path is exercised through open_ort_session, so stand in a healthy
+        # CUDA session instead of loading the real graph.
+        healthy = self._Session()
+        patcher = unittest.mock.patch.object(
+            server, "open_ort_session", return_value=(healthy, model.providers)
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        rebuilt = []
+        original = model.reload_session
 
-        def __init__(self, session):
-            self.session = session
-            self.reloads = 0
+        def tracking(observed_generation):
+            original(observed_generation)
+            rebuilt.append(model.generation)
 
-        def reload_session(self, observed_generation):
-            self.reloads += 1
-            self.generation += 1
-            self.session = ORTSessionRecoveryTest._Session(None)
+        model.reload_session = tracking
+        return model, rebuilt
 
-    def _request(self, error):
-        model = self._Model(self._Session(error))
-        return server.ORTInferRequest(model), model
+    def _infer(self, model):
+        return server.ORTInferRequest(model).infer(
+            {0: np.zeros((1, 3, 320, 320), dtype=np.float32)}
+        )
 
     def test_cuda_failure_rebuilds_once_and_retries(self):
-        request, model = self._request(
-            RuntimeError("CUBLAS failure 1: CUBLAS_STATUS_NOT_INITIALIZED")
+        model, rebuilt = self._model(
+            self._Session(RuntimeError("CUBLAS failure 1: CUBLAS_STATUS_NOT_INITIALIZED"))
         )
-        result = request.infer({0: np.zeros((1, 3, 320, 320), dtype=np.float32)})
-        self.assertEqual(model.reloads, 1)
+        result = self._infer(model)
+        self.assertEqual(len(rebuilt), 1)
         self.assertEqual(len(result), 1)
 
     def test_non_cuda_failure_propagates_without_reload(self):
-        request, model = self._request(ValueError("invalid tensor"))
+        model, rebuilt = self._model(self._Session(ValueError("invalid tensor")))
         with self.assertRaises(ValueError):
-            request.infer({0: np.zeros((1, 3, 320, 320), dtype=np.float32)})
-        self.assertEqual(model.reloads, 0)
+            self._infer(model)
+        self.assertEqual(rebuilt, [])
+
+    def test_concurrent_cuda_runs_never_overlap(self):
+        # Regression for the production crash: two threads inside the CUDA provider at
+        # once killed the context ("CUDA failure 700: an illegal memory access"), which
+        # exited the container and dropped every in-flight request.
+        session = self._Session(on_run=lambda: time.sleep(0.01))
+        model, _ = self._model(session)
+        errors = []
+
+        def worker():
+            try:
+                self._infer(model)
+            except BaseException as exc:  # pragma: no cover - reported below
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+        self.assertEqual(errors, [])
+        self.assertEqual(session.calls, 8)
+        self.assertEqual(session.max_active, 1)
+
+    def test_cpu_runs_stay_parallel(self):
+        # Serialization is a CUDA-provider remedy: a CPU deployment must keep using its
+        # request threads, or the concurrency this service was built for is lost.
+        entered = threading.Barrier(2, timeout=10)
+        session = self._Session(on_run=entered.wait)
+        model, _ = self._model(session, providers=["CPUExecutionProvider"])
+        errors = []
+
+        def worker():
+            try:
+                self._infer(model)
+            except BaseException as exc:  # pragma: no cover - reported below
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+        self.assertEqual(errors, [])
+        self.assertEqual(session.max_active, 2)
 
     def test_cuda_marker_detection(self):
         self.assertTrue(server.is_cuda_runtime_failure(RuntimeError("cuDNN failure 5003")))

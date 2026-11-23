@@ -336,23 +336,7 @@ class ORTInferRequest:
             tensor = next(iter(feeds.values()))
         if tensor is None:
             raise ValueError("ORT infer() requires the image tensor under key 0")
-        generation = self._model.generation
-        try:
-            outputs = self._model.session.run(None, {self._model.input_name: tensor})
-        except Exception as exc:
-            # A CUDA context can die while the process keeps running (driver reset,
-            # GPU power event, long-idle clock change). The session then answers 500
-            # to every request until the container is restarted. Rebuild it once and
-            # retry; non-CUDA errors propagate unchanged.
-            if not is_cuda_runtime_failure(exc):
-                raise
-            logger.warning(
-                "CUDA inference failed (%s); rebuilding the ONNX Runtime session and retrying once",
-                exc,
-            )
-            self._model.reload_session(generation)
-            outputs = self._model.session.run(None, {self._model.input_name: tensor})
-        return ORTInferenceResult(outputs)
+        return ORTInferenceResult(self._model.run(tensor))
 
 
 class ORTModel:
@@ -379,12 +363,55 @@ class ORTModel:
         self.resolution_mode = (
             "dynamic" if spatial_dims_are_dynamic(self.input_shape) else "static"
         )
+        # Guards the forward pass of the CUDA provider. ONNX Runtime advertises
+        # thread-safe sessions, but on this deployment (Pascal P106-100, CUDA 12.4)
+        # two request threads inside ``session.run`` at once abort the process with
+        # "CUDA failure 700: an illegal memory access was encountered": the CUDA
+        # context dies, the container exits, and every in-flight request is lost.
+        # Serializing costs nothing here — YOLOv8n at 320x320 executes in a few
+        # milliseconds and the request queue in front of the model bounds throughput
+        # — while the same lock makes a rebuild safe, because swapping the session
+        # while another thread is inside ``run`` is exactly the illegal state.
+        self._run_lock = threading.Lock()
         self._reload_lock = threading.Lock()
         self._generation = 0
 
     @property
     def generation(self) -> int:
         return self._generation
+
+    @property
+    def _serializes_runs(self) -> bool:
+        return "CUDAExecutionProvider" in self.providers
+
+    def run(self, tensor: "np.ndarray") -> Any:
+        """Execute one forward pass, rebuilding a dead CUDA session once.
+
+        A CUDA context can die while the process keeps running (driver reset, GPU
+        power event, long-idle clock change, or the concurrent-run access violation
+        above). The session then answers 500 to every request until the container is
+        restarted, so rebuild it once and retry; non-CUDA errors propagate unchanged.
+        """
+        if not self._serializes_runs:
+            # CPU execution keeps the previous behaviour: independent threads run in
+            # parallel and nothing is gained by serializing them.
+            return self._run_or_recover(tensor)
+        with self._run_lock:
+            return self._run_or_recover(tensor)
+
+    def _run_or_recover(self, tensor: "np.ndarray") -> Any:
+        generation = self._generation
+        try:
+            return self.session.run(None, {self.input_name: tensor})
+        except Exception as exc:
+            if not is_cuda_runtime_failure(exc):
+                raise
+            logger.warning(
+                "CUDA inference failed (%s); rebuilding the ONNX Runtime session and retrying once",
+                exc,
+            )
+            self.reload_session(generation)
+            return self.session.run(None, {self.input_name: tensor})
 
     def reload_session(self, observed_generation: int) -> None:
         """Replace a dead session once, even when several request threads race."""

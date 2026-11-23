@@ -9,6 +9,14 @@ Standalone Computer Vision inference service optimized for non-AVX x86_64 hardwa
 - **Resource Constraints**: Cgroups limits: `512MB RAM`, `1.0 CPU`.
 - **Reference**: Evaluated and benchmarked in [`docs/spike-cv-runtime.md`](../../docs/spike-cv-runtime.md) (Issue #104).
 
+## Backends and inference concurrency
+
+`CV_BACKEND` selects how the YOLOv8n graph executes; preprocessing, post-processing and the HTTP contract are identical on both paths.
+
+- `openvino` (default): Intel CPU plugin, request threads run inference in parallel.
+- `ort`: ONNX Runtime, CUDA first with CPU as the creation-time fallback. When the session resolves `CUDAExecutionProvider`, forward passes are **serialized inside the process** (`ORTModel._run_lock`). Concurrent `session.run` calls on the CUDA provider of this deployment (Pascal P106-100, CUDA 12.4) abort the process with `CUDA failure 700: an illegal memory access was encountered`, killing the context and every in-flight request. Serialization costs nothing measurable — YOLOv8n at 320x320 is a few milliseconds while `InferenceQueueManager` bounds admission — and it also makes a session rebuild safe, since swapping the session while another thread is inside `run` is the illegal state itself.
+- A CUDA failure inside a run rebuilds the session once and retries; with `CV_REQUIRE_CUDA=1` a rebuild that resolves only `CPUExecutionProvider` exits so the container restarts with a fresh context instead of silently serving on CPU.
+
 ## Endpoints
 
 - `GET /healthz`: Health check endpoint.
