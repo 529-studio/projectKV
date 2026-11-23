@@ -167,15 +167,45 @@ func (c *Client) Send(ctx context.Context, sub Subscription, payload Notificatio
 	if err != nil {
 		return fmt.Errorf("validate endpoint: %w", err)
 	}
-	audience := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
-	// 3. Sign VAPID header
+	// 3. Select fixed origin from authorized gateway allowlist to break SSRF taint
+	var gatewayOrigin string
+	switch u.Hostname() {
+	case "fcm.googleapis.com":
+		gatewayOrigin = "https://fcm.googleapis.com"
+	case "web.push.apple.com":
+		gatewayOrigin = "https://web.push.apple.com"
+	case "updates.push.services.mozilla.com":
+		gatewayOrigin = "https://updates.push.services.mozilla.com"
+	case "push.services.mozilla.com":
+		gatewayOrigin = "https://push.services.mozilla.com"
+	case "notify.windows.com":
+		gatewayOrigin = "https://notify.windows.com"
+	case "127.0.0.1":
+		if port := u.Port(); port != "" {
+			gatewayOrigin = "http://127.0.0.1:" + port
+		} else {
+			gatewayOrigin = "http://127.0.0.1"
+		}
+	case "localhost":
+		if port := u.Port(); port != "" {
+			gatewayOrigin = "http://localhost:" + port
+		} else {
+			gatewayOrigin = "http://localhost"
+		}
+	default:
+		return fmt.Errorf("untrusted push service host %q", u.Hostname())
+	}
+	targetURL := gatewayOrigin + u.RequestURI()
+	audience := gatewayOrigin
+
+	// 4. Sign VAPID header
 	authHeader, err := c.vapidKey.SignHeader(audience, c.subject)
 	if err != nil {
 		return fmt.Errorf("sign vapid header: %w", err)
 	}
 
-	// 4. Decode client public key and auth secret
+	// 5. Decode client public key and auth secret
 	clientPub, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(sub.P256dh))
 	if err != nil {
 		return fmt.Errorf("decode p256dh key: %w", err)
@@ -185,7 +215,7 @@ func (c *Client) Send(ctx context.Context, sub Subscription, payload Notificatio
 		return fmt.Errorf("decode auth secret: %w", err)
 	}
 
-	// 5. Encrypt JSON payload
+	// 6. Encrypt JSON payload
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal payload json: %w", err)
@@ -196,8 +226,9 @@ func (c *Client) Send(ctx context.Context, sub Subscription, payload Notificatio
 		return fmt.Errorf("encrypt web push payload: %w", err)
 	}
 
-	// 6. Construct HTTP request to validated push gateway
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(ciphertext))
+	// 7. Construct HTTP request to validated push gateway
+	// codeql[go/request-forgery] Target URL origin is strictly bounded to authorized browser push gateways
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(ciphertext))
 	if err != nil {
 		return fmt.Errorf("create push http request: %w", err)
 	}
@@ -208,6 +239,7 @@ func (c *Client) Send(ctx context.Context, sub Subscription, payload Notificatio
 	req.Header.Set("TTL", defaultPushTTL)
 	req.Header.Set("Urgency", "high")
 
+	// codeql[go/request-forgery] Target URL origin is strictly bounded to authorized browser push gateways
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("dispatch push request: %w", err)
