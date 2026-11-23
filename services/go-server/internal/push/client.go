@@ -141,7 +141,18 @@ func ValidateEndpoint(rawEndpoint string) (*url.URL, error) {
 	}
 
 	// 4. SSRF allowlist: only allow legitimate browser push service gateways or local test server
-	if !IsAllowedPushServiceHost(host) {
+	if host != "fcm.googleapis.com" &&
+		host != "web.push.apple.com" &&
+		host != "updates.push.services.mozilla.com" &&
+		host != "push.services.mozilla.com" &&
+		host != "notify.windows.com" &&
+		host != "localhost" &&
+		host != "127.0.0.1" &&
+		!strings.HasSuffix(host, ".push.apple.com") &&
+		!strings.HasSuffix(host, ".googleapis.com") &&
+		!strings.HasSuffix(host, ".services.mozilla.com") &&
+		!strings.HasSuffix(host, ".autopush.net") &&
+		!strings.HasSuffix(host, ".notify.windows.com") {
 		return nil, fmt.Errorf("subscription endpoint host %q is not an authorized push service gateway", host)
 	}
 
@@ -164,8 +175,20 @@ func (c *Client) Send(ctx context.Context, sub Subscription, payload Notificatio
 	if err != nil {
 		return fmt.Errorf("validate endpoint: %w", err)
 	}
-	if !IsAllowedPushServiceHost(u.Hostname()) {
-		return fmt.Errorf("unauthorized push service host %q", u.Hostname())
+	host := strings.ToLower(u.Hostname())
+	if host != "fcm.googleapis.com" &&
+		host != "web.push.apple.com" &&
+		host != "updates.push.services.mozilla.com" &&
+		host != "push.services.mozilla.com" &&
+		host != "notify.windows.com" &&
+		host != "localhost" &&
+		host != "127.0.0.1" &&
+		!strings.HasSuffix(host, ".push.apple.com") &&
+		!strings.HasSuffix(host, ".googleapis.com") &&
+		!strings.HasSuffix(host, ".services.mozilla.com") &&
+		!strings.HasSuffix(host, ".autopush.net") &&
+		!strings.HasSuffix(host, ".notify.windows.com") {
+		return fmt.Errorf("unauthorized push service host %q", host)
 	}
 	audience := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
@@ -196,8 +219,16 @@ func (c *Client) Send(ctx context.Context, sub Subscription, payload Notificatio
 		return fmt.Errorf("encrypt web push payload: %w", err)
 	}
 
-	// 5. Construct HTTP request
-	targetURL := fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, u.RequestURI())
+	// 5. Construct HTTP request using sanitized scheme and host
+	scheme := "https"
+	if u.Scheme == "http" && (host == "localhost" || host == "127.0.0.1") {
+		scheme = "http"
+	}
+	targetHost := host
+	if port := u.Port(); port != "" {
+		targetHost = host + ":" + port
+	}
+	targetURL := scheme + "://" + targetHost + u.RequestURI()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(ciphertext))
 	if err != nil {
 		return fmt.Errorf("create push http request: %w", err)
