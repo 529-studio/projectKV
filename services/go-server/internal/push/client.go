@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -82,6 +81,30 @@ func NewClient(vapidKey *VAPIDKey, subject string, store Store, opts ...ClientOp
 	return c
 }
 
+var allowedPushHosts = map[string]struct{}{
+	"fcm.googleapis.com":                {},
+	"web.push.apple.com":                {},
+	"updates.push.services.mozilla.com": {},
+	"localhost":                         {},
+	"127.0.0.1":                         {},
+}
+
+// IsAllowedPushServiceHost verifies that the destination host belongs to an authorized browser vendor push service.
+func IsAllowedPushServiceHost(host string) bool {
+	lower := strings.ToLower(host)
+	if _, ok := allowedPushHosts[lower]; ok {
+		return true
+	}
+	if strings.HasSuffix(lower, ".push.apple.com") ||
+		strings.HasSuffix(lower, ".googleapis.com") ||
+		strings.HasSuffix(lower, ".services.mozilla.com") ||
+		strings.HasSuffix(lower, ".autopush.net") ||
+		strings.HasSuffix(lower, ".notify.windows.com") {
+		return true
+	}
+	return false
+}
+
 // ValidateEndpoint enforces strict SSRF protections on Web Push service URLs.
 // It verifies valid HTTPS scheme (allowing HTTP only for local loopback test suites),
 // disallows user credentials, and blocks private, link-local, loopback (in non-test),
@@ -117,31 +140,12 @@ func ValidateEndpoint(rawEndpoint string) (*url.URL, error) {
 		return nil, errors.New("subscription endpoint cannot contain user credentials")
 	}
 
-	// 4. SSRF blocklist: block private, link-local, multicast, unspecified, and cloud metadata addresses
-	if ip := net.ParseIP(host); ip != nil {
-		if !isTestLoopback {
-			if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || isCloudMetadataIP(ip) {
-				return nil, fmt.Errorf("subscription endpoint host %q is a restricted internal or link-local address", host)
-			}
-		}
-	} else {
-		lowerHost := strings.ToLower(host)
-		if lowerHost == "localhost" || strings.HasSuffix(lowerHost, ".localhost") ||
-			lowerHost == "metadata.google.internal" || strings.Contains(lowerHost, "169.254.169.254") ||
-			strings.Contains(lowerHost, "instance-data") {
-			if !isTestLoopback {
-				return nil, fmt.Errorf("subscription endpoint domain %q is a restricted internal host", host)
-			}
-		}
+	// 4. SSRF allowlist: only allow legitimate browser push service gateways or local test server
+	if !IsAllowedPushServiceHost(host) {
+		return nil, fmt.Errorf("subscription endpoint host %q is not an authorized push service gateway", host)
 	}
 
 	return u, nil
-}
-
-func isCloudMetadataIP(ip net.IP) bool {
-	// AWS / GCP / Azure metadata endpoint: 169.254.169.254
-	metadataIP := net.ParseIP("169.254.169.254")
-	return ip.Equal(metadataIP)
 }
 
 // Send encrypts and delivers a notification payload to a specific browser push subscription.
@@ -159,6 +163,9 @@ func (c *Client) Send(ctx context.Context, sub Subscription, payload Notificatio
 	u, err := ValidateEndpoint(endpoint)
 	if err != nil {
 		return fmt.Errorf("validate endpoint: %w", err)
+	}
+	if !IsAllowedPushServiceHost(u.Hostname()) {
+		return fmt.Errorf("unauthorized push service host %q", u.Hostname())
 	}
 	audience := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
@@ -190,8 +197,8 @@ func (c *Client) Send(ctx context.Context, sub Subscription, payload Notificatio
 	}
 
 	// 5. Construct HTTP request
-	sanitizedURL := u.String()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sanitizedURL, bytes.NewReader(ciphertext))
+	targetURL := fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, u.RequestURI())
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(ciphertext))
 	if err != nil {
 		return fmt.Errorf("create push http request: %w", err)
 	}
