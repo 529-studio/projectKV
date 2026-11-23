@@ -95,6 +95,11 @@ func (h *Handler) Subscribe(c *gin.Context) {
 		return
 	}
 
+	if _, err := ValidateEndpoint(endpoint); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid endpoint: " + err.Error()})
+		return
+	}
+
 	targetTypeStr := strings.ToLower(strings.TrimSpace(req.TargetType))
 	if targetTypeStr == "" {
 		targetTypeStr = string(subscription.TargetAll)
@@ -166,6 +171,11 @@ func (h *Handler) Unsubscribe(c *gin.Context) {
 		return
 	}
 
+	if _, err := ValidateEndpoint(endpoint); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid endpoint: " + err.Error()})
+		return
+	}
+
 	subID := HashEndpoint(endpoint)
 
 	// 1. Remove from pushStore
@@ -198,6 +208,11 @@ func (h *Handler) TestPush(c *gin.Context) {
 		Endpoint: strings.TrimSpace(req.Endpoint),
 		P256dh:   strings.TrimSpace(req.Keys.P256dh),
 		Auth:     strings.TrimSpace(req.Keys.Auth),
+	}
+
+	if _, err := ValidateEndpoint(sub.Endpoint); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid endpoint: " + err.Error()})
+		return
 	}
 
 	payload := NotificationPayload{

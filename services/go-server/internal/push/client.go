@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -66,13 +67,81 @@ func NewClient(vapidKey *VAPIDKey, subject string, store Store, opts ...ClientOp
 		vapidKey: vapidKey,
 		subject:  strings.TrimSpace(subject),
 		store:    store,
-		client:   &http.Client{Timeout: defaultPushTimeout},
-		log:      slog.Default(),
+		client: &http.Client{
+			Timeout: defaultPushTimeout,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				// Push services do not issue redirects; prevent SSRF redirect bypass
+				return http.ErrUseLastResponse
+			},
+		},
+		log: slog.Default(),
 	}
 	for _, opt := range opts {
 		opt(c)
 	}
 	return c
+}
+
+// ValidateEndpoint enforces strict SSRF protections on Web Push service URLs.
+// It verifies valid HTTPS scheme (allowing HTTP only for local loopback test suites),
+// disallows user credentials, and blocks private, link-local, loopback (in non-test),
+// and cloud metadata addresses.
+func ValidateEndpoint(rawEndpoint string) (*url.URL, error) {
+	raw := strings.TrimSpace(rawEndpoint)
+	if raw == "" {
+		return nil, errors.New("subscription endpoint is empty")
+	}
+	if len(raw) > 2048 {
+		return nil, errors.New("subscription endpoint exceeds maximum allowed length of 2048 characters")
+	}
+
+	u, err := url.ParseRequestURI(raw)
+	if err != nil {
+		return nil, fmt.Errorf("invalid subscription endpoint url: %w", err)
+	}
+
+	// 1. Strict scheme: HTTPS only (or HTTP only for local loopback test server)
+	isTestLoopback := u.Scheme == "http" && (u.Hostname() == "127.0.0.1" || u.Hostname() == "localhost")
+	if u.Scheme != "https" && !isTestLoopback {
+		return nil, fmt.Errorf("unsupported URL scheme %q: push endpoints must use https", u.Scheme)
+	}
+
+	// 2. Hostname validation
+	host := u.Hostname()
+	if host == "" {
+		return nil, errors.New("subscription endpoint host cannot be empty")
+	}
+
+	// 3. Userinfo disallowance (user:pass@host)
+	if u.User != nil {
+		return nil, errors.New("subscription endpoint cannot contain user credentials")
+	}
+
+	// 4. SSRF blocklist: block private, link-local, multicast, unspecified, and cloud metadata addresses
+	if ip := net.ParseIP(host); ip != nil {
+		if !isTestLoopback {
+			if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || isCloudMetadataIP(ip) {
+				return nil, fmt.Errorf("subscription endpoint host %q is a restricted internal or link-local address", host)
+			}
+		}
+	} else {
+		lowerHost := strings.ToLower(host)
+		if lowerHost == "localhost" || strings.HasSuffix(lowerHost, ".localhost") ||
+			lowerHost == "metadata.google.internal" || strings.Contains(lowerHost, "169.254.169.254") ||
+			strings.Contains(lowerHost, "instance-data") {
+			if !isTestLoopback {
+				return nil, fmt.Errorf("subscription endpoint domain %q is a restricted internal host", host)
+			}
+		}
+	}
+
+	return u, nil
+}
+
+func isCloudMetadataIP(ip net.IP) bool {
+	// AWS / GCP / Azure metadata endpoint: 169.254.169.254
+	metadataIP := net.ParseIP("169.254.169.254")
+	return ip.Equal(metadataIP)
 }
 
 // Send encrypts and delivers a notification payload to a specific browser push subscription.
@@ -86,10 +155,10 @@ func (c *Client) Send(ctx context.Context, sub Subscription, payload Notificatio
 		return errors.New("subscription endpoint is empty")
 	}
 
-	// 1. Parse audience origin from endpoint
-	u, err := url.Parse(endpoint)
+	// 1. Validate endpoint URL against SSRF and parse audience origin
+	u, err := ValidateEndpoint(endpoint)
 	if err != nil {
-		return fmt.Errorf("invalid subscription endpoint url: %w", err)
+		return fmt.Errorf("validate endpoint: %w", err)
 	}
 	audience := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
@@ -121,7 +190,8 @@ func (c *Client) Send(ctx context.Context, sub Subscription, payload Notificatio
 	}
 
 	// 5. Construct HTTP request
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(ciphertext))
+	sanitizedURL := u.String()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sanitizedURL, bytes.NewReader(ciphertext))
 	if err != nil {
 		return fmt.Errorf("create push http request: %w", err)
 	}

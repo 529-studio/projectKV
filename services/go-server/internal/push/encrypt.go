@@ -19,12 +19,17 @@ const (
 	DefaultRecordSize = 4096
 	// HeaderLength for RFC 8188 aes128gcm with P-256 public key (16 + 4 + 1 + 65 = 86 bytes).
 	HeaderLength = 86
+	// MaxPayloadSize defines the maximum plaintext payload size allowed by RFC 8291 (4096 bytes).
+	MaxPayloadSize = 4096
 )
 
 // EncryptPayload encrypts a plaintext message for a Web Push client per RFC 8291 and RFC 8188.
 // clientPubBytes must be 65 bytes uncompressed P-256 point (0x04 || X || Y).
 // clientAuthBytes must be 16 bytes.
 func EncryptPayload(plaintext, clientPubBytes, clientAuthBytes []byte) ([]byte, error) {
+	if len(plaintext) > MaxPayloadSize {
+		return nil, fmt.Errorf("plaintext size %d exceeds RFC 8291 maximum allowed size of %d bytes", len(plaintext), MaxPayloadSize)
+	}
 	if len(clientPubBytes) != 65 || clientPubBytes[0] != 0x04 {
 		return nil, fmt.Errorf("invalid client p256dh public key: expected 65 bytes with 0x04 prefix, got %d", len(clientPubBytes))
 	}
@@ -84,9 +89,9 @@ func EncryptPayload(plaintext, clientPubBytes, clientAuthBytes []byte) ([]byte, 
 	}
 
 	// 7. Form record payload: plaintext || 0x02 (final record delimiter)
-	record := make([]byte, len(plaintext)+1)
-	copy(record, plaintext)
-	record[len(plaintext)] = 0x02
+	record := make([]byte, 0, len(plaintext)+1)
+	record = append(record, plaintext...)
+	record = append(record, 0x02)
 
 	// 8. Encrypt record with AES-128-GCM
 	block, err := aes.NewCipher(cek)
@@ -108,9 +113,9 @@ func EncryptPayload(plaintext, clientPubBytes, clientAuthBytes []byte) ([]byte, 
 	copy(header[21:86], asPubBytes)
 
 	// Full message = header || ciphertext
-	result := make([]byte, len(header)+len(ciphertext))
-	copy(result[:len(header)], header)
-	copy(result[len(header):], ciphertext)
+	result := make([]byte, 0, len(header)+len(ciphertext))
+	result = append(result, header...)
+	result = append(result, ciphertext...)
 
 	return result, nil
 }

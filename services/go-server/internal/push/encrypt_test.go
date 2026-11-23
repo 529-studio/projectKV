@@ -59,4 +59,9 @@ func TestEncryptPayload_InvalidInputs(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error on invalid client auth length")
 	}
+
+	oversized := make([]byte, push.MaxPayloadSize+1)
+	if _, err := push.EncryptPayload(oversized, validPub, validAuth); err == nil {
+		t.Fatalf("expected error for oversized payload > %d bytes, got nil", push.MaxPayloadSize)
+	}
 }

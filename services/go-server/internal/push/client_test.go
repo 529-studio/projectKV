@@ -131,3 +131,38 @@ func TestClient_Send_PrunesExpiredSubscription(t *testing.T) {
 		t.Fatalf("expected expired subscription to be deleted from store")
 	}
 }
+
+func TestValidateEndpoint_SecurityRules(t *testing.T) {
+	// 1. Valid endpoints
+	validCases := []string{
+		"https://fcm.googleapis.com/fcm/send/token123",
+		"https://web.push.apple.com/QN89123",
+		"https://updates.push.services.mozilla.com/wpush/v2/abc",
+		"http://127.0.0.1:8080/test",
+		"http://localhost:3000/test",
+	}
+	for _, tc := range validCases {
+		if _, err := push.ValidateEndpoint(tc); err != nil {
+			t.Errorf("expected %s to be valid, got error: %v", tc, err)
+		}
+	}
+
+	// 2. Blocked SSRF & invalid endpoints
+	invalidCases := []string{
+		"",                        // empty
+		"ftp://example.com/push",  // wrong scheme
+		"http://example.com/push", // unencrypted HTTP non-loopback
+		"http://169.254.169.254/latest/meta-data",   // cloud metadata
+		"https://169.254.169.254/secret",            // cloud metadata over HTTPS
+		"https://10.0.0.1/push",                     // private RFC 1918
+		"https://192.168.1.1/push",                  // private RFC 1918
+		"https://172.16.0.1/push",                   // private RFC 1918
+		"https://metadata.google.internal/compute",  // GCP metadata
+		"https://user:pass@fcm.googleapis.com/push", // userinfo credentials
+	}
+	for _, tc := range invalidCases {
+		if _, err := push.ValidateEndpoint(tc); err == nil {
+			t.Errorf("expected %s to be blocked by ValidateEndpoint, but it passed", tc)
+		}
+	}
+}
