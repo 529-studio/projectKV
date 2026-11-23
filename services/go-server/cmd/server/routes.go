@@ -26,6 +26,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
+	"github.com/529-studio/projectKV/services/go-server/internal/push"
 	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
 	"github.com/529-studio/projectKV/services/go-server/internal/telegrambot"
 	"github.com/529-studio/projectKV/services/go-server/internal/tide"
@@ -46,6 +47,7 @@ type routerConfig struct {
 	tileHandler       *tilecache.Handler
 	floodHandler      *flood.Handler
 	subHandler        *subscription.Handler
+	pushHandler       *push.Handler
 	archiverHandler   *archiver.Handler
 	harvesterCoord    *harvester.Coordinator
 	feedbackHandler   *feedback.Handler
@@ -175,6 +177,10 @@ func setupRouter(p routerConfig) *gin.Engine {
 		// POST/DELETE stay public; GET enumerates chat ids and is dev-gated.
 		if p.subHandler != nil {
 			p.subHandler.RegisterRoutes(api, subscription.WithAuditAuth(devAuth))
+		}
+		// Web Push API subscription manager and service worker notifications (Issue #525 / S18-T2)
+		if p.pushHandler != nil {
+			p.pushHandler.RegisterRoutes(api)
 		}
 		// Shared archiver snapshots and collaborative team labeler endpoints (Issue #214)
 		if p.archiverHandler != nil {

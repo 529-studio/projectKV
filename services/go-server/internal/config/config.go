@@ -54,6 +54,9 @@ type Config struct {
 	CFAccessCertsURL              string
 	CFAccessClientID              string
 	CFAccessClientSecret          string
+	VAPIDPublicKey                string
+	VAPIDPrivateKey               string
+	VAPIDSubject                  string
 }
 
 // CleanEnv returns the environment variable value with surrounding whitespace and quotes (`"`, `'`) stripped.
@@ -440,6 +443,9 @@ type ServerConfig struct {
 	CFAccessCertsURL              string
 	CFAccessClientID              string
 	CFAccessClientSecret          string
+	VAPIDPublicKey                string
+	VAPIDPrivateKey               string
+	VAPIDSubject                  string
 }
 
 // ResolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -528,6 +534,10 @@ func LoadConfig() *ServerConfig {
 	telegramBotUsername := strings.TrimPrefix(strings.TrimSpace(parseEnvString("TELEGRAM_BOT_USERNAME", "")), "@")
 	telegramWebhookSecret := strings.TrimSpace(parseEnvString("TELEGRAM_WEBHOOK_SECRET", ""))
 	telegramDebounceMinutes := parseEnvInt("TELEGRAM_DEBOUNCE_MINUTES", 30, 1)
+
+	vapidPublicKey := parseEnvString("VAPID_PUBLIC_KEY", "")
+	vapidPrivateKey := parseEnvString("VAPID_PRIVATE_KEY", "")
+	vapidSubject := parseEnvString("VAPID_SUBJECT", "mailto:admin@529studio.site")
 
 	storageDriver := strings.ToLower(parseEnvString("STORAGE_DRIVER", "local"))
 	storageLocalRoot := parseEnvString("STORAGE_LOCAL_ROOT", resolvePath("data/proofs"))
@@ -667,5 +677,8 @@ func LoadConfig() *ServerConfig {
 		CFAccessCertsURL:              cfAccessCertsURL,
 		CFAccessClientID:              cfAccessClientID,
 		CFAccessClientSecret:          cfAccessClientSecret,
+		VAPIDPublicKey:                vapidPublicKey,
+		VAPIDPrivateKey:               vapidPrivateKey,
+		VAPIDSubject:                  vapidSubject,
 	}
 }

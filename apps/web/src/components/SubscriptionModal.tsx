@@ -5,7 +5,7 @@
  * Contract: `docs/sprints/s12_t4_spec.md` §5.3, §5.4, §6.
  *
  * Monochromatic zinc surfaces, inline SVG only, zero emoji. Every interactive
- * target is at least 48 × 48 px. The dialog owns its language toggle so VI ↔ EN
+ * target is at least 48 x 48 px. The dialog owns its language toggle so VI / EN
  * re-renders instantly without a refetch and without losing the selection.
  */
 
@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { SUBSCRIPTION_I18N } from '../config/constants';
 import { useSubscriptions } from '../hooks/useSubscriptions';
+import { useWebPush } from '../hooks/useWebPush';
 import {
   buildTelegramDeepLink,
   describeTarget,
@@ -93,6 +94,9 @@ export default function SubscriptionModal({
   const [selectedChokepoint, setSelectedChokepoint] = useState(
     initialTarget?.type === 'chokepoint' ? initialTarget.id : '',
   );
+  const webPush = useWebPush();
+  const [channelTab, setChannelTab] = useState<'webpush' | 'telegram'>('webpush');
+  const [webPushActionSuccess, setWebPushActionSuccess] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [chatId, setChatId] = useState('');
   const [phase, setPhase] = useState<ModalPhase>('idle');
@@ -503,13 +507,105 @@ export default function SubscriptionModal({
     </div>
   );
 
-  const renderForm = () => (
-    <div className="px-4 py-4">
-      <fieldset disabled={phase === 'submitting'} className="m-0 min-w-0 border-0 p-0">
-        {renderScopeSelector()}
-        {renderTargetPicker()}
-      </fieldset>
+  const handleWebPushSubscribe = async () => {
+    if (!selection) return;
+    setWebPushActionSuccess(null);
+    const ok = await webPush.subscribe(selection.type, selection.id);
+    if (ok) {
+      setWebPushActionSuccess(t('SUCCESS_TITLE'));
+    }
+  };
 
+  const handleWebPushUnsubscribe = async () => {
+    setWebPushActionSuccess(null);
+    await webPush.unsubscribe();
+  };
+
+  const handleWebPushTest = async () => {
+    setWebPushActionSuccess(null);
+    const ok = await webPush.sendTestNotification();
+    if (ok) {
+      setWebPushActionSuccess(activeLang === 'vi' ? 'Đã gửi thông báo thử nghiệm' : 'Test notification sent');
+    }
+  };
+
+  const renderWebPushChannel = () => (
+    <div className="mt-4 space-y-3">
+      {!webPush.isSupported ? (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-xs leading-relaxed text-zinc-400">
+          {t('WEBPUSH_STATUS_UNSUPPORTED')}
+        </div>
+      ) : webPush.permission === 'denied' ? (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-xs leading-relaxed text-zinc-400">
+          {t('WEBPUSH_STATUS_DENIED')}
+        </div>
+      ) : webPush.isSubscribed ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-xs text-zinc-200">
+            <span className="flex h-2 w-2 rounded-full bg-zinc-100" />
+            <span className="font-medium">{t('WEBPUSH_STATUS_ACTIVE')}</span>
+          </div>
+
+          {selection && (
+            <p className="text-xs text-zinc-400">
+              {describeTarget(selection, activeLang)}
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleWebPushTest}
+              disabled={webPush.loading}
+              className="flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs font-semibold text-zinc-200 transition-colors hover:border-zinc-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-zinc-100 disabled:opacity-50"
+            >
+              {t('WEBPUSH_CTA_TEST')}
+            </button>
+            <button
+              type="button"
+              onClick={handleWebPushUnsubscribe}
+              disabled={webPush.loading}
+              className="flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-xs font-semibold text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-zinc-100 disabled:opacity-50"
+            >
+              {t('WEBPUSH_CTA_DISABLE')}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={handleWebPushSubscribe}
+            disabled={webPush.loading || !selection}
+            className="flex min-h-[48px] min-w-[48px] w-full items-center justify-center gap-2 rounded-lg border border-zinc-100 bg-zinc-100 px-4 text-sm font-semibold text-zinc-950 transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-100 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900 disabled:text-zinc-600"
+          >
+            <span>{webPush.loading ? t('SUBMITTING') : t('WEBPUSH_CTA_ENABLE')}</span>
+          </button>
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            {t('WEBPUSH_DESC')}
+          </p>
+        </div>
+      )}
+
+      {webPushActionSuccess && (
+        <div className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-[11px] font-medium text-zinc-200">
+          {webPushActionSuccess}
+        </div>
+      )}
+      {webPush.error && (
+        <div role="alert" className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-[11px] text-zinc-300">
+          {webPush.error}
+        </div>
+      )}
+
+      <p className="border-t border-zinc-800 pt-3 text-[10.5px] leading-relaxed text-zinc-500">
+        {t('WEBPUSH_PRIVACY_NOTE')}
+      </p>
+    </div>
+  );
+
+  const renderTelegramChannel = () => (
+    <div>
       <div className="mt-4">
         {deepLink ? (
           <a
@@ -625,6 +721,55 @@ export default function SubscriptionModal({
       </div>
 
       <p className="mt-3 text-[10.5px] leading-relaxed text-zinc-500">{t('PRIVACY_NOTE')}</p>
+    </div>
+  );
+
+  const renderForm = () => (
+    <div className="px-4 py-4">
+      {/* 1. Channel Selector (Web Push vs Telegram) */}
+      <div role="tablist" aria-label="Notification Channel" className="grid grid-cols-2 gap-2 border-b border-zinc-800 pb-3">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={channelTab === 'webpush'}
+          onClick={() => {
+            setChannelTab('webpush');
+            setWebPushActionSuccess(null);
+          }}
+          className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg border px-2 text-center text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-zinc-100 ${
+            channelTab === 'webpush'
+              ? 'border-zinc-100 bg-zinc-100 text-zinc-950 font-bold'
+              : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+          }`}
+        >
+          {t('TAB_WEBPUSH')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={channelTab === 'telegram'}
+          onClick={() => {
+            setChannelTab('telegram');
+            setWebPushActionSuccess(null);
+          }}
+          className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg border px-2 text-center text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-zinc-100 ${
+            channelTab === 'telegram'
+              ? 'border-zinc-100 bg-zinc-100 text-zinc-950 font-bold'
+              : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+          }`}
+        >
+          {t('TAB_TELEGRAM')}
+        </button>
+      </div>
+
+      {/* 2. Common Scope Selector & Target Picker */}
+      <fieldset disabled={phase === 'submitting' || webPush.loading} className="m-0 min-w-0 border-0 p-0 mt-3">
+        {renderScopeSelector()}
+        {renderTargetPicker()}
+      </fieldset>
+
+      {/* 3. Channel specific content */}
+      {channelTab === 'webpush' ? renderWebPushChannel() : renderTelegramChannel()}
     </div>
   );
 

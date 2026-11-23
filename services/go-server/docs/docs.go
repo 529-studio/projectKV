@@ -1711,7 +1711,8 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
@@ -1880,7 +1881,8 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
@@ -2142,6 +2144,12 @@ const docTemplate = `{
                 "PassabilityPassable": "THÔNG THOÁNG",
                 "PassabilityUnknown": "CHƯA ĐỦ DỮ LIỆU"
             },
+            "x-enum-descriptions": [
+                "THÔNG THOÁNG",
+                "CẢNH BÁO XE GẦM THẤP / ÙN TẮC",
+                "NGUY CƠ CHẾT MÁY / THỦY KÍCH",
+                "CHƯA ĐỦ DỮ LIỆU"
+            ],
             "x-enum-varnames": [
                 "PassabilityPassable",
                 "PassabilityCaution",
@@ -2917,7 +2925,8 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },

@@ -893,4 +893,27 @@ export const SUBSCRIPTION_I18N = Object.freeze({
     en: 'We store only your chat ID and chosen scope. Send /stop to unsubscribe at any time.',
   },
   OPEN_TELEGRAM: { vi: 'Mở Telegram', en: 'Open Telegram' },
+  TAB_TELEGRAM: { vi: 'Bot Telegram', en: 'Telegram Bot' },
+  TAB_WEBPUSH: { vi: 'Trình duyệt (Web Push)', en: 'Browser (Web Push)' },
+  WEBPUSH_TITLE: { vi: 'Thông báo trên trình duyệt', en: 'Browser Notifications' },
+  WEBPUSH_DESC: {
+    vi: 'Nhận thông báo trực tiếp trên thiết bị này mà không cần cài đặt ứng dụng hay tài khoản.',
+    en: 'Receive alerts directly on this device without installing an app or creating an account.',
+  },
+  WEBPUSH_CTA_ENABLE: { vi: 'Bật thông báo trình duyệt', en: 'Enable Browser Notifications' },
+  WEBPUSH_CTA_DISABLE: { vi: 'Tắt thông báo trên thiết bị này', en: 'Disable on this device' },
+  WEBPUSH_CTA_TEST: { vi: 'Gửi thử nghiệm', en: 'Send test notification' },
+  WEBPUSH_STATUS_ACTIVE: { vi: 'Đang bật nhận cảnh báo trên trình duyệt', en: 'Browser notifications active' },
+  WEBPUSH_STATUS_DENIED: {
+    vi: 'Trình duyệt đã chặn quyền thông báo. Vui lòng mở cài đặt trình duyệt để cấp quyền.',
+    en: 'Notification permission is blocked. Please allow notifications in your browser settings.',
+  },
+  WEBPUSH_STATUS_UNSUPPORTED: {
+    vi: 'Trình duyệt này không hỗ trợ Web Push API.',
+    en: 'This browser does not support the Web Push API.',
+  },
+  WEBPUSH_PRIVACY_NOTE: {
+    vi: 'Hệ thống chỉ lưu mã định danh push và khoá công khai của trình duyệt. Không thu thập vị trí GPS hay thông tin cá nhân.',
+    en: 'We only store the browser push endpoint and public encryption key. Zero GPS tracking or personal information collected.',
+  },
 });

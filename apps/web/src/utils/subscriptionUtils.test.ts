@@ -392,6 +392,17 @@ describe('SUBSCRIPTION_I18N catalog', () => {
     'CLOSE',
     'PRIVACY_NOTE',
     'OPEN_TELEGRAM',
+    'TAB_TELEGRAM',
+    'TAB_WEBPUSH',
+    'WEBPUSH_TITLE',
+    'WEBPUSH_DESC',
+    'WEBPUSH_CTA_ENABLE',
+    'WEBPUSH_CTA_DISABLE',
+    'WEBPUSH_CTA_TEST',
+    'WEBPUSH_STATUS_ACTIVE',
+    'WEBPUSH_STATUS_DENIED',
+    'WEBPUSH_STATUS_UNSUPPORTED',
+    'WEBPUSH_PRIVACY_NOTE',
   ];
 
   test('declares every key the modal needs', () => {
