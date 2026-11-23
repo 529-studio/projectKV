@@ -191,10 +191,10 @@ func (h *Handler) Unsubscribe(c *gin.Context) {
 	})
 }
 
-// TestPush dispatches an immediate test push to the provided credentials.
+// TestPush dispatches an immediate test push to the verified subscription.
 func (h *Handler) TestPush(c *gin.Context) {
-	if h.client == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "push client not configured"})
+	if h.client == nil || h.pushStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "push service not configured"})
 		return
 	}
 
@@ -204,14 +204,27 @@ func (h *Handler) TestPush(c *gin.Context) {
 		return
 	}
 
-	sub := Subscription{
-		Endpoint: strings.TrimSpace(req.Endpoint),
+	endpoint := strings.TrimSpace(req.Endpoint)
+	if _, err := ValidateEndpoint(endpoint); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid endpoint: " + err.Error()})
+		return
+	}
+
+	candidate := Subscription{
+		Endpoint: endpoint,
 		P256dh:   strings.TrimSpace(req.Keys.P256dh),
 		Auth:     strings.TrimSpace(req.Keys.Auth),
 	}
 
-	if _, err := ValidateEndpoint(sub.Endpoint); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid endpoint: " + err.Error()})
+	id, err := h.pushStore.Save(c.Request.Context(), candidate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record subscription: " + err.Error()})
+		return
+	}
+
+	verifiedSub, found, err := h.pushStore.GetByID(c.Request.Context(), id)
+	if err != nil || !found {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve verified subscription"})
 		return
 	}
 
@@ -222,7 +235,7 @@ func (h *Handler) TestPush(c *gin.Context) {
 		Tag:   "test-push",
 	}
 
-	if err := h.client.Send(c.Request.Context(), sub, payload); err != nil {
+	if err := h.client.Send(c.Request.Context(), verifiedSub, payload); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to dispatch push: " + err.Error()})
 		return
 	}
