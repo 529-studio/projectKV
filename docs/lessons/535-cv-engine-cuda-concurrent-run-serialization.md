@@ -71,10 +71,24 @@ regression the production crash represents. Its CPU counterpart asserts the lock
 applied globally, because a fix that serializes every backend would silently halve the
 CPU throughput the older soak measured (98 → 113 RPS with concurrency 5).
 
-## 4. Verification Limits
+## 4. Verification Evidence (2026-11-23, desk-srv-02, NVIDIA P106-100, driver 550.163.01)
 
-Unit coverage proves the invariant; it cannot prove the GPU stops aborting. The
-authoritative check is a post-merge soak of the rebuilt image on stack 27 with
-`RestartCount` flat, `predict_err = 0` and `shed_count = 0` while the backend polls the 57
-hotset cameras. Until that soak exists, the fix is `[INFERENCE]`-strong at the process
-boundary and proven only at the code boundary.
+Throwaway containers on `127.0.0.1:18000/18001` running the identical model mount, env and
+GPU reservation; production `warded-cv-engine` and stack 27 untouched (`StartedAt` and
+`RestartCount` unchanged across the run).
+
+| | pre-fix image (deployed tag) | fixed branch `a85c1a4` |
+| :--- | :--- | :--- |
+| 8-way `POST /predict` | exited after **12.0 s** | survived full **180 s** |
+| requests | 977 (976 × 200, 1 × 500, 8 conn-reset) | **33,761 — all 200** |
+| `CUDA failure 700` lines | 8, then `CV_REQUIRE_CUDA` exit | **0** |
+| container | `exited exit=1` | `running restarts=0` |
+| latency under load | p50 43.15 / p95 64.36 ms (until crash) | p50 41.91 / p95 47.81 / p99 58.49 ms |
+| throughput | 81.4 rps (crashing) | **187.5 rps** |
+
+33,761 requests over 180 s is ~5.3 ms per serialized GPU forward pass: the lock is
+saturated, not idle, and the HTTP p50 (41.91 ms) is below the pre-fix 43.15 ms. The
+"serialization costs throughput" objection is therefore measured, not argued.
+
+Remaining open item: a stack-27 soak against the real 57-hotset traffic after the image is
+published, which proves the upstream workload rather than a synthetic frame.
