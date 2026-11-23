@@ -17,6 +17,8 @@ interface CorridorOverviewCardProps {
   showPolyline?: boolean;
   onTogglePolyline?: () => void;
   vehicleType?: VehicleType;
+  onToggleNavigationAlerts?: () => void;
+  showNavigationAlerts?: boolean;
 }
 
 export default function CorridorOverviewCard({
@@ -28,6 +30,8 @@ export default function CorridorOverviewCard({
   showPolyline = true,
   onTogglePolyline,
   vehicleType = 'scooter',
+  onToggleNavigationAlerts,
+  showNavigationAlerts = false,
 }: CorridorOverviewCardProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -153,6 +157,31 @@ export default function CorridorOverviewCard({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
                 </svg>
               )}
+            </button>
+          )}
+
+          {/* Turn-by-Turn Navigation Alerts Toggle (>=48px touch target) */}
+          {onToggleNavigationAlerts && (
+            <button
+              type="button"
+              onClick={onToggleNavigationAlerts}
+              className={`min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors rounded ${
+                showNavigationAlerts ? 'text-cyan-400 bg-cyan-950/40' : 'text-zinc-400 hover:text-white'
+              }`}
+              aria-label={
+                lang === 'vi'
+                  ? 'Bật/tắt cảnh báo ngã tư theo lộ trình'
+                  : 'Toggle turn-by-turn navigation alerts'
+              }
+              title={
+                lang === 'vi'
+                  ? 'Cảnh báo ngã tư theo lộ trình'
+                  : 'Turn-by-turn alerts'
+              }
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
             </button>
           )}
 
