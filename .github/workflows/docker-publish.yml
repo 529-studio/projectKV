@@ -227,8 +227,15 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     concurrency:
+      # Queue, never cancel. The deploy job advances the image tag only for a
+      # service whose build job ran in this run (`BE_BUILT` / `FE_BUILT`), and
+      # `detect-changes` filters by path, so a commit that touches one service
+      # produces a run that rebuilds only that service. Cancelling such a run
+      # strands the service on its previous tag: no later run rebuilds it, so
+      # nothing would ever promote the image that was already pushed. A cancel
+      # can also cut a Portainer stack PUT mid-flight.
       group: staging-deployment
-      cancel-in-progress: true
+      cancel-in-progress: false
     needs: [detect-changes, build-backend, build-frontend, build-model]
     if: |
       always() &&
