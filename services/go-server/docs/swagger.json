@@ -1704,7 +1704,8 @@
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
@@ -1873,7 +1874,8 @@
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },
@@ -2135,6 +2137,12 @@
                 "PassabilityPassable": "THÔNG THOÁNG",
                 "PassabilityUnknown": "CHƯA ĐỦ DỮ LIỆU"
             },
+            "x-enum-descriptions": [
+                "THÔNG THOÁNG",
+                "CẢNH BÁO XE GẦM THẤP / ÙN TẮC",
+                "NGUY CƠ CHẾT MÁY / THỦY KÍCH",
+                "CHƯA ĐỦ DỮ LIỆU"
+            ],
             "x-enum-varnames": [
                 "PassabilityPassable",
                 "PassabilityCaution",
@@ -2910,7 +2918,8 @@
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number"
+                            "type": "number",
+                            "format": "float64"
                         }
                     }
                 },

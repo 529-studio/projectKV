@@ -22,6 +22,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
 	"github.com/529-studio/projectKV/services/go-server/internal/notify"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
+	"github.com/529-studio/projectKV/services/go-server/internal/push"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
 	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
 	"github.com/529-studio/projectKV/services/go-server/internal/telegrambot"
@@ -142,6 +143,33 @@ func main() {
 		}
 	}()
 
+	// 4b. Web Push (RFC 8291 / RFC 8292 - Issue #525)
+	pushStore := push.NewStore(db)
+	var vapidKey *push.VAPIDKey
+	if cfg.VAPIDPrivateKey != "" {
+		var err error
+		vapidKey, err = push.NewVAPIDKeyFromBase64(cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey)
+		if err != nil {
+			log.Printf("[WARN] Failed to load VAPID key from env: %v", err)
+		}
+	} else if cfg.AppEnv != "production" {
+		var err error
+		vapidKey, err = push.GenerateVAPIDKeys()
+		if err != nil {
+			log.Printf("[WARN] Failed to generate ephemeral VAPID keys: %v", err)
+		} else {
+			log.Printf("[INIT] Generated ephemeral VAPID key for %s (dev mode)", cfg.VAPIDSubject)
+		}
+	}
+
+	var pushClient *push.Client
+	if vapidKey != nil {
+		pushClient = push.NewClient(vapidKey, cfg.VAPIDSubject, pushStore)
+		pushChan := push.NewWebPushChannel(pushClient, pushStore, subFinder, push.WithCorridorSubscriberFinder(corridorSubFinder))
+		notifyManager.Register(pushChan)
+	}
+	pushHandler := push.NewHandler(vapidKey, pushStore, subStore, pushClient)
+
 	// 5. Flood chokepoints & real-time alert dispatcher
 	chokepointMap, floodChokepoints := loadFloodChokepoints()
 	dispatchFloodAlert := makeFloodAlertDispatcher(camCatalog, chokepointMap, notifyManager)
@@ -229,7 +257,7 @@ func main() {
 		cfg: cfg, camCatalogHandler: camCatalogHandler, proxyHandler: proxyHandler,
 		hotsetHandler: hotsetHandler, corridorHandler: corridorHandler, forecastHandler: forecastHandler,
 		weatherHandler: weatherHandler, tideHandler: tideHandler, tileHandler: tileHandler, floodHandler: floodHandler,
-		subHandler: subHandler, archiverHandler: archiverHandler, harvesterCoord: harvesterCoord,
+		subHandler: subHandler, pushHandler: pushHandler, archiverHandler: archiverHandler, harvesterCoord: harvesterCoord,
 		feedbackHandler: feedbackHandler, wsHub: wsHub, liveHub: liveHub, botHandler: botHandler,
 		webhookEnabled: webhookEnabled, healthHandler: httpserver.NewHealthHandler(healthChecker),
 	})
