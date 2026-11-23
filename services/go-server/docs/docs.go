@@ -592,14 +592,14 @@ const docTemplate = `{
         },
         "/api/health": {
             "get": {
-                "description": "Liveness and readiness probe reporting system, schema and cv-engine readiness",
+                "description": "Readiness probe: 503 when the wired cv-engine is unhealthy, so a caller that needs inference sees the dependency failure",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "System"
                 ],
-                "summary": "Health check",
+                "summary": "Readiness check",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1546,14 +1546,14 @@ const docTemplate = `{
         },
         "/health": {
             "get": {
-                "description": "Liveness and readiness probe reporting system, schema and cv-engine readiness",
+                "description": "Readiness probe: 503 when the wired cv-engine is unhealthy, so a caller that needs inference sees the dependency failure",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "System"
                 ],
-                "summary": "Health check",
+                "summary": "Readiness check",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1574,24 +1574,17 @@ const docTemplate = `{
         },
         "/healthz": {
             "get": {
-                "description": "Liveness and readiness probe reporting system, schema and cv-engine readiness",
+                "description": "Liveness probe: always 200 while the process answers, reporting cv-engine state under \"cv_engine\" without failing the probe",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "System"
                 ],
-                "summary": "Health check",
+                "summary": "Liveness check",
                 "responses": {
                     "200": {
                         "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "503": {
-                        "description": "Service Unavailable",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -1648,7 +1641,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "flood_submersion_anchor": {
-                    "description": "dry, wet_asphalt_no_standing, tire_base_under_10cm, exhaust_hub_over_15cm",
+                    "description": "dry, wet_asphalt_no_standing, tire_base_under_10cm, exhaust_hub_over_15cm, wheel_submerged_over_30cm",
                     "type": "string"
                 },
                 "notes": {
@@ -1668,6 +1661,10 @@ const docTemplate = `{
                 "snapshot_key": {
                     "type": "string"
                 },
+                "submersion_depth_cm": {
+                    "description": "physical calibrated water depth in cm",
+                    "type": "number"
+                },
                 "time_of_day": {
                     "description": "day, dusk, night",
                     "type": "string"
@@ -1685,6 +1682,10 @@ const docTemplate = `{
                 },
                 "traffic_level": {
                     "description": "clear, moderate, heavy, gridlock/congested",
+                    "type": "string"
+                },
+                "waterline_depth": {
+                    "description": "DRY, WET_SURFACE, TIRE_QUARTER_SUBMERGED, TIRE_HALF_SUBMERGED, IMPASSABLE, UNKNOWN",
                     "type": "string"
                 },
                 "weather": {
@@ -1710,8 +1711,7 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number",
-                            "format": "float64"
+                            "type": "number"
                         }
                     }
                 },
@@ -1880,8 +1880,7 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number",
-                            "format": "float64"
+                            "type": "number"
                         }
                     }
                 },
@@ -2143,12 +2142,6 @@ const docTemplate = `{
                 "PassabilityPassable": "THÔNG THOÁNG",
                 "PassabilityUnknown": "CHƯA ĐỦ DỮ LIỆU"
             },
-            "x-enum-descriptions": [
-                "THÔNG THOÁNG",
-                "CẢNH BÁO XE GẦM THẤP / ÙN TẮC",
-                "NGUY CƠ CHẾT MÁY / THỦY KÍCH",
-                "CHƯA ĐỦ DỮ LIỆU"
-            ],
             "x-enum-varnames": [
                 "PassabilityPassable",
                 "PassabilityCaution",
@@ -2924,8 +2917,7 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "number",
-                            "format": "float64"
+                            "type": "number"
                         }
                     }
                 },

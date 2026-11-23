@@ -48,7 +48,11 @@ func serveHealth(t *testing.T, handler *HealthHandler, url string) (*httptest.Re
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET(url, handler.Healthz)
+	if url == "/healthz" {
+		router.GET(url, handler.Livez)
+	} else {
+		router.GET(url, handler.Healthz)
+	}
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, url, nil)
@@ -61,8 +65,8 @@ func serveHealth(t *testing.T, handler *HealthHandler, url string) (*httptest.Re
 	return w, body
 }
 
-// TestHealthEndpoints_AllAliasesWithoutChecker verifies the three health paths
-// stay a pure liveness probe when no cv-engine checker is wired.
+// TestHealthEndpoints_AllAliasesWithoutChecker verifies every health path
+// reports healthy when no cv-engine checker is wired.
 func TestHealthEndpoints_AllAliasesWithoutChecker(t *testing.T) {
 	handler := NewHealthHandler(nil)
 	for _, url := range []string{"/health", "/healthz", "/api/health"} {
@@ -139,7 +143,7 @@ func TestHealthEndpoints_CVEngineStatuses(t *testing.T) {
 				return report
 			}))
 
-			for _, url := range []string{"/health", "/healthz", "/api/health"} {
+			for _, url := range []string{"/health", "/api/health"} {
 				w, body := serveHealth(t, handler, url)
 				if w.Code != tt.wantHTTPCode {
 					t.Errorf("%s: expected HTTP %d, got %d", url, tt.wantHTTPCode, w.Code)
@@ -155,6 +159,39 @@ func TestHealthEndpoints_CVEngineStatuses(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestHealthEndpoints_LivenessIgnoresEngineState verifies /healthz stays 200
+// with an overall healthy status while the cv_engine block still reports the
+// engine failure, so a container healthcheck never restarts the backend for a
+// down inference worker on another node.
+func TestHealthEndpoints_LivenessIgnoresEngineState(t *testing.T) {
+	handler := NewHealthHandler(HealthCheckerFunc(func(ctx context.Context) CVEngineHealth {
+		return CVEngineHealth{
+			Status:    HealthStatusUnhealthy,
+			Service:   "cv-engine",
+			Error:     "dial tcp 127.0.0.1:59999: i/o timeout",
+			CheckedAt: time.Now().UTC(),
+		}
+	}))
+
+	w, body := serveHealth(t, handler, "/healthz")
+	if w.Code != http.StatusOK {
+		t.Errorf("/healthz: expected 200 for liveness, got %d", w.Code)
+	}
+	if body.Status != HealthStatusHealthy {
+		t.Errorf("/healthz: expected overall status healthy, got %q", body.Status)
+	}
+	if body.CVEngine.Status != HealthStatusUnhealthy {
+		t.Errorf("/healthz: expected cv_engine.status unhealthy, got %q", body.CVEngine.Status)
+	}
+	if !body.CVEngine.Configured {
+		t.Error("/healthz: expected cv_engine.configured=true")
+	}
+
+	if w, _ := serveHealth(t, handler, "/health"); w.Code != http.StatusServiceUnavailable {
+		t.Errorf("/health: expected 503 for readiness, got %d", w.Code)
 	}
 }
 

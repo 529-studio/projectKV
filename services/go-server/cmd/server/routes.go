@@ -68,16 +68,18 @@ func setupRouter(p routerConfig) *gin.Engine {
 	router.Use(middleware.SecretSanitizer())
 	router.Use(middleware.RateLimitMiddleware(cfg.RateLimitRPS, cfg.RateLimitBurst))
 
-	// Health check probes. The handler carries the optional cv-engine health
-	// checker so orchestrators see inference readiness, not just process
-	// liveness, on every alias.
+	// Health endpoints split by contract: /health and /api/health are
+	// readiness (503 when the wired cv-engine is unhealthy), /healthz is
+	// liveness (always 200 while the process answers). The container
+	// healthcheck uses /healthz, so a powered-off inference worker on another
+	// node cannot mark the backend unhealthy and restart it.
 	health := p.healthHandler
 	if health == nil {
 		health = httpserver.NewHealthHandler(nil)
 	}
 	router.GET("/health", health.Healthz)
 	router.HEAD("/health", health.Healthz)
-	router.GET("/healthz", health.Healthz)
+	router.GET("/healthz", health.Livez)
 
 	// WebSocket Live Broadcast (Issue #9: GET /ws/live) — kept until D1 FE migration verified.
 	if p.wsHub != nil {
