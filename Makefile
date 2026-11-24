@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint lint-deploy test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast train-forecast-daemon export-seg export-seg-openvino train-seg benchmark-mock benchmark-real bench-seg-avx2 bench-seg-avx2-docker bench-seg-avx2-check materialize-seg smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close test-deploy restore-drill
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint lint-deploy test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast train-forecast-daemon export-seg export-seg-openvino train-seg benchmark-mock benchmark-real bench-seg-avx2 bench-seg-avx2-docker bench-seg-avx2-check materialize-seg smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close test-deploy restore-drill quantize-int8 test-quantize
 
 # Segmentation training defaults (S11-T5). Override on the command line:
 #   make train-seg EPOCHS=100 DATA=data/yolo_seg/dataset.yaml
@@ -92,6 +92,8 @@ help:
 	@echo "  make r2-setup        - Configure ~/.config/rclone/rclone.conf from .env"
 	@echo "  make r2-ls           - List Cloudflare R2 bucket partitions via rclone"
 	@echo "  make r2-size         - Measure total object count and size on Cloudflare R2"
+	@echo "  make quantize-int8   - Run static INT8 quantization on ONNX models (S18-T5)"
+	@echo "  make test-quantize   - Run INT8 parity & benchmark suite against FP32 baseline (S18-T5)"
 	@echo "  make sprint-close    - Validate the sprint handoff and print the next-conversation prompt"
 
 install:
@@ -178,6 +180,15 @@ test-eval:
 
 test-harvester:
 	python3 -m unittest discover -s tools/harvester -p "*_test.py"
+
+quantize-int8:
+	$(SEG_PYTHON) tools/cv/quantize_int8.py --input data/models/yolov8n_640.onnx --output models/yolov8n_640_int8.onnx
+	$(SEG_PYTHON) tools/cv/quantize_int8.py --input models/yolov8n_seg.onnx --output models/yolov8n_seg_int8.onnx
+
+test-quantize:
+	$(SEG_PYTHON) -m unittest discover -s tools/cv -p "test_*_unit.py"
+	$(SEG_PYTHON) tools/cv/test_quantization.py --fp32-model data/models/yolov8n_640.onnx --int8-model models/yolov8n_640_int8.onnx --max-frames 20
+	$(SEG_PYTHON) tools/cv/test_quantization.py --fp32-model models/yolov8n_seg.onnx --int8-model models/yolov8n_seg_int8.onnx --max-frames 20
 
 ingest-proofs:
 	python3 tools/eval/ingest_proof_archive.py --archive-dir services/go-server/data/proofs/2026-11-03 --manifest-out docs/proofs/sprint11/proof_archive_manifest.json

@@ -37,6 +37,31 @@ MODEL_DIR = os.environ.get("MODEL_DIR", "/app/models/yolov8n_openvino_320")
 SUPPORTED_BACKENDS: Tuple[str, ...] = ("openvino", "ort")
 DEFAULT_BACKEND = "openvino"
 
+SUPPORTED_PRECISIONS: Tuple[str, ...] = ("auto", "int8", "fp16", "fp32")
+DEFAULT_PRECISION = "auto"
+
+
+def resolve_precision(raw: Optional[str]) -> str:
+    """Return the precision named by ``CV_PRECISION``, defaulting to auto.
+
+    An unrecognised value is logged with a warning and defaults to 'auto'.
+    """
+    candidate = (raw or "").strip().lower()
+    if not candidate:
+        return DEFAULT_PRECISION
+    if candidate in SUPPORTED_PRECISIONS:
+        return candidate
+    logger.warning(
+        "Ignoring CV_PRECISION=%r: allowed values are %s; falling back to %s",
+        raw,
+        ", ".join(SUPPORTED_PRECISIONS),
+        DEFAULT_PRECISION,
+    )
+    return DEFAULT_PRECISION
+
+
+CV_PRECISION = resolve_precision(os.environ.get("CV_PRECISION"))
+
 
 def resolve_backend(raw: Optional[str]) -> str:
     """Return the backend named by ``CV_BACKEND``, defaulting to OpenVINO.
@@ -67,6 +92,65 @@ CV_ONNX_MODEL = (os.environ.get("CV_ONNX_MODEL") or "").strip() or os.path.join(
     MODEL_DIR, "yolov8n.onnx"
 )
 
+
+def resolve_onnx_model_path(
+    explicit_path: Optional[str] = None,
+    precision: Optional[str] = None,
+    model_dir: Optional[str] = None,
+) -> Tuple[str, str, bool]:
+    """Resolve the ONNX model path, target precision, and quantization status.
+
+    Precedence:
+      1. If explicit_path is provided:
+         - If precision is 'int8' or 'auto', check if an int8 quantized file exists
+           (e.g., explicit_path with '_int8.onnx' suffix, or explicit_path if already int8).
+         - Otherwise use explicit_path.
+      2. If explicit_path is not provided or does not exist:
+         - In search directories (model_dir, 'models', 'data/models'), look for INT8
+           candidates if precision is 'int8' or 'auto':
+           'yolov8n_640_int8.onnx', 'yolov8n_seg_int8.onnx', 'yolov8n_int8.onnx'.
+         - If not found, look for baseline FP32/FP16 models:
+           'yolov8n_640.onnx', 'yolov8n_seg.onnx', 'yolov8n.onnx'.
+
+    Returns:
+      (resolved_model_path, effective_precision, is_quantized)
+    """
+    req_precision = resolve_precision(precision)
+    base_dir = model_dir or MODEL_DIR
+
+    # 1. Explicit path given
+    if explicit_path and explicit_path.strip():
+        cand = explicit_path.strip()
+        if "int8" in os.path.basename(cand).lower() or "quant" in os.path.basename(cand).lower():
+            return cand, "int8", True
+        if req_precision in ("int8", "auto"):
+            stem, ext = os.path.splitext(cand)
+            int8_peer = f"{stem}_int8{ext}"
+            if os.path.isfile(int8_peer):
+                return int8_peer, "int8", True
+        if os.path.isfile(cand):
+            return cand, ("fp16" if req_precision == "fp16" else "fp32"), False
+        return cand, ("int8" if req_precision == "int8" else "fp32"), (req_precision == "int8")
+
+    # 2. Search in search_dirs
+    search_dirs = [base_dir, "models", "data/models"]
+    if req_precision in ("int8", "auto"):
+        for d in search_dirs:
+            for name in ("yolov8n_640_int8.onnx", "yolov8n_seg_int8.onnx", "yolov8n_int8.onnx"):
+                p = os.path.join(d, name)
+                if os.path.isfile(p):
+                    return p, "int8", True
+
+    for d in search_dirs:
+        for name in ("yolov8n_640.onnx", "yolov8n_seg.onnx", "yolov8n.onnx"):
+            p = os.path.join(d, name)
+            if os.path.isfile(p):
+                return p, ("fp16" if req_precision == "fp16" else "fp32"), False
+
+    default_p = os.path.join(base_dir, "yolov8n.onnx")
+    return default_p, ("int8" if req_precision == "int8" else "fp32"), (req_precision == "int8")
+
+
 # Attempt to import optional OpenVINO and imaging libraries
 OPENVINO_AVAILABLE = False
 PIL_AVAILABLE = False
@@ -82,6 +166,8 @@ compiled_input_shape = None
 # ORT session is loaded. Reported by /info so an operator can see whether CUDA was
 # really available instead of inferring it from the requested list.
 ort_providers: List[str] = []
+effective_precision: str = "fp32"
+is_model_quantized: bool = False
 
 try:
     import openvino as ov
@@ -503,6 +589,7 @@ def load_ort_model() -> None:
     ``/info`` rather than the requested list, which cannot distinguish the two.
     """
     global compiled_model, resolution_mode, compiled_input_shape, ort_providers
+    global effective_precision, is_model_quantized
 
     # Imported lazily: the OpenVINO path must not pay ORT's import cost or fail on a
     # host image that only carries the Intel runtime.
@@ -512,7 +599,16 @@ def load_ort_model() -> None:
         logger.error("CV_BACKEND=ort but onnxruntime is not installed: %s", exc)
         return
 
-    model_path = CV_ONNX_MODEL
+    explicit = CV_ONNX_MODEL if os.environ.get("CV_ONNX_MODEL") else None
+    resolved_path, target_precision, is_quant = resolve_onnx_model_path(
+        explicit_path=explicit,
+        precision=CV_PRECISION,
+        model_dir=MODEL_DIR,
+    )
+    model_path = resolved_path
+    effective_precision = target_precision
+    is_model_quantized = is_quant
+
     require_cuda = (os.environ.get("CV_REQUIRE_CUDA") or "").strip() == "1"
     if require_cuda and not os.path.exists("/dev/nvidia0"):
         # With pip CUDA libraries present but no device node, ORT can die inside the
@@ -541,8 +637,10 @@ def load_ort_model() -> None:
 
     start_t = time.perf_counter()
     logger.info(
-        "Loading ONNX Runtime model from %s (providers=%s)...",
+        "Loading ONNX Runtime model from %s (precision=%s, quantized=%s, providers=%s)...",
         model_path,
+        effective_precision,
+        is_model_quantized,
         ["CUDAExecutionProvider", "CPUExecutionProvider"],
     )
     try:
@@ -570,14 +668,46 @@ def load_ort_model() -> None:
         ort_providers = providers
         duration = (time.perf_counter() - start_t) * 1000
         logger.info(
-            "ONNX Runtime session created in %.1f ms (providers=%s, input=%s %s, mode=%s)",
+            "ONNX Runtime session created in %.1f ms (providers=%s, input=%s %s, mode=%s, precision=%s)",
             duration,
             providers,
             input_name,
             shape,
             resolution_mode,
+            effective_precision,
         )
     except Exception as exc:
+        if is_model_quantized and CV_PRECISION in ("auto", "int8"):
+            baseline_path = model_path.replace("_int8.onnx", ".onnx")
+            if os.path.isfile(baseline_path) and baseline_path != model_path:
+                logger.warning(
+                    "INT8 model %s failed (%s); falling back to baseline %s",
+                    model_path,
+                    exc,
+                    baseline_path,
+                )
+                try:
+                    session, providers = open_ort_session(baseline_path)
+                    input_name = session.get_inputs()[0].name
+                    shape = ort_input_shape(session)
+                    compiled_model = ORTModel(session, input_name, shape, providers, baseline_path)
+                    compiled_input_shape = list(shape)
+                    resolution_mode = compiled_model.resolution_mode
+                    ort_providers = providers
+                    effective_precision = "fp32"
+                    is_model_quantized = False
+                    duration = (time.perf_counter() - start_t) * 1000
+                    logger.info(
+                        "Fallback ONNX Runtime session created in %.1f ms (providers=%s, input=%s %s, mode=%s)",
+                        duration,
+                        providers,
+                        input_name,
+                        shape,
+                        resolution_mode,
+                    )
+                    return
+                except Exception as fallback_exc:
+                    logger.error("Failed to load fallback ONNX model %s: %s", baseline_path, fallback_exc)
         logger.error("Failed to create ONNX Runtime session for %s: %s", model_path, exc)
 
 
@@ -590,11 +720,14 @@ def load_model():
     a reload must not leave the handler describing a model that is no longer loaded.
     """
     global compiled_model, resolution_mode, compiled_input_shape, ort_providers
+    global effective_precision, is_model_quantized
 
     compiled_model = None
     compiled_input_shape = None
     resolution_mode = "unknown"
     ort_providers = []
+    effective_precision = "fp32"
+    is_model_quantized = False
 
     if CV_BACKEND == "ort":
         load_ort_model()
@@ -1290,6 +1423,8 @@ class CVRequestHandler(BaseHTTPRequestHandler):
                 "service": "projectkv-cv-engine",
                 "version": "1.0.0",
                 "backend": CV_BACKEND,
+                "precision": effective_precision if CV_BACKEND == "ort" else "fp32",
+                "quantized": is_model_quantized if CV_BACKEND == "ort" else False,
                 "providers": list(ort_providers) if CV_BACKEND == "ort" else [],
                 "openvino_available": OPENVINO_AVAILABLE,
                 "available_devices": devices,

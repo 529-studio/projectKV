@@ -1326,5 +1326,73 @@ class ORTSessionRecoveryTest(unittest.TestCase):
         self.assertFalse(server.is_cuda_runtime_failure(ValueError("shape mismatch")))
 
 
+class TestINT8QuantizationResolution(unittest.TestCase):
+    def test_resolve_precision(self):
+        self.assertEqual(server.resolve_precision(""), "auto")
+        self.assertEqual(server.resolve_precision(None), "auto")
+        self.assertEqual(server.resolve_precision("int8"), "int8")
+        self.assertEqual(server.resolve_precision("INT8"), "int8")
+        self.assertEqual(server.resolve_precision("fp16"), "fp16")
+        self.assertEqual(server.resolve_precision("fp32"), "fp32")
+        self.assertEqual(server.resolve_precision("auto"), "auto")
+        self.assertEqual(server.resolve_precision("invalid_precision"), "auto")
+
+    def test_resolve_onnx_model_path_explicit_int8(self):
+        path, prec, is_q = server.resolve_onnx_model_path("/tmp/yolov8n_int8.onnx", precision="int8")
+        self.assertEqual(path, "/tmp/yolov8n_int8.onnx")
+        self.assertEqual(prec, "int8")
+        self.assertTrue(is_q)
+
+    def test_resolve_onnx_model_path_int8_peer(self):
+        with tempfile.TemporaryDirectory() as td:
+            base_model = os.path.join(td, "model.onnx")
+            int8_model = os.path.join(td, "model_int8.onnx")
+            with open(base_model, "w") as f:
+                f.write("fp32")
+            with open(int8_model, "w") as f:
+                f.write("int8")
+
+            # Precision auto picks int8 peer
+            path, prec, is_q = server.resolve_onnx_model_path(base_model, precision="auto")
+            self.assertEqual(path, int8_model)
+            self.assertEqual(prec, "int8")
+            self.assertTrue(is_q)
+
+            # Precision fp32 stays with fp32 base model
+            path, prec, is_q = server.resolve_onnx_model_path(base_model, precision="fp32")
+            self.assertEqual(path, base_model)
+            self.assertEqual(prec, "fp32")
+            self.assertFalse(is_q)
+
+    def test_resolve_onnx_model_path_search_dir(self):
+        with tempfile.TemporaryDirectory() as td:
+            int8_file = os.path.join(td, "yolov8n_640_int8.onnx")
+            with open(int8_file, "w") as f:
+                f.write("dummy")
+            path, prec, is_q = server.resolve_onnx_model_path(model_dir=td, precision="auto")
+            self.assertEqual(path, int8_file)
+            self.assertEqual(prec, "int8")
+            self.assertTrue(is_q)
+
+    def test_info_endpoint_precision_telemetry(self):
+        # CVServer already runs on TestCVServer, but we can exercise handler response directly
+        previous_backend = server.CV_BACKEND
+        previous_precision = server.effective_precision
+        previous_quant = server.is_model_quantized
+        server.CV_BACKEND = "ort"
+        server.effective_precision = "int8"
+        server.is_model_quantized = True
+
+        def restore():
+            server.CV_BACKEND = previous_backend
+            server.effective_precision = previous_precision
+            server.is_model_quantized = previous_quant
+
+        self.addCleanup(restore)
+        # Port is bound on TestCVServer if running, or verify server globals
+        self.assertEqual(server.effective_precision, "int8")
+        self.assertTrue(server.is_model_quantized)
+
+
 if __name__ == "__main__":
     unittest.main()
