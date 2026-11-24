@@ -175,7 +175,7 @@ export function useFlood(): UseFloodReturn {
             return null;
           });
 
-        // 3. Fetch initial crowdsourced user flood reports (S8-T7)
+        // 3. Fetch initial crowdsourced user flood reports (S8-T7) and hazard corroborations (S18-T4)
         const userReportsPromise = fetch(getApiUrl(API_ENDPOINTS.FLOOD_USER_REPORTS))
           .then((res) => (res.ok ? res.json() : null))
           .catch((err) => {
@@ -183,10 +183,18 @@ export function useFlood(): UseFloodReturn {
             return null;
           });
 
-        const [statusData, hexData, userReportsData] = await Promise.all([
+        const hazardReportsPromise = fetch(getApiUrl(API_ENDPOINTS.HAZARD_REPORTS))
+          .then((res) => (res.ok ? res.json() : null))
+          .catch((err) => {
+            console.warn('Failed to fetch hazard reports:', err);
+            return null;
+          });
+
+        const [statusData, hexData, userReportsData, hazardReportsData] = await Promise.all([
           statusPromise,
           hexPromise,
           userReportsPromise,
+          hazardReportsPromise,
         ]);
         if (isCancelled) return;
 
@@ -255,6 +263,58 @@ export function useFlood(): UseFloodReturn {
               }
             }
           });
+
+          if (Array.isArray(hazardReportsData)) {
+            hazardReportsData.forEach((item: unknown) => {
+              if (item && typeof item === 'object' && 'camera_id' in item && typeof item.camera_id === 'string' && item.camera_id) {
+                const status = ('status' in item && typeof item.status === 'string')
+                  ? (item.status as UserFloodReport['status'])
+                  : undefined;
+                const confidence = ('confidence' in item && typeof item.confidence === 'number')
+                  ? item.confidence
+                  : undefined;
+                const corroboratingCameraId = ('corroborating_camera_id' in item && typeof item.corroborating_camera_id === 'string')
+                  ? item.corroborating_camera_id
+                  : undefined;
+                const corroboratingDistance = ('corroborating_distance_m' in item && typeof item.corroborating_distance_m === 'number')
+                  ? item.corroborating_distance_m
+                  : undefined;
+
+                const existing = initialUserReports.get(item.camera_id);
+                if (existing) {
+                  existing.status = status;
+                  existing.confidence = confidence;
+                  existing.corroborating_camera_id = corroboratingCameraId;
+                  existing.corroborating_distance_m = corroboratingDistance;
+                } else {
+                  const expiresAt = ('expires_at' in item && typeof item.expires_at === 'string')
+                    ? new Date(item.expires_at).getTime()
+                    : Date.now() + 5400000;
+                  if (Date.now() < expiresAt) {
+                    const timestamp = ('submitted_at' in item && typeof item.submitted_at === 'string')
+                      ? item.submitted_at
+                      : new Date().toISOString();
+                    const reportCount = ('report_count' in item && typeof item.report_count === 'number')
+                      ? item.report_count
+                      : 1;
+                    initialUserReports.set(item.camera_id, {
+                      camera_id: item.camera_id,
+                      timestamp,
+                      report_count: reportCount,
+                      escalated: reportCount >= 2,
+                      ttl_seconds: 5400,
+                      expires_at: expiresAt,
+                      status,
+                      confidence,
+                      corroborating_camera_id: corroboratingCameraId,
+                      corroborating_distance_m: corroboratingDistance,
+                    });
+                  }
+                }
+              }
+            });
+          }
+
           setUserFloodReports(initialUserReports);
         }
       } finally {

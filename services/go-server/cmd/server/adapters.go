@@ -28,6 +28,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
 	"github.com/529-studio/projectKV/services/go-server/internal/notify"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
+	"github.com/529-studio/projectKV/services/go-server/internal/reports"
 	"github.com/529-studio/projectKV/services/go-server/internal/storage"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
 	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
@@ -1001,6 +1002,91 @@ func initStorageDriver(cfg *config.ServerConfig) (storage.Storage, string) {
 	return storeDriver, retentionRootDir
 }
 
+// reportsCameraLocatorAdapter adapts *camera.Catalog to reports.CameraLocator
+// (Dependency Inversion Principle: consumer package reports defines the interface,
+// composition root adapts the catalog).
+type reportsCameraLocatorAdapter struct {
+	catalog *camera.Catalog
+}
+
+func (a *reportsCameraLocatorAdapter) FindCamerasWithin(lat, lng, radiusMeters float64) []reports.NearbyCamera {
+	if a == nil || a.catalog == nil {
+		return nil
+	}
+	var res []reports.NearbyCamera
+	for _, c := range a.catalog.All() {
+		if c.IsGhost {
+			continue
+		}
+		dist := reports.HaversineDistanceMeters(lat, lng, c.Latitude, c.Longitude)
+		if dist <= radiusMeters {
+			title := c.DisplayName
+			if title == "" {
+				title = c.Title
+			}
+			res = append(res, reports.NearbyCamera{
+				ID:        c.ID,
+				Title:     title,
+				Latitude:  c.Latitude,
+				Longitude: c.Longitude,
+				DistanceM: dist,
+			})
+		}
+	}
+	return res
+}
+
+func (a *reportsCameraLocatorAdapter) GetCamera(id string) (reports.NearbyCamera, bool) {
+	if a == nil || a.catalog == nil {
+		return reports.NearbyCamera{}, false
+	}
+	c, ok := a.catalog.ByID(id)
+	if !ok || c == nil {
+		return reports.NearbyCamera{}, false
+	}
+	title := c.DisplayName
+	if title == "" {
+		title = c.Title
+	}
+	return reports.NearbyCamera{
+		ID:        c.ID,
+		Title:     title,
+		Latitude:  c.Latitude,
+		Longitude: c.Longitude,
+		DistanceM: 0,
+	}, true
+}
+
+// reportsVerdictReaderAdapter adapts *hotset.Store to reports.VerdictReader.
+type reportsVerdictReaderAdapter struct {
+	store *hotset.Store
+}
+
+func (a *reportsVerdictReaderAdapter) GetLatestVerdict(cameraID string) (reports.CameraVerdictInfo, bool) {
+	if a == nil || a.store == nil {
+		return reports.CameraVerdictInfo{}, false
+	}
+	v, ok := a.store.Get(cameraID)
+	if !ok {
+		return reports.CameraVerdictInfo{}, false
+	}
+	return reports.CameraVerdictInfo{
+		CameraID:      v.CameraID,
+		Severity:      v.Severity,
+		FloodSeverity: v.FloodSeverity,
+		FloodDepthCm:  v.FloodDepthCm,
+		Confidence:    v.Confidence,
+		ObservedAt:    v.ObservedAt,
+	}, true
+}
+
+// reportsTideReaderAdapter adapts tide.PredictTide to reports.TideReader.
+type reportsTideReaderAdapter struct{}
+
+func (a *reportsTideReaderAdapter) PredictTide(station string, t time.Time) float64 {
+	return tide.PredictTide(station, t)
+}
+
 // initFeedbackHandler initializes the crowdsourced flood feedback handler and wires live runtime event bridges.
 func initFeedbackHandler(
 	camCatalog *camera.Catalog,
@@ -1009,6 +1095,7 @@ func initFeedbackHandler(
 	storeDriver storage.Storage,
 	floodHexAggregator *live.FloodHexAggregator,
 	liveHub *live.Hub,
+	reportsService *reports.Service,
 ) *feedback.Handler {
 	feedbackChecker := &feedbackCameraChecker{catalog: camCatalog}
 	feedbackFetcher := &feedbackSnapshotFetcher{
@@ -1026,6 +1113,9 @@ func initFeedbackHandler(
 			reportCount, escalated := 1, false
 			if floodHexAggregator != nil {
 				reportCount, escalated = floodHexAggregator.OnUserReport(cameraID, report.ClientIPHash, report.Timestamp)
+			}
+			if reportsService != nil {
+				reportsService.OnCameraReport(cameraID, report.ClientIPHash, report.Timestamp)
 			}
 			if liveHub != nil {
 				liveHub.BroadcastUserFloodReport(live.UserFloodReport{

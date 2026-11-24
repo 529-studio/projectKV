@@ -519,6 +519,11 @@ export default function CameraModal({
                       : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE[currentLang]}
                     {' '}{USER_FLOOD_REPORT_I18N.REMAINING_MINUTES[currentLang](getUserReportRemainingMinutes(userFloodReport))}
                   </span>
+                  {userFloodReport.status === 'CORROBORATED' && (
+                    <span className="ml-1 pl-1 border-l border-amber-500/40 text-emerald-400 font-semibold">
+                      {USER_FLOOD_REPORT_I18N.CAMERA_VERIFIED[currentLang](Math.round((userFloodReport.confidence ?? 0.5) * 100))}
+                    </span>
+                  )}
                 </span>
               )}
 
@@ -749,6 +754,11 @@ export default function CameraModal({
                         : (currentLang === 'vi' ? USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE.vi : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE.en)}
                       {' '}{USER_FLOOD_REPORT_I18N.REMAINING_MINUTES[currentLang](getUserReportRemainingMinutes(userFloodReport))}
                     </span>
+                    {userFloodReport.status === 'CORROBORATED' && (
+                      <span className="ml-1 pl-1 border-l border-amber-500/40 text-emerald-400 font-semibold">
+                        {USER_FLOOD_REPORT_I18N.CAMERA_VERIFIED[currentLang](Math.round((userFloodReport.confidence ?? 0.5) * 100))}
+                      </span>
+                    )}
                   </span>
                 )}
 

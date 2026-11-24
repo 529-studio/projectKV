@@ -654,6 +654,108 @@
                 }
             }
         },
+        "/api/reports": {
+            "get": {
+                "description": "Returns list of active crowd-sourced hazard reports with verification status and confidence scores.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "List active verified and submitted hazard reports",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/reports.HazardReport"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Submits a new citizen hazard report (flood, congestion, obstruction) at a camera or GPS coordinate.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Submit citizen hazard report",
+                "parameters": [
+                    {
+                        "description": "Hazard Report Payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/reports.SubmitReportRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/reports.HazardReport"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/reports/{id}": {
+            "get": {
+                "description": "Returns verification details for a specific hazard report.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Get hazard report details by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Report ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/reports.HazardReport"
+                        }
+                    },
+                    "404": {
+                        "description": "Report Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/roads": {
             "get": {
                 "description": "Returns list of all known road keys with associated camera counts, sorted by camera density descending.",
@@ -3083,6 +3185,101 @@
                 },
                 "report_count": {
                     "type": "integer"
+                }
+            }
+        },
+        "reports.HazardReport": {
+            "type": "object",
+            "properties": {
+                "camera_id": {
+                    "type": "string"
+                },
+                "confidence": {
+                    "type": "number"
+                },
+                "corroborating_camera_id": {
+                    "type": "string"
+                },
+                "corroborating_distance_m": {
+                    "type": "number"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "hazard_type": {
+                    "$ref": "#/definitions/reports.HazardType"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "report_count": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/reports.ReportStatus"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "verified_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "reports.HazardType": {
+            "type": "string",
+            "enum": [
+                "flood",
+                "congestion",
+                "obstruction"
+            ],
+            "x-enum-varnames": [
+                "HazardTypeFlood",
+                "HazardTypeCongestion",
+                "HazardTypeObstruction"
+            ]
+        },
+        "reports.ReportStatus": {
+            "type": "string",
+            "enum": [
+                "SUBMITTED",
+                "CORROBORATED",
+                "UNVERIFIED",
+                "EXPIRED"
+            ],
+            "x-enum-varnames": [
+                "ReportStatusSubmitted",
+                "ReportStatusCorroborated",
+                "ReportStatusUnverified",
+                "ReportStatusExpired"
+            ]
+        },
+        "reports.SubmitReportRequest": {
+            "type": "object",
+            "properties": {
+                "camera_id": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "hazard_type": {
+                    "$ref": "#/definitions/reports.HazardType"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
                 }
             }
         },

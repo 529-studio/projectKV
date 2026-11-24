@@ -212,6 +212,10 @@ export default function MapComponent({
         ? USER_FLOOD_REPORT_I18N.BADGE_ESCALATED[lang]
         : USER_FLOOD_REPORT_I18N.BADGE_CANDIDATE[lang];
       trafficInfo += `<br><span style="color:#f59e0b; font-weight:bold;">${label} ${remainingText}</span>`;
+      if (userReport.status === 'CORROBORATED' || (userReport.confidence !== undefined && userReport.confidence >= 0.5)) {
+        const pct = Math.round((userReport.confidence ?? 0.5) * 100);
+        trafficInfo += `<br><span style="color:#10b981; font-weight:bold;">${USER_FLOOD_REPORT_I18N.CAMERA_VERIFIED[lang](pct)}</span>`;
+      }
     }
     if (floodVerdict && !isFloodVerdictStale(floodVerdict)) {
       const s = (floodVerdict.flood_severity || '').toUpperCase().trim();
@@ -637,8 +641,8 @@ export default function MapComponent({
         } else if (hasUserReport && userReport) {
           isFloodProminent = true;
           isDimmed = false;
-          fillColor = '#f59e0b';
-          strokeColor = userReport.escalated ? '#ffffff' : '#d97706';
+          fillColor = userReport.status === 'CORROBORATED' ? '#059669' : '#f59e0b';
+          strokeColor = userReport.status === 'CORROBORATED' ? '#34d399' : (userReport.escalated ? '#ffffff' : '#d97706');
           weight = userReport.escalated ? 2.5 : 2.0;
           radius = userReport.escalated ? baseR + 2.5 : baseR + 2.0;
           className = userReport.escalated ? 'marker-congested-pulse' : '';
@@ -675,9 +679,9 @@ export default function MapComponent({
         }
       } else {
         if (hasUserReport && userReport) {
-          // Highlight user flood report with amber marker even in traffic lens
-          fillColor = '#f59e0b';
-          strokeColor = userReport.escalated ? '#ffffff' : '#d97706';
+          // Highlight user flood report with amber marker (or emerald when camera corroborated) even in traffic lens
+          fillColor = userReport.status === 'CORROBORATED' ? '#059669' : '#f59e0b';
+          strokeColor = userReport.status === 'CORROBORATED' ? '#34d399' : (userReport.escalated ? '#ffffff' : '#d97706');
           weight = userReport.escalated ? 2.5 : 2.0;
           radius = userReport.escalated ? baseR + 2.5 : baseR + 2.0;
           className = userReport.escalated ? 'marker-congested-pulse' : '';
