@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint lint-deploy test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast train-forecast-daemon export-seg export-seg-openvino train-seg benchmark-mock benchmark-real bench-seg-avx2 bench-seg-avx2-docker bench-seg-avx2-check materialize-seg smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close test-deploy restore-drill quantize-int8 test-quantize
+.PHONY: all dev-all dev-node dev-web crawl help install setup-hooks dev-go dev-cv dev-model dev-api build-go test-go test-pcu test-model lint-go swagger geo-enrich test-enrich normalize-roads curate-hotset hex-polygons docs-lint test-docs evidence-lint lint-deploy test-ci test-eval test-harvester test-seg test-train test-forecast train-forecast train-forecast-daemon export-seg export-seg-openvino train-seg benchmark-mock benchmark-real bench-seg-avx2 bench-seg-avx2-docker bench-seg-avx2-check materialize-seg smoke-eval collect-frames dataset-progress r2-setup r2-ls r2-size auto-harvest batch-auto-label prelabel-sam ingest-proofs sprint-close test-deploy restore-drill quantize-int8 test-quantize cull-dead-cameras test-cull-cameras
 
 # Segmentation training defaults (S11-T5). Override on the command line:
 #   make train-seg EPOCHS=100 DATA=data/yolo_seg/dataset.yaml
@@ -284,6 +284,12 @@ r2-size:
 	rclone size R2:warded-proofs/
 
 
+
+cull-dead-cameras:
+	python3 tools/eval/cull_dead_cameras.py --dry-run
+
+test-cull-cameras:
+	python3 -m unittest tools/eval/test_cull_dead_cameras.py
 
 sprint-close:
 	@tools/sprint/close.sh $(if $(S),--sprint $(S),) $(if $(LAUNCH),--launch,)
