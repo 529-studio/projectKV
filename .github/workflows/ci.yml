@@ -141,7 +141,7 @@ jobs:
           make lint-deploy
           make test-deploy
           # Hermetic path: builds a real WAL-mode SQLite database, snapshots it
-          # through the SQLite backup API exactly like warded-backup, restores
+          # with VACUUM INTO exactly like warded-backup, restores
           # it and enforces the RTO/RPO budgets in CI.
           make restore-drill EXTRA="--cycles 3"
 

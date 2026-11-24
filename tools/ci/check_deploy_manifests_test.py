@@ -44,7 +44,7 @@ VALID_BACKUP_SERVICE = """
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        sqlite3 /app/data/camera-view.db ".backup '/backup/camera-view.db'"
+        sqlite3 /app/data/camera-view.db "VACUUM INTO '/backup/camera-view.db'"
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m,mode=1777
     security_opt:
@@ -251,7 +251,7 @@ Persistent=true
     def test_backup_snapshot_outside_staging_volume_flagged(self) -> None:
         self.compose_path.write_text(
             self.compose_path.read_text().replace(
-                '".backup \'/backup/camera-view.db\'"', '".backup \'/tmp/camera-view.db\'"'
+                '"VACUUM INTO \'/backup/camera-view.db\'"', '"VACUUM INTO \'/tmp/camera-view.db\'"'
             )
         )
         violations = cdm.check_backup_sidecar(self.compose_path)
@@ -299,12 +299,22 @@ Persistent=true
     def test_backup_raw_file_copy_flagged(self) -> None:
         self.compose_path.write_text(
             self.compose_path.read_text().replace(
-                'sqlite3 /app/data/camera-view.db ".backup \'/backup/camera-view.db\'"',
+                'sqlite3 /app/data/camera-view.db "VACUUM INTO \'/backup/camera-view.db\'"',
                 "cp /app/data/camera-view.db /backup/camera-view.db",
             )
         )
         violations = cdm.check_backup_sidecar(self.compose_path)
         self.assertTrue(any(v.rule == "backup_command" for v in violations))
+
+    def test_backup_hot_backup_api_flagged(self) -> None:
+        self.compose_path.write_text(
+            self.compose_path.read_text().replace(
+                'sqlite3 /app/data/camera-view.db "VACUUM INTO \'/backup/camera-view.db\'"',
+                'sqlite3 /app/data/camera-view.db ".backup \'/backup/camera-view.db\'"',
+            )
+        )
+        violations = cdm.check_backup_sidecar(self.compose_path)
+        self.assertTrue(any(v.rule == "backup_hot_snapshot" for v in violations))
 
     def test_backup_must_wait_for_volume_init(self) -> None:
         self.compose_path.write_text(

@@ -353,7 +353,7 @@ def check_backup_sidecar(compose_path: Path) -> list[Violation]:
             Violation(
                 compose_path,
                 "backup_snapshot_path",
-                "Expected the sqlite3 .backup snapshot to be written to /backup/camera-view.db",
+                "Expected the snapshot to be written to /backup/camera-view.db",
             )
         )
 
@@ -366,12 +366,27 @@ def check_backup_sidecar(compose_path: Path) -> list[Violation]:
             )
         )
 
-    if not re.search(r"\.backup", block):
+    if not re.search(r"VACUUM INTO", block):
         violations.append(
             Violation(
                 compose_path,
                 "backup_command",
-                "Expected 'sqlite3 .backup' (WAL-safe snapshot API), not a raw file copy",
+                "Expected 'sqlite3 ... VACUUM INTO' (single consistent pass over a live "
+                "database), not a raw file copy",
+            )
+        )
+
+    # The online backup API restarts whenever the source is written while it
+    # copies. This database is written continuously, so on 2026-11-24 a 558 MB
+    # ".backup" restarted for four hours on the 5400 RPM disk and produced no
+    # archive. Never reintroduce it.
+    if re.search(r"\.backup\s+['\"]", block):
+        violations.append(
+            Violation(
+                compose_path,
+                "backup_hot_snapshot",
+                "Prohibited 'sqlite3 .backup': it restarts on every source write and "
+                "does not converge on a continuously written database; use VACUUM INTO",
             )
         )
 

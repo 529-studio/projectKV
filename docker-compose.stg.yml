@@ -226,9 +226,10 @@ services:
   # Daily SQLite backup to Cloudflare R2. This replaces the removed streaming
   # replication sidecar: tailing the WAL every second meant continuous R2 Class A
   # operations on a Celeron-class host, and it bought an RPO the product does not
-  # need. A 24h RPO is accepted, and `sqlite3 .backup` is WAL-safe: it snapshots
-  # through the SQLite backup API, so committed frames still sitting in the WAL
-  # are captured without a raw file copy that would race the writer.
+  # need. A 24h RPO is accepted, and `VACUUM INTO` is WAL-safe: it reads one
+  # consistent snapshot, so committed frames still sitting in the WAL are
+  # captured without a raw file copy that would race the writer. It also cannot
+  # restart mid-copy, which `sqlite3 .backup` does on every source write.
   warded-backup:
     image: alpine:3.20
     container_name: ${BACKUP_CONTAINER_NAME:-warded-backup}
@@ -286,8 +287,14 @@ services:
           archive="/backup/warded-$${stamp}.sqlite3.gz"
           echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S %Z') starting backup of camera-view.db"
           rm -f "$$snapshot"
-          if ! sqlite3 /app/data/camera-view.db ".backup '$$snapshot'"; then
-            echo "[ERR] sqlite3 .backup failed for /app/data/camera-view.db" >&2
+          # VACUUM INTO writes one consistent snapshot in a single pass. The
+          # SQLite backup API (".backup") restarts whenever the source changes
+          # under it, and this database is written continuously: on 2026-11-24 a
+          # 558 MB .backup thrashed for four hours on the 5400 RPM disk, never
+          # converged and produced no archive. "timeout" bounds a future stall
+          # instead of letting the whole night hang with no upload.
+          if ! timeout 5400 sqlite3 -cmd ".timeout 60000" /app/data/camera-view.db "VACUUM INTO '$$snapshot'"; then
+            echo "[ERR] sqlite3 VACUUM INTO failed or exceeded 5400s for /app/data/camera-view.db" >&2
           elif ! gzip -c "$$snapshot" > "$$archive"; then
             echo "[ERR] gzip failed for $$archive" >&2
           elif ! rclone copyto "$$archive" "r2:$${BACKUP_BUCKET_NAME}/warded/$(basename "$$archive")"; then
