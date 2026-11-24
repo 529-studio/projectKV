@@ -24,6 +24,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
+	"github.com/529-studio/projectKV/services/go-server/internal/metrics"
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
 	"github.com/529-studio/projectKV/services/go-server/internal/push"
@@ -58,6 +59,8 @@ type routerConfig struct {
 	botHandler        *telegrambot.Handler
 	webhookEnabled    bool
 	healthHandler     *httpserver.HealthHandler
+	metricsHandler    *metrics.Handler
+	metricsReg        *metrics.Registry
 }
 
 // setupRouter centralizes Gin router creation, middleware attachments, and route registrations.
@@ -71,6 +74,9 @@ func setupRouter(p routerConfig) *gin.Engine {
 	))
 	router.Use(middleware.SecretSanitizer())
 	router.Use(middleware.RateLimitMiddleware(cfg.RateLimitRPS, cfg.RateLimitBurst))
+	if p.metricsReg != nil {
+		router.Use(metrics.RequestMiddleware(p.metricsReg))
+	}
 
 	// Health endpoints split by contract: /health and /api/health are
 	// readiness (503 when the wired cv-engine is unhealthy), /healthz is
@@ -84,6 +90,11 @@ func setupRouter(p routerConfig) *gin.Engine {
 	router.GET("/health", health.Healthz)
 	router.HEAD("/health", health.Healthz)
 	router.GET("/healthz", health.Livez)
+
+	// Standard Prometheus / OpenMetrics endpoint (Issue #529 / S18-T6: GET /metrics).
+	if p.metricsHandler != nil {
+		p.metricsHandler.RegisterRoutes(router)
+	}
 
 	// WebSocket Live Broadcast (Issue #9: GET /ws/live) — kept until D1 FE migration verified.
 	if p.wsHub != nil {

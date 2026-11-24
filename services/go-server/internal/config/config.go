@@ -57,6 +57,8 @@ type Config struct {
 	VAPIDPublicKey                string
 	VAPIDPrivateKey               string
 	VAPIDSubject                  string
+	MetricsAuthToken              string
+	MetricsAllowedCIDRs           []string
 }
 
 // CleanEnv returns the environment variable value with surrounding whitespace and quotes (`"`, `'`) stripped.
@@ -361,6 +363,9 @@ func LoadFromEnv() (*Config, error) {
 		cfg.DevAccessToken = parseEnvString("LABELER_SECRET_TOKEN", "")
 	}
 
+	cfg.MetricsAuthToken = parseEnvString("METRICS_AUTH_TOKEN", cfg.DevAccessToken)
+	cfg.MetricsAllowedCIDRs = parseEnvStringSlice("METRICS_ALLOWED_CIDRS", nil)
+
 	cfg.AllowedOrigins = parseEnvStringSlice("ALLOWED_ORIGINS", DefaultAllowedOrigins)
 	cfg.CFAccessAudience = parseEnvString("CF_ACCESS_AUDIENCE", "")
 	cfTeamDomain := parseEnvString("CF_ACCESS_TEAM_DOMAIN", "")
@@ -446,6 +451,8 @@ type ServerConfig struct {
 	VAPIDPublicKey                string
 	VAPIDPrivateKey               string
 	VAPIDSubject                  string
+	MetricsAuthToken              string
+	MetricsAllowedCIDRs           []string
 }
 
 // ResolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -516,6 +523,9 @@ func LoadConfig() *ServerConfig {
 	if devAccessToken == "" {
 		devAccessToken = parseEnvString("LABELER_SECRET_TOKEN", "")
 	}
+
+	metricsAuthToken := parseEnvString("METRICS_AUTH_TOKEN", devAccessToken)
+	metricsAllowedCIDRs := parseEnvStringSlice("METRICS_ALLOWED_CIDRS", nil)
 
 	allowedOrigins := parseEnvStringSlice("ALLOWED_ORIGINS", DefaultAllowedOrigins)
 	cfAccessAudience := parseEnvString("CF_ACCESS_AUDIENCE", "")
@@ -680,5 +690,7 @@ func LoadConfig() *ServerConfig {
 		VAPIDPublicKey:                vapidPublicKey,
 		VAPIDPrivateKey:               vapidPrivateKey,
 		VAPIDSubject:                  vapidSubject,
+		MetricsAuthToken:              metricsAuthToken,
+		MetricsAllowedCIDRs:           metricsAllowedCIDRs,
 	}
 }

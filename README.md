@@ -178,20 +178,16 @@ make dev-all
 | Service | Port | Endpoint URL | Verification Check |
 |---|:---:|---|---|
 | **Web Map Explorer** | `3001` | http://localhost:3001 | Interactive Leaflet map, corridor dock |
-| **Collaborative Labeler** | `3001` | http://localhost:3001/labeler | Snapshot labeling tool with auto-harvest review filters, partition cache, Shift+Enter approval, and a 6-class polygon segmentation mode (ADR-011 D1) |
+| **Collaborative Labeler** | `3001` | http://localhost:3001/labeler | Snapshot labeling tool with review filters, partition cache, and polygon segmentation (ADR-011 D1) |
 | **Go Backend API** | `3000` | http://localhost:3000 | Core Gin HTTP REST server |
 | **Subscription API** | `3000` | http://localhost:3000/api/subscriptions | `POST`, `GET`, `DELETE` flood alert subscriptions |
 | **Swagger UI** | `3000` | http://localhost:3000/swagger/index.html | Interactive OpenAPI documentation |
-| **Backend Health** | `3000` | http://localhost:3000/health | Readiness `healthy`/`degraded`/`unhealthy` (503 if unhealthy); `/healthz` is liveness, always 200 |
+| **Backend Health** | `3000` | http://localhost:3000/health | Readiness (503 if unhealthy); `/healthz` liveness, always 200 |
+| **Metrics Endpoint** | `3000` | http://localhost:3000/metrics | OpenMetrics / Prometheus exposition endpoint for corridor saturation and replication SLAs |
 | **CV Inference Engine** | `8000` | http://localhost:8000/healthz | Returns `{"status":"healthy","model":"yolov8n_openvino_320"}` |
 
 > [!NOTE]
 > `make dev-all` launches the Go backend and Next.js dev server. Expects the `warded-model` container running with `ANALYZER=onnx`.
-
-*   **Browser Access**:
-    *   Full Application (Backend + Web): `http://localhost:3000`
-    *   Standalone Frontend Dev: `http://localhost:3001`
-    *   Collaborative Labeler: `http://localhost:3001/labeler`
 
 ### 2.3. Dataset Labeling & Model Training Workflow
 
