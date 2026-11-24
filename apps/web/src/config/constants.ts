@@ -31,6 +31,7 @@ export const API_ENDPOINTS = Object.freeze({
   ROAD_STATUS: (roadKey: string) => `/api/roads/${encodeURIComponent(roadKey)}/status`,
   ROAD_STATUS_SUMMARY: `/api/roads/status-summary`,
   ROAD_ROUTE: (roadKey: string) => `/api/roads/${encodeURIComponent(roadKey)}/route`,
+  ROAD_HISTORY: (roadKey: string, hours = 24) => `/api/roads/${encodeURIComponent(roadKey)}/history?hours=${hours}`,
   CORRIDORS_OVERVIEW: '/api/corridors/overview',
   COMMUTE_EVAL: '/api/corridors/commute-eval',
   WEATHER: '/api/weather',

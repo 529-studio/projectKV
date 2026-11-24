@@ -697,6 +697,50 @@
                 }
             }
         },
+        "/api/roads/{road_key}/history": {
+            "get": {
+                "description": "Returns hourly historical flood depths (average and peak) and correlated astronomical river tide elevations for a corridor.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Corridor"
+                ],
+                "summary": "Get downsampled corridor flood history and tidal correlation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Road Key identifier (e.g. vo_van_kiet, nguyen_huu_canh)",
+                        "name": "road_key",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of hours of history to query (default 24, min 1, max 72)",
+                        "name": "hours",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/corridor.CorridorHistoryResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Corridor not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/roads/{road_key}/route": {
             "get": {
                 "description": "Returns pre-computed GeoJSON FeatureCollection containing LineString and camera Points along with cumulative flood hazard, travel delay, and passability verdict.",
@@ -1996,6 +2040,37 @@
                 }
             }
         },
+        "corridor.CorridorHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "hours": {
+                    "type": "integer"
+                },
+                "road_key": {
+                    "type": "string"
+                },
+                "station": {
+                    "description": "\"phu_an\" | \"nha_be\"",
+                    "type": "string"
+                },
+                "station_name": {
+                    "description": "e.g. {\"vi\": \"Trạm Phú An (Sông Sài Gòn)\", \"en\": \"Phu An Station (Saigon River)\"}",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/corridor.HistorySummary"
+                },
+                "timeline": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/corridor.HourlyHistoryItem"
+                    }
+                }
+            }
+        },
         "corridor.CorridorRouteSummary": {
             "type": "object",
             "properties": {
@@ -2119,6 +2194,61 @@
                     "$ref": "#/definitions/corridor.PassabilityVerdict"
                 },
                 "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "corridor.HistorySummary": {
+            "type": "object",
+            "properties": {
+                "headline": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "max_depth_cm": {
+                    "type": "number"
+                },
+                "peak_flood_time": {
+                    "type": "string"
+                },
+                "peak_tide_level_m": {
+                    "type": "number"
+                },
+                "peak_tide_time": {
+                    "type": "string"
+                }
+            }
+        },
+        "corridor.HourlyHistoryItem": {
+            "type": "object",
+            "properties": {
+                "avg_depth_cm": {
+                    "description": "Arithmetic mean depth in cm (0.0 if dry/unmeasured)",
+                    "type": "number"
+                },
+                "hazard_level": {
+                    "description": "\"CLEAR\" | \"CAUTION\" | \"IMPASSABLE\"",
+                    "type": "string"
+                },
+                "hour_label": {
+                    "description": "e.g. \"17:00\"",
+                    "type": "string"
+                },
+                "max_depth_cm": {
+                    "description": "Peak flood depth observed along the corridor in cm",
+                    "type": "number"
+                },
+                "tide_alert_level": {
+                    "description": "\"NORMAL\" | \"LEVEL_1\" | \"LEVEL_2\" | \"LEVEL_3\"",
+                    "type": "string"
+                },
+                "tide_level_m": {
+                    "description": "Astronomical tide height in meters",
+                    "type": "number"
+                },
+                "time": {
                     "type": "string"
                 }
             }

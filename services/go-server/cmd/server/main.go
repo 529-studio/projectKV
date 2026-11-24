@@ -77,6 +77,7 @@ func main() {
 
 	verdictRepo := store.NewVerdictRepo(db)
 	verdictHistoryRepo := store.NewVerdictHistoryRepo(db)
+	floodHistoryRepo := store.NewFloodHistoryRepo(db)
 	weatherRepo := store.NewWeatherRepo(db)
 	subStore := subscription.NewSQLiteStore(db)
 	startRetentionPurge(appCtx, verdictHistoryRepo)
@@ -114,8 +115,14 @@ func main() {
 
 	var corridorService *corridor.Service
 	if camCatalog != nil {
+		corridorOpts := make([]corridor.Option, 0, 2)
+		if floodHistoryRepo != nil {
+			corridorOpts = append(corridorOpts, corridor.WithFloodHistory(&corridorFloodHistoryAdapter{repo: floodHistoryRepo}))
+		}
+		corridorOpts = append(corridorOpts, corridor.WithTidePredictor(&corridorTidePredictorAdapter{}))
 		corridorService = corridor.NewService(
 			camCatalog, &verdictStoreAdapter{repo: verdictRepo}, cfg.AppEnv, time.Duration(cfg.VerdictStaleTTLSeconds)*time.Second,
+			corridorOpts...,
 		)
 	}
 
@@ -215,7 +222,7 @@ func main() {
 	preseedHotsetFromStore(verdictRepo, hotsetStore, hexAggregator, floodHexAggregator, time.Duration(cfg.VerdictStaleTTLSeconds)*time.Second)
 
 	// 8. Decoupled Multimodal Flood Pipeline & Storage/Archiver
-	floodHandler := initFloodPipeline(appCtx, cfg, camCatalog, weatherService, floodChokepoints, verdictRepo, floodHexAggregator, liveHub, dispatchFloodAlert)
+	floodHandler := initFloodPipeline(appCtx, cfg, camCatalog, weatherService, floodChokepoints, verdictRepo, floodHistoryRepo, floodHexAggregator, liveHub, dispatchFloodAlert)
 	storeDriver, retentionRootDir := initStorageDriver(cfg)
 	var archiverHandler *archiver.Handler
 	if storeDriver != nil {
@@ -240,7 +247,7 @@ func main() {
 			proxyCache: proxyCache, frozenDetector: hotset.NewFrozenDetector(cfg.FrozenFrameThreshold),
 			hotsetStore: hotsetStore, liveHub: liveHub, hexAggregator: hexAggregator,
 			floodHexAggregator: floodHexAggregator, dispatchFloodAlert: dispatchFloodAlert,
-			verdictRepo: verdictRepo, verdictHistoryRepo: verdictHistoryRepo, arch: arch, analyzerMode: cfg.Analyzer,
+			verdictRepo: verdictRepo, verdictHistoryRepo: verdictHistoryRepo, floodHistoryRepo: floodHistoryRepo, arch: arch, analyzerMode: cfg.Analyzer,
 		})
 		sched := hotset.NewScheduler(hotsetRegistry, analyzer, time.Duration(cfg.HotsetIntervalSeconds)*time.Second, cfg.HotsetMaxParallel, onVerdict, nil)
 		sched.SetStore(hotsetStore)

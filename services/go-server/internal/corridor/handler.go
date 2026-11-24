@@ -2,6 +2,7 @@ package corridor
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -21,9 +22,11 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/roads", h.ListRoads)
 	rg.GET("/roads/:road_key/status", h.GetStatus)
+	rg.GET("/roads/:road_key/history", h.GetHistory)
 	rg.GET("/roads/status-summary", h.GetStatusSummary)
 	rg.GET("/roads/:road_key/route", h.GetRoute)
 	rg.GET("/corridors/overview", h.GetCorridorsOverview)
+	rg.GET("/corridors/:road_key/history", h.GetHistory)
 	rg.GET("/corridors/commute-eval", h.EvaluateCommute)
 }
 
@@ -141,4 +144,31 @@ func (h *Handler) EvaluateCommute(c *gin.Context) {
 	vType := NormalizeVehicleType(c.Query("vehicle"))
 	result := h.service.EvaluateCommute(corridorKeys, vType)
 	c.JSON(http.StatusOK, result)
+}
+
+// GetHistory godoc
+// @Summary Get downsampled corridor flood history and tidal correlation
+// @Description Returns hourly historical flood depths (average and peak) and correlated astronomical river tide elevations for a corridor.
+// @Tags Corridor
+// @Produce json
+// @Param road_key path string true "Road Key identifier (e.g. vo_van_kiet, nguyen_huu_canh)"
+// @Param hours query int false "Number of hours of history to query (default 24, min 1, max 72)"
+// @Success 200 {object} corridor.CorridorHistoryResponse
+// @Failure 404 {object} map[string]string "Corridor not found"
+// @Router /api/roads/{road_key}/history [get]
+func (h *Handler) GetHistory(c *gin.Context) {
+	roadKey := c.Param("road_key")
+	hours := 24
+	if hStr := c.Query("hours"); hStr != "" {
+		if val, err := strconv.Atoi(hStr); err == nil && val >= 1 && val <= 72 {
+			hours = val
+		}
+	}
+
+	history, ok := h.service.GetHistory(roadKey, hours)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "corridor not found"})
+		return
+	}
+	c.JSON(http.StatusOK, history)
 }

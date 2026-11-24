@@ -145,6 +145,7 @@ type hotsetDispatcherParams struct {
 	dispatchFloodAlert func(hotset.Verdict)
 	verdictRepo        *store.VerdictRepo
 	verdictHistoryRepo *store.VerdictHistoryRepo
+	floodHistoryRepo   *store.FloodHistoryRepo
 	arch               *archiver.Archiver
 	analyzerMode       string
 }
@@ -258,6 +259,29 @@ func buildHotsetOnVerdict(p hotsetDispatcherParams) func(v hotset.Verdict) {
 				if err := p.verdictHistoryRepo.Record(context.Background(), dirHV); err != nil {
 					log.Printf("[WARN] Failed to record directional verdict history for %s (dir %s): %v", v.CameraID, dir.Direction, err)
 				}
+			}
+		}
+
+		// Fan-out 2c: append to flood verdict history if flood metrics are present (Issue #526).
+		if p.floodHistoryRepo != nil && (v.FloodSeverity != "" || v.FloodDepthCm != nil) {
+			observedAt := v.ObservedAt
+			if observedAt.IsZero() {
+				observedAt = v.Timestamp
+			}
+			if observedAt.IsZero() {
+				observedAt = time.Now().UTC()
+			}
+			rec := store.FloodHistoryRecord{
+				CameraID:             v.CameraID,
+				FloodDepthCm:         v.FloodDepthCm,
+				FloodHazardLevel:     v.FloodHazardLevel,
+				FloodSeverity:        v.FloodSeverity,
+				FloodDepthConfidence: v.FloodDepthConfidence,
+				FloodCalibrationRef:  v.FloodCalibrationRef,
+				ObservedAt:           observedAt,
+			}
+			if err := p.floodHistoryRepo.Record(context.Background(), rec); err != nil {
+				log.Printf("[WARN] Failed to record flood history from hotset for %s: %v", v.CameraID, err)
 			}
 		}
 
