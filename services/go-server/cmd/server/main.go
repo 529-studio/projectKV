@@ -20,6 +20,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/hotset"
 	"github.com/529-studio/projectKV/services/go-server/internal/httpserver"
 	"github.com/529-studio/projectKV/services/go-server/internal/live"
+	"github.com/529-studio/projectKV/services/go-server/internal/metrics"
 	"github.com/529-studio/projectKV/services/go-server/internal/notify"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
 	"github.com/529-studio/projectKV/services/go-server/internal/push"
@@ -269,6 +270,41 @@ func main() {
 	harvesterCoord := initHarvesterCoordinator(cfg, camCatalog, weatherService, proxyCache, upstreamBase, storeDriver)
 	startHarvesterJob(appCtx, harvesterCoord, cfg.HarvesterEnabled)
 
+	// 9.5 Standard Prometheus / OpenMetrics Registry (Issue #529 / S18-T6: GET /metrics)
+	metricsReg := metrics.NewRegistry()
+	metricsReg.RegisterGaugeFunc("warded_corridor_active_count", "Number of actively monitored arterial traffic corridors", func() float64 {
+		if corridorService != nil {
+			return float64(len(corridorService.GetStatusSummary()))
+		}
+		return 0
+	}, nil)
+	metricsReg.RegisterGaugeFunc("warded_camera_offline_count", "Count of offline cameras in catalog", func() float64 {
+		if camCatalog != nil {
+			var offline float64
+			for _, c := range camCatalog.All() {
+				if !c.IsOnline {
+					offline++
+				}
+			}
+			return offline
+		}
+		return 0
+	}, nil)
+	metricsReg.RegisterGaugeFunc("warded_uptime_seconds", "Process uptime in seconds", metricsReg.Uptime, nil)
+	metricsReg.RegisterGauge("warded_ingest_queue_depth", "Depth of snapshot ingestion queue", nil)
+	metricsReg.RegisterGauge("warded_cv_inference_latency_ms", "Inference latency observed from cv-engine in ms", nil)
+	metricsReg.RegisterGauge("warded_litestream_lag_seconds", "Seconds elapsed since last successful replication", nil)
+
+	cidrs, cidrErr := metrics.ParseCIDRBlocks(cfg.MetricsAllowedCIDRs)
+	if cidrErr != nil {
+		log.Printf("[WARN] Failed to parse METRICS_ALLOWED_CIDRS: %v, falling back to defaults", cidrErr)
+	}
+	metricsHandler := metrics.NewHandler(metricsReg, metrics.HandlerConfig{
+		AdminToken:   cfg.MetricsAuthToken,
+		AllowedCIDRs: cidrs,
+		AppEnv:       cfg.AppEnv,
+	})
+
 	// 10. Gin Router & HTTP Server
 	router := setupRouter(routerConfig{
 		cfg: cfg, camCatalogHandler: camCatalogHandler, proxyHandler: proxyHandler,
@@ -277,6 +313,7 @@ func main() {
 		subHandler: subHandler, pushHandler: pushHandler, archiverHandler: archiverHandler, harvesterCoord: harvesterCoord,
 		feedbackHandler: feedbackHandler, reportsHandler: reportsHandler, wsHub: wsHub, liveHub: liveHub, botHandler: botHandler,
 		webhookEnabled: webhookEnabled, healthHandler: httpserver.NewHealthHandler(healthChecker),
+		metricsHandler: metricsHandler, metricsReg: metricsReg,
 	})
 
 	srv := &http.Server{Addr: fmt.Sprintf(":%s", cfg.Port), Handler: router}

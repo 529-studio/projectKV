@@ -50,6 +50,7 @@ Danh sách đầy đủ các biến nằm ở mục **Configuration Reference** 
 | Go Backend API | `3000` | http://localhost:3000 |
 | Swagger | `3000` | http://localhost:3000/swagger/index.html |
 | Kiểm tra sức khỏe | `3000` | http://localhost:3000/health (readiness, trả 503 khi unhealthy) và http://localhost:3000/healthz (liveness, luôn 200) |
+| Chỉ số Prometheus | `3000` | http://localhost:3000/metrics |
 | CV Engine | `8000` | http://localhost:8000/healthz |
 
 ## 4. Huấn luyện & benchmark (tùy chọn)
