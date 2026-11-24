@@ -995,6 +995,72 @@ definitions:
       report_count:
         type: integer
     type: object
+  reports.HazardReport:
+    properties:
+      camera_id:
+        type: string
+      confidence:
+        type: number
+      corroborating_camera_id:
+        type: string
+      corroborating_distance_m:
+        type: number
+      description:
+        type: string
+      expires_at:
+        type: string
+      hazard_type:
+        $ref: '#/definitions/reports.HazardType'
+      id:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      report_count:
+        type: integer
+      status:
+        $ref: '#/definitions/reports.ReportStatus'
+      submitted_at:
+        type: string
+      verified_at:
+        type: string
+    type: object
+  reports.HazardType:
+    enum:
+    - flood
+    - congestion
+    - obstruction
+    type: string
+    x-enum-varnames:
+    - HazardTypeFlood
+    - HazardTypeCongestion
+    - HazardTypeObstruction
+  reports.ReportStatus:
+    enum:
+    - SUBMITTED
+    - CORROBORATED
+    - UNVERIFIED
+    - EXPIRED
+    type: string
+    x-enum-varnames:
+    - ReportStatusSubmitted
+    - ReportStatusCorroborated
+    - ReportStatusUnverified
+    - ReportStatusExpired
+  reports.SubmitReportRequest:
+    properties:
+      camera_id:
+        type: string
+      description:
+        type: string
+      hazard_type:
+        $ref: '#/definitions/reports.HazardType'
+      latitude:
+        type: number
+      longitude:
+        type: number
+    type: object
   subscription.ChokepointInfo:
     properties:
       id:
@@ -1691,6 +1757,75 @@ paths:
       summary: List camera wards (Phường)
       tags:
       - Camera
+  /api/reports:
+    get:
+      description: Returns list of active crowd-sourced hazard reports with verification
+        status and confidence scores.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/reports.HazardReport'
+            type: array
+      summary: List active verified and submitted hazard reports
+      tags:
+      - reports
+    post:
+      consumes:
+      - application/json
+      description: Submits a new citizen hazard report (flood, congestion, obstruction)
+        at a camera or GPS coordinate.
+      parameters:
+      - description: Hazard Report Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/reports.SubmitReportRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/reports.HazardReport'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Submit citizen hazard report
+      tags:
+      - reports
+  /api/reports/{id}:
+    get:
+      description: Returns verification details for a specific hazard report.
+      parameters:
+      - description: Report ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/reports.HazardReport'
+        "404":
+          description: Report Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get hazard report details by ID
+      tags:
+      - reports
   /api/roads:
     get:
       description: Returns list of all known road keys with associated camera counts,

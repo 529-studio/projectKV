@@ -23,6 +23,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/notify"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
 	"github.com/529-studio/projectKV/services/go-server/internal/push"
+	"github.com/529-studio/projectKV/services/go-server/internal/reports"
 	"github.com/529-studio/projectKV/services/go-server/internal/store"
 	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
 	"github.com/529-studio/projectKV/services/go-server/internal/telegrambot"
@@ -228,7 +229,16 @@ func main() {
 	if storeDriver != nil {
 		archiverHandler = archiver.NewHandler(storeDriver, cameraTitleAdapter{catalog: camCatalog})
 	}
-	feedbackHandler := initFeedbackHandler(camCatalog, proxyCache, upstreamBase, storeDriver, floodHexAggregator, liveHub)
+
+	// 8b. Crowdsourced Hazard Report Verification & Proximity Engine (Issue #527 / S18-T4)
+	reportsLocator := &reportsCameraLocatorAdapter{catalog: camCatalog}
+	reportsVerdictReader := &reportsVerdictReaderAdapter{store: hotsetStore}
+	reportsTideReader := &reportsTideReaderAdapter{}
+	reportsVerifier := reports.NewVerifier(reportsLocator, reportsVerdictReader, reportsTideReader, nil)
+	reportsService := reports.NewService(reportsVerifier, reportsLocator, nil)
+	reportsHandler := reports.NewHandler(reportsService)
+
+	feedbackHandler := initFeedbackHandler(camCatalog, proxyCache, upstreamBase, storeDriver, floodHexAggregator, liveHub, reportsService)
 
 	// 9. Hot Set Scheduler & Harvester Coordinator
 	var arch *archiver.Archiver
@@ -265,7 +275,7 @@ func main() {
 		hotsetHandler: hotsetHandler, corridorHandler: corridorHandler, forecastHandler: forecastHandler,
 		weatherHandler: weatherHandler, tideHandler: tideHandler, tileHandler: tileHandler, floodHandler: floodHandler,
 		subHandler: subHandler, pushHandler: pushHandler, archiverHandler: archiverHandler, harvesterCoord: harvesterCoord,
-		feedbackHandler: feedbackHandler, wsHub: wsHub, liveHub: liveHub, botHandler: botHandler,
+		feedbackHandler: feedbackHandler, reportsHandler: reportsHandler, wsHub: wsHub, liveHub: liveHub, botHandler: botHandler,
 		webhookEnabled: webhookEnabled, healthHandler: httpserver.NewHealthHandler(healthChecker),
 	})
 

@@ -39,6 +39,7 @@ export const API_ENDPOINTS = Object.freeze({
   FLOOD_VERIFY: '/api/flood/verify',
   REPORT_FLOOD: (id: string) => `/api/v1/cameras/${encodeURIComponent(id)}/report-flood`,
   FLOOD_USER_REPORTS: '/api/flood/user-reports',
+  HAZARD_REPORTS: '/api/reports',
   FLOOD_CHOKEPOINTS: '/api/flood/chokepoints',
   FLOOD_QUOTA: '/api/flood/quota',
   SSE_LIVE: '/api/live/stream',
@@ -545,6 +546,10 @@ export const USER_FLOOD_REPORT_I18N = Object.freeze({
   BADGE_ESCALATED: {
     vi: '[Báo cáo từ người dân: Có ngập (Nhiều nguồn xác nhận)]',
     en: '[Crowdsourced: Flooding reported (Multiple confirmations)]',
+  },
+  CAMERA_VERIFIED: {
+    vi: (confidence: number) => `[Xác thực qua camera · ${confidence}%]`,
+    en: (confidence: number) => `[Camera verified · ${confidence}%]`,
   },
   REMAINING_MINUTES: {
     vi: (m: number) => `(còn ${m} phút)`,

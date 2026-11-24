@@ -622,6 +622,10 @@ export interface UserFloodReport {
   escalated: boolean;
   ttl_seconds?: number;
   expires_at?: number; // epoch ms
+  status?: 'SUBMITTED' | 'CORROBORATED' | 'UNVERIFIED' | 'EXPIRED';
+  confidence?: number;
+  corroborating_camera_id?: string;
+  corroborating_distance_m?: number;
 }
 
 /**

@@ -27,6 +27,7 @@ import (
 	"github.com/529-studio/projectKV/services/go-server/internal/middleware"
 	"github.com/529-studio/projectKV/services/go-server/internal/proxycache"
 	"github.com/529-studio/projectKV/services/go-server/internal/push"
+	"github.com/529-studio/projectKV/services/go-server/internal/reports"
 	"github.com/529-studio/projectKV/services/go-server/internal/subscription"
 	"github.com/529-studio/projectKV/services/go-server/internal/telegrambot"
 	"github.com/529-studio/projectKV/services/go-server/internal/tide"
@@ -51,6 +52,7 @@ type routerConfig struct {
 	archiverHandler   *archiver.Handler
 	harvesterCoord    *harvester.Coordinator
 	feedbackHandler   *feedback.Handler
+	reportsHandler    *reports.Handler
 	wsHub             *ws.Hub
 	liveHub           *live.Hub
 	botHandler        *telegrambot.Handler
@@ -191,6 +193,10 @@ func setupRouter(p routerConfig) *gin.Engine {
 		// Crowdsourced flood feedback & R2 archiver (Issue #249 / S7-T4 / S8-T2)
 		if p.feedbackHandler != nil {
 			p.feedbackHandler.RegisterRoutes(api)
+		}
+		// Crowdsourced hazard report corroboration & proximity engine (Issue #527 / S18-T4)
+		if p.reportsHandler != nil {
+			p.reportsHandler.RegisterRoutes(api)
 		}
 		// Legacy alias kept for backward compat with existing FE constants.js
 		if p.proxyHandler != nil {
