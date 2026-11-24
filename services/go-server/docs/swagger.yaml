@@ -278,6 +278,28 @@ definitions:
       severity:
         type: string
     type: object
+  corridor.CorridorHistoryResponse:
+    properties:
+      hours:
+        type: integer
+      road_key:
+        type: string
+      station:
+        description: '"phu_an" | "nha_be"'
+        type: string
+      station_name:
+        additionalProperties:
+          type: string
+        description: 'e.g. {"vi": "Trạm Phú An (Sông Sài Gòn)", "en": "Phu An Station
+          (Saigon River)"}'
+        type: object
+      summary:
+        $ref: '#/definitions/corridor.HistorySummary'
+      timeline:
+        items:
+          $ref: '#/definitions/corridor.HourlyHistoryItem'
+        type: array
+    type: object
   corridor.CorridorRouteSummary:
     properties:
       chokepoint_count:
@@ -361,6 +383,44 @@ definitions:
       passability_verdict:
         $ref: '#/definitions/corridor.PassabilityVerdict'
       reason:
+        type: string
+    type: object
+  corridor.HistorySummary:
+    properties:
+      headline:
+        additionalProperties:
+          type: string
+        type: object
+      max_depth_cm:
+        type: number
+      peak_flood_time:
+        type: string
+      peak_tide_level_m:
+        type: number
+      peak_tide_time:
+        type: string
+    type: object
+  corridor.HourlyHistoryItem:
+    properties:
+      avg_depth_cm:
+        description: Arithmetic mean depth in cm (0.0 if dry/unmeasured)
+        type: number
+      hazard_level:
+        description: '"CLEAR" | "CAUTION" | "IMPASSABLE"'
+        type: string
+      hour_label:
+        description: e.g. "17:00"
+        type: string
+      max_depth_cm:
+        description: Peak flood depth observed along the corridor in cm
+        type: number
+      tide_alert_level:
+        description: '"NORMAL" | "LEVEL_1" | "LEVEL_2" | "LEVEL_3"'
+        type: string
+      tide_level_m:
+        description: Astronomical tide height in meters
+        type: number
+      time:
         type: string
     type: object
   corridor.PassabilityVerdict:
@@ -1643,6 +1703,36 @@ paths:
           schema:
             $ref: '#/definitions/corridor.RoadsResponse'
       summary: List all known road keys
+      tags:
+      - Corridor
+  /api/roads/{road_key}/history:
+    get:
+      description: Returns hourly historical flood depths (average and peak) and correlated
+        astronomical river tide elevations for a corridor.
+      parameters:
+      - description: Road Key identifier (e.g. vo_van_kiet, nguyen_huu_canh)
+        in: path
+        name: road_key
+        required: true
+        type: string
+      - description: Number of hours of history to query (default 24, min 1, max 72)
+        in: query
+        name: hours
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/corridor.CorridorHistoryResponse'
+        "404":
+          description: Corridor not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get downsampled corridor flood history and tidal correlation
       tags:
       - Corridor
   /api/roads/{road_key}/route:

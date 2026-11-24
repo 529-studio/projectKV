@@ -7,6 +7,7 @@ import type { VehicleType } from '../types/vehicle.ts';
 import { evaluateVehicleHazard } from '../utils/vehicleHazardUtils.ts';
 import { normalizeBotUsername } from '../utils/subscriptionUtils.ts';
 import { getApiUrl, API_ENDPOINTS } from '../config/constants.ts';
+import CorridorTrends from './CorridorTrends.tsx';
 
 interface CorridorOverviewCardProps {
   summary: CorridorRouteSummary | null;
@@ -264,6 +265,9 @@ export default function CorridorOverviewCard({
               </span>
             </div>
           </div>
+
+          {/* Historical Flood Depth & Tidal Inundation Trends (Issue #526) */}
+          <CorridorTrends roadKey={summary.road_key} lang={lang} />
 
           {/* Key Metrics Grid */}
           <div className="grid grid-cols-2 gap-2 text-xs">

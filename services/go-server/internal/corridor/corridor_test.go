@@ -1,6 +1,7 @@
 package corridor
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -782,5 +783,199 @@ func TestEvaluateCommute_MultiCorridorAndDetour(t *testing.T) {
 	}
 	if httpResp.Detour == nil || httpResp.Detour.DetourCorridorKey != "dien_bien_phu" {
 		t.Errorf("expected detour to dien_bien_phu from API, got %+v", httpResp.Detour)
+	}
+}
+
+type mockFloodHistoryProvider struct {
+	records []FloodHistoryObservation
+}
+
+func (m *mockFloodHistoryProvider) GetRecentByCameraIDs(ctx context.Context, cameraIDs []string, start, end time.Time) ([]FloodHistoryObservation, error) {
+	var out []FloodHistoryObservation
+	for _, r := range m.records {
+		matchedCam := false
+		for _, cid := range cameraIDs {
+			if r.CameraID == cid {
+				matchedCam = true
+				break
+			}
+		}
+		if matchedCam && (r.ObservedAt.Equal(start) || r.ObservedAt.After(start)) && r.ObservedAt.Before(end) {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
+type mockTidePredictor struct {
+	fixedHeight float64
+}
+
+func (m *mockTidePredictor) PredictTide(station string, t time.Time) float64 {
+	return m.fixedHeight
+}
+
+func TestService_GetHistory_DownsamplingAndTide(t *testing.T) {
+	cams := []camera.Camera{
+		{ID: "cam-vk-1", RoadKey: "vo_van_kiet"},
+		{ID: "cam-vk-2", RoadKey: "vo_van_kiet"},
+	}
+
+	fixedNow := time.Date(2026, 11, 24, 18, 0, 0, 0, time.UTC)
+	// Window: [yesterday 19:00, today 19:00] for 24 hours
+	t1 := fixedNow.Add(-2 * time.Hour).Add(10 * time.Minute) // 16:10 (bucket 16:00-17:00)
+	t2 := fixedNow.Add(-2 * time.Hour).Add(30 * time.Minute) // 16:30 (bucket 16:00-17:00)
+
+	depth10 := 10.0
+	depth30 := 30.0
+
+	floodMock := &mockFloodHistoryProvider{
+		records: []FloodHistoryObservation{
+			{CameraID: "cam-vk-1", FloodDepthCm: &depth10, ObservedAt: t1},
+			{CameraID: "cam-vk-2", FloodDepthCm: &depth30, ObservedAt: t2},
+		},
+	}
+	tideMock := &mockTidePredictor{fixedHeight: 1.55}
+
+	svc := NewService(
+		&mockCameraProvider{cameras: cams},
+		&mockVerdictProvider{},
+		"test",
+		60*time.Second,
+		WithFloodHistory(floodMock),
+		WithTidePredictor(tideMock),
+		WithNowFunc(func() time.Time { return fixedNow }),
+	)
+
+	// 1. Valid 24h query
+	res, ok := svc.GetHistory("vo_van_kiet", 24)
+	if !ok {
+		t.Fatalf("expected GetHistory to succeed for vo_van_kiet")
+	}
+
+	if res.RoadKey != "vo_van_kiet" || res.Hours != 24 || res.Station != "phu_an" {
+		t.Errorf("unexpected metadata: road=%s hours=%d station=%s", res.RoadKey, res.Hours, res.Station)
+	}
+
+	if len(res.Timeline) != 24 {
+		t.Fatalf("expected 24 timeline items, got %d", len(res.Timeline))
+	}
+
+	// Verify downsampled 16:00 bucket (2 hours before 18:00 is index 21 of 24, from 19:00 yesterday to 19:00 today)
+	// Let's find bucket at 16:00
+	var bucket16 *HourlyHistoryItem
+	for i := range res.Timeline {
+		if res.Timeline[i].Time.Hour() == 16 && res.Timeline[i].Time.Day() == 24 {
+			bucket16 = &res.Timeline[i]
+			break
+		}
+	}
+
+	if bucket16 == nil {
+		t.Fatalf("bucket 16:00 not found in timeline")
+	}
+
+	if bucket16.AvgDepthCm != 20.0 {
+		t.Errorf("expected avg depth 20.0cm, got %f", bucket16.AvgDepthCm)
+	}
+	if bucket16.MaxDepthCm != 30.0 {
+		t.Errorf("expected max depth 30.0cm, got %f", bucket16.MaxDepthCm)
+	}
+	if bucket16.HazardLevel != "IMPASSABLE" {
+		t.Errorf("expected IMPASSABLE on 30cm, got %s", bucket16.HazardLevel)
+	}
+	if bucket16.TideAlertLevel != "LEVEL_2" {
+		t.Errorf("expected LEVEL_2 for 1.55m tide, got %s", bucket16.TideAlertLevel)
+	}
+
+	// Verify peak metrics in summary
+	if res.Summary.MaxDepthCm != 30.0 {
+		t.Errorf("expected summary peak depth 30.0cm, got %f", res.Summary.MaxDepthCm)
+	}
+	if res.Summary.PeakTideLevelM != 1.55 {
+		t.Errorf("expected summary peak tide 1.55m, got %f", res.Summary.PeakTideLevelM)
+	}
+	if res.Summary.Headline["vi"] == "" || res.Summary.Headline["en"] == "" {
+		t.Errorf("expected non-empty bilingual headlines")
+	}
+
+	// 2. Hour clamping: <= 0 clamps to 24, > 72 clamps to 72
+	resClamped0, _ := svc.GetHistory("vo_van_kiet", 0)
+	if resClamped0.Hours != 24 || len(resClamped0.Timeline) != 24 {
+		t.Errorf("expected 0 to clamp to 24 hours, got %d", resClamped0.Hours)
+	}
+
+	resClamped100, _ := svc.GetHistory("vo_van_kiet", 100)
+	if resClamped100.Hours != 72 || len(resClamped100.Timeline) != 72 {
+		t.Errorf("expected 100 to clamp to 72 hours, got %d", resClamped100.Hours)
+	}
+
+	// 3. Station mapping: huynh_tan_phat -> nha_be
+	camsNhaBe := []camera.Camera{
+		{ID: "cam-htp-1", RoadKey: "huynh_tan_phat"},
+	}
+	svcHTP := NewService(
+		&mockCameraProvider{cameras: camsNhaBe},
+		&mockVerdictProvider{},
+		"test",
+		60*time.Second,
+	)
+	resHTP, okHTP := svcHTP.GetHistory("huynh_tan_phat", 12)
+	if !okHTP || resHTP.Station != "nha_be" {
+		t.Errorf("expected huynh_tan_phat to map to nha_be, got station=%s, ok=%t", resHTP.Station, okHTP)
+	}
+
+	// 4. Unknown road -> false
+	_, okUnknown := svc.GetHistory("non_existent_road", 24)
+	if okUnknown {
+		t.Errorf("expected non_existent_road to return false")
+	}
+}
+
+func TestHandler_GetHistory_HTTP(t *testing.T) {
+	cams := []camera.Camera{
+		{ID: "cam-1", RoadKey: "vo_van_kiet"},
+	}
+	svc := NewService(
+		&mockCameraProvider{cameras: cams},
+		&mockVerdictProvider{},
+		"test",
+		60*time.Second,
+	)
+
+	handler := NewHandler(svc)
+	router := gin.New()
+	handler.RegisterRoutes(router.Group("/api"))
+
+	// 1. Success on /api/roads/:road_key/history
+	req1 := httptest.NewRequest(http.MethodGet, "/api/roads/vo_van_kiet/history?hours=12", nil)
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("expected 200 on /api/roads/vo_van_kiet/history, got %d", w1.Code)
+	}
+
+	var resp1 CorridorHistoryResponse
+	if err := json.Unmarshal(w1.Body.Bytes(), &resp1); err != nil {
+		t.Fatalf("failed to parse response JSON: %v", err)
+	}
+	if resp1.RoadKey != "vo_van_kiet" || resp1.Hours != 12 || len(resp1.Timeline) != 12 {
+		t.Errorf("unexpected HTTP response data: %+v", resp1)
+	}
+
+	// 2. Success on alias /api/corridors/:road_key/history
+	req2 := httptest.NewRequest(http.MethodGet, "/api/corridors/vo_van_kiet/history", nil)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 on /api/corridors/vo_van_kiet/history, got %d", w2.Code)
+	}
+
+	// 3. 404 for unknown road
+	req404 := httptest.NewRequest(http.MethodGet, "/api/roads/unknown_street/history", nil)
+	w404 := httptest.NewRecorder()
+	router.ServeHTTP(w404, req404)
+	if w404.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for unknown road, got %d", w404.Code)
 	}
 }

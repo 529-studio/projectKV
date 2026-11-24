@@ -3,6 +3,7 @@
 package corridor
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -64,25 +65,106 @@ type VerdictProvider interface {
 	GetLatest() []hotset.Verdict
 }
 
-// Service provides corridor status and road inventory operations.
-type Service struct {
-	cameras  CameraProvider
-	verdicts VerdictProvider
-	appEnv   string
-	staleTTL time.Duration
+// FloodHistoryObservation represents a historical flood depth reading for a camera.
+type FloodHistoryObservation struct {
+	CameraID     string
+	FloodDepthCm *float64
+	ObservedAt   time.Time
 }
 
-// NewService constructs a Service with injected dependencies.
-func NewService(cameras CameraProvider, verdicts VerdictProvider, appEnv string, staleTTL time.Duration) *Service {
+// FloodHistoryProvider defines the interface to fetch historical flood observations.
+type FloodHistoryProvider interface {
+	GetRecentByCameraIDs(ctx context.Context, cameraIDs []string, start, end time.Time) ([]FloodHistoryObservation, error)
+}
+
+// TidePredictor calculates astronomical river tide height in meters at a given station and time.
+type TidePredictor interface {
+	PredictTide(station string, t time.Time) float64
+}
+
+// HourlyHistoryItem represents aggregated corridor conditions within a 1-hour window.
+type HourlyHistoryItem struct {
+	Time           time.Time `json:"time"`
+	HourLabel      string    `json:"hour_label"`       // e.g. "17:00"
+	AvgDepthCm     float64   `json:"avg_depth_cm"`     // Arithmetic mean depth in cm (0.0 if dry/unmeasured)
+	MaxDepthCm     float64   `json:"max_depth_cm"`     // Peak flood depth observed along the corridor in cm
+	TideLevelM     float64   `json:"tide_level_m"`     // Astronomical tide height in meters
+	TideAlertLevel string    `json:"tide_alert_level"` // "NORMAL" | "LEVEL_1" | "LEVEL_2" | "LEVEL_3"
+	HazardLevel    string    `json:"hazard_level"`     // "CLEAR" | "CAUTION" | "IMPASSABLE"
+}
+
+// HistorySummary provides peak metrics and a glanceable commuter advisory headline.
+type HistorySummary struct {
+	PeakTideTime   *time.Time        `json:"peak_tide_time,omitempty"`
+	PeakTideLevelM float64           `json:"peak_tide_level_m"`
+	PeakFloodTime  *time.Time        `json:"peak_flood_time,omitempty"`
+	MaxDepthCm     float64           `json:"max_depth_cm"`
+	Headline       map[string]string `json:"headline"`
+}
+
+// CorridorHistoryResponse represents the downsampled historical trends payload for /api/roads/:road_key/history.
+type CorridorHistoryResponse struct {
+	RoadKey     string              `json:"road_key"`
+	Hours       int                 `json:"hours"`
+	Station     string              `json:"station"`      // "phu_an" | "nha_be"
+	StationName map[string]string   `json:"station_name"` // e.g. {"vi": "Trạm Phú An (Sông Sài Gòn)", "en": "Phu An Station (Saigon River)"}
+	Summary     HistorySummary      `json:"summary"`
+	Timeline    []HourlyHistoryItem `json:"timeline"`
+}
+
+// Option configures optional Service dependencies.
+type Option func(*Service)
+
+// WithFloodHistory injects a FloodHistoryProvider.
+func WithFloodHistory(prov FloodHistoryProvider) Option {
+	return func(s *Service) {
+		s.floodHistory = prov
+	}
+}
+
+// WithTidePredictor injects a TidePredictor.
+func WithTidePredictor(tp TidePredictor) Option {
+	return func(s *Service) {
+		s.tidePredictor = tp
+	}
+}
+
+// WithNowFunc injects a custom time provider (for deterministic tests).
+func WithNowFunc(fn func() time.Time) Option {
+	return func(s *Service) {
+		s.nowFunc = fn
+	}
+}
+
+// Service provides corridor status and road inventory operations.
+type Service struct {
+	cameras       CameraProvider
+	verdicts      VerdictProvider
+	floodHistory  FloodHistoryProvider
+	tidePredictor TidePredictor
+	nowFunc       func() time.Time
+	appEnv        string
+	staleTTL      time.Duration
+}
+
+// NewService constructs a Service with injected dependencies and optional features.
+func NewService(cameras CameraProvider, verdicts VerdictProvider, appEnv string, staleTTL time.Duration, opts ...Option) *Service {
 	if staleTTL <= 0 {
 		staleTTL = 180 * time.Second
 	}
-	return &Service{
+	s := &Service{
 		cameras:  cameras,
 		verdicts: verdicts,
 		appEnv:   appEnv,
 		staleTTL: staleTTL,
+		nowFunc:  time.Now,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(s)
+		}
+	}
+	return s
 }
 
 // Severity ranking helper: CONGESTED/HEAVY (4) > MODERATE (2) > CLEAR (1) > UNKNOWN (0).
@@ -127,6 +209,178 @@ func (s *Service) GetStatus(roadKey string) (*CorridorStatus, bool) {
 	}
 
 	return s.aggregateStatus(target, matchingCameras), true
+}
+
+// GetHistory returns downsampled hourly historical flood depth and tidal correlation metrics
+// for the given roadKey over the past hours (clamped to [1, 72], default 24).
+// Returns (response, true) if cameras matching the roadKey exist, or (nil, false) otherwise.
+func (s *Service) GetHistory(roadKey string, hours int) (*CorridorHistoryResponse, bool) {
+	target := strings.ToLower(strings.TrimSpace(roadKey))
+	if target == "" {
+		return nil, false
+	}
+
+	allCameras := s.cameras.All()
+	var matchingCameraIDs []string
+	for _, c := range allCameras {
+		if strings.EqualFold(c.RoadKey, target) {
+			matchingCameraIDs = append(matchingCameraIDs, c.ID)
+			continue
+		}
+		for _, k := range c.RoadKeys {
+			if strings.EqualFold(k, target) {
+				matchingCameraIDs = append(matchingCameraIDs, c.ID)
+				break
+			}
+		}
+	}
+
+	if len(matchingCameraIDs) == 0 {
+		return nil, false
+	}
+
+	if hours <= 0 {
+		hours = 24
+	} else if hours > 72 {
+		hours = 72
+	}
+
+	station := "phu_an"
+	stationName := map[string]string{
+		"vi": "Trạm Phú An (Sông Sài Gòn)",
+		"en": "Phu An Station (Saigon River)",
+	}
+	if target == "huynh_tan_phat" {
+		station = "nha_be"
+		stationName = map[string]string{
+			"vi": "Trạm Nhà Bè (Ngã ba sông Đồng Tranh)",
+			"en": "Nha Be Station (Dong Tranh River)",
+		}
+	}
+
+	now := s.nowFunc().UTC()
+	windowEnd := now.Truncate(time.Hour).Add(time.Hour)
+	windowStart := windowEnd.Add(-time.Duration(hours) * time.Hour)
+
+	var observations []FloodHistoryObservation
+	if s.floodHistory != nil {
+		obs, err := s.floodHistory.GetRecentByCameraIDs(context.Background(), matchingCameraIDs, windowStart, windowEnd)
+		if err == nil {
+			observations = obs
+		}
+	}
+
+	timeline := make([]HourlyHistoryItem, hours)
+	for i := 0; i < hours; i++ {
+		bucketStart := windowStart.Add(time.Duration(i) * time.Hour)
+		bucketEnd := bucketStart.Add(time.Hour)
+
+		var sumDepth float64
+		var countMeasured int
+		var maxDepth float64
+
+		for _, ob := range observations {
+			if (ob.ObservedAt.Equal(bucketStart) || ob.ObservedAt.After(bucketStart)) && ob.ObservedAt.Before(bucketEnd) {
+				if ob.FloodDepthCm != nil {
+					d := *ob.FloodDepthCm
+					sumDepth += d
+					countMeasured++
+					if d > maxDepth {
+						maxDepth = d
+					}
+				}
+			}
+		}
+
+		avgDepth := 0.0
+		if countMeasured > 0 {
+			avgDepth = math.Round((sumDepth/float64(countMeasured))*10) / 10
+		}
+		maxDepth = math.Round(maxDepth*10) / 10
+
+		var tideLevel float64
+		if s.tidePredictor != nil {
+			tideLevel = s.tidePredictor.PredictTide(station, bucketStart)
+		}
+
+		tideAlert := "NORMAL"
+		if tideLevel >= 1.60 {
+			tideAlert = "LEVEL_3"
+		} else if tideLevel >= 1.50 {
+			tideAlert = "LEVEL_2"
+		} else if tideLevel >= 1.40 {
+			tideAlert = "LEVEL_1"
+		}
+
+		hazard := "CLEAR"
+		if maxDepth > 20.0 {
+			hazard = "IMPASSABLE"
+		} else if maxDepth >= 10.0 {
+			hazard = "CAUTION"
+		}
+
+		timeline[i] = HourlyHistoryItem{
+			Time:           bucketStart,
+			HourLabel:      bucketStart.Format("15:04"),
+			AvgDepthCm:     avgDepth,
+			MaxDepthCm:     maxDepth,
+			TideLevelM:     tideLevel,
+			TideAlertLevel: tideAlert,
+			HazardLevel:    hazard,
+		}
+	}
+
+	var peakTideLevel float64 = -999.0
+	var peakTideTime time.Time
+	var peakFloodDepth float64 = 0.0
+	var peakFloodTime *time.Time
+
+	for _, item := range timeline {
+		if item.TideLevelM > peakTideLevel {
+			peakTideLevel = item.TideLevelM
+			peakTideTime = item.Time
+		}
+		if item.MaxDepthCm > peakFloodDepth {
+			peakFloodDepth = item.MaxDepthCm
+			t := item.Time
+			peakFloodTime = &t
+		}
+	}
+
+	tideHourStr := peakTideTime.Format("15:04")
+	var headline map[string]string
+	if peakFloodTime != nil && peakFloodDepth > 0 {
+		floodHourStr := peakFloodTime.Format("15:04")
+		headline = map[string]string{
+			"vi": fmt.Sprintf("Đỉnh ngập %.0fcm lúc %s • Đỉnh triều %.2fm lúc %s", peakFloodDepth, floodHourStr, peakTideLevel, tideHourStr),
+			"en": fmt.Sprintf("Peak flood %.0fcm at %s • Peak tide %.2fm at %s", peakFloodDepth, floodHourStr, peakTideLevel, tideHourStr),
+		}
+	} else {
+		headline = map[string]string{
+			"vi": fmt.Sprintf("Tuyến đường khô ráo • Đỉnh triều %.2fm lúc %s", peakTideLevel, tideHourStr),
+			"en": fmt.Sprintf("Corridor dry • Peak tide %.2fm at %s", peakTideLevel, tideHourStr),
+		}
+	}
+
+	var ptTime *time.Time
+	if !peakTideTime.IsZero() {
+		ptTime = &peakTideTime
+	}
+
+	return &CorridorHistoryResponse{
+		RoadKey:     target,
+		Hours:       hours,
+		Station:     station,
+		StationName: stationName,
+		Summary: HistorySummary{
+			PeakTideTime:   ptTime,
+			PeakTideLevelM: peakTideLevel,
+			PeakFloodTime:  peakFloodTime,
+			MaxDepthCm:     peakFloodDepth,
+			Headline:       headline,
+		},
+		Timeline: timeline,
+	}, true
 }
 
 // GetStatusSummary returns a map of all corridor statuses by road key.

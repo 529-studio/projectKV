@@ -180,6 +180,10 @@ var CriticalTables = []TableSchemaSpec{
 		TableName: "weather_observations",
 		Columns:   []string{"precipitation_mm", "weather_code", "temperature_c", "humidity_pct", "radar_active", "radar_frame_age_s", "source", "observed_at", "recorded_at"},
 	},
+	{
+		TableName: "flood_verdict_history",
+		Columns:   []string{"camera_id", "flood_depth_cm", "flood_hazard_level", "flood_severity", "observed_at"},
+	},
 }
 
 // AssertSchemaReady verifies that all essential database tables and columns exist.

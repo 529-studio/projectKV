@@ -115,6 +115,39 @@ func (a *forecastHistoryAdapter) GetRecentByCameraBefore(ctx context.Context, ca
 	return obs, nil
 }
 
+// corridorFloodHistoryAdapter adapts *store.FloodHistoryRepo to corridor.FloodHistoryProvider
+// (Dependency Inversion Principle: consumer package corridor defines the interface,
+// composition root adapts the persistent store).
+type corridorFloodHistoryAdapter struct {
+	repo *store.FloodHistoryRepo
+}
+
+func (a *corridorFloodHistoryAdapter) GetRecentByCameraIDs(ctx context.Context, cameraIDs []string, start, end time.Time) ([]corridor.FloodHistoryObservation, error) {
+	if a == nil || a.repo == nil {
+		return nil, fmt.Errorf("flood history repo is nil")
+	}
+	rows, err := a.repo.GetRecentByCameraIDs(ctx, cameraIDs, start, end)
+	if err != nil {
+		return nil, err
+	}
+	obs := make([]corridor.FloodHistoryObservation, len(rows))
+	for i, r := range rows {
+		obs[i] = corridor.FloodHistoryObservation{
+			CameraID:     r.CameraID,
+			FloodDepthCm: r.FloodDepthCm,
+			ObservedAt:   r.ObservedAt,
+		}
+	}
+	return obs, nil
+}
+
+// corridorTidePredictorAdapter adapts tide.PredictTide to corridor.TidePredictor.
+type corridorTidePredictorAdapter struct{}
+
+func (a *corridorTidePredictorAdapter) PredictTide(station string, t time.Time) float64 {
+	return tide.PredictTide(station, t)
+}
+
 // forecastCameraAdapter adapts camera.Reader to forecast.CameraCatalog.
 type forecastCameraAdapter struct {
 	catalog camera.Reader
@@ -1176,6 +1209,7 @@ func initFloodPipeline(
 	weatherService *weather.Service,
 	floodChokepoints []flood.FloodChokepoint,
 	verdictRepo *store.VerdictRepo,
+	floodHistoryRepo *store.FloodHistoryRepo,
 	floodHexAggregator *live.FloodHexAggregator,
 	liveHub *live.Hub,
 	dispatchFloodAlert func(hotset.Verdict),
@@ -1215,6 +1249,27 @@ func initFloodPipeline(
 			}
 			if err := verdictRepo.Save(context.Background(), sv); err != nil {
 				log.Printf("[WARN] Failed to persist flood verdict for %s: %v", v.CameraID, err)
+			}
+		}
+		if floodHistoryRepo != nil {
+			observedAt := v.ObservedAt
+			if observedAt.IsZero() {
+				observedAt = v.Timestamp
+			}
+			if observedAt.IsZero() {
+				observedAt = time.Now().UTC()
+			}
+			rec := store.FloodHistoryRecord{
+				CameraID:             v.CameraID,
+				FloodDepthCm:         v.FloodDepthCm,
+				FloodHazardLevel:     v.FloodHazardLevel,
+				FloodSeverity:        v.FloodSeverity,
+				FloodDepthConfidence: v.FloodDepthConfidence,
+				FloodCalibrationRef:  v.FloodCalibrationRef,
+				ObservedAt:           observedAt,
+			}
+			if err := floodHistoryRepo.Record(context.Background(), rec); err != nil {
+				log.Printf("[WARN] Failed to persist flood verdict history for %s: %v", v.CameraID, err)
 			}
 		}
 		if floodHexAggregator != nil {
