@@ -239,10 +239,11 @@ func (s *Service) GetHistory(roadKey string, hours int) (*CorridorHistoryRespons
 		return nil, false
 	}
 
-	if hours <= 0 {
-		hours = 24
-	} else if hours > 72 {
-		hours = 72
+	validHours := hours
+	if validHours <= 0 {
+		validHours = 24
+	} else if validHours > 72 {
+		validHours = 72
 	}
 
 	station := "phu_an"
@@ -260,7 +261,7 @@ func (s *Service) GetHistory(roadKey string, hours int) (*CorridorHistoryRespons
 
 	now := s.nowFunc().UTC()
 	windowEnd := now.Truncate(time.Hour).Add(time.Hour)
-	windowStart := windowEnd.Add(-time.Duration(hours) * time.Hour)
+	windowStart := windowEnd.Add(-time.Duration(validHours) * time.Hour)
 
 	var observations []FloodHistoryObservation
 	if s.floodHistory != nil {
@@ -270,8 +271,8 @@ func (s *Service) GetHistory(roadKey string, hours int) (*CorridorHistoryRespons
 		}
 	}
 
-	timeline := make([]HourlyHistoryItem, hours)
-	for i := 0; i < hours; i++ {
+	timeline := make([]HourlyHistoryItem, 0, 72)
+	for i := 0; i < validHours; i++ {
 		bucketStart := windowStart.Add(time.Duration(i) * time.Hour)
 		bucketEnd := bucketStart.Add(time.Hour)
 
@@ -319,7 +320,7 @@ func (s *Service) GetHistory(roadKey string, hours int) (*CorridorHistoryRespons
 			hazard = "CAUTION"
 		}
 
-		timeline[i] = HourlyHistoryItem{
+		timeline = append(timeline, HourlyHistoryItem{
 			Time:           bucketStart,
 			HourLabel:      bucketStart.Format("15:04"),
 			AvgDepthCm:     avgDepth,
@@ -327,7 +328,7 @@ func (s *Service) GetHistory(roadKey string, hours int) (*CorridorHistoryRespons
 			TideLevelM:     tideLevel,
 			TideAlertLevel: tideAlert,
 			HazardLevel:    hazard,
-		}
+		})
 	}
 
 	var peakTideLevel float64 = -999.0
@@ -369,7 +370,7 @@ func (s *Service) GetHistory(roadKey string, hours int) (*CorridorHistoryRespons
 
 	return &CorridorHistoryResponse{
 		RoadKey:     target,
-		Hours:       hours,
+		Hours:       validHours,
 		Station:     station,
 		StationName: stationName,
 		Summary: HistorySummary{

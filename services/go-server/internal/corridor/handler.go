@@ -160,7 +160,7 @@ func (h *Handler) GetHistory(c *gin.Context) {
 	roadKey := c.Param("road_key")
 	hours := 24
 	if hStr := c.Query("hours"); hStr != "" {
-		if val, err := strconv.Atoi(hStr); err == nil {
+		if val, err := strconv.Atoi(hStr); err == nil && val >= 1 && val <= 72 {
 			hours = val
 		}
 	}
