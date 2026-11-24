@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Restore drill for the daily SQLite ``.backup`` archives.
+"""Restore drill for the daily SQLite ``VACUUM INTO`` archives.
 
 Production keeps one archive per day in ``r2:<bucket>/warded/``: the
-``warded-backup`` sidecar runs ``sqlite3 .backup`` (the SQLite online backup
-API, so a WAL database is snapshotted consistently), gzips the snapshot to
-``warded-YYYYMMDD.sqlite3.gz`` and uploads it with ``rclone``.
+``warded-backup`` sidecar runs ``sqlite3 ... "VACUUM INTO ..."`` (one
+consistent pass over a live database, so WAL frames are included), gzips the
+snapshot to ``warded-YYYYMMDD.sqlite3.gz`` and uploads it with ``rclone``.
 
 This tool proves that artifact can be restored:
 
 ``hermetic`` (no network, no credentials)
-    Builds a WAL-mode database, snapshots it through
-    ``sqlite3.Connection.backup()`` exactly like the sidecar, gzips the
-    snapshot, restores it into a sandbox and verifies integrity, row count, a
+    Builds a WAL-mode database, snapshots it with ``VACUUM INTO`` exactly like
+    the sidecar, gzips the snapshot, restores it into a sandbox and verifies
+    integrity, row count, a
     stable table checksum, and that every row committed before the snapshot is
     present while rows written afterwards are not.  Repeats ``--cycles`` times
     and measures restore wall time against the RTO budget.
@@ -281,7 +281,8 @@ def build_hermetic_archive(
 
     The source database runs in WAL mode with autocheckpoint disabled, so the
     committed rows live only in the ``-wal`` file when the snapshot is taken.
-    ``Connection.backup()`` still captures them; a raw ``cp`` would not.
+    ``VACUUM INTO`` reads one consistent snapshot and captures them; a raw
+    ``cp`` would not.
     """
     workdir.mkdir(parents=True, exist_ok=True)
     day = stamp or utc_now().strftime(ARCHIVE_DATE_FORMAT)
@@ -301,11 +302,7 @@ def build_hermetic_archive(
         if not Path(f"{source_path}-wal").is_file():
             raise DrillError("source database did not enter WAL mode")
 
-        target = sqlite3.connect(snapshot_path)
-        try:
-            connection.backup(target)
-        finally:
-            target.close()
+        connection.execute("VACUUM INTO ?", (str(snapshot_path),))
 
         # Written after the snapshot: these rows must not appear in the restore.
         _insert_rows(connection, rows + 1, rows + rows_after_snapshot)

@@ -2,7 +2,7 @@
 
 - **Issue:** #442 (S14-T2) as superseded by the Phase 3 two-site migration (2026-11-20)
 - **Applies to:** `docker-compose.stg.yml` (`warded-backup` sidecar), `r2:homelab-backup/warded/`
-- **Last verified:** 2026-11-20 (compose renders, validator and unit tests pass; no live restore executed yet)
+- **Last verified:** 2026-11-24 (compose renders, validator and unit tests pass; no live restore executed yet)
 
 ## 1. What this protects and what it does not
 
@@ -23,12 +23,21 @@ Out of scope: point-in-time recovery inside the RPO window, logical corruption
 introduced by the application, and R2 bucket or account deletion. This is a
 single daily archive in one bucket, not a second independent copy.
 
-Why a daily `.backup` replaced streaming WAL replication: continuous
+Why a daily snapshot replaced streaming WAL replication: continuous
 replication meant a constant Class A operation stream against R2 from a
-Celeron-class host, and it bought an RPO the product does not need. `sqlite3
-.backup` is WAL-safe: it snapshots through the SQLite backup API, so committed
-frames still sitting in the WAL are captured without a raw file copy that would
-race the writer. A 24 h RPO is the accepted trade.
+Celeron-class host, and it bought an RPO the product does not need. `VACUUM
+INTO` is WAL-safe: it reads one consistent snapshot, so committed frames still
+sitting in the WAL are captured without a raw file copy that would race the
+writer. A 24 h RPO is the accepted trade.
+
+Why `VACUUM INTO` and not `sqlite3 .backup`: the online backup API restarts a
+pass whenever the source is written while it copies. This database is written
+continuously, so on 2026-11-24 a 558 MB `.backup` restarted for four hours on
+the 5400 RPM disk, never converged and produced no archive, which is exactly
+the missing `warded-20261124.sqlite3.gz` the R2 watchdog reported. `VACUUM
+INTO` writes one compacted database in a single pass and cannot restart; the
+sidecar bounds it with `timeout 5400` so a future stall fails the night loudly
+instead of hanging until morning.
 
 ## 2. Topology
 
@@ -38,7 +47,7 @@ warded-backend (10001:10001)
           |
           v
 /app/data/camera-view.db  <-- same volume --  warded-backup
-  (+ -wal, -shm)                                sqlite3 .backup -> /backup
+  (+ -wal, -shm)                                sqlite3 VACUUM INTO -> /backup
                                                 gzip -> /backup/warded-YYYYMMDD.sqlite3.gz
                                                 rclone copyto
                                                       |
@@ -131,7 +140,7 @@ Three modes, standard library only:
 
 | Mode | What it does | Network |
 |---|---|---|
-| `hermetic` | Creates a WAL-mode SQLite database, snapshots it with the SQLite backup API exactly like the sidecar, gzips it, restores it in a sandbox, then checks `PRAGMA integrity_check`, row count, a table checksum and that every row committed before the snapshot is present. Run it with `make restore-drill RESTORE_DRILL_MODE=hermetic` | none |
+| `hermetic` | Creates a WAL-mode SQLite database, snapshots it with `VACUUM INTO` exactly like the sidecar, gzips it, restores it in a sandbox, then checks `PRAGMA integrity_check`, row count, a table checksum and that every row committed before the snapshot is present. Run it with `make restore-drill RESTORE_DRILL_MODE=hermetic` | none |
 | `live` | Lists `r2:<bucket>/warded/` with `rclone`, downloads the newest `warded-*.sqlite3.gz`, restores it and reports its age in hours | bucket read only |
 | `auto` (default) | Runs `live` when `rclone` is on `PATH` and `RCLONE_CONFIG_R2_*` is configured; otherwise prints `[INFO] live drill skipped: <reason>` and runs the hermetic drill, so the snapshot/restore path is still exercised | may read the bucket |
 
@@ -242,7 +251,7 @@ writing into a file you are about to swap.
 
 | Symptom | Cause | Action |
 |---|---|---|
-| `[ERR] sqlite3 .backup failed` | Volume owned by root, or the database is locked by an unresponsive writer | `docker compose run --rm warded-init-vol`; verify `ls -ldn /app/data` shows `10001 10001`; restart the backend |
+| `[ERR] sqlite3 VACUUM INTO failed or exceeded 5400s` | Volume owned by root, the destination file already exists, the database is locked by an unresponsive writer, or the 5400 s bound was hit | `docker compose run --rm warded-init-vol`; verify `ls -ldn /app/data` shows `10001 10001`; confirm `/backup` holds no stale `camera-view.db`; restart the backend |
 | `[ERR] rclone upload failed` | Missing or wrong `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`, endpoint typo, or an R2 outage | Check the keys in the stack environment; a correct endpoint always resolves under `r2.cloudflarestorage.com` |
 | `[ERR] apk add sqlite rclone tzdata failed` | No egress from the container, or the Alpine mirror is unreachable | Check the host DNS path; the sidecar retries every 300 s and never crash-loops |
 | Backup lands at the wrong hour | `TZ` not applied (missing tzdata in a custom image) | Keep tzdata in the install line; confirm the log line prints `Asia/Ho_Chi_Minh` |
