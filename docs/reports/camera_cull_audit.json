@@ -1,0 +1,1048 @@
+{
+  "timestamp": "2026-11-24T16:54:19.532407+00:00",
+  "dry_run": true,
+  "threshold_days": 14,
+  "min_corridor_coverage": 0.5,
+  "total_cameras": 837,
+  "previously_offline": 118,
+  "culled_count": 89,
+  "active_remaining": 719,
+  "protected_by_corridor_floor": 29,
+  "protected_cameras": [
+    {
+      "id": "587c79e9b807da0011e33d3d",
+      "display_name": "Điện Biên Phủ - Nguyễn Văn Thương 2",
+      "road_key": "nguyen_van_thuong",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "58b0084b17139d0010f35cd7",
+      "display_name": "Khu3 4",
+      "road_key": "khu3",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "5abbb9d598d8fc001102dfdd",
+      "display_name": "PMH 06",
+      "road_key": "pmh",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "5deb576d1dc17d7c5515ad0d",
+      "display_name": "Lê Lợi - Pasteur",
+      "road_key": "le_loi",
+      "reason": "status_not_image",
+      "projected_coverage": 0.33,
+      "threshold": 0.5
+    },
+    {
+      "id": "5abbb82598d8fc001102dfd1",
+      "display_name": "PMH 02",
+      "road_key": "pmh",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "58df4c2bdc195800111e04b7",
+      "display_name": "Thăng Long - Phan Thúc Duyện",
+      "road_key": "thang_long",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "5deb576d1dc17d7c5515ad12",
+      "display_name": "Nam Kỳ Khởi Nghĩa - Lê Lợi",
+      "road_key": "le_loi",
+      "reason": "status_not_image",
+      "projected_coverage": 0.33,
+      "threshold": 0.5
+    },
+    {
+      "id": "5abbb89698d8fc001102dfd4",
+      "display_name": "PMH 03",
+      "road_key": "pmh",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "595ddb493dcfc400106f28b6",
+      "display_name": "Quốc lộ 1 - Cầu vượt Tân Thới Hiệp 2",
+      "road_key": "cau_vuot_tan_thoi_hiep",
+      "reason": "status_not_image",
+      "projected_coverage": 0.33,
+      "threshold": 0.5
+    },
+    {
+      "id": "5abbb90798d8fc001102dfd7",
+      "display_name": "PMH 04",
+      "road_key": "pmh",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "58b54f5617139d0010f35d48",
+      "display_name": "Khu4 4",
+      "road_key": "khu4",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "58b54ec317139d0010f35d44",
+      "display_name": "Khu4 2",
+      "road_key": "khu4",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "68ede0cf230ee50017d04657",
+      "display_name": "Mỹ Phước Tân Vạn - Điện Biên Phủ (1)",
+      "road_key": "my_phuoc_tan_van",
+      "reason": "status_not_image",
+      "projected_coverage": 0.25,
+      "threshold": 0.5
+    },
+    {
+      "id": "5a8250cc5058170011f6eaba",
+      "display_name": "Lê Văn Việt - Đình Phong Phú 1",
+      "road_key": "dinh_phong_phu",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "58b54f1217139d0010f35d46",
+      "display_name": "Khu4 3",
+      "road_key": "khu4",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "58df50ffdc195800111e04c0",
+      "display_name": "Cộng Hòa - Thăng Long",
+      "road_key": "thang_long",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "56df857fc062921100c143e7",
+      "display_name": "Trần Quốc Hoàn - Phan Thúc Duyện",
+      "road_key": "phan_thuc_duyen",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "68ede438230ee50017d04a79",
+      "display_name": "Mỹ Phước Tân Vạn - ĐT 743A (1)",
+      "road_key": "my_phuoc_tan_van",
+      "reason": "status_not_image",
+      "projected_coverage": 0.25,
+      "threshold": 0.5
+    },
+    {
+      "id": "68ede112230ee50017d046a6",
+      "display_name": "Mỹ Phước Tân Vạn - Điện Biên Phủ (2)",
+      "road_key": "my_phuoc_tan_van",
+      "reason": "status_not_image",
+      "projected_coverage": 0.25,
+      "threshold": 0.5
+    },
+    {
+      "id": "5abbb98498d8fc001102dfda",
+      "display_name": "PMH 05",
+      "road_key": "pmh",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "68ede227230ee50017d0480b",
+      "display_name": "Mỹ Phước Tân Vạn - Thủ Khoa Huân (1)",
+      "road_key": "my_phuoc_tan_van",
+      "reason": "status_not_image",
+      "projected_coverage": 0.25,
+      "threshold": 0.5
+    },
+    {
+      "id": "68ede25b230ee50017d0484d",
+      "display_name": "Mỹ Phước Tân Vạn - Thủ Khoa Huân (2)",
+      "road_key": "my_phuoc_tan_van",
+      "reason": "status_not_image",
+      "projected_coverage": 0.25,
+      "threshold": 0.5
+    },
+    {
+      "id": "5a8251575058170011f6eabc",
+      "display_name": "Lê Văn Việt - Đình Phong Phú 2",
+      "road_key": "dinh_phong_phu",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "595ddc123dcfc400106f28ba",
+      "display_name": "Quốc lộ 1 - Cầu vượt Tân Thới Hiệp 1",
+      "road_key": "cau_vuot_tan_thoi_hiep",
+      "reason": "status_not_image",
+      "projected_coverage": 0.33,
+      "threshold": 0.5
+    },
+    {
+      "id": "68ede490230ee50017d04ae5",
+      "display_name": "Mỹ Phước Tân Vạn - ĐT 743A (2)",
+      "road_key": "my_phuoc_tan_van",
+      "reason": "status_not_image",
+      "projected_coverage": 0.25,
+      "threshold": 0.5
+    },
+    {
+      "id": "63b66008bfd3d90017eaa476",
+      "display_name": "Ung Văn Khiêm - Nguyễn Văn Thương (D1)",
+      "road_key": "nguyen_van_thuong",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "58b54e6917139d0010f35d42",
+      "display_name": "Khu4 1",
+      "road_key": "khu4",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "58b0087a17139d0010f35cd9",
+      "display_name": "Khu3 5",
+      "road_key": "khu3",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    },
+    {
+      "id": "56df85bdc062921100c143e8",
+      "display_name": "Phan Đình Giót - Phan Thúc Duyện",
+      "road_key": "phan_thuc_duyen",
+      "reason": "status_not_image",
+      "projected_coverage": 0.0,
+      "threshold": 0.5
+    }
+  ],
+  "culled_cameras": [
+    {
+      "id": "6623f44f6f998a001b2528aa",
+      "title": "TTH 299.1",
+      "display_name": "Võ Nguyên Giáp - Đỗ Xuân Hợp (1)",
+      "road_key": "vo_nguyen_giap",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5a605f828576340017d06608",
+      "title": "TTH 24.4",
+      "display_name": "Nguyễn Thái Sơn - Nguyễn Văn Nghi 1",
+      "road_key": "nguyen_thai_son",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "68188fe36dfb4b0018f90520",
+      "title": "TTH 457",
+      "display_name": "Trần Văn Giàu - đường Kênh 1",
+      "road_key": "tran_van_giau",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "58b571c817139d0010f35d5d",
+      "title": "TTH 34.11",
+      "display_name": "Nguyễn Văn Trỗi - Trần Huy Liệu",
+      "road_key": "nguyen_van_troi",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515ad00",
+      "title": "ITS 3.1",
+      "display_name": "Điện Biên Phủ - Hai Bà Trưng",
+      "road_key": "dien_bien_phu",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "595dc70d3dcfc400106f289a",
+      "title": "TTH 21.62",
+      "display_name": "Quốc lộ 1 - Ngã 4 Ga",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "595dd6093dcfc400106f28ad",
+      "title": "TTH 21.67",
+      "display_name": "Quốc lộ 1 - Cầu Bến Cát 2",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "6318287ec9eae60017a19f36",
+      "title": "TTH 176.2",
+      "display_name": "Nguyễn Thị Minh Khai - Đinh Tiên Hoàng 2",
+      "road_key": "nguyen_thi_minh_khai",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "681826506dfb4b0018f83e64",
+      "title": "TTH 422",
+      "display_name": "Mai Bá Hương - Kênh 3",
+      "road_key": "mai_ba_huong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "56df833ac062921100c143e1",
+      "title": "TTH 25.2",
+      "display_name": "Nguyễn Hữu Thọ - Nguyễn Thị Thập 2",
+      "road_key": "nguyen_huu_tho",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "595d98fc3dcfc400106f287b",
+      "title": "TTH 21.52",
+      "display_name": "Quốc lộ 1 - An Phú Đông 13 (2)",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "68a587d54e89b100173b6021",
+      "title": "TTH 460.1",
+      "display_name": "Tỉnh Lộ 8 - Tỉnh Lộ 15 (1)",
+      "road_key": "tinh_lo_8",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "63ae7b3cbfd3d90017e8f34d",
+      "title": "TTH 200.3",
+      "display_name": "Ba Tháng Hai - Lý Thường Kiệt 3",
+      "road_key": "ba_thang_hai",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5a8267fe5058170011f6eae1",
+      "title": "TTH 123.1",
+      "display_name": "Lê Văn Lương - Cầu Rạch Đĩa",
+      "road_key": "le_van_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b25a268f13cba001124e713",
+      "title": "TTH 130",
+      "display_name": "Nam Kỳ Khởi Nghĩa - Lê Thánh Tôn",
+      "road_key": "nam_ky_khoi_nghia",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "589aa984b3bf760011028389",
+      "title": "TTH-CV TTay 1.01",
+      "display_name": "TTH-CV TTay 1.01",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "589d0bceb3bf7600110283d6",
+      "title": "TTH 49.2",
+      "display_name": "Cầu Sài Gòn 2 (dạ cầu)",
+      "road_key": "cau_sai_gon",
+      "previous_status": "WATERWAY_MONITOR",
+      "previous_is_online": false,
+      "cull_reason": "marked_offline"
+    },
+    {
+      "id": "5d8cd253766c88001718893a",
+      "title": "TTH 139",
+      "display_name": "Nguyễn Tri Phương - Hùng Vương",
+      "road_key": "nguyen_tri_phuong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "589add0fb3bf7600110283ae",
+      "title": "TTH 46.2",
+      "display_name": "Tô Ký (Tỉnh lộ 15) - Đông Bắc",
+      "road_key": "to_ky",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "59ca2fa302eb490011a0a3fd",
+      "title": "IDICO-QL1 19",
+      "display_name": "QL1 - cầu Bình Thuận",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "58743d62b807da0011e33c8c",
+      "title": "TTH 8.1",
+      "display_name": "TTH 8.1",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5a6080bc8576340017d06673",
+      "title": "IDICO-QL1 09",
+      "display_name": "IDICO-QL1 09",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "58d7b3e8c1e33c00112b3207",
+      "title": "TTH 21.47",
+      "display_name": "Quốc lộ 1 - Nguyễn Văn Linh",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5a824b6c5058170011f6eaab",
+      "title": "TTH 104.1",
+      "display_name": "Nút giao Bốn Xã 3 (Lê Văn Quới)",
+      "road_key": "nut_giao_bon_xa",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "58175ac4edeb6c0012a2d5bb",
+      "title": "TTH 3.1",
+      "display_name": "Mai Chí Thọ - Đồng Văn Cống 1",
+      "road_key": "mai_chi_tho",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "589aa7edb3bf760011028386",
+      "title": "TTH-CV Calm 1.01",
+      "display_name": "TTH-CV Calm 1.01",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "595d9ba43dcfc400106f2880",
+      "title": "TTH 21.54",
+      "display_name": "Quốc lộ 1 - An Phú Đông 12 (2)",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "595dd9ac3dcfc400106f28b4",
+      "title": "TTH 21.70",
+      "display_name": "Quốc lộ 1 - BQB Trước UBND Q12 (hướng đi An Sương)",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5a8259035058170011f6eacf",
+      "title": "TTH 117.1",
+      "display_name": "Nguyễn Văn Linh - Nguyễn Hữu Thọ (1)",
+      "road_key": "nguyen_van_linh",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b6c15b8ca0577001163fe39",
+      "title": "TTH 135.2",
+      "display_name": "Nguyễn Hữu Cảnh 3 (Hầm chui)",
+      "road_key": "nguyen_huu_canh",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "595dd3a63dcfc400106f28a7",
+      "title": "TTH 21.64",
+      "display_name": "Quốc lộ 1 - Đường Tô Ngọc Vân 1",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "662b5afe1afb9c00172d9284",
+      "title": "TTH 366.2",
+      "display_name": "Trường Chinh - Phan Huy Ích 2",
+      "road_key": "truong_chinh",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "589b4379b3bf7600110283c9",
+      "title": "TTH 47.5",
+      "display_name": "QL 22 - Giáp Hải",
+      "road_key": "quoc_lo_22",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "662a8e121afb9c00172d2a3f",
+      "title": "TTH 323.2",
+      "display_name": "Huỳnh Tấn Phát - cầu Tân Thuận 1",
+      "road_key": "huynh_tan_phat",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "58743f9bb807da0011e33c95",
+      "title": "TTH 12.2",
+      "display_name": "TTH 12.2",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b728aafca0577001163ff7e",
+      "title": "TTH 136",
+      "display_name": "Hồng Bàng - Châu Văn Liêm",
+      "road_key": "hong_bang",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "58743f02b807da0011e33c92",
+      "title": "TTH 11.2",
+      "display_name": "TTH 11.2",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "58743cc5b807da0011e33c8a",
+      "title": "TTH 7.3",
+      "display_name": "TTH 7.3",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "662b57ec1afb9c00172d90e3",
+      "title": "TTH 359",
+      "display_name": "Cộng Hòa - Hoàng Hoa Thám",
+      "road_key": "cong_hoa",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "62da3e620637a10017d70720",
+      "title": "TTH 268.2",
+      "display_name": "Quốc Lộ 13 - Đinh Thị Thi 2",
+      "road_key": "quoc_lo_13",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b0b7e1c0e517b00119fd80b",
+      "title": "TTH 127",
+      "display_name": "Nguyễn Duy Trinh (Chợ Long Trường)",
+      "road_key": "nguyen_duy_trinh",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5d8cd3b7766c880017188942",
+      "title": "TTH 143",
+      "display_name": "Lê Hồng Phong - Nguyễn Trãi",
+      "road_key": "le_hong_phong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5d8cdac3766c880017188962",
+      "title": "TTH 159",
+      "display_name": "Trường Chinh - Đồng Đen",
+      "road_key": "truong_chinh",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "584e71cb61cfea0012cf694b",
+      "title": "TTH 21.36",
+      "display_name": "Quốc lộ 1 - KCN Vĩnh Lộc 3",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515acf4",
+      "title": "ITS 1.3-1",
+      "display_name": "Nút giao Ngã bảy Lý Thái Tổ",
+      "road_key": "nut_giao_nga_bay_ly_thai_to",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5a6085188576340017d06682",
+      "title": "IDICO-QL1 26",
+      "display_name": "QL1-Tỉnh lộ 10 (2)",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "58d8ebd2dc195800111e0429",
+      "title": "TTH 1.4",
+      "display_name": "Cao tốc LTDG - Cầu Bà Dạt 2",
+      "road_key": "cao_toc_long_thanh_dau_giay",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b6006dafd4edb0019c7db29",
+      "title": "TTH 103.3",
+      "display_name": "TTH 103.3",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b0b74280e517b00119fd7f9",
+      "title": "TTH 120",
+      "display_name": "Nguyễn Tất Thành - Cảng Sài Gòn",
+      "road_key": "nguyen_tat_thanh",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5bbc7163ca0577001164127f",
+      "title": "TTH 137",
+      "display_name": "Lê Văn Lương - Cầu Long Kiểng (HCM)",
+      "road_key": "le_van_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "595dd4133dcfc400106f28a9",
+      "title": "TTH 21.65",
+      "display_name": "Quốc lộ 1 - Đường Tô Ngọc Vân 2",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5d8cd7bb766c880017188952",
+      "title": "TTH 151",
+      "display_name": "Phạm Văn Đồng - Đường 20 (hướng đi Thủ Đức)",
+      "road_key": "pham_van_dong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5d8cd49f766c880017188944",
+      "title": "TTH 144",
+      "display_name": "Nguyễn Tri Phương - Nguyễn Trãi",
+      "road_key": "nguyen_tri_phuong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515acf3",
+      "title": "ITS 1.2",
+      "display_name": "Ba Tháng Hai - Lý Thái Tổ",
+      "road_key": "ba_thang_hai",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515ad1b",
+      "title": "ITS 9.1",
+      "display_name": "Hoàng Diệu - Cầu Ông Lãnh",
+      "road_key": "hoang_dieu",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "56df8416c062921100c143e4",
+      "title": "TTH 24.3",
+      "display_name": "Nút giao Nguyễn Thái Sơn 2 (Nguyễn Kiệm)",
+      "road_key": "nut_giao_nguyen_thai_son",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "665861d864f11e00173c73a9",
+      "title": "TTH 309",
+      "display_name": "Huỳnh Tấn Phát - Cầu Tân Thuận 1",
+      "road_key": "huynh_tan_phat",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "58b57a6c17139d0010f35d65",
+      "title": "TTH 33.5",
+      "display_name": "Xa Lộ Hà Nội - Đường D13",
+      "road_key": "xa_lo_ha_noi",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "587478d8b807da0011e33cf3",
+      "title": "TTH 28.1",
+      "display_name": "Nút giao Bảy Hiền 1 (Cách Mạng Tháng Tám)",
+      "road_key": "nut_giao_bay_hien",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b600777fd4edb0019c7db2c",
+      "title": "TTH 103.4",
+      "display_name": "TTH 103.4",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "59ca2ecb02eb490011a0a3f6",
+      "title": "IDICO-QL1 15",
+      "display_name": "QL1 - Trạm thu phí AS-AL 1",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "589b3705b3bf7600110283bd",
+      "title": "TTH 47.1",
+      "display_name": "QL 22 - Nguyễn Ảnh Thủ 1",
+      "road_key": "quoc_lo_22",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5a60873e8576340017d0668d",
+      "title": "IDICO-QL1 31",
+      "display_name": "IDICO-QL1 31",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515acf7",
+      "title": "ITS 1.4-2",
+      "display_name": "Nút giao Ngã sáu Cộng Hòa",
+      "road_key": "nut_giao_nga_sau_cong_hoa",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "56de42f611f398ec0c48129e",
+      "title": "TTH 22.1",
+      "display_name": "Đồng Văn Cống - Phan Văn Đáng",
+      "road_key": "dong_van_cong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5d8cd372766c880017188940",
+      "title": "TTH 142",
+      "display_name": "Nút giao Cây Gõ 2 (Minh Phụng)",
+      "road_key": "nut_giao_cay_go",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "587440c6b807da0011e33c98",
+      "title": "TTH 13.3",
+      "display_name": "TTH 13.3",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "59d3524f02eb490011a0a61b",
+      "title": "TTH 33.9",
+      "display_name": "Cầu vượt Trạm 2 (TĐ ->Q9)",
+      "road_key": "cau_vuot_tram_2_td",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b19d2f9af4ff60011d6ea4f",
+      "title": "TTH 120.1",
+      "display_name": "Nguyễn Tất Thành - Xóm Chiếu",
+      "road_key": "nguyen_tat_thanh",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "595f91653dcfc400106f28f6",
+      "title": "TTH 21.81",
+      "display_name": "Quốc lộ 1 - Cầu vượt An Sương (Song hành QL 22)",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "58744157b807da0011e33c9a",
+      "title": "TTH 14.3",
+      "display_name": "TTH 14.3",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5d9dde8e766c880017188c9a",
+      "title": "TTH 172",
+      "display_name": "Nút giao Hàng Xanh 4 (Cầu Văn Thánh - Hàng Xanh)",
+      "road_key": "nut_giao_hang_xanh_4_cau_van_thanh",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "57e8994d5b5dd00012e90a0a",
+      "title": "CNTP",
+      "display_name": "CNTP",
+      "road_key": "cntp",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5a6084208576340017d0667e",
+      "title": "IDICO-QL1 23",
+      "display_name": "QL1 - Tân Tạo Chợ Đệm 2",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "586e20a0f9fab7001111b0a7",
+      "title": "TTH 39.1",
+      "display_name": "Nguyễn Kiệm - Hồ Văn Huê",
+      "road_key": "nguyen_kiem",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "56de42f611f398ec0c481294",
+      "title": "TTH 14.2",
+      "display_name": "Đường hầm - Đầu Quận 1",
+      "road_key": "ham",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5ad068b198d8fc001102e278",
+      "title": "TTH 118.1",
+      "display_name": "Quốc lộ 50 - Cầu Ông Thìn (1)",
+      "road_key": "quoc_lo_50",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b25a1dcf13cba001124e710",
+      "title": "TTH 129",
+      "display_name": "Lý Tự Trọng - Pasteur 1",
+      "road_key": "ly_tu_trong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "589b46b3b3bf7600110283d0",
+      "title": "TTH 48.2",
+      "display_name": "Hà Huy Giáp - Cầu Phú Long 2",
+      "road_key": "ha_huy_giap",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b0b7d240e517b00119fd809",
+      "title": "TTH 104.4",
+      "display_name": "Hương Lộ 2 (Số 878)",
+      "road_key": "huong_lo_2",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5deb576d1dc17d7c5515ad1d",
+      "title": "ITS 9.4",
+      "display_name": "Nguyễn Công Trứ - Calmette 2",
+      "road_key": "nguyen_cong_tru",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b6c155aca0577001163fe36",
+      "title": "TTH 135.1",
+      "display_name": "Nguyễn Hữu Cảnh 1 (Dạ cầu)",
+      "road_key": "nguyen_huu_canh",
+      "previous_status": "WATERWAY_MONITOR",
+      "previous_is_online": false,
+      "cull_reason": "marked_offline"
+    },
+    {
+      "id": "59d3504502eb490011a0a619",
+      "title": "TTH 33.8",
+      "display_name": "TTH 33.8",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "63b65fa9bfd3d90017eaa449",
+      "title": "TTH 236",
+      "display_name": "Xô Viết Nghệ Tĩnh - Nguyễn Văn Lạc",
+      "road_key": "xo_viet_nghe_tinh",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5d8cd1f9766c880017188938",
+      "title": "TTH 138",
+      "display_name": "Nguyễn Tri Phương - Trần Phú",
+      "road_key": "nguyen_tri_phuong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5a607ea98576340017d0666d",
+      "title": "IDICO-QL1 06",
+      "display_name": "QL1-Phan Văn Hớn (Q12)",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "59ca2e6002eb490011a0a3f3",
+      "title": "IDICO-QL1 13",
+      "display_name": "QL1 - TTDK 50-07V",
+      "road_key": "quoc_lo_1",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    },
+    {
+      "id": "5b6c1618ca0577001163fe3c",
+      "title": "TTH 135.3",
+      "display_name": "Nguyễn Hữu Cảnh 2 (Chân cầu)",
+      "road_key": "nguyen_huu_canh",
+      "previous_status": "WATERWAY_MONITOR",
+      "previous_is_online": false,
+      "cull_reason": "marked_offline"
+    },
+    {
+      "id": "591c6d3ba6bfb500119400ac",
+      "title": "TTH 48.12",
+      "display_name": "TTH 48.12",
+      "road_key": "cao_toc_trung_luong",
+      "previous_status": "NOT_IMAGE",
+      "previous_is_online": false,
+      "cull_reason": "status_not_image"
+    }
+  ]
+}
