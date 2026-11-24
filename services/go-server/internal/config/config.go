@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -26,6 +28,7 @@ type Config struct {
 	SQLitePath                    string
 	DedupeCooldownMinutes         int
 	LogLevel                      string
+	AppEnv                        string
 	StorageDriver                 string
 	StorageLocalRoot              string
 	R2AccountID                   string
@@ -59,6 +62,7 @@ type Config struct {
 	VAPIDSubject                  string
 	MetricsAuthToken              string
 	MetricsAllowedCIDRs           []string
+	TrustedProxies                []string
 }
 
 // CleanEnv returns the environment variable value with surrounding whitespace and quotes (`"`, `'`) stripped.
@@ -238,6 +242,39 @@ var DefaultAllowedOrigins = []string{
 	"https://warded-stg.529studio.site",
 }
 
+// ValidateCORSOrigins validates that allowed origins satisfy production security constraints.
+func ValidateCORSOrigins(origins []string, appEnv string) error {
+	if appEnv != "production" {
+		return nil
+	}
+
+	if len(origins) == 0 {
+		return errors.New("production requires explicit CORS_ALLOWED_ORIGINS; cannot be empty")
+	}
+
+	for _, o := range origins {
+		trimmed := strings.TrimSpace(o)
+		if trimmed == "" {
+			continue
+		}
+		if trimmed == "*" {
+			return errors.New("production CORS rejects wildcard '*' origin")
+		}
+		u, err := url.Parse(trimmed)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return fmt.Errorf("invalid CORS origin format %q: must include scheme (http/https) and host", o)
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return fmt.Errorf("invalid CORS origin scheme %q: must be http or https", u.Scheme)
+		}
+		hostname := strings.ToLower(u.Hostname())
+		if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" || hostname == "0.0.0.0" {
+			return fmt.Errorf("production CORS rejects loopback/localhost origin %q", o)
+		}
+	}
+	return nil
+}
+
 // parseEnvStringSlice reads a comma-separated string environment variable, trimming whitespace.
 func parseEnvStringSlice(key string, fallback []string) []string {
 	val := CleanEnv(key)
@@ -319,6 +356,7 @@ func LoadFromEnv() (*Config, error) {
 		SQLitePath:                    parseEnvString("SQLITE_PATH", "./data/camera-view.db"),
 		DedupeCooldownMinutes:         parseEnvInt("DEDUPE_COOLDOWN_MINUTES", 15, 1),
 		LogLevel:                      parseEnvString("LOG_LEVEL", "info"),
+		AppEnv:                        parseEnvString("APP_ENV", "dev"),
 		StorageDriver:                 parseEnvString("STORAGE_DRIVER", "local"),
 		StorageLocalRoot:              parseEnvString("STORAGE_LOCAL_ROOT", "./data/proofs"),
 		R2AccountID:                   parseEnvString("R2_ACCOUNT_ID", ""),
@@ -366,7 +404,24 @@ func LoadFromEnv() (*Config, error) {
 	cfg.MetricsAuthToken = parseEnvString("METRICS_AUTH_TOKEN", cfg.DevAccessToken)
 	cfg.MetricsAllowedCIDRs = parseEnvStringSlice("METRICS_ALLOWED_CIDRS", nil)
 
-	cfg.AllowedOrigins = parseEnvStringSlice("ALLOWED_ORIGINS", DefaultAllowedOrigins)
+	corsOrigins := parseEnvStringSlice("CORS_ALLOWED_ORIGINS", nil)
+	if len(corsOrigins) == 0 {
+		corsOrigins = parseEnvStringSlice("ALLOWED_ORIGINS", nil)
+	}
+	if cfg.AppEnv == "production" {
+		if err := ValidateCORSOrigins(corsOrigins, cfg.AppEnv); err != nil {
+			errs = append(errs, fmt.Errorf("production CORS configuration error: %w", err))
+		}
+	} else if len(corsOrigins) == 0 {
+		corsOrigins = DefaultAllowedOrigins
+	}
+	cfg.AllowedOrigins = corsOrigins
+
+	trustedProxies := parseEnvStringSlice("TRUSTED_PROXIES", nil)
+	if len(trustedProxies) == 0 {
+		trustedProxies = []string{"127.0.0.1", "::1"}
+	}
+	cfg.TrustedProxies = trustedProxies
 	cfg.CFAccessAudience = parseEnvString("CF_ACCESS_AUDIENCE", "")
 	cfTeamDomain := parseEnvString("CF_ACCESS_TEAM_DOMAIN", "")
 	if cfTeamDomain == "" {
@@ -453,6 +508,7 @@ type ServerConfig struct {
 	VAPIDSubject                  string
 	MetricsAuthToken              string
 	MetricsAllowedCIDRs           []string
+	TrustedProxies                []string
 }
 
 // ResolvePath checks common relative paths to support running either from root or from services/go-server.
@@ -527,7 +583,23 @@ func LoadConfig() *ServerConfig {
 	metricsAuthToken := parseEnvString("METRICS_AUTH_TOKEN", devAccessToken)
 	metricsAllowedCIDRs := parseEnvStringSlice("METRICS_ALLOWED_CIDRS", nil)
 
-	allowedOrigins := parseEnvStringSlice("ALLOWED_ORIGINS", DefaultAllowedOrigins)
+	corsOrigins := parseEnvStringSlice("CORS_ALLOWED_ORIGINS", nil)
+	if len(corsOrigins) == 0 {
+		corsOrigins = parseEnvStringSlice("ALLOWED_ORIGINS", nil)
+	}
+	if appEnv == "production" {
+		if err := ValidateCORSOrigins(corsOrigins, appEnv); err != nil {
+			log.Fatalf("[FATAL] Invalid production CORS configuration: %v", err)
+		}
+	} else if len(corsOrigins) == 0 {
+		corsOrigins = DefaultAllowedOrigins
+	}
+	allowedOrigins := corsOrigins
+
+	trustedProxies := parseEnvStringSlice("TRUSTED_PROXIES", nil)
+	if len(trustedProxies) == 0 {
+		trustedProxies = []string{"127.0.0.1", "::1"}
+	}
 	cfAccessAudience := parseEnvString("CF_ACCESS_AUDIENCE", "")
 	cfTeamDomain := parseEnvString("CF_ACCESS_TEAM_DOMAIN", "")
 	if cfTeamDomain == "" {
@@ -692,5 +764,6 @@ func LoadConfig() *ServerConfig {
 		VAPIDSubject:                  vapidSubject,
 		MetricsAuthToken:              metricsAuthToken,
 		MetricsAllowedCIDRs:           metricsAllowedCIDRs,
+		TrustedProxies:                trustedProxies,
 	}
 }

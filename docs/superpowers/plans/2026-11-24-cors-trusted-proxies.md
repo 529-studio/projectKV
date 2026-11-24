@@ -1,0 +1,25 @@
+# Implementation Plan: Production CORS Gating and Trusted Proxy Hardening
+
+- [ ] 1. Update `services/go-server/internal/middleware/cors.go`:
+  - [ ] Add `CORSConfig` struct (`AllowedOrigins []string`, `AppEnv string`).
+  - [ ] Implement `ValidateCORSOrigins(origins []string, appEnv string) error`.
+  - [ ] Implement `CORSMiddlewareWithConfig(cfg CORSConfig) gin.HandlerFunc`.
+  - [ ] Update `CORSMiddleware(allowedOrigins ...string)` to call `CORSMiddlewareWithConfig(CORSConfig{AllowedOrigins: allowedOrigins, AppEnv: "dev"})`.
+- [ ] 2. Update `services/go-server/internal/config/config.go`:
+  - [ ] Add `TrustedProxies []string` to `Config` and `ServerConfig`.
+  - [ ] Support `CORS_ALLOWED_ORIGINS` with fallback to `ALLOWED_ORIGINS`.
+  - [ ] Support `TRUSTED_PROXIES` with default to loopback `[]string{"127.0.0.1", "::1"}`.
+  - [ ] In `LoadFromEnv()`, validate CORS origins if `AppEnv == "production"` using `ValidateCORSOrigins`.
+  - [ ] In `LoadConfig()`, validate CORS origins if `AppEnv == "production"` and fail fast on error.
+- [ ] 3. Update `services/go-server/cmd/server/routes.go`:
+  - [ ] Call `router.SetTrustedProxies(cfg.TrustedProxies)`.
+  - [ ] Pass `middleware.CORSConfig{AllowedOrigins: cfg.AllowedOrigins, AppEnv: cfg.AppEnv}` to `CORSMiddlewareWithConfig`.
+- [ ] 4. Unit & Integration Tests:
+  - [ ] Add `TestValidateCORSOrigins` in `cors_test.go`.
+  - [ ] Add `TestCORSMiddleware_Production_RejectsUntrustedPreflight` in `cors_test.go`.
+  - [ ] Add `TestCORSMiddleware_Production_NoWildcardForEmptyOrigin` in `cors_test.go`.
+  - [ ] Add `TestServer_TrustedProxy_SpoofedXForwardedForBlocked` in `abuse_guard_test.go`.
+  - [ ] Update existing `APP_ENV=production` tests to supply `CORS_ALLOWED_ORIGINS=https://warded.529studio.site`.
+- [ ] 5. Run verification suite (`make test-go`, `make build-go`, `make docs-lint`, `make evidence-lint`, `make test-model`).
+- [ ] 6. Document lesson in `docs/lessons/530-cors-and-trusted-proxies.md`.
+- [ ] 7. Commit, push branch `feat/530-cors-and-trusted-proxies`, create PR targeting `dev`, watch CI until 100% green.

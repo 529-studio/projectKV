@@ -981,6 +981,78 @@ func TestLoadConfig_AllowedOrigins_Custom(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_CORSAllowedOrigins_Precedence(t *testing.T) {
+	_ = os.Setenv("CORS_ALLOWED_ORIGINS", "https://cors-precedence.529studio.site")
+	_ = os.Setenv("ALLOWED_ORIGINS", "https://ignored.529studio.site")
+	defer func() {
+		_ = os.Unsetenv("CORS_ALLOWED_ORIGINS")
+		_ = os.Unsetenv("ALLOWED_ORIGINS")
+	}()
+
+	cfg := config.LoadConfig()
+	if len(cfg.AllowedOrigins) != 1 || cfg.AllowedOrigins[0] != "https://cors-precedence.529studio.site" {
+		t.Fatalf("expected CORS_ALLOWED_ORIGINS to take precedence, got %v", cfg.AllowedOrigins)
+	}
+}
+
+func TestLoadConfig_TrustedProxies_DefaultAndCustom(t *testing.T) {
+	_ = os.Unsetenv("TRUSTED_PROXIES")
+	cfgDef := config.LoadConfig()
+	if len(cfgDef.TrustedProxies) != 2 || cfgDef.TrustedProxies[0] != "127.0.0.1" || cfgDef.TrustedProxies[1] != "::1" {
+		t.Fatalf("expected default loopback trusted proxies, got %v", cfgDef.TrustedProxies)
+	}
+
+	_ = os.Setenv("TRUSTED_PROXIES", "10.0.0.0/8, 172.16.0.0/12")
+	defer func() {
+		_ = os.Unsetenv("TRUSTED_PROXIES")
+	}()
+	cfgCustom := config.LoadConfig()
+	if len(cfgCustom.TrustedProxies) != 2 || cfgCustom.TrustedProxies[0] != "10.0.0.0/8" || cfgCustom.TrustedProxies[1] != "172.16.0.0/12" {
+		t.Fatalf("expected custom trusted proxies, got %v", cfgCustom.TrustedProxies)
+	}
+}
+
+func TestLoadFromEnv_ProductionCORSValidation(t *testing.T) {
+	_ = os.Setenv("APP_ENV", "production")
+	_ = os.Setenv("SNAPSHOT_UPSTREAM_BASE_URL", "http://example.com/snapshot")
+	_ = os.Unsetenv("CORS_ALLOWED_ORIGINS")
+	_ = os.Unsetenv("ALLOWED_ORIGINS")
+	defer func() {
+		_ = os.Unsetenv("APP_ENV")
+		_ = os.Unsetenv("SNAPSHOT_UPSTREAM_BASE_URL")
+	}()
+
+	// 1. Missing CORS origins in production returns error
+	_, err := config.LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected error for missing CORS origins in production, got nil")
+	}
+
+	// 2. Wildcard origin in production returns error
+	_ = os.Setenv("CORS_ALLOWED_ORIGINS", "*")
+	_, err = config.LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected error for wildcard CORS origin in production, got nil")
+	}
+
+	// 3. Localhost origin in production returns error
+	_ = os.Setenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+	_, err = config.LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected error for localhost CORS origin in production, got nil")
+	}
+
+	// 4. Valid origin in production succeeds
+	_ = os.Setenv("CORS_ALLOWED_ORIGINS", "https://warded.529studio.site")
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		t.Fatalf("expected valid CORS origin in production to pass, got error: %v", err)
+	}
+	if len(cfg.AllowedOrigins) != 1 || cfg.AllowedOrigins[0] != "https://warded.529studio.site" {
+		t.Fatalf("expected https://warded.529studio.site, got %v", cfg.AllowedOrigins)
+	}
+}
+
 func TestLoadConfig_CFAccess_Config(t *testing.T) {
 	_ = os.Setenv("CF_ACCESS_AUDIENCE", "test-aud-123")
 	_ = os.Setenv("CF_ACCESS_TEAM_NAME", "myteam")

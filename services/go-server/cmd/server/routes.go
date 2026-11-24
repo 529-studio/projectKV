@@ -67,8 +67,16 @@ type routerConfig struct {
 func setupRouter(p routerConfig) *gin.Engine {
 	cfg := p.cfg
 	router := gin.Default()
+	if len(cfg.TrustedProxies) > 0 {
+		_ = router.SetTrustedProxies(cfg.TrustedProxies)
+	} else {
+		_ = router.SetTrustedProxies(nil)
+	}
 	router.Use(middleware.SecurityHeaders())
-	router.Use(middleware.CORSMiddleware(cfg.AllowedOrigins...))
+	router.Use(middleware.CORSMiddlewareWithConfig(middleware.CORSConfig{
+		AllowedOrigins: cfg.AllowedOrigins,
+		AppEnv:         cfg.AppEnv,
+	}))
 	router.Use(gzip.Gzip(gzip.DefaultCompression,
 		gzip.WithExcludedPaths([]string{"/api/snapshot", "/api/cameras/snapshot", "/api/live/stream", "/ws"}),
 	))

@@ -36,6 +36,7 @@ func TestStartup_RefusesMockOutsideDev(t *testing.T) {
 	cmd.Env = append(cmd.Environ(),
 		"ANALYZER=mock",
 		"APP_ENV=production",
+		"CORS_ALLOWED_ORIGINS=https://warded.529studio.site",
 		"CAMERAS_FILE_PATH="+absCameras,
 	)
 
@@ -47,6 +48,58 @@ func TestStartup_RefusesMockOutsideDev(t *testing.T) {
 	outStr := string(out)
 	if !strings.Contains(outStr, "strictly forbidden") && !strings.Contains(outStr, "Refusing to start") {
 		t.Errorf("expected fatal error message about mock in non-dev, got output:\n%s", outStr)
+	}
+}
+
+func TestStartup_ProductionRequiresValidCORS(t *testing.T) {
+	absCameras, err := filepath.Abs("../../../../cameras_enriched.json")
+	if err != nil {
+		t.Fatalf("resolve cameras path: %v", err)
+	}
+
+	testCases := []struct {
+		name        string
+		corsOrigins string
+		wantSub     string
+	}{
+		{
+			name:        "missing origins",
+			corsOrigins: "",
+			wantSub:     "cannot be empty",
+		},
+		{
+			name:        "wildcard origin",
+			corsOrigins: "*",
+			wantSub:     "rejects wildcard",
+		},
+		{
+			name:        "localhost origin",
+			corsOrigins: "http://localhost:3000",
+			wantSub:     "rejects loopback/localhost",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := exec.Command("go", "run", ".")
+			cmd.Dir = "."
+			cmd.Env = append(cmd.Environ(),
+				"ANALYZER=none",
+				"APP_ENV=production",
+				"CAMERAS_FILE_PATH="+absCameras,
+			)
+			if tc.corsOrigins != "" {
+				cmd.Env = append(cmd.Env, "CORS_ALLOWED_ORIGINS="+tc.corsOrigins)
+			}
+
+			out, err := cmd.CombinedOutput()
+			if err == nil {
+				t.Fatalf("expected server startup to fail in production with CORS %q, but succeeded: %s", tc.corsOrigins, string(out))
+			}
+			if !strings.Contains(string(out), tc.wantSub) {
+				t.Errorf("expected fatal error containing %q, got output:\n%s", tc.wantSub, string(out))
+			}
+		})
 	}
 }
 
@@ -66,6 +119,7 @@ func TestStartup_AnalyzerNone_EmptyVerdictsAndNoSSE(t *testing.T) {
 		"PORT="+port,
 		"ANALYZER=none",
 		"APP_ENV=production",
+		"CORS_ALLOWED_ORIGINS=https://warded.529studio.site",
 		"CAMERAS_FILE_PATH="+absCameras,
 		"SQLITE_PATH=:memory:",
 	)
@@ -263,6 +317,7 @@ func TestStartup_CatalogGzipCompressionAndCachingHeaders(t *testing.T) {
 		"PORT="+port,
 		"ANALYZER=none",
 		"APP_ENV=production",
+		"CORS_ALLOWED_ORIGINS=https://warded.529studio.site",
 		"CAMERAS_FILE_PATH="+absCameras,
 		"SQLITE_PATH=:memory:",
 	)
@@ -467,6 +522,7 @@ func TestStartup_StaticWebServing_NextJSExportAndPurgedVanillaJS(t *testing.T) {
 		"PORT="+port,
 		"ANALYZER=none",
 		"APP_ENV=production",
+		"CORS_ALLOWED_ORIGINS=https://warded.529studio.site",
 		"CAMERAS_FILE_PATH="+absCameras,
 		"SQLITE_PATH=:memory:",
 		"STATIC_WEB_DIR="+tmpStaticDir,
