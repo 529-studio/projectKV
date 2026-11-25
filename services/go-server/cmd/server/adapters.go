@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"sort"
@@ -1237,16 +1238,14 @@ func makeFloodAlertDispatcher(
 	camCatalog *camera.Catalog,
 	chokepointMap map[string]flood.FloodChokepoint,
 	notifyManager *notify.Manager,
+	corridorService *corridor.Service,
 ) func(v hotset.Verdict) {
 	return func(v hotset.Verdict) {
-		if !notify.IsFloodSeverity(v.FloodSeverity) {
-			return
-		}
-
 		camName := v.CameraID
 		zone := ""
 		ward := ""
 		snapshotURL := ""
+		roadKey := ""
 		if camCatalog != nil {
 			if cam, ok := camCatalog.ByID(v.CameraID); ok {
 				if cam.DisplayName != "" {
@@ -1257,6 +1256,7 @@ func makeFloodAlertDispatcher(
 				zone = cam.Zone
 				ward = cam.PhuongName
 				snapshotURL = cam.SnapshotURL
+				roadKey = cam.RoadKey
 			}
 		}
 
@@ -1268,6 +1268,9 @@ func makeFloodAlertDispatcher(
 		obs := v.ObservedAt
 		if obs.IsZero() {
 			obs = v.Timestamp
+		}
+		if obs.IsZero() {
+			obs = time.Now()
 		}
 
 		alert := notify.BuildFloodAlert(
@@ -1284,8 +1287,32 @@ func makeFloodAlertDispatcher(
 		go func() {
 			dispatchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			if err := notifyManager.Dispatch(dispatchCtx, alert); err != nil {
-				log.Printf("[WARN] Failed to dispatch flood alert for %s: %v", v.CameraID, err)
+			if notifyManager != nil {
+				if err := notifyManager.Dispatch(dispatchCtx, alert); err != nil {
+					log.Printf("[WARN] Failed to dispatch flood alert for %s: %v", v.CameraID, err)
+				}
+
+				if corridorService != nil && roadKey != "" {
+					if summary, ok := corridorService.GetCorridorRouteSummary(roadKey); ok && summary != nil {
+						var delayMin int
+						if summary.DelaySeconds > 0 {
+							delayMin = int(math.Ceil(float64(summary.DelaySeconds) / 60.0))
+						}
+						corridorAlert := notify.CorridorAlert{
+							RoadKey:            summary.RoadKey,
+							RoadName:           summary.DisplayName,
+							Passability:        string(summary.PassabilityVerdict),
+							WorstFloodSeverity: summary.WorstFloodSeverity,
+							MaxDepthCm:         summary.MaxDepthCm,
+							EstimatedDelayMin:  delayMin,
+							ObservedAt:         obs,
+							RouteWebURL:        fmt.Sprintf("/roads/%s", summary.RoadKey),
+						}
+						if err := notifyManager.DispatchCorridor(dispatchCtx, corridorAlert); err != nil {
+							log.Printf("[WARN] Failed to dispatch corridor alert for %s: %v", roadKey, err)
+						}
+					}
+				}
 			}
 		}()
 	}

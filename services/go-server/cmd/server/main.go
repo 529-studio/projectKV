@@ -181,7 +181,7 @@ func main() {
 
 	// 5. Flood chokepoints & real-time alert dispatcher
 	chokepointMap, floodChokepoints := loadFloodChokepoints()
-	dispatchFloodAlert := makeFloodAlertDispatcher(camCatalog, chokepointMap, notifyManager)
+	dispatchFloodAlert := makeFloodAlertDispatcher(camCatalog, chokepointMap, notifyManager, corridorService)
 
 	// 6. Analyzer selection & Core Handlers (Hotset, Corridor, Forecast, Weather)
 	analyzer, analysisEnabled := initAnalyzer(cfg, camCatalog, db)

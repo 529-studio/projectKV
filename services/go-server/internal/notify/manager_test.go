@@ -265,3 +265,50 @@ func TestManager_DispatchCorridor_FilteringAndDebounce(t *testing.T) {
 		t.Fatalf("expected corridor count to become 3 after 15m debounce window, got %d", ch.SentCorridorCount())
 	}
 }
+
+func TestManager_Dispatch_EscalationBypassesDebounce(t *testing.T) {
+	mgr := NewManager(nil)
+	ch := newMockChannel("mock-ch")
+	mgr.Register(ch)
+
+	t0 := time.Now()
+
+	// 1. Initial shallow flood
+	shallowAlert := FloodAlert{
+		CameraID:      "cam-esc",
+		FloodSeverity: "FLOODED_SHALLOW",
+		ObservedAt:    t0,
+	}
+	if err := mgr.Dispatch(context.Background(), shallowAlert); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ch.SentCount() != 1 {
+		t.Fatalf("expected 1 dispatch for initial shallow flood, got %d", ch.SentCount())
+	}
+
+	// 2. Repeat shallow flood at T+3m: suppressed by debounce window
+	shallowRepeat := FloodAlert{
+		CameraID:      "cam-esc",
+		FloodSeverity: "FLOODED_SHALLOW",
+		ObservedAt:    t0.Add(3 * time.Minute),
+	}
+	if err := mgr.Dispatch(context.Background(), shallowRepeat); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ch.SentCount() != 1 {
+		t.Fatalf("expected repeat shallow flood to be suppressed, got %d", ch.SentCount())
+	}
+
+	// 3. Escalation to FLOODED_DEEP at T+5m: MUST bypass debounce and dispatch immediately
+	deepAlert := FloodAlert{
+		CameraID:      "cam-esc",
+		FloodSeverity: "FLOODED_DEEP",
+		ObservedAt:    t0.Add(5 * time.Minute),
+	}
+	if err := mgr.Dispatch(context.Background(), deepAlert); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ch.SentCount() != 2 {
+		t.Fatalf("expected deep escalation to bypass debounce and dispatch (count 2), got %d", ch.SentCount())
+	}
+}
