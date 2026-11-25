@@ -29,3 +29,15 @@ Standalone Computer Vision inference service optimized for non-AVX x86_64 hardwa
 docker build -t projectkv-model -f services/cv-engine/Dockerfile .
 docker run --rm -p 8000:8000 --memory=512m --cpus=1.0 projectkv-model
 ```
+
+## Secondary Edge INT8 Deployment (CPU Nodes)
+
+Secondary edge nodes run statically quantized INT8 ONNX weights (`yolov8n_640_int8.onnx`) via `CPUExecutionProvider` using `docker-compose.cv-edge.yml`:
+
+```bash
+# Verify artifact integrity (Rule 10 size > 1MB & Shannon entropy >= 3.0) and emit manifest
+python3 tools/cv/deploy_edge_int8.py --model models/yolov8n_640_int8.onnx --smoke-test
+
+# Launch secondary CPU edge worker
+docker compose -f docker-compose.cv-edge.yml up -d
+```
