@@ -286,6 +286,7 @@ writing into a file you are about to swap.
 - Compose stack: [`docker-compose.stg.yml`](../../docker-compose.stg.yml)
 - Validator: [`tools/ci/check_deploy_manifests.py`](../../tools/ci/check_deploy_manifests.py)
 - Restore drill: [`tools/deploy/restore_drill.py`](../../tools/deploy/restore_drill.py)
+- Automated WAL failover drill harness: [`tools/dr/failover_drill.sh`](../../tools/dr/failover_drill.sh) (`python3 -m unittest tools/dr/test_failover_drill.py`)
 - Plan: `self-infras/plans/2026-11-20-phase3-two-site-tunnels.md`
 - Superseded runbook (removed with the streaming sidecar):
   `docs/runbooks/sqlite_litestream_disaster_recovery.md` in git history
