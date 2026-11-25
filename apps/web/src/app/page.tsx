@@ -57,6 +57,8 @@ const VehicleProfileSelector = dynamic(() => import('../components/VehicleProfil
 const HourlyTimelineScrubber = dynamic(() => import('../components/HourlyTimelineScrubber'), { ssr: false });
 const MyRouteCard = dynamic(() => import('../components/MyRouteCard'), { ssr: false });
 const MyRouteSetupModal = dynamic(() => import('../components/MyRouteSetupModal'), { ssr: false });
+const NotificationDrawer = dynamic(() => import('../components/NotificationDrawer'), { ssr: false });
+import NotificationPromptBanner from '../components/NotificationPromptBanner';
 
 /** A fix younger than this is reused instead of starting a new GPS request (AC2). */
 const NEAR_ME_FIX_MAX_AGE_MS = 60_000;
@@ -574,6 +576,10 @@ export default function Home() {
     setSubscriptionOpen(false);
   }, []);
 
+  // S19-T2 / Issue #550: citizen notification preference drawer
+  const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+  const [drawerCorridorKey, setDrawerCorridorKey] = useState<string | undefined>(undefined);
+
   const handleNearMeRecenter = useCallback(() => {
     const fix = geo.fix;
     if (!fix || !map) {
@@ -726,6 +732,10 @@ export default function Home() {
 
       {/* MAP WORKSPACE */}
       <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-zinc-950">
+        <NotificationPromptBanner
+          onOpenDrawer={() => setNotificationDrawerOpen(true)}
+          lang={lang}
+        />
         <div className="flex-1 w-full h-full relative">
           <MapComponent
             cameras={displayCameras}
@@ -944,9 +954,9 @@ export default function Home() {
                 onSelectDetour={(detourKey) => {
                   handleSelectCorridor(detourKey);
                 }}
-                onSubscribeRoute={() => {
-                  setSubscriptionTarget({ type: 'all', id: '' });
-                  setSubscriptionOpen(true);
+                onSubscribeRoute={(corridorKey) => {
+                  setDrawerCorridorKey(corridorKey || commuteConfig.selectedCorridors?.[0] || 'nguyen_huu_canh');
+                  setNotificationDrawerOpen(true);
                 }}
                 lang={lang}
                 vehicleType={vehicleType}
@@ -1214,6 +1224,14 @@ export default function Home() {
         lang={lang}
         initialTarget={subscriptionTarget}
         botUsernameFallback={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
+      />
+
+      {/* S19-T2 / Issue #550: citizen notification preference drawer */}
+      <NotificationDrawer
+        isOpen={notificationDrawerOpen}
+        onClose={() => setNotificationDrawerOpen(false)}
+        lang={lang}
+        initialCorridorKey={drawerCorridorKey}
       />
 
       {/* S12-T2 / Issue #400: sheet renders under CameraModal (z-[9999]) and is
