@@ -1,0 +1,47 @@
+# Secondary Edge Inference Worker Compose Configuration (INT8 ONNX Runtime CPU Pipeline).
+# Issue #553 / Sprint 19 Task 5.
+#
+# Designed for CPU-only secondary edge nodes (no NVIDIA GPU reservation required).
+# Executes INT8 statically quantized YOLOv8n ONNX models via ONNX Runtime CPUExecutionProvider,
+# enforcing a 4x footprint reduction and >2x inference speedup on commodity edge CPUs.
+
+services:
+  warded-cv-edge:
+    image: ${MODEL_IMAGE_NAME:-ghcr.io/529-studio/projectkv-model}:${MODEL_IMAGE_TAG:-${IMAGE_TAG:-stg-latest}}
+    container_name: ${EDGE_CONTAINER_NAME:-warded-cv-edge}
+    restart: unless-stopped
+    pull_policy: ${PULL_POLICY:-always}
+    ports:
+      - "${CV_EDGE_BIND_ADDR:-127.0.0.1}:${CV_EDGE_PORT:-8001}:8000"
+    networks:
+      - core-network
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+      - CV_BACKEND=ort
+      - CV_PRECISION=${CV_PRECISION:-int8}
+      - CV_ONNX_MODEL=${CV_ONNX_MODEL:-/app/models/yolov8n_640_int8.onnx}
+      - CV_REQUIRE_CUDA=0
+      - CV_INPUT_RESOLUTION=${CV_INPUT_RESOLUTION:-640}
+      - ORT_NUM_THREADS=${ORT_NUM_THREADS:-2}
+    volumes:
+      - ${EDGE_MODELS_DIR:-/home/ubuntu/cv-engine/models}:/app/models:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      start-period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "${EDGE_CPU_LIMIT:-2.00}"
+          memory: "${EDGE_MEMORY_LIMIT:-1024M}"
+        reservations:
+          cpus: "${EDGE_CPU_RESERVATION:-0.50}"
+          memory: "${EDGE_MEMORY_RESERVATION:-256M}"
+
+networks:
+  core-network:
+    name: ${DOCKER_NETWORK:-core-network}
+    external: true
