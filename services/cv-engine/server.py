@@ -1382,6 +1382,8 @@ queue_manager = InferenceQueueManager(
 class CVServer(ThreadingHTTPServer):
     """Multi-threaded HTTP server with resilient socket disconnect handling."""
     daemon_threads = True
+    allow_reuse_address = True
+    request_queue_size = 128
 
     def handle_error(self, request, client_address):
         # Ignore broken pipe and connection reset errors caused by abrupt client disconnections
