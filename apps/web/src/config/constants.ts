@@ -923,3 +923,55 @@ export const SUBSCRIPTION_I18N = Object.freeze({
     en: 'We only store the browser push endpoint and public encryption key. Zero GPS tracking or personal information collected.',
   },
 });
+
+export const NOTIFICATION_DRAWER_I18N = Object.freeze({
+  DRAWER_TITLE: { vi: 'Cài đặt cảnh báo ngập', en: 'Flood Alert Preferences' },
+  DRAWER_DESC: {
+    vi: 'Tuỳ chỉnh cảnh báo tức thời theo phương tiện, tuyến đường và khung giờ di chuyển.',
+    en: 'Customize instant alerts by vehicle type, route, and commute hours.',
+  },
+  STATUS_TITLE: { vi: 'Kênh thông báo trình duyệt', en: 'Browser Push Channel' },
+  STATUS_ACTIVE: { vi: 'Đang bật nhận cảnh báo trực tiếp', en: 'Instant alert delivery active' },
+  STATUS_INACTIVE: { vi: 'Chưa kích hoạt trên thiết bị này', en: 'Not active on this device' },
+  STATUS_DENIED: {
+    vi: 'Trình duyệt đã từ chối quyền. Hãy mở cài đặt trình duyệt để cho phép.',
+    en: 'Notification permission denied. Please allow in browser settings.',
+  },
+  STATUS_UNSUPPORTED: {
+    vi: 'Trình duyệt không hỗ trợ Web Push.',
+    en: 'Browser does not support Web Push.',
+  },
+  CTA_ENABLE: { vi: 'Bật thông báo Web Push', en: 'Enable Web Push' },
+  CTA_DISABLE: { vi: 'Tắt thông báo thiết bị', en: 'Disable Device Alerts' },
+  CTA_TEST: { vi: 'Thử nghiệm thông báo', en: 'Send Test Alert' },
+  TEST_SENT: { vi: 'Đã gửi thông báo thử nghiệm thành công.', en: 'Test alert sent successfully.' },
+  TARGET_SECTION_TITLE: { vi: 'Phạm vi theo dõi cảnh báo', en: 'Alert Tracking Scope' },
+  TARGET_MY_ROUTE: { vi: 'Tuyến đường đi làm (My Route)', en: 'My Commute Route' },
+  TARGET_MY_ROUTE_SUB: {
+    vi: 'Chỉ nhận cảnh báo khi tuyến đường lưu sẵn xuất hiện ngập hoặc sự cố lưu thông.',
+    en: 'Only notify when saved route encounters flood or congestion.',
+  },
+  TARGET_CORRIDORS: { vi: 'Các trục đường chính (Corridors)', en: 'Arterial Corridors' },
+  TARGET_ALL_CITY: { vi: 'Toàn bộ điểm đen ngập nước TP.HCM', en: 'All HCMC Flood Hotspots' },
+  VEHICLE_SECTION_TITLE: { vi: 'Giới hạn cảnh báo theo gầm xe', en: 'Vehicle Clearance Filter' },
+  VEHICLE_SECTION_SUB: {
+    vi: 'Hệ thống tự động lọc các cảnh báo có độ sâu ngập đe dọa trực tiếp phương tiện của bạn.',
+    en: 'Filters alerts to flood depths threatening your specific vehicle clearance.',
+  },
+  HOURS_SECTION_TITLE: { vi: 'Khung giờ nhận tin', en: 'Active Alert Hours' },
+  HOURS_COMMUTE_ONLY: {
+    vi: 'Giờ cao điểm đi làm (06:30 - 09:00 & 16:30 - 19:30)',
+    en: 'Rush hours only (06:30 - 09:00 & 16:30 - 19:30)',
+  },
+  HOURS_ALL_DAY: { vi: 'Toàn thời gian (24/7)', en: '24/7 Real-Time' },
+  CLOSE_DRAWER: { vi: 'Đóng cài đặt', en: 'Close Settings' },
+  SAVE_CHANGES: { vi: 'Lưu tuỳ chọn', en: 'Save Preferences' },
+  SAVED_SUCCESS: { vi: 'Đã lưu cấu hình thông báo thành công.', en: 'Notification preferences saved.' },
+  PROMPT_TITLE: { vi: 'Nhận cảnh báo ngập trên tuyến đường của bạn', en: 'Get Flood Alerts For Your Route' },
+  PROMPT_DESC: {
+    vi: 'Bật thông báo đẩy để nhận cảnh báo tức thời khi triều cường hoặc mưa lớn gây ngập.',
+    en: 'Turn on push notifications to receive instant alerts when high tide or rain causes flooding.',
+  },
+  PROMPT_CTA: { vi: 'Cài đặt cảnh báo', en: 'Configure Alerts' },
+  PROMPT_DISMISS: { vi: 'Để sau', en: 'Dismiss' },
+});
