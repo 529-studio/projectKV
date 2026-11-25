@@ -128,7 +128,7 @@ export default function NotificationDrawer({
       role="dialog"
       aria-modal="true"
       aria-labelledby="notification-drawer-title"
-      className="fixed inset-0 z-50 overflow-hidden"
+      className="fixed inset-0 z-[980] overflow-hidden"
     >
       {/* Monochromatic backdrop */}
       <div
@@ -213,7 +213,11 @@ export default function NotificationDrawer({
                 {webPush.isSubscribed && (
                   <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between">
                     <span className="text-[11px] text-zinc-400">
-                      {testSentNotice ? t.TEST_SENT[lang] : 'Kiểm tra hoạt động chuông thông báo:'}
+                      {testSentNotice
+                        ? t.TEST_SENT[lang]
+                        : lang === 'vi'
+                        ? 'Kiểm tra hoạt động chuông thông báo:'
+                        : 'Verify browser alert delivery:'}
                     </span>
                     <button
                       type="button"
@@ -335,7 +339,7 @@ export default function NotificationDrawer({
                     >
                       <span className="text-xs font-semibold block">{prof.name[lang]}</span>
                       <span className="text-[10px] text-zinc-400 mt-1 block">
-                        Nguy cơ: &gt;={prof.cautionDepthCm} cm
+                        {lang === 'vi' ? 'Nguy cơ: ' : 'Threshold: '}&gt;={prof.cautionDepthCm} cm
                       </span>
                     </button>
                   );

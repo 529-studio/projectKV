@@ -94,10 +94,10 @@ export default function MyRouteCard({
     <section
       role="region"
       aria-label={COMMUTE_I18N.TITLE[lang]}
-      className="pointer-events-auto w-full max-w-lg mx-auto bg-zinc-950/95 border border-zinc-700/80 rounded-xl shadow-2xl backdrop-blur-md overflow-hidden text-zinc-100 transition-all font-sans"
+      className="pointer-events-auto w-full max-w-lg max-h-[34vh] flex flex-col ml-auto bg-zinc-950/95 border border-zinc-700/80 rounded-xl shadow-2xl backdrop-blur-md overflow-hidden text-zinc-100 transition-all font-sans"
     >
       {/* HEADER BAR */}
-      <header className="px-4 py-2.5 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between gap-2">
+      <header className="px-4 py-2.5 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0" aria-hidden="true" />
           <h2 className="text-xs font-semibold text-zinc-200 tracking-wide uppercase truncate">
@@ -190,7 +190,7 @@ export default function MyRouteCard({
 
       {/* BODY CONTENT */}
       {!isCollapsed && (
-        <div className="p-3.5 space-y-3">
+        <div className="p-3.5 space-y-3 overflow-y-auto flex-1 min-h-0">
           {/* ORIGIN ➔ DESTINATION GLANCE */}
           <div className="flex items-center justify-between text-xs text-zinc-300 pb-1 border-b border-zinc-800/80">
             <div className="truncate max-w-[45%] font-medium text-zinc-200" title={originName}>

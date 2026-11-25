@@ -104,10 +104,10 @@ export default function CorridorOverviewCard({
   return (
     <section
       aria-label={lang === 'vi' ? 'Tổng quan trục đường' : 'Corridor Overview'}
-      className="relative pointer-events-auto w-full sm:w-[380px] bg-zinc-950/95 backdrop-blur-md border border-zinc-800 rounded-lg shadow-2xl font-mono text-white transition-all duration-200"
+      className="relative pointer-events-auto w-full sm:w-[380px] max-h-[34vh] flex flex-col bg-zinc-950/95 backdrop-blur-md border border-zinc-800 rounded-lg shadow-2xl font-mono text-white transition-all duration-200"
     >
       {/* Header bar */}
-      <div className="flex items-center justify-between p-3 border-b border-zinc-800/80">
+      <div className="flex items-center justify-between p-3 border-b border-zinc-800/80 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${badge.indicator} shrink-0`} />
@@ -239,7 +239,7 @@ export default function CorridorOverviewCard({
 
       {/* Body content */}
       {!isCollapsed && (
-        <div className="p-3 space-y-3">
+        <div className="p-3 space-y-3 overflow-y-auto flex-1 min-h-0">
           {/* Passability Verdict Badge */}
           <div
             className={`flex flex-col gap-1 px-3 py-2 rounded border ${badge.bg} ${badge.border}`}
