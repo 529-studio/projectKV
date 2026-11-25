@@ -47,6 +47,16 @@ func (d *Debouncer) ShouldSuppress(cameraID string, now time.Time) bool {
 	return false
 }
 
+// RecordAlert explicitly updates the last dispatched timestamp for cameraID.
+func (d *Debouncer) RecordAlert(cameraID string, now time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if now.IsZero() {
+		now = time.Now()
+	}
+	d.lastAlerts[cameraID] = now
+}
+
 // LastDispatched returns the timestamp of the last dispatched alert for cameraID.
 func (d *Debouncer) LastDispatched(cameraID string) time.Time {
 	d.mu.RLock()

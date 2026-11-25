@@ -731,6 +731,12 @@ func (s *Service) GetRoute(roadKey string, vehicle ...VehicleType) (*GeoJSONFeat
 	}, summary, true
 }
 
+// GetCorridorRouteSummary computes and returns the CorridorRouteSummary for a given roadKey.
+func (s *Service) GetCorridorRouteSummary(roadKey string, vehicle ...VehicleType) (*CorridorRouteSummary, bool) {
+	_, summary, ok := s.GetRoute(roadKey, vehicle...)
+	return summary, ok
+}
+
 // calculateRouteSummary computes travel duration, flood delay penalty, and passability verdict based on vehicle clearance.
 func (s *Service) calculateRouteSummary(def *CorridorDefinition, status *CorridorStatus, vehicle VehicleType) *CorridorRouteSummary {
 	var (

@@ -20,6 +20,7 @@ type Manager struct {
 	channels          map[string]Channel
 	debouncer         *Debouncer
 	corridorDebouncer *Debouncer
+	stateTracker      *StateTracker
 	log               *slog.Logger
 }
 
@@ -53,6 +54,15 @@ func WithCorridorDebounceWindow(w time.Duration) ManagerOption {
 	}
 }
 
+// WithStateTracker overrides the default state tracker for Manager.
+func WithStateTracker(st *StateTracker) ManagerOption {
+	return func(m *Manager) {
+		if st != nil {
+			m.stateTracker = st
+		}
+	}
+}
+
 // NewManager creates a new notification Manager.
 func NewManager(debouncer *Debouncer, opts ...ManagerOption) *Manager {
 	if debouncer == nil {
@@ -62,6 +72,7 @@ func NewManager(debouncer *Debouncer, opts ...ManagerOption) *Manager {
 		channels:          make(map[string]Channel),
 		debouncer:         debouncer,
 		corridorDebouncer: NewDebouncer(DefaultCorridorDebounceWindow),
+		stateTracker:      NewStateTracker(),
 		log:               slog.Default(),
 	}
 	for _, opt := range opts {
@@ -110,36 +121,51 @@ func (m *Manager) CorridorDebouncer() *Debouncer {
 	return m.corridorDebouncer
 }
 
+// StateTracker returns the underlying StateTracker instance.
+func (m *Manager) StateTracker() *StateTracker {
+	return m.stateTracker
+}
+
 // IsFloodSeverity returns true if severity represents actionable flooding.
 func IsFloodSeverity(severity string) bool {
 	return severity == "FLOODED_SHALLOW" || severity == "FLOODED_DEEP"
 }
 
-// Dispatch evaluates a FloodAlert, checks the 30-minute anti-spam debounce window,
+// Dispatch evaluates a FloodAlert, checks state transitions and anti-spam debounce windows,
 // and fans out delivery to all registered channels.
 func (m *Manager) Dispatch(ctx context.Context, alert FloodAlert) error {
-	// 1. Only dispatch actionable flood conditions (shallow or deep flood)
+	// 1. Record state transition in StateTracker
+	var tr StateTransition
+	if m.stateTracker != nil {
+		tr = m.stateTracker.RecordCamera(alert.CameraID, alert.FloodSeverity, alert.ObservedAt)
+	}
+
+	// 2. Only dispatch actionable flood conditions (shallow or deep flood)
 	if !IsFloodSeverity(alert.FloodSeverity) {
 		m.log.Debug("notify: skipping non-flood verdict", "camera_id", alert.CameraID, "severity", alert.FloodSeverity)
 		return nil
 	}
 
-	// 2. 30-Minute anti-spam sliding debounce check per chokepoint
-	if m.debouncer.ShouldSuppress(alert.CameraID, alert.ObservedAt) {
+	// 3. Debounce suppression check:
+	// Escalations (e.g. CLEAR -> SHALLOW/DEEP or SHALLOW -> DEEP) bypass the debounce window
+	// to ensure critical flood hazards are immediately delivered, while refreshing the debounce window.
+	if tr.IsEscalation {
+		m.debouncer.RecordAlert(alert.CameraID, alert.ObservedAt)
+	} else if m.debouncer.ShouldSuppress(alert.CameraID, alert.ObservedAt) {
 		m.log.Info("notify: flood alert suppressed by 30-minute debounce window", "camera_id", alert.CameraID, "severity", alert.FloodSeverity)
 		return nil
 	}
 
-	// 3. Collect registered channels
+	// 4. Collect registered channels
 	channels := m.Channels()
 	if len(channels) == 0 {
 		m.log.Debug("notify: no channels registered, alert not dispatched", "camera_id", alert.CameraID)
 		return nil
 	}
 
-	m.log.Info("notify: dispatching flood alert to channels", "camera_id", alert.CameraID, "severity", alert.FloodSeverity, "channels_count", len(channels))
+	m.log.Info("notify: dispatching flood alert to channels", "camera_id", alert.CameraID, "severity", alert.FloodSeverity, "channels_count", len(channels), "escalation", tr.IsEscalation)
 
-	// 4. Concurrent fan-out across channels
+	// 5. Concurrent fan-out across channels
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(channels))
 
@@ -168,10 +194,16 @@ func (m *Manager) Dispatch(ctx context.Context, alert FloodAlert) error {
 	return nil
 }
 
-// DispatchCorridor evaluates a CorridorAlert, checks the 15-minute anti-spam debounce window,
+// DispatchCorridor evaluates a CorridorAlert, checks state transitions and anti-spam debounce windows,
 // and fans out delivery to registered channels that support corridor alerts.
 func (m *Manager) DispatchCorridor(ctx context.Context, alert CorridorAlert) error {
-	// 1. Only dispatch actionable hazard conditions (IMPASSABLE, CAUTION, or depth >= 15 cm)
+	// 1. Record state transition in StateTracker
+	var tr StateTransition
+	if m.stateTracker != nil {
+		tr = m.stateTracker.RecordCorridor(alert.RoadKey, alert.Passability, alert.ObservedAt)
+	}
+
+	// 2. Only dispatch actionable hazard conditions (IMPASSABLE, CAUTION, or depth >= 15 cm)
 	isHazard := strings.EqualFold(alert.Passability, "IMPASSABLE") ||
 		strings.EqualFold(alert.Passability, "CAUTION") ||
 		alert.WorstFloodSeverity == "FLOODED_SHALLOW" ||
@@ -183,20 +215,23 @@ func (m *Manager) DispatchCorridor(ctx context.Context, alert CorridorAlert) err
 		return nil
 	}
 
-	// 2. 15-Minute anti-spam sliding debounce check per corridor
-	if m.corridorDebouncer.ShouldSuppress(alert.RoadKey, alert.ObservedAt) {
+	// 3. Debounce suppression check:
+	// Escalations (e.g. PASSABLE -> CAUTION/IMPASSABLE or CAUTION -> IMPASSABLE) bypass debounce suppression.
+	if tr.IsEscalation {
+		m.corridorDebouncer.RecordAlert(alert.RoadKey, alert.ObservedAt)
+	} else if m.corridorDebouncer.ShouldSuppress(alert.RoadKey, alert.ObservedAt) {
 		m.log.Info("notify: corridor alert suppressed by 15-minute debounce window", "road_key", alert.RoadKey, "passability", alert.Passability)
 		return nil
 	}
 
-	// 3. Collect registered channels
+	// 4. Collect registered channels
 	channels := m.Channels()
 	if len(channels) == 0 {
 		m.log.Debug("notify: no channels registered, corridor alert not dispatched", "road_key", alert.RoadKey)
 		return nil
 	}
 
-	m.log.Info("notify: dispatching corridor alert to channels", "road_key", alert.RoadKey, "passability", alert.Passability, "channels_count", len(channels))
+	m.log.Info("notify: dispatching corridor alert to channels", "road_key", alert.RoadKey, "passability", alert.Passability, "channels_count", len(channels), "escalation", tr.IsEscalation)
 
 	// 4. Concurrent fan-out across channels supporting corridor alerts
 	var wg sync.WaitGroup
