@@ -2226,6 +2226,12 @@ const docTemplate = `{
                     "description": "\"#22c55e\" | \"#eab308\" | \"#ef4444\" | \"#71717a\"",
                     "type": "string"
                 },
+                "tidal_gates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/corridor.TidalGate"
+                    }
+                },
                 "total_cameras": {
                     "type": "integer"
                 },
@@ -2413,6 +2419,51 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
+        },
+        "corridor.TidalGate": {
+            "type": "object",
+            "properties": {
+                "downstream_level_m": {
+                    "type": "number"
+                },
+                "gate_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "observed_at": {
+                    "type": "string"
+                },
+                "pump_active": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "$ref": "#/definitions/corridor.TidalGateStatus"
+                },
+                "status_text_en": {
+                    "type": "string"
+                },
+                "status_text_vi": {
+                    "type": "string"
+                },
+                "upstream_level_m": {
+                    "type": "number"
+                }
+            }
+        },
+        "corridor.TidalGateStatus": {
+            "type": "string",
+            "enum": [
+                "CLOSED_PUMPING",
+                "OPEN_GRAVITY",
+                "MAINTENANCE"
+            ],
+            "x-enum-varnames": [
+                "TidalGateClosedPumping",
+                "TidalGateOpenGravity",
+                "TidalGateMaintenance"
+            ]
         },
         "corridor.VehicleType": {
             "type": "string",

@@ -266,6 +266,60 @@ export default function CorridorOverviewCard({
             </div>
           </div>
 
+          {/* Localized Tidal Sluice Gate Status Indicators (Issue #551 / S19-T3) */}
+          {summary.tidal_gates && summary.tidal_gates.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 block">
+                {lang === 'vi' ? 'Trạng thái cống ngăn triều' : 'Tidal Sluice Gate Status'}
+              </span>
+              <div className="space-y-1.5">
+                {summary.tidal_gates.map(gate => {
+                  const isClosed = gate.status === 'CLOSED_PUMPING';
+                  const isMaint = gate.status === 'MAINTENANCE';
+                  const badgeBorder = isClosed
+                    ? 'border-cyan-800/80 bg-cyan-950/30'
+                    : isMaint
+                    ? 'border-amber-800/80 bg-amber-950/30'
+                    : 'border-zinc-800 bg-zinc-900/70';
+                  const textTone = isClosed
+                    ? 'text-cyan-300'
+                    : isMaint
+                    ? 'text-amber-300'
+                    : 'text-zinc-300';
+
+                  return (
+                    <div
+                      key={gate.gate_id}
+                      className={`p-2 rounded border ${badgeBorder} flex flex-col gap-1 text-[11px]`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-zinc-200 truncate">{gate.name}</span>
+                        <span className={`font-mono text-[10px] font-bold uppercase shrink-0 ${textTone}`}>
+                          {lang === 'vi' ? gate.status_text_vi : gate.status_text_en}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                        <span>
+                          {lang === 'vi' ? 'Hạ lưu sông: ' : 'River: '}
+                          <strong className="text-zinc-200">{gate.downstream_level_m.toFixed(2)}m</strong>
+                        </span>
+                        <span>
+                          {lang === 'vi' ? 'Thượng lưu kênh: ' : 'Canal: '}
+                          <strong className="text-zinc-200">{gate.upstream_level_m.toFixed(2)}m</strong>
+                        </span>
+                        {gate.pump_active && (
+                          <span className="text-cyan-400 font-semibold">
+                            {lang === 'vi' ? 'BƠM HOẠT ĐỘNG' : 'PUMP ON'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Historical Flood Depth & Tidal Inundation Trends (Issue #526) */}
           <CorridorTrends roadKey={summary.road_key} lang={lang} />
 

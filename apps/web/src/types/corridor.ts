@@ -5,6 +5,20 @@
 
 export type PassabilityVerdict = 'PASSABLE' | 'CAUTION' | 'IMPASSABLE' | 'UNKNOWN';
 
+export type TidalGateStatus = 'CLOSED_PUMPING' | 'OPEN_GRAVITY' | 'MAINTENANCE';
+
+export interface TidalGate {
+  gate_id: string;
+  name: string;
+  status: TidalGateStatus;
+  status_text_vi: string;
+  status_text_en: string;
+  upstream_level_m: number;
+  downstream_level_m: number;
+  pump_active: boolean;
+  observed_at: string;
+}
+
 export interface CorridorRouteSummary {
   road_key: string;
   display_name: string;
@@ -24,6 +38,7 @@ export interface CorridorRouteSummary {
   verified_cameras: number;
   coverage_pct: number;
   chokepoint_count: number;
+  tidal_gates?: TidalGate[];
 }
 
 export interface RouteLineStringGeometry {

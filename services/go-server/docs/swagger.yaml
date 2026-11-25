@@ -331,6 +331,10 @@ definitions:
       status_color:
         description: '"#22c55e" | "#eab308" | "#ef4444" | "#71717a"'
         type: string
+      tidal_gates:
+        items:
+          $ref: '#/definitions/corridor.TidalGate'
+        type: array
       total_cameras:
         type: integer
       vehicle:
@@ -461,6 +465,37 @@ definitions:
       total:
         type: integer
     type: object
+  corridor.TidalGate:
+    properties:
+      downstream_level_m:
+        type: number
+      gate_id:
+        type: string
+      name:
+        type: string
+      observed_at:
+        type: string
+      pump_active:
+        type: boolean
+      status:
+        $ref: '#/definitions/corridor.TidalGateStatus'
+      status_text_en:
+        type: string
+      status_text_vi:
+        type: string
+      upstream_level_m:
+        type: number
+    type: object
+  corridor.TidalGateStatus:
+    enum:
+    - CLOSED_PUMPING
+    - OPEN_GRAVITY
+    - MAINTENANCE
+    type: string
+    x-enum-varnames:
+    - TidalGateClosedPumping
+    - TidalGateOpenGravity
+    - TidalGateMaintenance
   corridor.VehicleType:
     enum:
     - scooter

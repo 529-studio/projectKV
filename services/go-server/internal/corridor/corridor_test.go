@@ -979,3 +979,56 @@ func TestHandler_GetHistory_HTTP(t *testing.T) {
 		t.Fatalf("expected 404 for unknown road, got %d", w404.Code)
 	}
 }
+
+func TestTidalGatesEvaluation(t *testing.T) {
+	cams := []camera.Camera{
+		{ID: "cam-nhc", RoadKey: "nguyen_huu_canh"},
+		{ID: "cam-htp", RoadKey: "huynh_tan_phat"},
+	}
+
+	// 1. High tide (>= 1.40m) -> CLOSED_PUMPING
+	svcHigh := NewService(
+		&mockCameraProvider{cameras: cams},
+		&mockVerdictProvider{},
+		"test",
+		60*time.Second,
+		WithTidePredictor(&mockTidePredictor{fixedHeight: 1.58}),
+	)
+
+	summaryNHC, ok := svcHigh.GetCorridorRouteSummary("nguyen_huu_canh")
+	if !ok || summaryNHC == nil {
+		t.Fatalf("expected nguyen_huu_canh summary")
+	}
+	if len(summaryNHC.TidalGates) != 1 {
+		t.Fatalf("expected 1 tidal gate on nguyen_huu_canh, got %d", len(summaryNHC.TidalGates))
+	}
+	g1 := summaryNHC.TidalGates[0]
+	if g1.GateID != "cong_nhieu_loc_thi_nghe" || g1.Status != TidalGateClosedPumping || !g1.PumpActive {
+		t.Errorf("unexpected high tide gate status: %+v", g1)
+	}
+	if g1.DownstreamLevelM != 1.58 || g1.UpstreamLevelM != 0.75 {
+		t.Errorf("unexpected gate levels: upstream=%f downstream=%f", g1.UpstreamLevelM, g1.DownstreamLevelM)
+	}
+
+	// 2. Low tide (< 1.40m) -> OPEN_GRAVITY
+	svcLow := NewService(
+		&mockCameraProvider{cameras: cams},
+		&mockVerdictProvider{},
+		"test",
+		60*time.Second,
+		WithTidePredictor(&mockTidePredictor{fixedHeight: 0.95}),
+	)
+
+	summaryHTP, ok := svcLow.GetCorridorRouteSummary("huynh_tan_phat")
+	if !ok || summaryHTP == nil {
+		t.Fatalf("expected huynh_tan_phat summary")
+	}
+	if len(summaryHTP.TidalGates) != 2 {
+		t.Fatalf("expected 2 tidal gates on huynh_tan_phat, got %d", len(summaryHTP.TidalGates))
+	}
+	for _, g := range summaryHTP.TidalGates {
+		if g.Status != TidalGateOpenGravity || g.PumpActive {
+			t.Errorf("expected OPEN_GRAVITY with PumpActive=false, got %+v", g)
+		}
+	}
+}

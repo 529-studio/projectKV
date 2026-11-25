@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, describe } from 'node:test';
 import { toRoadKey } from '../utils/corridorUtils.ts';
 import type {
   CorridorRouteSummary,
   CorridorRouteResponse,
   CorridorCameraPointProperties,
+  TidalGate,
 } from '../types/corridor.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Empirical Automated Verification for Issue #476 / S15-T2:
@@ -178,5 +185,36 @@ describe('S15-T2: Commuter Route Polyline & Corridor Overview Card Verification'
     onFilterClear();
     assert.equal(selectedCorridor, null, 'Corridor filter is now cleared');
     assert.equal(mapResetCount, 1, 'Map smoothly recenters ONLY on explicit filter clear');
+  });
+
+  test('Scenario 8 (Issue #551 / S19-T3): Localized tidal sluice gate status indicators and zero-emoji validation', () => {
+    const sampleGate: TidalGate = {
+      gate_id: 'cong_nhieu_loc_thi_nghe',
+      name: 'Cống Nhiêu Lộc - Thị Nghè',
+      status: 'CLOSED_PUMPING',
+      status_text_vi: 'ĐÓNG NGĂN TRIỀU & BƠM',
+      status_text_en: 'CLOSED & PUMPING',
+      upstream_level_m: 0.75,
+      downstream_level_m: 1.58,
+      pump_active: true,
+      observed_at: '2026-11-25T11:00:00Z',
+    };
+
+    assert.equal(sampleGate.status, 'CLOSED_PUMPING');
+    assert.equal(sampleGate.pump_active, true);
+
+    const cardPath = path.join(__dirname, 'CorridorOverviewCard.tsx');
+    const content = fs.readFileSync(cardPath, 'utf8');
+    const EMOJI_REGEX = /\p{Extended_Pictographic}/u;
+
+    assert.equal(
+      EMOJI_REGEX.test(content),
+      false,
+      'CorridorOverviewCard.tsx must strictly contain zero emoji per Rule 1',
+    );
+    assert.match(content, /tidal_gates/, 'Must render summary.tidal_gates telemetry');
+    assert.match(content, /CLOSED_PUMPING/, 'Must style CLOSED_PUMPING sluice gate state');
+    assert.match(content, /BƠM HOẠT ĐỘNG/, 'Must include Vietnamese pump active status');
+    assert.match(content, /PUMP ON/, 'Must include English pump active status');
   });
 });
