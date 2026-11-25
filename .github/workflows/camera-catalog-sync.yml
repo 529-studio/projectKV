@@ -1,0 +1,130 @@
+name: Camera Catalog Sync & Culling
+
+# Daily automated camera catalog synchronization and corridor-floor dead feed culling.
+# Issue #552 / Sprint 19 Task 4.
+#
+# Policy: Never pushes directly to dev/main — always opens a PR targeting dev
+# (AGENTS.md Rule 5). Automated PRs are never auto-merged.
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run audit in dry-run mode without writing catalog changes'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+concurrency:
+  group: camera-catalog-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-sync:
+    name: Audit & Sync Camera Catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify Culling Safeguard Unit Tests
+        run: python3 -m unittest tools/eval/test_cull_dead_cameras.py
+
+      - name: Run Dead Feed Audit & Corridor-Floor Culling
+        env:
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          EXTRA_ARGS=""
+          if [ "$DRY_RUN" = "true" ]; then
+            EXTRA_ARGS="--dry-run"
+          fi
+          python3 tools/eval/cull_dead_cameras.py \
+            --catalog cameras_enriched.json \
+            --threshold-days 14 \
+            --min-corridor-coverage 0.50 \
+            --output-report /tmp/camera_cull_audit.json \
+            $EXTRA_ARGS
+
+      - name: Validate Catalog Schema Integrity
+        run: |
+          python3 -c '
+          import json
+          with open("cameras_enriched.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
+          assert isinstance(data, list), "Catalog must be a JSON array"
+          assert len(data) >= 500, f"Unexpectedly small catalog count: {len(data)}"
+          online = sum(1 for c in data if c.get("isOnline", False))
+          print(f"Validated {len(data)} cameras ({online} online).")
+          '
+
+      - name: Upload Culling Audit Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-cull-audit-report
+          path: /tmp/camera_cull_audit.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Open Catalog Sync Pull Request on Drift
+        env:
+          GH_TOKEN: ${{ secrets.RESYNC_TOKEN || secrets.GITHUB_TOKEN }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- cameras_enriched.json; then
+            echo "Catalog is already synchronized with corridor coverage protections; no PR needed."
+            exit 0
+          fi
+
+          BRANCH="chore/camera-catalog-cull-$(date -u +%Y%m%d)-${RUN_NUMBER}"
+          TITLE="chore(catalog): automated daily camera synchronization and dead feed culling ($(date -u +%Y-%m-%d))"
+          CHANGED=$(git diff --stat -- cameras_enriched.json | tail -n 1)
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add cameras_enriched.json
+          git commit -m "$TITLE"
+          git push -u origin "$BRANCH"
+
+          gh pr create \
+            --base dev \
+            --head "$BRANCH" \
+            --title "$TITLE" \
+            --body "$(cat <<EOF
+          ### Automated Daily Camera Catalog Synchronization
+
+          Daily scheduled execution of \`tools/eval/cull_dead_cameras.py\` with 14-day blackout thresholding and 50% arterial corridor coverage floor protection.
+
+          **Summary:** \`${CHANGED}\`
+
+          - Persistent dead feeds (>14 days offline) marked \`status: "stale_culled"\`, \`isOnline: false\`.
+          - Multi-camera arterial corridors protected at >= 50% active coverage.
+          - Full audit telemetry attached as \`camera-cull-audit-report\` artifact.
+
+          _Opened automatically by \`.github/workflows/camera-catalog-sync.yml\`. Manual review required per AGENTS.md Rule 5._
+          EOF
+          )"
