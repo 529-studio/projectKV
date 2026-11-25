@@ -686,6 +686,9 @@ func (s *Service) GetRoute(roadKey string, vehicle ...VehicleType) (*GeoJSONFeat
 	if summary.MaxHazardLevel != nil {
 		lineProps["max_hazard_level"] = *summary.MaxHazardLevel
 	}
+	if len(summary.TidalGates) > 0 {
+		lineProps["tidal_gates"] = summary.TidalGates
+	}
 
 	features = append(features, GeoJSONFeature{
 		Type: "Feature",
@@ -857,7 +860,51 @@ func (s *Service) calculateRouteSummary(def *CorridorDefinition, status *Corrido
 		CoveragePct:        status.CoveragePct,
 		ChokepointCount:    chokepointCount,
 		Vehicle:            vehicle,
+		TidalGates:         s.evaluateTidalGates(def.Key, s.nowFunc()),
 	}
+}
+
+// evaluateTidalGates resolves the operational state of tidal sluice gates mapped to the corridor.
+func (s *Service) evaluateTidalGates(roadKey string, now time.Time) []TidalGate {
+	gateDefs, exists := CorridorTidalGateMapping[normalizeCorridorKey(roadKey)]
+	if !exists || len(gateDefs) == 0 {
+		return nil
+	}
+
+	gates := make([]TidalGate, 0, len(gateDefs))
+	for _, gd := range gateDefs {
+		downstreamTide := 1.10
+		if s.tidePredictor != nil {
+			station := gd.Station
+			if station == "" {
+				station = "phu_an"
+			}
+			downstreamTide = s.tidePredictor.PredictTide(station, now)
+		}
+
+		isHighTide := downstreamTide >= 1.40
+		gate := TidalGate{
+			GateID:           gd.GateID,
+			Name:             gd.Name,
+			ObservedAt:       now,
+			DownstreamLevelM: math.Round(downstreamTide*100) / 100,
+		}
+		if isHighTide {
+			gate.Status = TidalGateClosedPumping
+			gate.StatusTextVI = "ĐÓNG NGĂN TRIỀU & BƠM"
+			gate.StatusTextEN = "CLOSED & PUMPING"
+			gate.PumpActive = true
+			gate.UpstreamLevelM = 0.75
+		} else {
+			gate.Status = TidalGateOpenGravity
+			gate.StatusTextVI = "MỞ XẢ TỰ NHIÊN"
+			gate.StatusTextEN = "OPEN (GRAVITY)"
+			gate.PumpActive = false
+			gate.UpstreamLevelM = math.Round(downstreamTide*100) / 100
+		}
+		gates = append(gates, gate)
+	}
+	return gates
 }
 
 // GetCorridorsOverview returns the operational route summary for all registered arterial corridors.

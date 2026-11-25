@@ -1,7 +1,10 @@
 // Package corridor provides arterial corridor geometry definitions and route analytics.
 package corridor
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // CorridorDefinition holds the static geographic geometry and operational attributes of an arterial corridor.
 type CorridorDefinition struct {
@@ -350,6 +353,62 @@ type CorridorRouteSummary struct {
 	CoveragePct        float64            `json:"coverage_pct"`
 	ChokepointCount    int                `json:"chokepoint_count"`
 	Vehicle            VehicleType        `json:"vehicle,omitempty"`
+	TidalGates         []TidalGate        `json:"tidal_gates,omitempty"`
+}
+
+// TidalGateStatus represents the operational state of a regional tidal control sluice gate.
+type TidalGateStatus string
+
+const (
+	TidalGateClosedPumping TidalGateStatus = "CLOSED_PUMPING"
+	TidalGateOpenGravity   TidalGateStatus = "OPEN_GRAVITY"
+	TidalGateMaintenance   TidalGateStatus = "MAINTENANCE"
+)
+
+// TidalGate models municipal tidal sluice gate telemetry mapped to an arterial corridor.
+type TidalGate struct {
+	GateID           string          `json:"gate_id"`
+	Name             string          `json:"name"`
+	Status           TidalGateStatus `json:"status"`
+	StatusTextVI     string          `json:"status_text_vi"`
+	StatusTextEN     string          `json:"status_text_en"`
+	UpstreamLevelM   float64         `json:"upstream_level_m"`
+	DownstreamLevelM float64         `json:"downstream_level_m"`
+	PumpActive       bool            `json:"pump_active"`
+	ObservedAt       time.Time       `json:"observed_at"`
+}
+
+// TidalGateDef maps a static floodgate identifier and human-readable Vietnamese name.
+type TidalGateDef struct {
+	GateID  string
+	Name    string
+	Station string
+}
+
+// CorridorTidalGateMapping associates canonical arterial corridors with municipal tidal gates.
+var CorridorTidalGateMapping = map[string][]TidalGateDef{
+	"nguyen_huu_canh": {
+		{GateID: "cong_nhieu_loc_thi_nghe", Name: "Cống Nhiêu Lộc - Thị Nghè", Station: "phu_an"},
+	},
+	"dien_bien_phu": {
+		{GateID: "cong_nhieu_loc_thi_nghe", Name: "Cống Nhiêu Lộc - Thị Nghè", Station: "phu_an"},
+	},
+	"xo_viet_nghe_tinh": {
+		{GateID: "cong_nhieu_loc_thi_nghe", Name: "Cống Nhiêu Lộc - Thị Nghè", Station: "phu_an"},
+	},
+	"vo_van_kiet": {
+		{GateID: "cong_ben_nghe", Name: "Cống Bến Nghé", Station: "phu_an"},
+	},
+	"huynh_tan_phat": {
+		{GateID: "cong_tan_thuan", Name: "Cống Tân Thuận", Station: "nha_be"},
+		{GateID: "cong_muong_chuoi", Name: "Cống Mương Chuối", Station: "nha_be"},
+	},
+	"quoc_lo_50": {
+		{GateID: "cong_cay_kho", Name: "Cống Cây Khô", Station: "nha_be"},
+	},
+	"mai_chi_tho": {
+		{GateID: "cong_phu_xuan", Name: "Cống Phú Xuân", Station: "nha_be"},
+	},
 }
 
 // GeoJSONGeometry models the geometry of a GeoJSON feature.
