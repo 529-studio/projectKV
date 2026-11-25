@@ -86,6 +86,7 @@ describe('NotificationDrawer & PromptBanner (Issue #550 / S19-T2)', () => {
     assert.match(content, /role="dialog"/, 'Must specify role="dialog"');
     assert.match(content, /aria-modal="true"/, 'Must specify aria-modal="true"');
     assert.match(content, /aria-labelledby=/, 'Must specify aria-labelledby');
+    assert.match(content, /z-\[980\]/, 'NotificationDrawer must layer above z-[800] map overlays and z-[970] SubscriptionModal');
 
     // Kiosk touch ergonomics: minimum 48px buttons and touch labels
     assert.match(

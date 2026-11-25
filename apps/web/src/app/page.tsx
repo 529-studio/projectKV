@@ -912,7 +912,7 @@ export default function Home() {
         }`}>
           {/* CORRIDOR OVERVIEW CARD */}
           {selectedCorridor && corridorRoute?.summary && !isCorridorCardDismissed && (
-            <div className="w-full px-3 pb-3">
+            <div className="w-full px-3 pb-3 flex justify-end">
               <CorridorOverviewCard
                 summary={corridorRoute.summary}
                 corridorCameras={corridorCameras}
