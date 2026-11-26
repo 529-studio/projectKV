@@ -34,3 +34,7 @@ protected:
   "file:.githooks/*": [maintainers]
   "file:.agents/*": [maintainers]
   "file:.github/workflows/*": [maintainers]
+
+links:
+  self-infras:
+    repo_id: "aff2d3a0-7c33-4270-8ea3-6cacc22bad4b"
