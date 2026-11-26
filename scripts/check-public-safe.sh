@@ -38,7 +38,7 @@ scan() { # scan <label> <regex> <pathspec...>
 
 echo "[INFO] Scanning every tracked file for internal infrastructure references..."
 scan "internal host name, private mesh address or admin endpoint" \
-  'home-srv|homesrv|dev-box|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+|portainer\.529studio\.site|n8n\.529studio\.site|hub\.529studio\.site' \
+  'home-srv|homesrv|dev-box|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+|portainer\.529studio\.site|n8n\.529studio\.site|(^|[^a-zA-Z0-9-])hub\.529studio\.site' \
   .
 
 echo "[INFO] Scanning every tracked file for credential material..."
