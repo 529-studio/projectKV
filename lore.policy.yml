@@ -1,0 +1,40 @@
+# Team policy for the projectKV repository.
+# Team mode is enabled by LORE_TEAM_SECRET; without that variable the store runs local-only.
+# Evidence-backed claims (T0 tests, T1 files/tools) auto-promote; human chat (T3) and agent
+# inference (T4) stay maintainer-only, so agent memory cannot rewrite the agent contract, the
+# hooks or the release pipeline on its own.
+
+roles:
+  maintainers: [giangdq.01012003@gmail.com]
+  contributors: [vuthanhdat181@gmail.com]
+  machines: ["*"]
+
+approve:
+  t0: ["*"]
+  t1: ["*"]
+  t3: [maintainers]
+  t4: [maintainers]
+
+resolve:
+  "*": [maintainers]
+
+redact: [maintainers]
+purge: [maintainers]
+promote: [maintainers]
+attest: [maintainers]
+revert: [maintainers]
+
+# The agent contract, hooks, container build and CI are written by a maintainer, not by an
+# ingested claim.
+protected:
+  "file:AGENTS.md": [maintainers]
+  "file:CLAUDE.md": [maintainers]
+  "file:GEMINI.md": [maintainers]
+  "file:Dockerfile": [maintainers]
+  "file:.githooks/*": [maintainers]
+  "file:.agents/*": [maintainers]
+  "file:.github/workflows/*": [maintainers]
+
+links:
+  self-infras:
+    repo_id: "aff2d3a0-7c33-4270-8ea3-6cacc22bad4b"
