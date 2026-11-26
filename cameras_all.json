@@ -323,8 +323,8 @@
     "id": "595dd8463dcfc400106f28b2",
     "title": "TTH 21.69",
     "displayName": "Quốc lộ 1 - Đường Lê Thị Riêng 2",
-    "status": "UP",
-    "isOnline": true,
+    "status": "NOT_IMAGE",
+    "isOnline": false,
     "latitude": 10.8619248135124,
     "longitude": 106.654415130615,
     "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=595dd8463dcfc400106f28b2"
@@ -573,8 +573,8 @@
     "id": "56df8108c062921100c143db",
     "title": "TTH 23",
     "displayName": "Hoàng Minh Giám - Hồng Hà",
-    "status": "UP",
-    "isOnline": true,
+    "status": "NOT_IMAGE",
+    "isOnline": false,
     "latitude": 10.8090315732439,
     "longitude": 106.674022078514,
     "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=56df8108c062921100c143db"
@@ -3304,8 +3304,8 @@
     "id": "595dd7693dcfc400106f28b0",
     "title": "TTH 21.68",
     "displayName": "Quốc lộ 1 - Đường Lê Thị Riêng 1",
-    "status": "UP",
-    "isOnline": true,
+    "status": "NOT_IMAGE",
+    "isOnline": false,
     "latitude": 10.8619248135124,
     "longitude": 106.65426492691,
     "snapshotUrl": "https://giaothong.hochiminhcity.gov.vn/render/ImageHandler.ashx?id=595dd7693dcfc400106f28b0"
