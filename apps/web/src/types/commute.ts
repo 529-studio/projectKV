@@ -41,11 +41,16 @@ export interface CommuteBottleneck {
 
 export interface DetourSuggestion {
   original_corridor_key: string;
+  original_corridor_name?: string;
   detour_corridor_key: string;
   detour_corridor_name: string;
+  detour_path?: string[];
+  detour_path_names?: string[];
   passability_verdict: PassabilityVerdict;
   max_depth_cm?: number | null;
   delay_seconds: number;
+  estimated_delta_seconds?: number;
+  is_dry_route?: boolean;
   reason: {
     vi: string;
     en: string;
@@ -68,6 +73,7 @@ export interface CommuteEvaluation {
   corridors: string[];
   corridor_summaries: CorridorRouteSummary[];
   detour: DetourSuggestion | null;
+  detours?: DetourSuggestion[];
   vehicle: VehicleType;
 }
 
@@ -125,11 +131,19 @@ export const COMMUTE_I18N = {
   },
   DETOUR_AVAILABLE: {
     vi: 'Lộ trình thay thế khả dụng:',
-    en: 'Recommended detour route:',
+    en: 'Recommended detour routes:',
   },
   VIEW_DETOUR: {
     vi: 'Xem lộ trình tránh',
     en: 'View detour',
+  },
+  DRY_ROUTE_TAG: {
+    vi: 'Khô ráo',
+    en: 'Dry',
+  },
+  SAFER_ROUTE_TAG: {
+    vi: 'Ít ngập hơn',
+    en: 'Safer',
   },
   SUBSCRIBE_TELEGRAM: {
     vi: 'Nhận thông báo tuyến này',
