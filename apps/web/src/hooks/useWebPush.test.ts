@@ -91,5 +91,23 @@ describe('useWebPush pure utilities (Issue #525)', () => {
       assert.equal(mapPushPermission(null, true), 'default');
       assert.equal(mapPushPermission(undefined, true), 'default');
     });
+
+    // Denial-recovery contract pins (S20-P0, Issue #569).
+    // These tests exist to guard the denial-recovery UX: a 'denied' permission
+    // must map to the 'denied' state so the UI can show recovery instructions,
+    // not silently fall back to 'default' and re-prompt the user.
+    test('denied permission with supported=true pins denial recovery state', () => {
+      assert.equal(mapPushPermission('denied', true), 'denied');
+    });
+
+    test('denied permission with supported=false returns unsupported not denied', () => {
+      assert.equal(mapPushPermission('denied', false), 'unsupported');
+    });
+
+    test('null permission with supported=true maps to default after clearing site permissions', () => {
+      // After the user clears site permissions, Notification.permission becomes null.
+      // The app must treat this as 'default' (not 'denied') so the prompt re-appears.
+      assert.equal(mapPushPermission(null, true), 'default');
+    });
   });
 });
