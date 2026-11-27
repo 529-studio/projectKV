@@ -107,6 +107,12 @@ jobs:
           npm test
           npm run build
 
+      - name: Playwright e2e (mobile 390x844)
+        run: |
+          cd apps/web
+          npx playwright install chromium --with-deps
+          npm run test:e2e
+
   verify-tools-dataset:
     name: Verify Tools & Dataset Integrity
     needs: detect-changes
