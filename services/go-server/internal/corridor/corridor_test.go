@@ -784,6 +784,54 @@ func TestEvaluateCommute_MultiCorridorAndDetour(t *testing.T) {
 	if httpResp.Detour == nil || httpResp.Detour.DetourCorridorKey != "dien_bien_phu" {
 		t.Errorf("expected detour to dien_bien_phu from API, got %+v", httpResp.Detour)
 	}
+	if len(httpResp.Detours) != 1 || httpResp.Detours[0].DetourCorridorKey != "dien_bien_phu" || !httpResp.Detours[0].IsDryRoute {
+		t.Errorf("expected 1 dry detour to dien_bien_phu in detours[], got %+v", httpResp.Detours)
+	}
+}
+
+func TestEvaluateCommute_MultiPointRankedDetours(t *testing.T) {
+	now := time.Now()
+	d30 := 30.0 // impassable for scooter (>= 20cm)
+	d12 := 12.0 // caution for scooter (>= 10cm, < 20cm)
+
+	cams := []camera.Camera{
+		{ID: "cam-nhc", DisplayName: "NHC", RoadKey: "nguyen_huu_canh", RoadKeys: []string{"nguyen_huu_canh"}},
+		{ID: "cam-dbp", DisplayName: "DBP", RoadKey: "dien_bien_phu", RoadKeys: []string{"dien_bien_phu"}},
+		{ID: "cam-pvd", DisplayName: "PVD", RoadKey: "pham_van_dong", RoadKeys: []string{"pham_van_dong"}},
+		{ID: "cam-vvk", DisplayName: "VVK", RoadKey: "vo_van_kiet", RoadKeys: []string{"vo_van_kiet"}},
+		{ID: "cam-nvl", DisplayName: "NVL", RoadKey: "nguyen_van_linh", RoadKeys: []string{"nguyen_van_linh"}},
+	}
+
+	verdicts := []hotset.Verdict{
+		{CameraID: "cam-nhc", Severity: "CONGESTED", FloodSeverity: "FLOODED_DEEP", FloodDepthCm: &d30, ObservedAt: now.Add(-10 * time.Second)},
+		{CameraID: "cam-dbp", Severity: "MODERATE", FloodSeverity: "FLOODED_SHALLOW", FloodDepthCm: &d12, ObservedAt: now.Add(-10 * time.Second)},
+		{CameraID: "cam-pvd", Severity: "CLEAR", FloodSeverity: "DRY", ObservedAt: now.Add(-10 * time.Second)},
+		{CameraID: "cam-vvk", Severity: "CONGESTED", FloodSeverity: "FLOODED_DEEP", FloodDepthCm: &d30, ObservedAt: now.Add(-10 * time.Second)},
+		{CameraID: "cam-nvl", Severity: "CLEAR", FloodSeverity: "DRY", ObservedAt: now.Add(-10 * time.Second)},
+	}
+
+	svc := NewService(&mockCameraProvider{cameras: cams}, &mockVerdictProvider{verdicts: verdicts}, "production", 180*time.Second)
+
+	// Multi-corridor hazardous route (NHC + VVK):
+	// - VVK has direct 1-hop DRY detour: nguyen_van_linh (PASSABLE)
+	// - NHC has 1-hop CAUTION safer fallback: dien_bien_phu (12cm < 30cm), and 2-hop chain dien_bien_phu -> pham_van_dong
+	res := svc.EvaluateCommute([]string{"nguyen_huu_canh", "vo_van_kiet"}, VehicleScooter)
+	if len(res.Detours) < 2 {
+		t.Fatalf("expected at least 2 ranked detours across hazardous corridors, got %d (%+v)", len(res.Detours), res.Detours)
+	}
+	if res.Detour == nil || res.Detour.DetourCorridorKey != "nguyen_van_linh" || !res.Detour.IsDryRoute {
+		t.Fatalf("expected top-ranked detour to be dry 1-hop nguyen_van_linh, got %+v", res.Detour)
+	}
+
+	foundTwoHop := false
+	for _, d := range res.Detours {
+		if d.OriginalCorridorKey == "nguyen_huu_canh" && len(d.DetourPath) == 2 && d.DetourPath[0] == "dien_bien_phu" && d.DetourPath[1] == "pham_van_dong" {
+			foundTwoHop = true
+		}
+	}
+	if !foundTwoHop {
+		t.Errorf("expected 2-hop multi-point bypass [dien_bien_phu, pham_van_dong] in detours, got %+v", res.Detours)
+	}
 }
 
 type mockFloodHistoryProvider struct {

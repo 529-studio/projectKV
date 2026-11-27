@@ -5,7 +5,7 @@ import type { CommuteConfig, CommuteEvaluation } from '../types/commute.ts';
 import { COMMUTE_I18N } from '../types/commute.ts';
 import type { VehicleType } from '../types/vehicle.ts';
 import { VEHICLE_PROFILES } from '../types/vehicle.ts';
-import { formatCommuteDuration, formatCommuteDelay } from '../utils/commuteRouteUtils.ts';
+import { formatCommuteDuration, formatCommuteDelay, formatDetourDelta } from '../utils/commuteRouteUtils.ts';
 import { normalizeBotUsername } from '../utils/subscriptionUtils.ts';
 
 interface MyRouteCardProps {
@@ -283,29 +283,86 @@ export default function MyRouteCard({
             </div>
           )}
 
-          {/* DETOUR RECOMMENDATION (IF DETOUR AVAILABLE) */}
-          {evaluation?.detour && (
-            <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/80 text-xs flex items-center justify-between gap-2">
-              <div className="space-y-0.5 min-w-0">
-                <span className="font-semibold text-emerald-300 block">
+          {/* DETOUR RECOMMENDATIONS (IF DETOURS AVAILABLE) */}
+          {(() => {
+            const detourOptions =
+              evaluation?.detours && evaluation.detours.length > 0
+                ? evaluation.detours
+                : evaluation?.detour
+                  ? [evaluation.detour]
+                  : [];
+            if (detourOptions.length === 0) return null;
+
+            return (
+              <div className="space-y-1.5" role="list" aria-label={COMMUTE_I18N.DETOUR_AVAILABLE[lang]}>
+                <span className="font-semibold text-emerald-300 text-xs block">
                   {COMMUTE_I18N.DETOUR_AVAILABLE[lang]}
                 </span>
-                <p className="text-emerald-200/90 text-[11px] truncate">
-                  {evaluation.detour.reason[lang]}
-                </p>
-              </div>
+                {detourOptions.map((opt, idx) => {
+                  const isDry = opt.is_dry_route ?? opt.passability_verdict === 'PASSABLE';
+                  const pathLabel =
+                    opt.detour_path_names && opt.detour_path_names.length > 1
+                      ? opt.detour_path_names.join(' ➔ ')
+                      : opt.detour_corridor_name;
+                  const deltaLabel =
+                    typeof opt.estimated_delta_seconds === 'number'
+                      ? formatDetourDelta(opt.estimated_delta_seconds, lang)
+                      : null;
 
-              {onSelectDetour && (
-                <button
-                  type="button"
-                  onClick={() => onSelectDetour(evaluation.detour!.detour_corridor_key)}
-                  className="min-h-[48px] px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shrink-0 transition-colors cursor-pointer shadow flex items-center justify-center"
-                >
-                  {COMMUTE_I18N.VIEW_DETOUR[lang]}
-                </button>
-              )}
-            </div>
-          )}
+                  return (
+                    <div
+                      key={`${opt.original_corridor_key}-${opt.detour_corridor_key}-${idx}`}
+                      role="listitem"
+                      className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 ${
+                        isDry
+                          ? 'bg-emerald-950/40 border-emerald-800/80'
+                          : 'bg-amber-950/40 border-amber-800/80'
+                      }`}
+                    >
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`font-semibold truncate ${isDry ? 'text-emerald-200' : 'text-amber-200'}`}>
+                            {pathLabel}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                              isDry
+                                ? 'bg-emerald-900/60 border-emerald-700 text-emerald-200'
+                                : 'bg-amber-900/60 border-amber-700 text-amber-200'
+                            }`}
+                          >
+                            {isDry ? COMMUTE_I18N.DRY_ROUTE_TAG[lang] : COMMUTE_I18N.SAFER_ROUTE_TAG[lang]}
+                          </span>
+                          {deltaLabel && (
+                            <span className="text-[10px] text-zinc-400">
+                              {deltaLabel}
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-[11px] truncate ${isDry ? 'text-emerald-200/90' : 'text-amber-200/90'}`}>
+                          {opt.reason[lang]}
+                        </p>
+                      </div>
+
+                      {onSelectDetour && (
+                        <button
+                          type="button"
+                          onClick={() => onSelectDetour(opt.detour_corridor_key)}
+                          className={`min-h-[48px] px-3.5 py-2 text-xs font-semibold rounded-lg text-white shrink-0 transition-colors cursor-pointer shadow flex items-center justify-center ${
+                            isDry
+                              ? 'bg-emerald-600 hover:bg-emerald-500'
+                              : 'bg-amber-600 hover:bg-amber-500'
+                          }`}
+                        >
+                          {COMMUTE_I18N.VIEW_DETOUR[lang]}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* BOTTOM ACTIONS: TELEGRAM ALERT & ZERO TELEMETRY */}
           <div className="pt-1 border-t border-zinc-800 flex items-center justify-between text-[11px] text-zinc-400">

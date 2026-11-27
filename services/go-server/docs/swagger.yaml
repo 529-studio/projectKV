@@ -242,6 +242,10 @@ definitions:
         type: integer
       detour:
         $ref: '#/definitions/corridor.DetourSuggestion'
+      detours:
+        items:
+          $ref: '#/definitions/corridor.DetourSuggestion'
+        type: array
       estimated_seconds:
         type: integer
       free_flow_seconds:
@@ -380,9 +384,23 @@ definitions:
         type: string
       detour_corridor_name:
         type: string
+      detour_path:
+        items:
+          type: string
+        type: array
+      detour_path_names:
+        items:
+          type: string
+        type: array
+      estimated_delta_seconds:
+        type: integer
+      is_dry_route:
+        type: boolean
       max_depth_cm:
         type: number
       original_corridor_key:
+        type: string
+      original_corridor_name:
         type: string
       passability_verdict:
         $ref: '#/definitions/corridor.PassabilityVerdict'

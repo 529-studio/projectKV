@@ -445,13 +445,18 @@ type CommuteHazardBottleneck struct {
 
 // DetourSuggestion represents a recommended alternative bypass corridor when the primary route is impassable or hazardous.
 type DetourSuggestion struct {
-	OriginalCorridorKey string             `json:"original_corridor_key"`
-	DetourCorridorKey   string             `json:"detour_corridor_key"`
-	DetourCorridorName  string             `json:"detour_corridor_name"`
-	PassabilityVerdict  PassabilityVerdict `json:"passability_verdict"`
-	MaxDepthCm          *float64           `json:"max_depth_cm,omitempty"`
-	DelaySeconds        int                `json:"delay_seconds"`
-	Reason              string             `json:"reason"`
+	OriginalCorridorKey   string             `json:"original_corridor_key"`
+	OriginalCorridorName  string             `json:"original_corridor_name,omitempty"`
+	DetourCorridorKey     string             `json:"detour_corridor_key"`
+	DetourCorridorName    string             `json:"detour_corridor_name"`
+	DetourPath            []string           `json:"detour_path,omitempty"`
+	DetourPathNames       []string           `json:"detour_path_names,omitempty"`
+	PassabilityVerdict    PassabilityVerdict `json:"passability_verdict"`
+	MaxDepthCm            *float64           `json:"max_depth_cm,omitempty"`
+	DelaySeconds          int                `json:"delay_seconds"`
+	EstimatedDeltaSeconds int                `json:"estimated_delta_seconds"`
+	IsDryRoute            bool               `json:"is_dry_route"`
+	Reason                string             `json:"reason"`
 }
 
 // CommuteEvaluationResponse aggregates safety passability, travel duration, delays, worst bottleneck, and detour options for a multi-corridor journey.
@@ -464,6 +469,7 @@ type CommuteEvaluationResponse struct {
 	DelaySeconds       int                      `json:"delay_seconds"`
 	WorstBottleneck    *CommuteHazardBottleneck `json:"worst_bottleneck,omitempty"`
 	Detour             *DetourSuggestion        `json:"detour,omitempty"`
+	Detours            []DetourSuggestion       `json:"detours,omitempty"`
 	Corridors          []CorridorRouteSummary   `json:"corridors"`
 	Vehicle            VehicleType              `json:"vehicle"`
 }
