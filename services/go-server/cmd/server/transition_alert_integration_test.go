@@ -106,7 +106,9 @@ func TestTransitionAlertIntegration_EndToEnd(t *testing.T) {
 
 	dispatcher := makeFloodAlertDispatcher(catalog, chokepoints, notifyMgr, corridorSvc)
 
-	t0 := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+	// Anchor t0 to the current time so corridorSvc's 5m stale-verdict TTL
+	// never expires Scenario 2's verdict on future calendar dates.
+	t0 := time.Now().UTC().Add(-2 * time.Minute)
 
 	// Scenario 1: Initial CLEAR verdict -> 0 flood alerts dispatched
 	vClear := hotset.Verdict{

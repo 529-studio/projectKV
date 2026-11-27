@@ -29,6 +29,7 @@ export default function MyRouteSetupModal({
   const [homeName, setHomeName] = useState('');
   const [workName, setWorkName] = useState('');
   const [selectedCorridors, setSelectedCorridors] = useState<string[]>([]);
+  const [corridorError, setCorridorError] = useState<string | null>(null);
 
   useEffect(() => {
     if (config) {
@@ -61,6 +62,11 @@ export default function MyRouteSetupModal({
   };
 
   const handleSave = () => {
+    if (selectedCorridors.length === 0) {
+      setCorridorError(lang === 'vi' ? 'Chọn ít nhất 1 trục đường.' : 'Select at least one corridor.');
+      return;
+    }
+    setCorridorError(null);
     const newConfig: CommuteConfig = {
       home: {
         name: homeName.trim() || (lang === 'vi' ? 'Nhà' : 'Home'),
@@ -72,7 +78,7 @@ export default function MyRouteSetupModal({
         lat: config?.work?.lat || 10.776,
         lng: config?.work?.lng || 106.703,
       },
-      selectedCorridors: selectedCorridors.length > 0 ? selectedCorridors : ['nguyen_huu_canh'],
+      selectedCorridors,
       direction: config?.direction || 'to_work',
       enabled: true,
     };
@@ -205,6 +211,9 @@ export default function MyRouteSetupModal({
                 })}
               </div>
             </div>
+            {corridorError && (
+              <p role="alert" className="mt-1 text-[11px] text-rose-400">{corridorError}</p>
+            )}
           </div>
 
           {/* PRIVACY GUARANTEE */}

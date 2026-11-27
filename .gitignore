@@ -81,6 +81,8 @@ runs/
 # Local agent session artefacts
 .zcode/
 .agents/teamwork/
+INTERVIEW_DEFENSE.md
+warded-fresher-onboarding.md
 
 # Local agent scratchpad
 scratch/
