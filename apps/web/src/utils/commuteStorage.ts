@@ -130,6 +130,10 @@ export function getStoredCommuteConfig(): CommuteConfig | null {
     if (parsed && typeof parsed === 'object') {
       return {
         home: parsed.home ?? null,
+        waypoint:
+          parsed.waypoint && typeof parsed.waypoint === 'object' && parsed.waypoint.name
+            ? parsed.waypoint
+            : null,
         work: parsed.work ?? null,
         selectedCorridors: Array.isArray(parsed.selectedCorridors) ? parsed.selectedCorridors : [],
         direction: parsed.direction === 'to_home' ? 'to_home' : 'to_work',

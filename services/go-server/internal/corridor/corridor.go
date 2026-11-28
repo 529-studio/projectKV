@@ -963,14 +963,15 @@ func (s *Service) GetCorridorsOverview(vehicle ...VehicleType) []CorridorRouteSu
 // CorridorDetourPairs defines canonical arterial detour pairings in Ho Chi Minh City.
 var CorridorDetourPairs = map[string][]string{
 	"nguyen_huu_canh":     {"dien_bien_phu"},
-	"dien_bien_phu":       {"nguyen_huu_canh", "pham_van_dong"},
+	"dien_bien_phu":       {"nguyen_huu_canh", "pham_van_dong", "mai_chi_tho"},
 	"cach_mang_thang_tam": {"nam_ky_khoi_nghia"},
-	"nam_ky_khoi_nghia":   {"cach_mang_thang_tam"},
+	"nam_ky_khoi_nghia":   {"cach_mang_thang_tam", "dien_bien_phu"},
 	"cong_hoa":            {"pham_van_dong", "cach_mang_thang_tam"},
-	"pham_van_dong":       {"cong_hoa", "dien_bien_phu"},
+	"pham_van_dong":       {"cong_hoa", "dien_bien_phu", "quoc_lo_1"},
 	"vo_van_kiet":         {"nguyen_van_linh"},
-	"nguyen_van_linh":     {"vo_van_kiet"},
-	"mai_chi_tho":         {"dien_bien_phu"},
+	"nguyen_van_linh":     {"vo_van_kiet", "quoc_lo_1"},
+	"mai_chi_tho":         {"dien_bien_phu", "vo_van_kiet"},
+	"quoc_lo_1":           {"pham_van_dong", "nguyen_van_linh"},
 }
 
 // passabilityRank maps verdict to integer severity rank: IMPASSABLE (3) > CAUTION (2) > UNKNOWN (1) > PASSABLE (0).
@@ -1004,6 +1005,7 @@ func (s *Service) EvaluateCommute(corridorKeys []string, vehicle VehicleType) *C
 		worstStatusColor = "#22c55e"
 		worstBottleneck  *CommuteHazardBottleneck
 		impassableKeys   []string
+		badSummaries     = make(map[string]CorridorRouteSummary)
 		seenKeys         = make(map[string]bool)
 	)
 
@@ -1123,55 +1125,15 @@ func (s *Service) EvaluateCommute(corridorKeys []string, vehicle VehicleType) *C
 
 		if summary.PassabilityVerdict == PassabilityImpassable || summary.PassabilityVerdict == PassabilityCaution {
 			impassableKeys = append(impassableKeys, def.Key)
+			badSummaries[def.Key] = *summary
 		}
 	}
 
-	// Detour determination: if journey is Impassable or Caution, seek a passable alternative
+	detours := s.buildDetourSuggestions(impassableKeys, badSummaries, seenKeys, vehicle)
 	var detour *DetourSuggestion
-	if len(impassableKeys) > 0 {
-		for _, badKey := range impassableKeys {
-			pairs, exists := CorridorDetourPairs[badKey]
-			if !exists {
-				continue
-			}
-
-			badDef, _ := ArterialCorridors[badKey]
-			for _, candidateKey := range pairs {
-				// Avoid suggesting a corridor that is already part of the user's route
-				if seenKeys[candidateKey] {
-					continue
-				}
-
-				candDef, ok := ArterialCorridors[candidateKey]
-				if !ok {
-					continue
-				}
-
-				candStatus, hasStatus := s.GetStatus(candidateKey)
-				var candSummary *CorridorRouteSummary
-				if !hasStatus || candStatus == nil {
-					continue
-				}
-				candSummary = s.calculateRouteSummary(&candDef, candStatus, vehicle)
-
-				// A viable detour must be PASSABLE, or strictly safer than the original corridor
-				if candSummary.PassabilityVerdict == PassabilityPassable {
-					detour = &DetourSuggestion{
-						OriginalCorridorKey: badKey,
-						DetourCorridorKey:   candDef.Key,
-						DetourCorridorName:  candDef.DisplayName,
-						PassabilityVerdict:  candSummary.PassabilityVerdict,
-						MaxDepthCm:          candSummary.MaxDepthCm,
-						DelaySeconds:        candSummary.DelaySeconds,
-						Reason:              fmt.Sprintf("Tránh tuyến %s (%s); %s thông thoáng và an toàn.", badDef.DisplayName, badKey, candDef.DisplayName),
-					}
-					break
-				}
-			}
-			if detour != nil {
-				break
-			}
-		}
+	if len(detours) > 0 {
+		first := detours[0]
+		detour = &first
 	}
 
 	return &CommuteEvaluationResponse{
@@ -1183,9 +1145,240 @@ func (s *Service) EvaluateCommute(corridorKeys []string, vehicle VehicleType) *C
 		DelaySeconds:       delaySeconds,
 		WorstBottleneck:    worstBottleneck,
 		Detour:             detour,
+		Detours:            detours,
 		Corridors:          summaries,
 		Vehicle:            vehicle,
 	}
+}
+
+const maxDetourSuggestions = 4
+
+func (s *Service) evalCandidateSummary(key string, vehicle VehicleType, cache map[string]*CorridorRouteSummary) (CorridorDefinition, *CorridorRouteSummary, bool) {
+	def, ok := ArterialCorridors[key]
+	if !ok {
+		return CorridorDefinition{}, nil, false
+	}
+	if cached, found := cache[key]; found {
+		return def, cached, cached != nil
+	}
+	status, hasStatus := s.GetStatus(key)
+	if !hasStatus || status == nil {
+		cache[key] = nil
+		return def, nil, false
+	}
+	summary := s.calculateRouteSummary(&def, status, vehicle)
+	cache[key] = summary
+	return def, summary, true
+}
+
+func maxOptFloat(a, b *float64) *float64 {
+	if a == nil && b == nil {
+		return nil
+	}
+	val := 0.0
+	has := false
+	if a != nil {
+		val = *a
+		has = true
+	}
+	if b != nil && (!has || *b > val) {
+		val = *b
+	}
+	return &val
+}
+
+func isStrictlySaferDetour(bad, cand *CorridorRouteSummary) bool {
+	if cand.PassabilityVerdict == PassabilityPassable {
+		return true
+	}
+	if bad.PassabilityVerdict != PassabilityImpassable || cand.PassabilityVerdict != PassabilityCaution {
+		return false
+	}
+	if bad.MaxDepthCm != nil && cand.MaxDepthCm != nil {
+		return *cand.MaxDepthCm < *bad.MaxDepthCm
+	}
+	return bad.MaxDepthCm != nil && *bad.MaxDepthCm > 0
+}
+
+func (s *Service) buildDetourSuggestions(
+	impassableKeys []string,
+	badSummaries map[string]CorridorRouteSummary,
+	seenKeys map[string]bool,
+	vehicle VehicleType,
+) []DetourSuggestion {
+	if len(impassableKeys) == 0 {
+		return nil
+	}
+
+	// Evaluate worst corridors first (IMPASSABLE before CAUTION, deepest flood first).
+	orderedBad := append([]string(nil), impassableKeys...)
+	sort.SliceStable(orderedBad, func(i, j int) bool {
+		si := badSummaries[orderedBad[i]]
+		sj := badSummaries[orderedBad[j]]
+		ri, rj := passabilityRank(si.PassabilityVerdict), passabilityRank(sj.PassabilityVerdict)
+		if ri != rj {
+			return ri > rj
+		}
+		di, dj := 0.0, 0.0
+		if si.MaxDepthCm != nil {
+			di = *si.MaxDepthCm
+		}
+		if sj.MaxDepthCm != nil {
+			dj = *sj.MaxDepthCm
+		}
+		return di > dj
+	})
+
+	cache := make(map[string]*CorridorRouteSummary)
+	bestByPair := make(map[string]DetourSuggestion)
+
+	recordCandidate := func(cand DetourSuggestion) {
+		dedupeKey := cand.OriginalCorridorKey + "->" + cand.DetourCorridorKey
+		existing, exists := bestByPair[dedupeKey]
+		if !exists {
+			bestByPair[dedupeKey] = cand
+			return
+		}
+		// Keep dry over caution, and shorter hop chains for the same destination.
+		if cand.IsDryRoute != existing.IsDryRoute {
+			if cand.IsDryRoute {
+				bestByPair[dedupeKey] = cand
+			}
+			return
+		}
+		if len(cand.DetourPath) != len(existing.DetourPath) {
+			if len(cand.DetourPath) < len(existing.DetourPath) {
+				bestByPair[dedupeKey] = cand
+			}
+			return
+		}
+		candDepth, existDepth := 0.0, 0.0
+		if cand.MaxDepthCm != nil {
+			candDepth = *cand.MaxDepthCm
+		}
+		if existing.MaxDepthCm != nil {
+			existDepth = *existing.MaxDepthCm
+		}
+		if candDepth != existDepth {
+			if candDepth < existDepth {
+				bestByPair[dedupeKey] = cand
+			}
+			return
+		}
+		if cand.EstimatedDeltaSeconds < existing.EstimatedDeltaSeconds {
+			bestByPair[dedupeKey] = cand
+		}
+	}
+
+	for _, badKey := range orderedBad {
+		badDef := ArterialCorridors[badKey]
+		badSummary := badSummaries[badKey]
+
+		for _, c1 := range CorridorDetourPairs[badKey] {
+			if seenKeys[c1] {
+				continue
+			}
+			def1, sum1, ok1 := s.evalCandidateSummary(c1, vehicle, cache)
+			if !ok1 {
+				continue
+			}
+
+			if isStrictlySaferDetour(&badSummary, sum1) {
+				isDry := sum1.PassabilityVerdict == PassabilityPassable
+				reason := fmt.Sprintf("Tránh tuyến %s (%s); %s thông thoáng và an toàn.", badDef.DisplayName, badKey, def1.DisplayName)
+				if !isDry {
+					reason = fmt.Sprintf("Tránh điểm ngập sâu trên %s; %s ít ngập hơn.", badDef.DisplayName, def1.DisplayName)
+				}
+				recordCandidate(DetourSuggestion{
+					OriginalCorridorKey:   badKey,
+					OriginalCorridorName:  badDef.DisplayName,
+					DetourCorridorKey:     def1.Key,
+					DetourCorridorName:    def1.DisplayName,
+					DetourPath:            []string{def1.Key},
+					DetourPathNames:       []string{def1.DisplayName},
+					PassabilityVerdict:    sum1.PassabilityVerdict,
+					MaxDepthCm:            sum1.MaxDepthCm,
+					DelaySeconds:          sum1.DelaySeconds,
+					EstimatedDeltaSeconds: sum1.EstimatedSeconds - badSummary.EstimatedSeconds,
+					IsDryRoute:            isDry,
+					Reason:                reason,
+				})
+			}
+
+			// Explore 2-hop multi-point bypass chains when hop 1 is traversable.
+			if sum1.PassabilityVerdict != PassabilityPassable && !isStrictlySaferDetour(&badSummary, sum1) {
+				continue
+			}
+			for _, c2 := range CorridorDetourPairs[c1] {
+				if c2 == badKey || c2 == c1 || seenKeys[c2] {
+					continue
+				}
+				def2, sum2, ok2 := s.evalCandidateSummary(c2, vehicle, cache)
+				if !ok2 || sum2.PassabilityVerdict != PassabilityPassable {
+					continue
+				}
+				pathVerdict := PassabilityPassable
+				if sum1.PassabilityVerdict != PassabilityPassable {
+					pathVerdict = sum1.PassabilityVerdict
+				}
+				isDryPath := pathVerdict == PassabilityPassable
+				recordCandidate(DetourSuggestion{
+					OriginalCorridorKey:   badKey,
+					OriginalCorridorName:  badDef.DisplayName,
+					DetourCorridorKey:     def2.Key,
+					DetourCorridorName:    def2.DisplayName,
+					DetourPath:            []string{def1.Key, def2.Key},
+					DetourPathNames:       []string{def1.DisplayName, def2.DisplayName},
+					PassabilityVerdict:    pathVerdict,
+					MaxDepthCm:            maxOptFloat(sum1.MaxDepthCm, sum2.MaxDepthCm),
+					DelaySeconds:          sum1.DelaySeconds + sum2.DelaySeconds,
+					EstimatedDeltaSeconds: (sum1.EstimatedSeconds + sum2.EstimatedSeconds) - badSummary.EstimatedSeconds,
+					IsDryRoute:            isDryPath,
+					Reason:                fmt.Sprintf("Lộ trình vòng 2 chặng tránh %s: qua %s rồi %s.", badDef.DisplayName, def1.DisplayName, def2.DisplayName),
+				})
+			}
+		}
+	}
+
+	if len(bestByPair) == 0 {
+		return nil
+	}
+
+	ranked := make([]DetourSuggestion, 0, len(bestByPair))
+	for _, s := range bestByPair {
+		ranked = append(ranked, s)
+	}
+
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].IsDryRoute != ranked[j].IsDryRoute {
+			return ranked[i].IsDryRoute
+		}
+		if len(ranked[i].DetourPath) != len(ranked[j].DetourPath) {
+			return len(ranked[i].DetourPath) < len(ranked[j].DetourPath)
+		}
+		di, dj := 0.0, 0.0
+		if ranked[i].MaxDepthCm != nil {
+			di = *ranked[i].MaxDepthCm
+		}
+		if ranked[j].MaxDepthCm != nil {
+			dj = *ranked[j].MaxDepthCm
+		}
+		if di != dj {
+			return di < dj
+		}
+		if ranked[i].EstimatedDeltaSeconds != ranked[j].EstimatedDeltaSeconds {
+			return ranked[i].EstimatedDeltaSeconds < ranked[j].EstimatedDeltaSeconds
+		}
+		if ranked[i].OriginalCorridorKey != ranked[j].OriginalCorridorKey {
+			return ranked[i].OriginalCorridorKey < ranked[j].OriginalCorridorKey
+		}
+		return ranked[i].DetourCorridorKey < ranked[j].DetourCorridorKey
+	})
+
+	if len(ranked) > maxDetourSuggestions {
+		ranked = ranked[:maxDetourSuggestions]
+	}
+	return ranked
 }
 
 func floodRank(s string) int {

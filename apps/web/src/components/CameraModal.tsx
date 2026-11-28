@@ -26,6 +26,13 @@ import {
   isFloodReportDisabled,
   getCameraReportCooldown,
   setCameraReportCooldown,
+  CAMERA_ZOOM_I18N,
+  clampZoomScale,
+  nextTapZoom,
+  clampPanOffset,
+  selectBaselineSnapshot,
+  type SnapshotCompareMode,
+  type ArchivedSnapshotCandidate,
 } from '../utils/cameraModalUtils';
 
 // Module-level timestamp tracking so 15s cooldown persists across modal closes and reopens (Issue #223)
@@ -96,6 +103,29 @@ export default function CameraModal({
   const mountTimeRef = useRef<number>(Date.now());
   // Camera id whose ghost probe is currently in flight (prevents duplicate probes).
   const probeInFlightRef = useRef<string | null>(null);
+
+  // Tap/pinch zoom & time-lapse compare state (Issue #580)
+  const [zoomScale, setZoomScale] = useState<number>(1);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [compareMode, setCompareMode] = useState<SnapshotCompareMode>('live');
+  const [splitPercent, setSplitPercent] = useState<number>(50);
+  const [baselineSnapshot, setBaselineSnapshot] = useState<ArchivedSnapshotCandidate | null>(null);
+  const imageContainerRef = useRef<HTMLDivElement | null>(null);
+  const touchGestureRef = useRef<{
+    pinchStartDist: number | null;
+    pinchStartScale: number;
+    dragStartX: number;
+    dragStartY: number;
+    panStartX: number;
+    panStartY: number;
+  }>({
+    pinchStartDist: null,
+    pinchStartScale: 1,
+    dragStartX: 0,
+    dragStartY: 0,
+    panStartX: 0,
+    panStartY: 0,
+  });
 
   // Language rendered inside the modal (AC16 / M10). The modal can switch its own
   // copy — labels, advice and the decimal separator — with no refetch, and reports
@@ -173,6 +203,11 @@ export default function CameraModal({
     setIsReportingFlood(false);
     setFloodReportFeedback(null);
     setReportCooldownRemaining(camera?.id ? getCameraReportCooldown(camera.id) : 0);
+    setZoomScale(1);
+    setPanOffset({ x: 0, y: 0 });
+    setCompareMode('live');
+    setSplitPercent(50);
+    setBaselineSnapshot(null);
     if (typeof window !== 'undefined') {
       window.getSelection()?.removeAllRanges();
     }
@@ -307,6 +342,104 @@ export default function CameraModal({
       })
       .catch(() => {});
   }, [camera?.id, fetchTimestamp, camera?.isOnline, camera?.isGhost]);
+
+  // Fetch archived baseline snapshot for before-flood vs current compare (Issue #580)
+  useEffect(() => {
+    if (!camera?.id || !camera.isOnline || camera.isGhost) {
+      setBaselineSnapshot(null);
+      return;
+    }
+    let active = true;
+    const today = new Date().toISOString().slice(0, 10);
+    fetch(
+      getApiUrl(
+        `${API_ENDPOINTS.ARCHIVER_SNAPSHOTS}?date=${today}&camera_id=${encodeURIComponent(camera.id)}&limit=20`
+      )
+    )
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!active || !data) return;
+        const list = Array.isArray(data.snapshots)
+          ? data.snapshots
+          : Array.isArray(data.items)
+            ? data.items
+            : [];
+        setBaselineSnapshot(selectBaselineSnapshot(list, camera.id));
+      })
+      .catch(() => {
+        if (active) setBaselineSnapshot(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [camera?.id, camera?.isOnline, camera?.isGhost]);
+
+  const handleToggleTapZoom = useCallback(() => {
+    setZoomScale(prev => {
+      const next = nextTapZoom(prev);
+      if (next <= 1) {
+        setPanOffset({ x: 0, y: 0 });
+      }
+      return next;
+    });
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    setZoomScale(1);
+    setPanOffset({ x: 0, y: 0 });
+  }, []);
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        touchGestureRef.current.pinchStartDist = Math.hypot(dx, dy);
+        touchGestureRef.current.pinchStartScale = zoomScale;
+      } else if (e.touches.length === 1 && zoomScale > 1) {
+        touchGestureRef.current.dragStartX = e.touches[0].clientX;
+        touchGestureRef.current.dragStartY = e.touches[0].clientY;
+        touchGestureRef.current.panStartX = panOffset.x;
+        touchGestureRef.current.panStartY = panOffset.y;
+      }
+    },
+    [zoomScale, panOffset]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      const box = imageContainerRef.current?.getBoundingClientRect();
+      const width = box?.width || 390;
+      const height = box?.height || 220;
+
+      if (e.touches.length === 2 && touchGestureRef.current.pinchStartDist) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        const ratio = dist / touchGestureRef.current.pinchStartDist;
+        const nextScale = clampZoomScale(touchGestureRef.current.pinchStartScale * ratio);
+        setZoomScale(nextScale);
+        setPanOffset(prev => clampPanOffset(prev.x, prev.y, nextScale, width, height));
+      } else if (e.touches.length === 1 && zoomScale > 1) {
+        const dx = e.touches[0].clientX - touchGestureRef.current.dragStartX;
+        const dy = e.touches[0].clientY - touchGestureRef.current.dragStartY;
+        setPanOffset(
+          clampPanOffset(
+            touchGestureRef.current.panStartX + dx,
+            touchGestureRef.current.panStartY + dy,
+            zoomScale,
+            width,
+            height
+          )
+        );
+      }
+    },
+    [zoomScale]
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    touchGestureRef.current.pinchStartDist = null;
+  }, []);
 
   const handleRefresh = () => {
     setImgError(false);
@@ -919,7 +1052,15 @@ export default function CameraModal({
         {/* SCROLLABLE MODAL BODY (SNAPSHOT & FORECAST TIMELINE) */}
         <div className="overflow-y-auto flex-1 min-h-0">
           {/* IMAGE WRAPPER */}
-          <div className="relative w-full aspect-video bg-black flex items-center justify-center">
+          <div
+            ref={imageContainerRef}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className={`relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden ${
+              zoomScale > 1 ? 'touch-none' : ''
+            }`}
+          >
           {/* Overlay Navigation Buttons (< and >) */}
           {(hasPrevCamera || hasNextCamera) && (
             <>
@@ -1008,15 +1149,167 @@ export default function CameraModal({
               </div>
             </div>
           ) : (
-            <img 
-              key={fetchTimestamp}
-              src={`${getApiUrl(API_ENDPOINTS.SNAPSHOT(camera.id))}?t=${fetchTimestamp}`}
-              className="w-full h-full object-contain"
-              alt="Live Snapshot"
-              onError={handleImageError}
-            />
+            (() => {
+              const liveSrc = `${getApiUrl(API_ENDPOINTS.SNAPSHOT(camera.id))}?t=${fetchTimestamp}`;
+              const baselineSrc = baselineSnapshot
+                ? getApiUrl(
+                    baselineSnapshot.raw_url ||
+                      `${API_ENDPOINTS.ARCHIVER_RAW}?key=${encodeURIComponent(baselineSnapshot.key)}`
+                  )
+                : null;
+              const transformStyle = {
+                transform: `translate3d(${panOffset.x}px, ${panOffset.y}px, 0) scale(${zoomScale})`,
+              };
+
+              return (
+                <>
+                  {compareMode === 'baseline' && baselineSrc ? (
+                    <img
+                      src={baselineSrc}
+                      onClick={handleToggleTapZoom}
+                      style={transformStyle}
+                      className="w-full h-full object-contain transition-transform duration-150 cursor-zoom-in select-none"
+                      alt="Archived Baseline Snapshot"
+                    />
+                  ) : compareMode === 'split' && baselineSrc ? (
+                    <div
+                      className="relative w-full h-full overflow-hidden select-none"
+                      style={transformStyle}
+                    >
+                      <img
+                        key={fetchTimestamp}
+                        src={liveSrc}
+                        onClick={handleToggleTapZoom}
+                        className="w-full h-full object-contain cursor-zoom-in"
+                        alt="Live Snapshot"
+                        onError={handleImageError}
+                      />
+                      <div
+                        className="absolute inset-0 overflow-hidden pointer-events-none"
+                        style={{ clipPath: `inset(0 ${100 - splitPercent}% 0 0)` }}
+                      >
+                        <img
+                          src={baselineSrc}
+                          className="w-full h-full object-contain"
+                          alt="Archived Baseline Snapshot"
+                        />
+                      </div>
+                      <div
+                        className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-10"
+                        style={{ left: `${splitPercent}%` }}
+                        aria-hidden="true"
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      key={fetchTimestamp}
+                      src={liveSrc}
+                      onClick={handleToggleTapZoom}
+                      style={transformStyle}
+                      className="w-full h-full object-contain transition-transform duration-150 cursor-zoom-in select-none"
+                      alt="Live Snapshot"
+                      onError={handleImageError}
+                    />
+                  )}
+
+                  {/* ZOOM CONTROLS OVERLAY (>=48px touch target) */}
+                  <div className="absolute bottom-2.5 right-2.5 z-20 flex items-center gap-1.5">
+                    {zoomScale > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleResetZoom();
+                        }}
+                        aria-label={CAMERA_ZOOM_I18N.ZOOM_RESET[currentLang]}
+                        className="min-h-[48px] min-w-[48px] px-3 rounded-lg bg-zinc-950/85 hover:bg-zinc-900 border border-zinc-700 text-xs font-mono text-zinc-200 cursor-pointer backdrop-blur-md"
+                      >
+                        {CAMERA_ZOOM_I18N.ZOOM_RESET[currentLang]}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleTapZoom();
+                      }}
+                      aria-label={CAMERA_ZOOM_I18N.ZOOM_IN[currentLang]}
+                      data-zoom-scale={zoomScale}
+                      className="min-h-[48px] min-w-[48px] px-3 rounded-lg bg-zinc-950/85 hover:bg-zinc-900 border border-zinc-700 text-xs font-mono font-semibold text-cyan-300 cursor-pointer backdrop-blur-md"
+                    >
+                      {zoomScale}x
+                    </button>
+                  </div>
+                </>
+              );
+            })()
           )}
         </div>
+
+        {/* TIME-LAPSE COMPARE BAR (Issue #580) */}
+        {isActuallyAvailable && (
+          <div className="px-3 sm:px-4 py-2 bg-zinc-950 border-t border-zinc-850 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCompareMode('live')}
+                className={`min-h-[48px] min-w-[48px] px-3 rounded-lg border font-medium transition-colors cursor-pointer ${
+                  compareMode === 'live'
+                    ? 'bg-zinc-800 border-cyan-500 text-cyan-300'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                {CAMERA_ZOOM_I18N.COMPARE_LIVE[currentLang]}
+              </button>
+              <button
+                type="button"
+                disabled={!baselineSnapshot}
+                onClick={() => setCompareMode('baseline')}
+                className={`min-h-[48px] min-w-[48px] px-3 rounded-lg border font-medium transition-colors ${
+                  !baselineSnapshot
+                    ? 'bg-zinc-900/50 border-zinc-800/60 text-zinc-600 cursor-not-allowed'
+                    : compareMode === 'baseline'
+                      ? 'bg-zinc-800 border-cyan-500 text-cyan-300 cursor-pointer'
+                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 cursor-pointer'
+                }`}
+              >
+                {CAMERA_ZOOM_I18N.COMPARE_BASELINE[currentLang]}
+              </button>
+              <button
+                type="button"
+                disabled={!baselineSnapshot}
+                onClick={() => setCompareMode('split')}
+                className={`min-h-[48px] min-w-[48px] px-3 rounded-lg border font-medium transition-colors ${
+                  !baselineSnapshot
+                    ? 'bg-zinc-900/50 border-zinc-800/60 text-zinc-600 cursor-not-allowed'
+                    : compareMode === 'split'
+                      ? 'bg-zinc-800 border-cyan-500 text-cyan-300 cursor-pointer'
+                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 cursor-pointer'
+                }`}
+              >
+                {CAMERA_ZOOM_I18N.COMPARE_SPLIT[currentLang]}
+              </button>
+            </div>
+
+            {compareMode === 'split' && baselineSnapshot ? (
+              <div className="flex items-center gap-2 min-w-[140px] flex-1 max-w-xs">
+                <input
+                  type="range"
+                  min={10}
+                  max={90}
+                  value={splitPercent}
+                  onChange={e => setSplitPercent(Number(e.target.value))}
+                  aria-label={CAMERA_ZOOM_I18N.SPLIT_SLIDER_LABEL[currentLang]}
+                  className="w-full accent-cyan-400 cursor-pointer min-h-[44px]"
+                />
+              </div>
+            ) : !baselineSnapshot ? (
+              <span className="text-[11px] text-zinc-500">
+                {CAMERA_ZOOM_I18N.BASELINE_UNAVAILABLE[currentLang]}
+              </span>
+            ) : null}
+          </div>
+        )}
 
         {/* SHORT-HORIZON FORECAST TIMELINE (S10-T6 / Issue #377 / ADR-012 §D5) */}
         {isActuallyAvailable && (

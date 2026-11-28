@@ -65,6 +65,110 @@ test.describe('HUD cards mobile 390x844 (Issue #569)', () => {
     expect(box!.width).toBeGreaterThanOrEqual(44);
   });
 
+  test('MyRouteCard renders ranked multi-point detours within 34vh and 48px CTA buttons (Issue #578)', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('warded_landing_seen_v1', Date.now().toString());
+    });
+    await page.route('**/api/corridors/commute-eval*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          passability_verdict: 'IMPASSABLE',
+          status_color: '#ef4444',
+          total_distance_km: 3.2,
+          free_flow_seconds: 329,
+          estimated_seconds: 689,
+          delay_seconds: 360,
+          corridors: [],
+          vehicle: 'scooter',
+          detour: {
+            original_corridor_key: 'nguyen_huu_canh',
+            detour_corridor_key: 'dien_bien_phu',
+            detour_corridor_name: 'Đường Điện Biên Phủ',
+            detour_path: ['dien_bien_phu'],
+            detour_path_names: ['Đường Điện Biên Phủ'],
+            passability_verdict: 'PASSABLE',
+            delay_seconds: 30,
+            estimated_delta_seconds: 60,
+            is_dry_route: true,
+            reason: 'Tránh ngập trên Nguyễn Hữu Cảnh; Điện Biên Phủ khô ráo.',
+          },
+          detours: [
+            {
+              original_corridor_key: 'nguyen_huu_canh',
+              detour_corridor_key: 'dien_bien_phu',
+              detour_corridor_name: 'Đường Điện Biên Phủ',
+              detour_path: ['dien_bien_phu'],
+              detour_path_names: ['Đường Điện Biên Phủ'],
+              passability_verdict: 'PASSABLE',
+              delay_seconds: 30,
+              estimated_delta_seconds: 60,
+              is_dry_route: true,
+              reason: 'Tránh ngập trên Nguyễn Hữu Cảnh; Điện Biên Phủ khô ráo.',
+            },
+            {
+              original_corridor_key: 'nguyen_huu_canh',
+              detour_corridor_key: 'pham_van_dong',
+              detour_corridor_name: 'Đường Phạm Văn Đồng',
+              detour_path: ['dien_bien_phu', 'pham_van_dong'],
+              detour_path_names: ['Đường Điện Biên Phủ', 'Đường Phạm Văn Đồng'],
+              passability_verdict: 'PASSABLE',
+              delay_seconds: 45,
+              estimated_delta_seconds: 180,
+              is_dry_route: true,
+              reason: 'Lộ trình vòng 2 chặng qua Điện Biên Phủ rồi Phạm Văn Đồng.',
+            },
+          ],
+        }),
+      });
+    });
+
+    await seedCommuteConfig()({ page });
+    await page.goto('/');
+    const card = page.getByRole('region', { name: /my route|commute|lộ trình của tôi/i }).first();
+    await expect(card).toBeVisible({ timeout: 8_000 });
+    const box = await card.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeLessThanOrEqual(MAX_CARD_HEIGHT_PX);
+
+    const detourBtns = card.getByRole('button', { name: /view detour|xem l/i });
+    await expect(detourBtns).toHaveCount(2);
+    for (let i = 0; i < 2; i++) {
+      const btnBox = await detourBtns.nth(i).boundingBox();
+      expect(btnBox).not.toBeNull();
+      expect(btnBox!.height).toBeGreaterThanOrEqual(48);
+    }
+  });
+
+  test('MyRouteSetupModal saves waypoint and ordered segments onto MyRouteCard within 34vh (Issue #579)', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('warded_landing_seen_v1', Date.now().toString());
+    });
+    await seedCommuteConfig()({ page });
+    await page.goto('/');
+
+    const card = page.getByRole('region', { name: /my route|commute|lộ trình của tôi/i }).first();
+    await expect(card).toBeVisible({ timeout: 8_000 });
+
+    const setupBtn = card.getByRole('button', { name: /change endpoints|đổi điểm/i });
+    await setupBtn.click();
+
+    const modal = page.getByRole('dialog');
+    await expect(modal).toBeVisible({ timeout: 5_000 });
+
+    await modal.locator('#waypoint-endpoint-input').fill('Hang Xanh');
+    await modal.getByRole('button', { name: /save route|lưu lộ trình/i }).click();
+
+    await expect(card).toContainText('Hang Xanh');
+    const cardBox = await card.boundingBox();
+    expect(cardBox).not.toBeNull();
+    expect(cardBox!.height).toBeLessThanOrEqual(MAX_CARD_HEIGHT_PX);
+
+    const stored = await page.evaluate(() => localStorage.getItem('warded_commute_route'));
+    expect(stored).toContain('Hang Xanh');
+  });
+
   test('CorridorOverviewCard stays within 34vh on 844px screen when corridor is selected', async ({ page }) => {
     await page.goto('/');
     // Attempt to click a corridor marker or trigger overview card via page interaction

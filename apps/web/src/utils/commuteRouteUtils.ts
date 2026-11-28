@@ -6,19 +6,20 @@
 import type { PassabilityVerdict, CorridorRouteSummary } from '../types/corridor.ts';
 import type { VehicleType } from '../types/vehicle.ts';
 import { VEHICLE_PROFILES } from '../types/vehicle.ts';
-import type { CommuteBottleneck, DetourSuggestion, CommuteEvaluation } from '../types/commute.ts';
+import type { CommuteBottleneck, CommuteDirection, DetourSuggestion, CommuteEvaluation } from '../types/commute.ts';
 import type { WeatherData } from './weatherUtils.ts';
 
 export const CORRIDOR_DETOUR_MAP: Record<string, string[]> = {
   nguyen_huu_canh: ['dien_bien_phu'],
-  dien_bien_phu: ['nguyen_huu_canh', 'pham_van_dong'],
+  dien_bien_phu: ['nguyen_huu_canh', 'pham_van_dong', 'mai_chi_tho'],
   cach_mang_thang_tam: ['nam_ky_khoi_nghia'],
-  nam_ky_khoi_nghia: ['cach_mang_thang_tam'],
+  nam_ky_khoi_nghia: ['cach_mang_thang_tam', 'dien_bien_phu'],
   cong_hoa: ['pham_van_dong', 'cach_mang_thang_tam'],
-  pham_van_dong: ['cong_hoa', 'dien_bien_phu'],
+  pham_van_dong: ['cong_hoa', 'dien_bien_phu', 'quoc_lo_1'],
   vo_van_kiet: ['nguyen_van_linh'],
-  nguyen_van_linh: ['vo_van_kiet'],
-  mai_chi_tho: ['dien_bien_phu'],
+  nguyen_van_linh: ['vo_van_kiet', 'quoc_lo_1'],
+  mai_chi_tho: ['dien_bien_phu', 'vo_van_kiet'],
+  quoc_lo_1: ['pham_van_dong', 'nguyen_van_linh'],
 };
 
 export const CORRIDOR_NAMES: Record<string, string> = {
@@ -61,36 +62,64 @@ function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 }
 
+export const MAX_COMMUTE_SEGMENTS = 3;
+
+function findClosestCorridorKey(point: { lat: number; lng: number }): string {
+  let closestKey = 'vo_van_kiet';
+  let minDist = Infinity;
+  for (const [key, coords] of Object.entries(CORRIDOR_APPROX_COORDS)) {
+    const dist = haversineDistanceKm(point.lat, point.lng, coords[0], coords[1]);
+    if (dist < minDist) {
+      minDist = dist;
+      closestKey = key;
+    }
+  }
+  return closestKey;
+}
+
 /**
- * Finds connecting arterial corridors between origin and destination coordinates.
+ * Finds ordered connecting arterial corridors between origin, optional waypoint, and destination coordinates.
  */
 export function findConnectingCorridors(
   origin: { lat: number; lng: number },
-  destination: { lat: number; lng: number }
+  destination: { lat: number; lng: number },
+  waypoint?: { lat: number; lng: number } | null
 ): string[] {
-  let closestOriginKey = 'vo_van_kiet';
-  let minOriginDist = Infinity;
-  let closestDestKey = 'vo_van_kiet';
-  let minDestDist = Infinity;
-
-  for (const [key, coords] of Object.entries(CORRIDOR_APPROX_COORDS)) {
-    const distToOrigin = haversineDistanceKm(origin.lat, origin.lng, coords[0], coords[1]);
-    if (distToOrigin < minOriginDist) {
-      minOriginDist = distToOrigin;
-      closestOriginKey = key;
+  const stops = waypoint ? [origin, waypoint, destination] : [origin, destination];
+  const ordered: string[] = [];
+  for (const stop of stops) {
+    const key = findClosestCorridorKey(stop);
+    if (!ordered.includes(key)) {
+      ordered.push(key);
     }
-
-    const distToDest = haversineDistanceKm(destination.lat, destination.lng, coords[0], coords[1]);
-    if (distToDest < minDestDist) {
-      minDestDist = distToDest;
-      closestDestKey = key;
-    }
+    if (ordered.length >= MAX_COMMUTE_SEGMENTS) break;
   }
+  return ordered;
+}
 
-  if (closestOriginKey === closestDestKey) {
-    return [closestOriginKey];
+export function reorderCorridorSegments(
+  segments: string[],
+  index: number,
+  direction: 'up' | 'down'
+): string[] {
+  const target = direction === 'up' ? index - 1 : index + 1;
+  if (index < 0 || index >= segments.length || target < 0 || target >= segments.length) {
+    return segments;
   }
-  return [closestOriginKey, closestDestKey];
+  const next = [...segments];
+  const [moved] = next.splice(index, 1);
+  next.splice(target, 0, moved);
+  return next;
+}
+
+export function resolveOrderedCorridorsForDirection(
+  corridors: string[],
+  direction: CommuteDirection
+): string[] {
+  if (direction === 'to_home') {
+    return [...corridors].reverse();
+  }
+  return corridors;
 }
 
 function passabilityRank(v: PassabilityVerdict): number {
@@ -116,6 +145,189 @@ export interface EvaluateCommuteParams {
 /**
  * Evaluates aggregated passability, travel duration, delays, worst bottleneck, and detour options.
  */
+const MAX_DETOUR_SUGGESTIONS = 4;
+
+function resolveEffectivePassability(
+  summary: CorridorRouteSummary,
+  vehicleType: VehicleType
+): { verdict: PassabilityVerdict; color: string } {
+  const vehicleProfile = VEHICLE_PROFILES[vehicleType] || VEHICLE_PROFILES.scooter;
+  if (summary.max_depth_cm !== undefined && summary.max_depth_cm !== null) {
+    if (summary.max_depth_cm >= vehicleProfile.impassableDepthCm) {
+      return { verdict: 'IMPASSABLE', color: '#ef4444' };
+    }
+    if (summary.max_depth_cm >= vehicleProfile.cautionDepthCm) {
+      return { verdict: 'CAUTION', color: '#eab308' };
+    }
+    if (summary.worst_severity === 'CONGESTED' || summary.worst_severity === 'HEAVY') {
+      return { verdict: 'CAUTION', color: '#eab308' };
+    }
+    if (summary.verified_cameras > 0) {
+      return { verdict: 'PASSABLE', color: '#22c55e' };
+    }
+  }
+  return { verdict: summary.passability_verdict, color: summary.status_color };
+}
+
+function resolveCandidateVerdict(
+  summary: CorridorRouteSummary,
+  vehicleType: VehicleType
+): PassabilityVerdict {
+  return resolveEffectivePassability(summary, vehicleType).verdict;
+}
+
+function isStrictlySaferDetour(
+  badVerdict: PassabilityVerdict,
+  badSummary: CorridorRouteSummary,
+  candVerdict: PassabilityVerdict,
+  candSummary: CorridorRouteSummary
+): boolean {
+  if (candVerdict === 'PASSABLE') return true;
+  if (badVerdict !== 'IMPASSABLE' || candVerdict !== 'CAUTION') return false;
+  if (badSummary.max_depth_cm != null && candSummary.max_depth_cm != null) {
+    return candSummary.max_depth_cm < badSummary.max_depth_cm;
+  }
+  return (badSummary.max_depth_cm ?? 0) > 0;
+}
+
+function buildDetourSuggestions(
+  hazardousCorridorKeys: string[],
+  validKeys: string[],
+  summariesMap: Record<string, CorridorRouteSummary>,
+  evaluatedSummaryByKey: Record<string, CorridorRouteSummary>,
+  vehicleType: VehicleType
+): DetourSuggestion[] {
+  if (hazardousCorridorKeys.length === 0) return [];
+
+  const validSet = new Set(validKeys);
+  const orderedBad = [...hazardousCorridorKeys].sort((a, b) => {
+    const sa = evaluatedSummaryByKey[a];
+    const sb = evaluatedSummaryByKey[b];
+    const rankDiff = passabilityRank(sb.passability_verdict) - passabilityRank(sa.passability_verdict);
+    if (rankDiff !== 0) return rankDiff;
+    return (sb.max_depth_cm ?? 0) - (sa.max_depth_cm ?? 0);
+  });
+
+  const bestByPair = new Map<string, DetourSuggestion>();
+  const recordCandidate = (cand: DetourSuggestion) => {
+    const dedupeKey = `${cand.original_corridor_key}->${cand.detour_corridor_key}`;
+    const existing = bestByPair.get(dedupeKey);
+    if (!existing) {
+      bestByPair.set(dedupeKey, cand);
+      return;
+    }
+    if (Boolean(cand.is_dry_route) !== Boolean(existing.is_dry_route)) {
+      if (cand.is_dry_route) bestByPair.set(dedupeKey, cand);
+      return;
+    }
+    const hopDiff = (cand.detour_path?.length ?? 1) - (existing.detour_path?.length ?? 1);
+    if (hopDiff !== 0) {
+      if (hopDiff < 0) bestByPair.set(dedupeKey, cand);
+      return;
+    }
+    const depthDiff = (cand.max_depth_cm ?? 0) - (existing.max_depth_cm ?? 0);
+    if (depthDiff !== 0) {
+      if (depthDiff < 0) bestByPair.set(dedupeKey, cand);
+      return;
+    }
+    if ((cand.estimated_delta_seconds ?? 0) < (existing.estimated_delta_seconds ?? 0)) {
+      bestByPair.set(dedupeKey, cand);
+    }
+  };
+
+  for (const badKey of orderedBad) {
+    const badSummary = evaluatedSummaryByKey[badKey];
+    const badName = CORRIDOR_NAMES[badKey] || badKey;
+
+    for (const c1 of CORRIDOR_DETOUR_MAP[badKey] || []) {
+      if (validSet.has(c1)) continue;
+      const sum1 = summariesMap[c1];
+      if (!sum1) continue;
+
+      const cand1Verdict = resolveCandidateVerdict(sum1, vehicleType);
+      const cand1Name = CORRIDOR_NAMES[c1] || sum1.display_name || c1;
+      const safer1 = isStrictlySaferDetour(badSummary.passability_verdict, badSummary, cand1Verdict, sum1);
+
+      if (safer1) {
+        const isDry = cand1Verdict === 'PASSABLE';
+        recordCandidate({
+          original_corridor_key: badKey,
+          original_corridor_name: badName,
+          detour_corridor_key: c1,
+          detour_corridor_name: cand1Name,
+          detour_path: [c1],
+          detour_path_names: [cand1Name],
+          passability_verdict: cand1Verdict,
+          max_depth_cm: sum1.max_depth_cm,
+          delay_seconds: sum1.delay_seconds,
+          estimated_delta_seconds: sum1.estimated_seconds - badSummary.estimated_seconds,
+          is_dry_route: isDry,
+          reason: {
+            vi: isDry
+              ? `Tránh điểm ngập trên ${badName}; ${cand1Name} khô ráo, thông thoáng.`
+              : `Tránh điểm ngập sâu trên ${badName}; ${cand1Name} ít ngập hơn.`,
+            en: isDry
+              ? `Avoid water hazard on ${badName}; ${cand1Name} is dry and passable.`
+              : `Avoid deep flood on ${badName}; ${cand1Name} has lower hazard.`,
+          },
+        });
+      }
+
+      if (!safer1 && cand1Verdict !== 'PASSABLE') continue;
+      for (const c2 of CORRIDOR_DETOUR_MAP[c1] || []) {
+        if (c2 === badKey || c2 === c1 || validSet.has(c2)) continue;
+        const sum2 = summariesMap[c2];
+        if (!sum2) continue;
+
+        const cand2Verdict = resolveCandidateVerdict(sum2, vehicleType);
+        if (cand2Verdict !== 'PASSABLE') continue;
+
+        const cand2Name = CORRIDOR_NAMES[c2] || sum2.display_name || c2;
+        const pathVerdict: PassabilityVerdict = cand1Verdict === 'PASSABLE' ? 'PASSABLE' : cand1Verdict;
+        const isDryPath = pathVerdict === 'PASSABLE';
+        const d1 = sum1.max_depth_cm ?? null;
+        const d2 = sum2.max_depth_cm ?? null;
+        const maxDepth = d1 === null && d2 === null ? null : Math.max(d1 ?? 0, d2 ?? 0);
+
+        recordCandidate({
+          original_corridor_key: badKey,
+          original_corridor_name: badName,
+          detour_corridor_key: c2,
+          detour_corridor_name: cand2Name,
+          detour_path: [c1, c2],
+          detour_path_names: [cand1Name, cand2Name],
+          passability_verdict: pathVerdict,
+          max_depth_cm: maxDepth,
+          delay_seconds: sum1.delay_seconds + sum2.delay_seconds,
+          estimated_delta_seconds: sum1.estimated_seconds + sum2.estimated_seconds - badSummary.estimated_seconds,
+          is_dry_route: isDryPath,
+          reason: {
+            vi: `Lộ trình vòng 2 chặng tránh ${badName}: qua ${cand1Name} rồi ${cand2Name}.`,
+            en: `2-segment bypass around ${badName}: via ${cand1Name} then ${cand2Name}.`,
+          },
+        });
+      }
+    }
+  }
+
+  return Array.from(bestByPair.values())
+    .sort((a, b) => {
+      if (Boolean(a.is_dry_route) !== Boolean(b.is_dry_route)) {
+        return a.is_dry_route ? -1 : 1;
+      }
+      const hopDiff = (a.detour_path?.length ?? 1) - (b.detour_path?.length ?? 1);
+      if (hopDiff !== 0) return hopDiff;
+      const depthDiff = (a.max_depth_cm ?? 0) - (b.max_depth_cm ?? 0);
+      if (depthDiff !== 0) return depthDiff;
+      const deltaDiff = (a.estimated_delta_seconds ?? 0) - (b.estimated_delta_seconds ?? 0);
+      if (deltaDiff !== 0) return deltaDiff;
+      return `${a.original_corridor_key}:${a.detour_corridor_key}`.localeCompare(
+        `${b.original_corridor_key}:${b.detour_corridor_key}`
+      );
+    })
+    .slice(0, MAX_DETOUR_SUGGESTIONS);
+}
+
 export function evaluateCommuteRoute({
   corridorKeys,
   vehicleType,
@@ -140,6 +352,7 @@ export function evaluateCommuteRoute({
   let worstStatusColor = '#22c55e';
   let worstBottleneck: CommuteBottleneck | null = null;
   const hazardousCorridorKeys: string[] = [];
+  const evaluatedSummaryByKey: Record<string, CorridorRouteSummary> = {};
 
   const vehicleProfile = VEHICLE_PROFILES[vehicleType] || VEHICLE_PROFILES.scooter;
 
@@ -182,30 +395,18 @@ export function evaluateCommuteRoute({
     delaySeconds += summary.delay_seconds;
 
     // Adapt passability verdict to vehicle clearance
-    let effectiveVerdict: PassabilityVerdict = summary.passability_verdict;
-    let effectiveColor = summary.status_color;
-
-    if (summary.max_depth_cm !== undefined && summary.max_depth_cm !== null) {
-      const depth = summary.max_depth_cm;
-      if (depth >= vehicleProfile.impassableDepthCm) {
-        effectiveVerdict = 'IMPASSABLE';
-        effectiveColor = '#ef4444';
-      } else if (depth >= vehicleProfile.cautionDepthCm) {
-        effectiveVerdict = 'CAUTION';
-        effectiveColor = '#eab308';
-      } else if (summary.worst_severity === 'CONGESTED' || summary.worst_severity === 'HEAVY') {
-        effectiveVerdict = 'CAUTION';
-        effectiveColor = '#eab308';
-      } else if (summary.verified_cameras > 0) {
-        effectiveVerdict = 'PASSABLE';
-        effectiveColor = '#22c55e';
-      }
-    }
+    const { verdict: effectiveVerdict, color: effectiveColor } = resolveEffectivePassability(summary, vehicleType);
 
     if (passabilityRank(effectiveVerdict) > passabilityRank(worstVerdict)) {
       worstVerdict = effectiveVerdict;
       worstStatusColor = effectiveColor;
     }
+
+    evaluatedSummaryByKey[key] = {
+      ...summary,
+      passability_verdict: effectiveVerdict,
+      status_color: effectiveColor,
+    };
 
     if (effectiveVerdict === 'IMPASSABLE' || effectiveVerdict === 'CAUTION') {
       hazardousCorridorKeys.push(key);
@@ -255,47 +456,14 @@ export function evaluateCommuteRoute({
     }
   }
 
-  // Detour search: if route is IMPASSABLE or CAUTION, check detour candidates
-  let detour: DetourSuggestion | null = null;
-  if (hazardousCorridorKeys.length > 0) {
-    for (const badKey of hazardousCorridorKeys) {
-      const bypassCandidates = CORRIDOR_DETOUR_MAP[badKey] || [];
-      const badName = CORRIDOR_NAMES[badKey] || badKey;
-
-      for (const candKey of bypassCandidates) {
-        if (validKeys.includes(candKey)) continue; // Avoid recommending corridors already on path
-
-        const candSummary = summariesMap[candKey];
-        const candName = CORRIDOR_NAMES[candKey] || candKey;
-
-        if (candSummary) {
-          const candDepth = candSummary.max_depth_cm ?? 0;
-          const isCandPassable =
-            candSummary.passability_verdict === 'PASSABLE' ||
-            (candDepth < vehicleProfile.cautionDepthCm &&
-              candSummary.worst_severity !== 'CONGESTED' &&
-              candSummary.worst_severity !== 'HEAVY');
-
-          if (isCandPassable) {
-            detour = {
-              original_corridor_key: badKey,
-              detour_corridor_key: candKey,
-              detour_corridor_name: candName,
-              passability_verdict: candSummary.passability_verdict,
-              max_depth_cm: candSummary.max_depth_cm,
-              delay_seconds: candSummary.delay_seconds,
-              reason: {
-                vi: `Tránh điểm ngập trên ${badName}; ${candName} khô ráo, thông thoáng.`,
-                en: `Avoid water hazard on ${badName}; ${candName} is dry and passable.`,
-              },
-            };
-            break;
-          }
-        }
-      }
-      if (detour) break;
-    }
-  }
+  const detours = buildDetourSuggestions(
+    hazardousCorridorKeys,
+    validKeys,
+    summariesMap,
+    evaluatedSummaryByKey,
+    vehicleType
+  );
+  const detour: DetourSuggestion | null = detours[0] || null;
 
   // Weather & Rain Summary
   const rainPct = weather ? Math.round(weather.precipitation_probability_percent) : 0;
@@ -325,8 +493,18 @@ export function evaluateCommuteRoute({
     corridors: validKeys,
     corridor_summaries: activeSummaries,
     detour,
+    detours,
     vehicle: vehicleType,
   };
+}
+
+export function formatDetourDelta(deltaSeconds: number, lang: 'vi' | 'en'): string {
+  const deltaMins = Math.round(deltaSeconds / 60);
+  if (deltaMins === 0) {
+    return lang === 'vi' ? 'Tương đương' : 'Same ETA';
+  }
+  const unit = lang === 'vi' ? 'phút' : 'mins';
+  return deltaMins > 0 ? `+${deltaMins} ${unit}` : `${deltaMins} ${unit}`;
 }
 
 export function formatCommuteDuration(seconds: number, lang: 'vi' | 'en'): string {

@@ -11,6 +11,11 @@ import {
   setCameraReportCooldown,
   clearCameraReportCooldowns,
   CAMERA_REPORT_MODAL_I18N,
+  CAMERA_ZOOM_I18N,
+  clampZoomScale,
+  nextTapZoom,
+  clampPanOffset,
+  selectBaselineSnapshot,
 } from './cameraModalUtils.ts';
 import { FLOOD_VERIFY_I18N, FLOOD_REPORT_I18N, VERDICT_I18N } from '../config/constants.ts';
 
@@ -315,6 +320,46 @@ describe('CameraModal UI/UX & Cooldown Utilities (S6-T3 & S7-T3 / Issue #223, #2
       assert.equal(VERDICT_I18N.SEVERITY.CLEAR.en.toUpperCase(), 'CLEAR');
       assert.equal(VERDICT_I18N.SEVERITY.MODERATE.vi.toUpperCase(), 'ĐÔNG XE');
       assert.equal(VERDICT_I18N.SEVERITY.CONGESTED.vi.toUpperCase(), 'ÙN TẮC');
+    });
+  });
+
+  describe('Snapshot Tap-to-Zoom & Baseline Compare (Issue #580)', () => {
+    test('clampZoomScale bounds scale between 1 and 3', () => {
+      assert.equal(clampZoomScale(0.5), 1);
+      assert.equal(clampZoomScale(2.25), 2.25);
+      assert.equal(clampZoomScale(5), 3);
+      assert.equal(clampZoomScale(Number.NaN), 1);
+    });
+
+    test('nextTapZoom cycles 1 -> 2 -> 3 -> 1', () => {
+      assert.equal(nextTapZoom(1), 2);
+      assert.equal(nextTapZoom(2), 3);
+      assert.equal(nextTapZoom(3), 1);
+    });
+
+    test('clampPanOffset resets at 1x and bounds pan when zoomed', () => {
+      assert.deepEqual(clampPanOffset(100, -50, 1, 360, 200), { x: 0, y: 0 });
+      assert.deepEqual(clampPanOffset(500, -500, 2, 360, 200), { x: 180, y: -100 });
+    });
+
+    test('selectBaselineSnapshot picks earliest matching camera snapshot', () => {
+      const picked = selectBaselineSnapshot(
+        [
+          { key: '2026-11-28/cam-1/200_flood.jpg', camera_id: 'cam-1', timestamp: 200 },
+          { key: '2026-11-28/cam-1/100_dry.jpg', camera_id: 'cam-1', timestamp: 100 },
+          { key: '2026-11-28/cam-2/50_dry.jpg', camera_id: 'cam-2', timestamp: 50 },
+        ],
+        'cam-1'
+      );
+      assert.equal(picked?.key, '2026-11-28/cam-1/100_dry.jpg');
+      assert.equal(selectBaselineSnapshot([], 'cam-1'), null);
+    });
+
+    test('CAMERA_ZOOM_I18N has zero emojis in both languages', () => {
+      for (const entry of Object.values(CAMERA_ZOOM_I18N)) {
+        assert.equal(emojiRegex.test(entry.vi), false);
+        assert.equal(emojiRegex.test(entry.en), false);
+      }
     });
   });
 });
