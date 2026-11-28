@@ -6,7 +6,7 @@
 import type { PassabilityVerdict, CorridorRouteSummary } from '../types/corridor.ts';
 import type { VehicleType } from '../types/vehicle.ts';
 import { VEHICLE_PROFILES } from '../types/vehicle.ts';
-import type { CommuteBottleneck, DetourSuggestion, CommuteEvaluation } from '../types/commute.ts';
+import type { CommuteBottleneck, CommuteDirection, DetourSuggestion, CommuteEvaluation } from '../types/commute.ts';
 import type { WeatherData } from './weatherUtils.ts';
 
 export const CORRIDOR_DETOUR_MAP: Record<string, string[]> = {
@@ -62,36 +62,64 @@ function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 }
 
+export const MAX_COMMUTE_SEGMENTS = 3;
+
+function findClosestCorridorKey(point: { lat: number; lng: number }): string {
+  let closestKey = 'vo_van_kiet';
+  let minDist = Infinity;
+  for (const [key, coords] of Object.entries(CORRIDOR_APPROX_COORDS)) {
+    const dist = haversineDistanceKm(point.lat, point.lng, coords[0], coords[1]);
+    if (dist < minDist) {
+      minDist = dist;
+      closestKey = key;
+    }
+  }
+  return closestKey;
+}
+
 /**
- * Finds connecting arterial corridors between origin and destination coordinates.
+ * Finds ordered connecting arterial corridors between origin, optional waypoint, and destination coordinates.
  */
 export function findConnectingCorridors(
   origin: { lat: number; lng: number },
-  destination: { lat: number; lng: number }
+  destination: { lat: number; lng: number },
+  waypoint?: { lat: number; lng: number } | null
 ): string[] {
-  let closestOriginKey = 'vo_van_kiet';
-  let minOriginDist = Infinity;
-  let closestDestKey = 'vo_van_kiet';
-  let minDestDist = Infinity;
-
-  for (const [key, coords] of Object.entries(CORRIDOR_APPROX_COORDS)) {
-    const distToOrigin = haversineDistanceKm(origin.lat, origin.lng, coords[0], coords[1]);
-    if (distToOrigin < minOriginDist) {
-      minOriginDist = distToOrigin;
-      closestOriginKey = key;
+  const stops = waypoint ? [origin, waypoint, destination] : [origin, destination];
+  const ordered: string[] = [];
+  for (const stop of stops) {
+    const key = findClosestCorridorKey(stop);
+    if (!ordered.includes(key)) {
+      ordered.push(key);
     }
-
-    const distToDest = haversineDistanceKm(destination.lat, destination.lng, coords[0], coords[1]);
-    if (distToDest < minDestDist) {
-      minDestDist = distToDest;
-      closestDestKey = key;
-    }
+    if (ordered.length >= MAX_COMMUTE_SEGMENTS) break;
   }
+  return ordered;
+}
 
-  if (closestOriginKey === closestDestKey) {
-    return [closestOriginKey];
+export function reorderCorridorSegments(
+  segments: string[],
+  index: number,
+  direction: 'up' | 'down'
+): string[] {
+  const target = direction === 'up' ? index - 1 : index + 1;
+  if (index < 0 || index >= segments.length || target < 0 || target >= segments.length) {
+    return segments;
   }
-  return [closestOriginKey, closestDestKey];
+  const next = [...segments];
+  const [moved] = next.splice(index, 1);
+  next.splice(target, 0, moved);
+  return next;
+}
+
+export function resolveOrderedCorridorsForDirection(
+  corridors: string[],
+  direction: CommuteDirection
+): string[] {
+  if (direction === 'to_home') {
+    return [...corridors].reverse();
+  }
+  return corridors;
 }
 
 function passabilityRank(v: PassabilityVerdict): number {

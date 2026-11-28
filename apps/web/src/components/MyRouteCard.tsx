@@ -36,6 +36,7 @@ export default function MyRouteCard({
   const vehicleProfile = VEHICLE_PROFILES[vehicleType] || VEHICLE_PROFILES.scooter;
   const isToWork = config.direction === 'to_work';
   const originName = isToWork ? config.home?.name || 'Nhà' : config.work?.name || 'Cơ quan';
+  const waypointName = config.waypoint?.name?.trim() || '';
   const destName = isToWork ? config.work?.name || 'Cơ quan' : config.home?.name || 'Nhà';
 
   const verdict = evaluation?.passability || 'UNKNOWN';
@@ -191,14 +192,23 @@ export default function MyRouteCard({
       {/* BODY CONTENT */}
       {!isCollapsed && (
         <div className="p-3.5 space-y-3 overflow-y-auto flex-1 min-h-0">
-          {/* ORIGIN ➔ DESTINATION GLANCE */}
-          <div className="flex items-center justify-between text-xs text-zinc-300 pb-1 border-b border-zinc-800/80">
-            <div className="truncate max-w-[45%] font-medium text-zinc-200" title={originName}>
+          {/* ORIGIN ➔ [WAYPOINT ➔] DESTINATION GLANCE */}
+          <div className="flex items-center justify-between gap-1 text-xs text-zinc-300 pb-1 border-b border-zinc-800/80">
+            <div className={`truncate font-medium text-zinc-200 ${waypointName ? 'max-w-[30%]' : 'max-w-[45%]'}`} title={originName}>
               <span className="text-[10px] text-zinc-500 uppercase block">{isToWork ? COMMUTE_I18N.HOME[lang] : COMMUTE_I18N.WORK[lang]}</span>
               {originName}
             </div>
-            <div className="shrink-0 px-2 text-zinc-500" aria-hidden="true">➔</div>
-            <div className="truncate max-w-[45%] text-right font-medium text-zinc-200" title={destName}>
+            <div className="shrink-0 px-1 text-zinc-500" aria-hidden="true">➔</div>
+            {waypointName && (
+              <>
+                <div className="truncate max-w-[30%] text-center font-medium text-cyan-300" title={waypointName}>
+                  <span className="text-[10px] text-zinc-500 uppercase block">{COMMUTE_I18N.WAYPOINT[lang]}</span>
+                  {waypointName}
+                </div>
+                <div className="shrink-0 px-1 text-zinc-500" aria-hidden="true">➔</div>
+              </>
+            )}
+            <div className={`truncate text-right font-medium text-zinc-200 ${waypointName ? 'max-w-[30%]' : 'max-w-[45%]'}`} title={destName}>
               <span className="text-[10px] text-zinc-500 uppercase block">{isToWork ? COMMUTE_I18N.WORK[lang] : COMMUTE_I18N.HOME[lang]}</span>
               {destName}
             </div>

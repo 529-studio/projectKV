@@ -16,7 +16,10 @@ import {
   clearStoredCommuteConfig,
   COMMUTE_PRESETS,
 } from '../utils/commuteStorage.ts';
-import { evaluateCommuteRoute } from '../utils/commuteRouteUtils.ts';
+import {
+  evaluateCommuteRoute,
+  resolveOrderedCorridorsForDirection,
+} from '../utils/commuteRouteUtils.ts';
 import { getApiUrl, API_ENDPOINTS } from '../config/constants.ts';
 
 interface UseCommuteRouteProps {
@@ -118,7 +121,8 @@ export function useCommuteRoute({
 
   // Query Go backend `/api/corridors/commute-eval` when corridors are selected
   const activeCorridors = useMemo(() => {
-    return config?.selectedCorridors || [];
+    const base = config?.selectedCorridors || [];
+    return resolveOrderedCorridorsForDirection(base, config?.direction || 'to_work');
   }, [config]);
 
   useEffect(() => {

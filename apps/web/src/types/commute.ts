@@ -18,6 +18,7 @@ export type CommuteDirection = 'to_work' | 'to_home';
 
 export interface CommuteConfig {
   home: CommuteLocation | null;
+  waypoint?: CommuteLocation | null;
   work: CommuteLocation | null;
   selectedCorridors: string[];
   direction: CommuteDirection;
@@ -100,6 +101,10 @@ export const COMMUTE_I18N = {
   HOME: {
     vi: 'Nhà',
     en: 'Home',
+  },
+  WAYPOINT: {
+    vi: 'Điểm trung chuyển',
+    en: 'Waypoint',
   },
   WORK: {
     vi: 'Cơ quan',

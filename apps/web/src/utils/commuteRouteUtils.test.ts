@@ -10,6 +10,8 @@ import {
   findConnectingCorridors,
   formatCommuteDuration,
   formatCommuteDelay,
+  reorderCorridorSegments,
+  resolveOrderedCorridorsForDirection,
   CORRIDOR_DETOUR_MAP,
 } from './commuteRouteUtils.ts';
 import type { CorridorRouteSummary } from '../types/corridor.ts';
@@ -305,5 +307,22 @@ describe('S17-T4 / Issue #512: Commuter Journey Glance & Detour Recommendation',
     assert.ok(CORRIDOR_DETOUR_MAP.quoc_lo_1.length >= 2);
     const twoHop = res.detours!.find(d => (d.detour_path?.length ?? 0) === 2 && d.detour_corridor_key === 'nam_ky_khoi_nghia');
     assert.ok(twoHop !== undefined, 'Expected 2-hop multi-point bypass via CMT8 -> NKKN');
+  });
+
+  it('Scenario 10 (Issue #579): Waypoint interpolation, segment reordering, and return-direction reversal', () => {
+    const connected = findConnectingCorridors(
+      { lat: 10.789, lng: 106.716 }, // nguyen_huu_canh
+      { lat: 10.828, lng: 106.722 }, // pham_van_dong
+      { lat: 10.787, lng: 106.695 }  // dien_bien_phu waypoint
+    );
+    assert.deepEqual(connected, ['nguyen_huu_canh', 'dien_bien_phu', 'pham_van_dong']);
+
+    const reordered = reorderCorridorSegments(['nguyen_huu_canh', 'dien_bien_phu', 'pham_van_dong'], 1, 'up');
+    assert.deepEqual(reordered, ['dien_bien_phu', 'nguyen_huu_canh', 'pham_van_dong']);
+
+    assert.deepEqual(
+      resolveOrderedCorridorsForDirection(['nguyen_huu_canh', 'dien_bien_phu', 'pham_van_dong'], 'to_home'),
+      ['pham_van_dong', 'dien_bien_phu', 'nguyen_huu_canh']
+    );
   });
 });

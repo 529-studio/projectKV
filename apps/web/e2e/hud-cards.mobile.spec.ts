@@ -141,6 +141,34 @@ test.describe('HUD cards mobile 390x844 (Issue #569)', () => {
     }
   });
 
+  test('MyRouteSetupModal saves waypoint and ordered segments onto MyRouteCard within 34vh (Issue #579)', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('warded_landing_seen_v1', Date.now().toString());
+    });
+    await seedCommuteConfig()({ page });
+    await page.goto('/');
+
+    const card = page.getByRole('region', { name: /my route|commute|lộ trình của tôi/i }).first();
+    await expect(card).toBeVisible({ timeout: 8_000 });
+
+    const setupBtn = card.getByRole('button', { name: /change endpoints|đổi điểm/i });
+    await setupBtn.click();
+
+    const modal = page.getByRole('dialog');
+    await expect(modal).toBeVisible({ timeout: 5_000 });
+
+    await modal.locator('#waypoint-endpoint-input').fill('Hang Xanh');
+    await modal.getByRole('button', { name: /save route|lưu lộ trình/i }).click();
+
+    await expect(card).toContainText('Hang Xanh');
+    const cardBox = await card.boundingBox();
+    expect(cardBox).not.toBeNull();
+    expect(cardBox!.height).toBeLessThanOrEqual(MAX_CARD_HEIGHT_PX);
+
+    const stored = await page.evaluate(() => localStorage.getItem('warded_commute_route'));
+    expect(stored).toContain('Hang Xanh');
+  });
+
   test('CorridorOverviewCard stays within 34vh on 844px screen when corridor is selected', async ({ page }) => {
     await page.goto('/');
     // Attempt to click a corridor marker or trigger overview card via page interaction
