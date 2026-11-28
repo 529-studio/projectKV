@@ -6,7 +6,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { CommuteConfig, CommuteEvaluation, CommutePreset } from '../types/commute.ts';
+import type { CommuteConfig, CommuteEvaluation, CommutePreset, DetourSuggestion } from '../types/commute.ts';
 import type { VehicleType } from '../types/vehicle.ts';
 import type { WeatherData } from '../utils/weatherUtils.ts';
 import type { CorridorRouteSummary } from '../types/corridor.ts';
@@ -16,13 +16,51 @@ import {
   clearStoredCommuteConfig,
   COMMUTE_PRESETS,
 } from '../utils/commuteStorage.ts';
-import { evaluateCommuteRoute } from '../utils/commuteRouteUtils.ts';
+import {
+  evaluateCommuteRoute,
+  resolveOrderedCorridorsForDirection,
+} from '../utils/commuteRouteUtils.ts';
 import { getApiUrl, API_ENDPOINTS } from '../config/constants.ts';
 
 interface UseCommuteRouteProps {
   vehicleType: VehicleType;
   weather?: WeatherData | null;
   corridorSummaries?: Record<string, CorridorRouteSummary> | CorridorRouteSummary[];
+}
+
+interface RawApiDetour {
+  original_corridor_key: string;
+  original_corridor_name?: string;
+  detour_corridor_key: string;
+  detour_corridor_name: string;
+  detour_path?: string[];
+  detour_path_names?: string[];
+  passability_verdict: DetourSuggestion['passability_verdict'];
+  max_depth_cm?: number | null;
+  delay_seconds: number;
+  estimated_delta_seconds?: number;
+  is_dry_route?: boolean;
+  reason?: string;
+}
+
+function adaptApiDetour(raw: RawApiDetour): DetourSuggestion {
+  return {
+    original_corridor_key: raw.original_corridor_key,
+    original_corridor_name: raw.original_corridor_name,
+    detour_corridor_key: raw.detour_corridor_key,
+    detour_corridor_name: raw.detour_corridor_name,
+    detour_path: raw.detour_path,
+    detour_path_names: raw.detour_path_names,
+    passability_verdict: raw.passability_verdict,
+    max_depth_cm: raw.max_depth_cm,
+    delay_seconds: raw.delay_seconds,
+    estimated_delta_seconds: raw.estimated_delta_seconds,
+    is_dry_route: raw.is_dry_route ?? raw.passability_verdict === 'PASSABLE',
+    reason: {
+      vi: raw.reason || '',
+      en: raw.reason || '',
+    },
+  };
 }
 
 export function useCommuteRoute({
@@ -83,7 +121,8 @@ export function useCommuteRoute({
 
   // Query Go backend `/api/corridors/commute-eval` when corridors are selected
   const activeCorridors = useMemo(() => {
-    return config?.selectedCorridors || [];
+    const base = config?.selectedCorridors || [];
+    return resolveOrderedCorridorsForDirection(base, config?.direction || 'to_work');
   }, [config]);
 
   useEffect(() => {
@@ -127,15 +166,12 @@ export function useCommuteRoute({
             },
             corridors: activeCorridors,
             corridor_summaries: data.corridors || [],
-            detour: data.detour
-              ? {
-                  ...data.detour,
-                  reason: {
-                    vi: data.detour.reason || '',
-                    en: data.detour.reason || '',
-                  },
-                }
-              : null,
+            detour: data.detour ? adaptApiDetour(data.detour) : null,
+            detours: Array.isArray(data.detours)
+              ? data.detours.map(adaptApiDetour)
+              : data.detour
+                ? [adaptApiDetour(data.detour)]
+                : [],
             vehicle: vehicleType,
           };
           setApiEvaluation(adapted);

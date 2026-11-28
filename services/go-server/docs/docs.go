@@ -2094,6 +2094,12 @@ const docTemplate = `{
                 "detour": {
                     "$ref": "#/definitions/corridor.DetourSuggestion"
                 },
+                "detours": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/corridor.DetourSuggestion"
+                    }
+                },
                 "estimated_seconds": {
                     "type": "integer"
                 },
@@ -2299,10 +2305,31 @@ const docTemplate = `{
                 "detour_corridor_name": {
                     "type": "string"
                 },
+                "detour_path": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "detour_path_names": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "estimated_delta_seconds": {
+                    "type": "integer"
+                },
+                "is_dry_route": {
+                    "type": "boolean"
+                },
                 "max_depth_cm": {
                     "type": "number"
                 },
                 "original_corridor_key": {
+                    "type": "string"
+                },
+                "original_corridor_name": {
                     "type": "string"
                 },
                 "passability_verdict": {

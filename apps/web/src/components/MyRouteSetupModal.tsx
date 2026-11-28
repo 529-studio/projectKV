@@ -3,7 +3,11 @@
 import { useState, useEffect } from 'react';
 import type { CommuteConfig, CommutePreset } from '../types/commute.ts';
 import { COMMUTE_I18N } from '../types/commute.ts';
-import { CORRIDOR_NAMES } from '../utils/commuteRouteUtils.ts';
+import {
+  CORRIDOR_NAMES,
+  MAX_COMMUTE_SEGMENTS,
+  reorderCorridorSegments,
+} from '../utils/commuteRouteUtils.ts';
 
 interface MyRouteSetupModalProps {
   isOpen: boolean;
@@ -27,6 +31,7 @@ export default function MyRouteSetupModal({
   lang = 'vi',
 }: MyRouteSetupModalProps) {
   const [homeName, setHomeName] = useState('');
+  const [waypointName, setWaypointName] = useState('');
   const [workName, setWorkName] = useState('');
   const [selectedCorridors, setSelectedCorridors] = useState<string[]>([]);
   const [corridorError, setCorridorError] = useState<string | null>(null);
@@ -34,13 +39,16 @@ export default function MyRouteSetupModal({
   useEffect(() => {
     if (config) {
       setHomeName(config.home?.name || '');
+      setWaypointName(config.waypoint?.name || '');
       setWorkName(config.work?.name || '');
-      setSelectedCorridors(config.selectedCorridors || []);
+      setSelectedCorridors((config.selectedCorridors || []).slice(0, MAX_COMMUTE_SEGMENTS));
     } else {
       setHomeName('');
+      setWaypointName('');
       setWorkName('');
       setSelectedCorridors(['nguyen_huu_canh']);
     }
+    setCorridorError(null);
   }, [config, isOpen]);
 
   useEffect(() => {
@@ -56,9 +64,26 @@ export default function MyRouteSetupModal({
   if (!isOpen) return null;
 
   const toggleCorridor = (key: string) => {
-    setSelectedCorridors(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
+    setSelectedCorridors(prev => {
+      if (prev.includes(key)) {
+        setCorridorError(null);
+        return prev.filter(k => k !== key);
+      }
+      if (prev.length >= MAX_COMMUTE_SEGMENTS) {
+        setCorridorError(
+          lang === 'vi'
+            ? `Tối đa ${MAX_COMMUTE_SEGMENTS} trục đường nối tiếp.`
+            : `Select up to ${MAX_COMMUTE_SEGMENTS} ordered corridors.`
+        );
+        return prev;
+      }
+      setCorridorError(null);
+      return [...prev, key];
+    });
+  };
+
+  const handleMoveSegment = (index: number, direction: 'up' | 'down') => {
+    setSelectedCorridors(prev => reorderCorridorSegments(prev, index, direction));
   };
 
   const handleSave = () => {
@@ -67,12 +92,20 @@ export default function MyRouteSetupModal({
       return;
     }
     setCorridorError(null);
+    const trimmedWaypoint = waypointName.trim();
     const newConfig: CommuteConfig = {
       home: {
         name: homeName.trim() || (lang === 'vi' ? 'Nhà' : 'Home'),
         lat: config?.home?.lat || 10.795,
         lng: config?.home?.lng || 106.721,
       },
+      waypoint: trimmedWaypoint
+        ? {
+            name: trimmedWaypoint,
+            lat: config?.waypoint?.lat || 10.787,
+            lng: config?.waypoint?.lng || 106.711,
+          }
+        : null,
       work: {
         name: workName.trim() || (lang === 'vi' ? 'Cơ quan' : 'Work'),
         lat: config?.work?.lat || 10.776,
@@ -169,6 +202,21 @@ export default function MyRouteSetupModal({
               />
             </div>
 
+            {/* WAYPOINT INPUT (OPTIONAL) */}
+            <div>
+              <label htmlFor="waypoint-endpoint-input" className="text-xs text-zinc-400 block mb-1">
+                {COMMUTE_I18N.WAYPOINT[lang]} ({lang === 'vi' ? 'Điểm trung chuyển, tùy chọn' : 'Optional intermediate stop'}):
+              </label>
+              <input
+                id="waypoint-endpoint-input"
+                type="text"
+                value={waypointName}
+                onChange={e => setWaypointName(e.target.value)}
+                placeholder={lang === 'vi' ? 'Ví dụ: Ngã tư Hàng Xanh' : 'e.g. Hang Xanh Junction'}
+                className="w-full min-h-[48px] px-3 py-2.5 text-xs rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-500 transition-colors"
+              />
+            </div>
+
             {/* WORK INPUT */}
             <div>
               <label htmlFor="work-endpoint-input" className="text-xs text-zinc-400 block mb-1">
@@ -187,8 +235,44 @@ export default function MyRouteSetupModal({
             {/* ARTERIAL CORRIDORS SELECTION */}
             <div>
               <span className="text-xs text-zinc-400 block mb-1.5">
-                {lang === 'vi' ? 'Các trục đường chính trên hành trình:' : 'Arterial corridors on journey:'}
+                {lang === 'vi'
+                  ? `Chọn tối đa ${MAX_COMMUTE_SEGMENTS} trục đường nối tiếp:`
+                  : `Select up to ${MAX_COMMUTE_SEGMENTS} ordered corridors:`}
               </span>
+              {selectedCorridors.length > 0 && (
+                <div className="mb-2 space-y-1" aria-label={lang === 'vi' ? 'Thứ tự chặng đã chọn' : 'Ordered commute segments'}>
+                  {selectedCorridors.map((key, idx) => (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-200"
+                    >
+                      <span className="truncate">
+                        {idx + 1}. {CORRIDOR_NAMES[key] || key}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveSegment(idx, 'up')}
+                          disabled={idx === 0}
+                          aria-label={lang === 'vi' ? `Đưa chặng ${idx + 1} lên` : `Move segment ${idx + 1} up`}
+                          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 cursor-pointer"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveSegment(idx, 'down')}
+                          disabled={idx === selectedCorridors.length - 1}
+                          aria-label={lang === 'vi' ? `Đưa chặng ${idx + 1} xuống` : `Move segment ${idx + 1} down`}
+                          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 cursor-pointer"
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto p-1 bg-zinc-900/60 rounded-lg border border-zinc-800">
                 {Object.entries(CORRIDOR_NAMES).map(([key, name]) => {
                   const isChecked = selectedCorridors.includes(key);
