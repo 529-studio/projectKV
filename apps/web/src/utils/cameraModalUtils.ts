@@ -147,3 +147,71 @@ export function setCameraReportCooldown(cameraId: string, timestamp = Date.now()
 export function clearCameraReportCooldowns(): void {
   cameraReportCooldowns.clear();
 }
+
+export const MAX_SNAPSHOT_ZOOM = 3;
+export const MIN_SNAPSHOT_ZOOM = 1;
+
+export type SnapshotCompareMode = 'live' | 'baseline' | 'split';
+
+export interface ArchivedSnapshotCandidate {
+  key: string;
+  camera_id?: string;
+  timestamp?: number;
+  reason?: string;
+  raw_url?: string;
+}
+
+export const CAMERA_ZOOM_I18N = Object.freeze({
+  ZOOM_IN: { vi: 'Phóng to', en: 'Zoom in' },
+  ZOOM_RESET: { vi: 'Thu 1x', en: 'Reset 1x' },
+  COMPARE_LIVE: { vi: 'Hiện tại', en: 'Live' },
+  COMPARE_BASELINE: { vi: 'Trước ngập', en: 'Before' },
+  COMPARE_SPLIT: { vi: 'So sánh', en: 'Compare' },
+  BASELINE_UNAVAILABLE: { vi: 'Chưa có ảnh nền lưu trữ', en: 'No archived baseline frame' },
+  SPLIT_SLIDER_LABEL: { vi: 'Thanh kéo so sánh trước và hiện tại', en: 'Before and live comparison slider' },
+});
+
+export function clampZoomScale(scale: number): number {
+  if (!Number.isFinite(scale)) return MIN_SNAPSHOT_ZOOM;
+  return Math.min(MAX_SNAPSHOT_ZOOM, Math.max(MIN_SNAPSHOT_ZOOM, Math.round(scale * 100) / 100));
+}
+
+export function nextTapZoom(currentScale: number): number {
+  if (currentScale < 1.9) return 2;
+  if (currentScale < 2.9) return 3;
+  return MIN_SNAPSHOT_ZOOM;
+}
+
+export function clampPanOffset(
+  x: number,
+  y: number,
+  scale: number,
+  containerWidth: number,
+  containerHeight: number
+): { x: number; y: number } {
+  if (scale <= 1 || containerWidth <= 0 || containerHeight <= 0) {
+    return { x: 0, y: 0 };
+  }
+  const maxX = ((scale - 1) * containerWidth) / 2;
+  const maxY = ((scale - 1) * containerHeight) / 2;
+  return {
+    x: Math.max(-maxX, Math.min(maxX, x)),
+    y: Math.max(-maxY, Math.min(maxY, y)),
+  };
+}
+
+export function selectBaselineSnapshot(
+  snapshots: ArchivedSnapshotCandidate[],
+  cameraId: string
+): ArchivedSnapshotCandidate | null {
+  if (!Array.isArray(snapshots) || snapshots.length === 0 || !cameraId) {
+    return null;
+  }
+  const matching = snapshots.filter(
+    (s) => s && s.key && (!s.camera_id || s.camera_id === cameraId)
+  );
+  if (matching.length === 0) return null;
+
+  const sorted = [...matching].sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+  return sorted[0];
+}
